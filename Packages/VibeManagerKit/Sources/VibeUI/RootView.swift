@@ -406,7 +406,11 @@ public struct RootView: View {
                   openSettings()
                 },
                 themes: model.conversations.themes,
-                conversationAppearance: model.conversations.appearance
+                conversationAppearance: model.conversations.appearance,
+                onboarding: model.onboarding,
+                tourStep: model.onboarding.step.flatMap { step in
+                  step.draftTarget.flatMap { model.tourStep(on: $0) }
+                }
               )
               // One view per draft: another draft brought on screen starts with its own folds,
               // popover and caret, not the ones left by the previous.
@@ -455,6 +459,10 @@ public struct RootView: View {
             Label(LocalizedStringResource("New Session", bundle: .module), systemImage: "plus")
           }
           .disabled(!model.canCreateSession)
+          .tourPopover(
+            model, on: .toolbarNewSession,
+            // Without a session on screen, the bubble is on "No session yet"'s own (#338).
+            isEligible: model.selectedSession != nil)
         }
         if model.browser != nil {
           // In a window too narrow for both, the terminal and the web view take turns, and this
@@ -867,6 +875,7 @@ public struct RootView: View {
         }
         .buttonStyle(.borderedProminent)
         .disabled(!model.canCreateSession)
+        .tourPopover(model, on: .emptyStateNewSession)
       }
     }
   }

@@ -463,6 +463,9 @@ public final class AppEnvironment {
       appearancePalette: UserDefaultsSessionAppearancePaletteStore(suiteName: data.defaultsSuite),
       beep: { NSSound.beep() }
     )
+    // The first launch's tour (#338), before the window loads and resumes it.
+    appModel.onboarding = OnboardingModel(
+      preferences: UserDefaultsOnboardingPreferences(suiteName: data.defaultsSuite))
     // The requests above the other applications, and the avatar that presents them (#41).
     appModel.floatingPanel = FloatingRequestPanelModel(
       preferences: UserDefaultsFloatingPanelPreferences(suiteName: data.defaultsSuite))

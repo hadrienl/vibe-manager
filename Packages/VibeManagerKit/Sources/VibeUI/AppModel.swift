@@ -54,6 +54,8 @@ public final class AppModel {
         // A session renamed, archived or gone changes the requests listed without any activity
         // saying so; the count the toolbar reads is stored, so it follows here (#254).
         requestsDidChange()
+        // However the tour's session went In Progress — Start Session included (#338).
+        onboarding.observe(sessions)
       }
     }
   }
@@ -133,6 +135,11 @@ public final class AppModel {
       requestsDidChange()
     }
   }
+  /// The first launch's tour (#338). Set by the application before the window loads: a workspace
+  /// assembled without it has the tour over.
+  public var onboarding = OnboardingModel(preferences: InMemoryOnboardingPreferences())
+  /// Brings the workspace window forward, from another window. Set by the application.
+  @ObservationIgnored public var showWorkspaceWindow: (@MainActor () -> Void)?
   /// The library of avatars: the one in use, and those being made (#41, #154).
   public var avatars: AvatarLibraryModel?
   /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
@@ -1274,6 +1281,7 @@ public final class AppModel {
       diagnostics.record(
         .session, .info, "session.taskStatusChanged",
         ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
+      onboarding.send(.taskStatusChanged(id, status))
     } catch {
       return .failed(message: Self.message(for: error), suggestion: nil)
     }
@@ -1508,6 +1516,7 @@ public final class AppModel {
         String(
           localized: "\(session.name) moved to \(String(localized: status.label)).",
           bundle: .module, comment: "A session's name, then a task status."))
+      onboarding.send(.taskStatusChanged(id, status))
     } catch {
       reportAction(error, .moveStatus, on: id) { [weak self] in
         await self?.setTaskStatus(status, for: id)
@@ -2476,6 +2485,14 @@ public final class AppModel {
     // The choices of sessions that are gone are forgotten — never on an empty list, which may be
     // a store that could not be read rather than one without sessions.
     if !sessions.isEmpty { layout.keepPresentations(of: Set(sessions.map(\.id))) }
+    // Only on a list read: a store that could not be read is not one without sessions (#338).
+    if case .loaded(let loaded) = state {
+      onboarding.resume(hasSessions: !loaded.isEmpty) { id in
+        loaded.contains { $0.id == id && $0.status != .archived }
+      }
+      // A draft opened with ⌘N before the list was read is where the tour starts.
+      if isPresentingNewSession { onboarding.send(.draftOpened) }
+    }
     Signposts.end("launch.firstList", firstList)
     // What drops left behind for sessions archived or gone — a crash between the archive and its
     // cleanup — goes, with the same care: never against an empty list (#42).
@@ -2797,6 +2814,7 @@ public final class AppModel {
   public func cancelNewSession() {
     isPresentingNewSession = false
     newSessionModel = nil
+    onboarding.send(.draftDiscarded)
   }
 
   /// The order the ticket asks for: the session is already stored, so it is published and
@@ -2824,6 +2842,8 @@ public final class AppModel {
     _ creation: SessionCreation, launching: Bool, tracked: Bool, follows: Bool = true
   ) async {
     let id = creation.session.id
+    // Before the insertion, which the tour then sees the session in To Do with (#338).
+    onboarding.send(.created(id, launched: launching))
     insert(creation.session)
     // Stored, so its folder is one sessions were created in: offered again from now on.
     noteFolder(of: creation.session)

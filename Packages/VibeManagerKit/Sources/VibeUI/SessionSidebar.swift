@@ -32,7 +32,10 @@ struct SessionSidebar: View {
   /// A drag over a row: taken or refused (#42).
   @State private var rowDropHover: [SessionID: DropHover] = [:]
   @State private var springLoading = SpringLoading()
+  /// The row the tour opened to show the swipe (#338), and how far, until it puts it back.
+  @State private var demoSwipe: (id: SessionID, translation: CGFloat)?
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+  @Environment(\.controlActiveState) private var activeState
 
   var body: some View {
     let _ = BodyCounter.tick(.sessionSidebar)
@@ -100,11 +103,14 @@ struct SessionSidebar: View {
             // A click on the open row puts its buttons away, as a click anywhere else does. With
             // Reduce Motion the row stays under its buttons, and only they answer.
             clicked: { id in
+              if id != nil, id == demoSwipe?.id { demoSwipe = nil }
               if !reduceMotion, id != nil, id == swipe?.sessionID { closeSwipe(animated: true) }
             },
             interrupted: { closeSwipe(animated: true) }
           )
         )
+        // The tour's bubble on the new session's row shows the gesture it talks about (#338).
+        .task(id: demoSessionID) { await playSwipeDemo(on: demoSessionID, width: width) }
         // Over the foot of the list, never over the session on screen, and the list's last rows
         // stay reachable above it (#40).
         .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -378,7 +384,11 @@ struct SessionSidebar: View {
         model: model, sessionID: session.id, springLoading: springLoading,
         hovered: Binding(
           get: { rowDropHover[session.id] },
-          set: { rowDropHover[session.id] = $0 })))
+          set: { rowDropHover[session.id] = $0 })
+      )
+    )
+    // Beside the row, over the session: the tour's statuses and its last word (#338).
+    .tourPopover(model, on: .sessionRow(session.id), arrowEdge: .trailing)
   }
 
   // MARK: - Swipe
@@ -398,6 +408,8 @@ struct SessionSidebar: View {
     let visible = model.visibleSessions
     guard let session = (id ?? hoveredSessionID).flatMap({ id in visible.first { $0.id == id } })
     else { return false }
+    // The tour's demo gives the row up to the fingers: it is theirs now (#338).
+    if demoSwipe?.id == session.id { demoSwipe = nil }
     // A swipe on the row already open takes it from where it is.
     if swipe?.sessionID != session.id {
       swipe = makeSwipe(for: session, width: width)
@@ -439,6 +451,64 @@ struct SessionSidebar: View {
   private func commit(_ status: SessionTaskStatus, for id: SessionID) {
     closeSwipe(animated: true)
     Task { await model.setTaskStatus(status, for: id) }
+  }
+
+  // MARK: - Tour
+
+  /// The row whose bubble explains the statuses, while it is on screen (#338).
+  private var demoSessionID: SessionID? {
+    guard activeState != .inactive, let id = model.onboarding.sessionID,
+      model.tourStep(on: .sessionRow(id)) == .statuses
+    else { return nil }
+    return id
+  }
+
+  /// Opens the row as two fingers would, on the statuses after its own, then on those before it,
+  /// putting it back each time, for as long as the bubble is there. A side without statuses only
+  /// gives a little, as it does under the fingers. With Reduce Motion the row stays open on the
+  /// statuses after its own while the bubble is there: the still picture of the gesture.
+  private func playSwipeDemo(on id: SessionID?, width: CGFloat) async {
+    guard let id else { return endSwipeDemo() }
+    // Once the bubble is there to say what the row does.
+    try? await Task.sleep(for: .milliseconds(800))
+    while !Task.isCancelled {
+      for towardsNext in [true, false] {
+        guard showSwipeDemo(on: id, towardsNext: towardsNext, width: width) else { return }
+        if reduceMotion { return }
+        try? await Task.sleep(for: .seconds(2.2))
+        endSwipeDemo()
+        guard !Task.isCancelled else { return }
+        try? await Task.sleep(for: .seconds(1))
+      }
+      try? await Task.sleep(for: .seconds(2))
+    }
+  }
+
+  /// One side of the demo. `false` when the row is not there to show it, or is the user's.
+  private func showSwipeDemo(on id: SessionID, towardsNext: Bool, width: CGFloat) -> Bool {
+    guard !Task.isCancelled, swipe == nil,
+      let session = model.visibleSessions.first(where: { $0.id == id })
+    else { return false }
+    var opened = makeSwipe(for: session, width: width)
+    opened.open(towardsNext: towardsNext)
+    // A side with nothing to offer: as far as the fingers would pull it before it resists.
+    let translation =
+      opened.translation != 0
+      ? opened.translation : (towardsNext ? -1 : 1) * SessionSwipe.bareSideLimit * 4
+    swipe = makeSwipe(for: session, width: width)
+    slidingSessionIDs.insert(id)
+    demoSwipe = (id, translation)
+    animateSwipe(reduceMotion ? nil : .smooth(duration: 1)) { swipe?.translation = translation }
+    return true
+  }
+
+  /// Puts the row back, unless the user took it meanwhile.
+  private func endSwipeDemo() {
+    guard let demo = demoSwipe else { return }
+    demoSwipe = nil
+    guard swipe?.sessionID == demo.id, swipe?.translation == demo.translation else { return }
+    // As slowly as it opened: the demo is to be watched.
+    animateSwipe(reduceMotion ? nil : .smooth(duration: 0.8)) { swipe = nil }
   }
 
   // MARK: - Empty

@@ -3962,6 +3962,17 @@
         }
       }
     },
+    "A session is an agent working in a folder, with its conversation, notes and progress. Click New Session to start one." : {
+      "comment" : "Tutorial, pointing at New Session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une session, c’est un agent qui travaille dans un dossier, avec sa conversation, ses notes et son suivi. Cliquez sur « Nouvelle session » pour en démarrer une."
+          }
+        }
+      }
+    },
     "A template can propose the folder, the name and the appearance." : {
       "localizations" : {
         "fr" : {
@@ -5209,6 +5220,17 @@
         }
       }
     },
+    "Change its status" : {
+      "comment" : "Tutorial, pointing at the new session's row.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changez son statut"
+          }
+        }
+      }
+    },
     "Changed" : {
       "comment" : "An imported template that differs from the one of the library.",
       "localizations" : {
@@ -5364,6 +5386,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisissez un agent pour envoyer."
+          }
+        }
+      }
+    },
+    "Choose the agent and its model. The badge next to the name sets the icon and colour, and More Options links a ticket. Then write in the prompt below." : {
+      "comment" : "Tutorial, pointing at the new session's agent and model.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez l’agent et son modèle. Le badge à côté du nom définit l’icône et la couleur, et « Plus d’options » associe un ticket. Écrivez ensuite dans le prompt ci-dessous."
+          }
+        }
+      }
+    },
+    "Choose the folder" : {
+      "comment" : "Tutorial, pointing at the new session's working folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez le dossier"
           }
         }
       }
@@ -7319,6 +7363,17 @@
         }
       }
     },
+    "First session" : {
+      "comment" : "Settings: the tutorial's row.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Première session"
+          }
+        }
+      }
+    },
     "First words after %lld ms." : {
       "localizations" : {
         "fr" : {
@@ -8938,6 +8993,17 @@
         }
       }
     },
+    "Move it to In Progress" : {
+      "comment" : "Tutorial, pointing at the new session's row, which waits in To Do.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passez-la « En cours »"
+          }
+        }
+      }
+    },
     "Move to Done" : {
       "comment" : "Changes a session's task status.",
       "localizations" : {
@@ -9020,6 +9086,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nom (facultatif)"
+          }
+        }
+      }
+    },
+    "Name it" : {
+      "comment" : "Tutorial, pointing at the new session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nommez-la"
           }
         }
       }
@@ -9258,6 +9335,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Nouvelle demande : %@, %@"
+          }
+        }
+      }
+    },
+    "Next" : {
+      "comment" : "Goes to the tutorial's next step.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Suivant"
           }
         }
       }
@@ -10576,6 +10664,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Choisissez un symbole, ou tapez son nom exact."
+          }
+        }
+      }
+    },
+    "Pick the agent" : {
+      "comment" : "Tutorial, pointing at the new session's agent and model.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisissez l’agent"
           }
         }
       }
@@ -12651,6 +12750,17 @@
         }
       }
     },
+    "Show Tutorial Again" : {
+      "comment" : "Settings: starts the tutorial over.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Revoir le tutoriel"
+          }
+        }
+      }
+    },
     "Show Web View" : {
       "comment" : "Shows the session's web view beside its terminal.",
       "localizations" : {
@@ -12919,6 +13029,17 @@
         }
       }
     },
+    "Skip Tutorial" : {
+      "comment" : "Ends the tutorial for good.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer le tutoriel"
+          }
+        }
+      }
+    },
     "Skipped: %@" : {
       "comment" : "Why an imported template is left out.",
       "localizations" : {
@@ -13005,6 +13126,17 @@
         }
       }
     },
+    "Start your first session" : {
+      "comment" : "Tutorial, pointing at New Session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrez votre première session"
+          }
+        }
+      }
+    },
     "Started with %@" : {
       "comment" : "The agent a session first ran: its name, and its model.",
       "localizations" : {
@@ -13065,6 +13197,23 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Statut"
+          }
+        }
+      }
+    },
+    "Step %lld of %lld" : {
+      "comment" : "The tutorial's progress: the step on screen, then how many there are.",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Step %1$lld of %2$lld"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Étape %1$lld sur %2$lld"
           }
         }
       }
@@ -13234,6 +13383,28 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Surpris"
+          }
+        }
+      }
+    },
+    "Swipe a session with two fingers on the trackpad, or right-click it, to change its status as the work goes on." : {
+      "comment" : "Tutorial, pointing at the new session's row.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balayez une session à deux doigts sur le trackpad, ou faites un clic droit dessus, pour changer son statut au fil du travail."
+          }
+        }
+      }
+    },
+    "Swipe a session with two fingers on the trackpad, or right-click it, to change its status. Move this one to In Progress to start its agent." : {
+      "comment" : "Tutorial, pointing at the new session's row, which waits in To Do.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Balayez une session à deux doigts sur le trackpad, ou faites un clic droit dessus, pour changer son statut. Passez celle-ci « En cours » pour démarrer son agent."
           }
         }
       }
@@ -13727,6 +13898,17 @@
         }
       }
     },
+    "The agent works in this folder. Choose the project it should work on." : {
+      "comment" : "Tutorial, pointing at the new session's working folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent travaille dans ce dossier. Choisissez le projet sur lequel il doit travailler."
+          }
+        }
+      }
+    },
     "The agents of %lld sessions will be stopped." : {
       "localizations" : {
         "en" : {
@@ -14104,6 +14286,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "L’URL de base doit être une adresse complète, par exemple https://hote/v1."
+          }
+        }
+      }
+    },
+    "The bubbles that walk you from New Session to an agent at work." : {
+      "comment" : "Settings: what Show Tutorial Again shows.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les bulles qui vous guident de « Nouvelle session » jusqu’à un agent au travail."
           }
         }
       }
@@ -14580,6 +14773,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Les modèles n’ont pas pu être lus."
+          }
+        }
+      }
+    },
+    "The name tells your sessions apart in the sidebar. Leave it empty and it is taken from your prompt." : {
+      "comment" : "Tutorial, pointing at the new session's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nom distingue vos sessions dans la barre latérale. Laissé vide, il est tiré de votre prompt."
           }
         }
       }
@@ -16049,6 +16253,17 @@
         }
       }
     },
+    "Tutorial" : {
+      "comment" : "A section of the Settings window.\nVoiceOver: a tutorial bubble.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tutoriel"
+          }
+        }
+      }
+    },
     "Type a colour as #RRGGBB." : {
       "localizations" : {
         "fr" : {
@@ -16785,6 +17000,17 @@
         }
       }
     },
+    "What you write here is the first message sent to the agent. Click Add to To Do to keep the session for later." : {
+      "comment" : "Tutorial, pointing at the new session's prompt.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que vous écrivez ici est le premier message envoyé à l’agent. Cliquez sur « Ajouter à À faire » pour garder la session pour plus tard."
+          }
+        }
+      }
+    },
     "When Vibe Manager is not in front, an avatar presents the requests in a bubble. Notifications are then not needed." : {
       "localizations" : {
         "fr" : {
@@ -16940,6 +17166,17 @@
         }
       }
     },
+    "Write the first message" : {
+      "comment" : "Tutorial, pointing at the new session's prompt.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrivez le premier message"
+          }
+        }
+      }
+    },
     "Write the identifier shown before the title." : {
       "localizations" : {
         "fr" : {
@@ -17011,6 +17248,17 @@
         }
       }
     },
+    "Your agent is at work. Good luck!" : {
+      "comment" : "Tutorial, the closing bubble.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Votre agent est au travail. Bon courage !"
+          }
+        }
+      }
+    },
     "Your agents are still running in the background, but Vibe Manager could not reattach." : {
       "localizations" : {
         "fr" : {
@@ -17070,6 +17318,17 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vos modifications seront perdues si vous ne les enregistrez pas."
+          }
+        }
+      }
+    },
+    "You’re all set" : {
+      "comment" : "Tutorial, the closing bubble.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tout est prêt"
           }
         }
       }
