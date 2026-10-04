@@ -71,6 +71,48 @@ struct FullScreenTitlebarRepairTests {
     #expect(stray.isHidden)
   }
 
+  @Test("In the inspector's split view, inside the columns' one, it is found too")
+  func foundInNestedSplitView() throws {
+    let root = NSView()
+    let columns = NSSplitView()
+    let detail = NSView()
+    let inspector = NSSplitView()
+    let stray = try background()
+    inspector.addSubview(stray)
+    detail.addSubview(inspector)
+    columns.addSubview(detail)
+    root.addSubview(columns)
+    #expect(FullScreenTitlebarRepair.strayBackgrounds(in: root) == [stray])
+  }
+
+  @Test("What scrolls is not walked")
+  func scrollViewNotWalked() throws {
+    let root = NSView()
+    let scroll = NSScrollView()
+    let split = NSSplitView()
+    split.addSubview(try background())
+    scroll.addSubview(split)
+    root.addSubview(scroll)
+    #expect(FullScreenTitlebarRepair.strayBackgrounds(in: root).isEmpty)
+  }
+
+  @Test("Shown again by AppKit while in full screen, it is hidden at once")
+  func hiddenAgainAtOnce() throws {
+    let (root, stray, _) = try hierarchy()
+    let repair = FullScreenTitlebarRepair()
+    repair.update(root: root, isFullScreen: true)
+    stray.isHidden = false
+    #expect(stray.isHidden)
+    repair.update(root: root, isFullScreen: true)
+    #expect(stray.isHidden)
+    // Tracked once: out of full screen, shown, and left shown.
+    repair.update(root: root, isFullScreen: false)
+    #expect(!stray.isHidden)
+    stray.isHidden = true
+    stray.isHidden = false
+    #expect(!stray.isHidden)
+  }
+
   @Test("Stopped, it shows what it hid")
   func stopped() throws {
     let (root, stray, _) = try hierarchy()
@@ -78,6 +120,8 @@ struct FullScreenTitlebarRepairTests {
     repair.update(root: root, isFullScreen: true)
     #expect(stray.isHidden)
     repair.stop()
+    #expect(!stray.isHidden)
+    stray.isHidden = false
     #expect(!stray.isHidden)
   }
 }

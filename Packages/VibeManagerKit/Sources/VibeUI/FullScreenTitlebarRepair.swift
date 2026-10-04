@@ -11,9 +11,12 @@ import VibeApplication
 /// of mode (91 pt beside the notch), and veils the top of whatever the column shows until the
 /// window leaves full screen. Hidden, the column looks as it should.
 ///
-/// Nothing here moves or resizes AppKit's views: a background found in the split view of a
-/// full-screen window is hidden, and shown again as soon as the window leaves full screen, where
-/// that place is its own again.
+/// With the inspector open, the background sits in the inspector's own split view, inside the
+/// columns' one; and each time the inspector opens, AppKit shows it again.
+///
+/// Nothing here moves or resizes AppKit's views: a background found in a split view of a
+/// full-screen window is hidden, hidden again as soon as AppKit shows it there, and shown again
+/// once the window leaves full screen, where that place is its own again.
 @MainActor
 final class FullScreenTitlebarRepair {
   /// AppKit's private class: matched by name, nothing is found if it is renamed.
@@ -24,11 +27,21 @@ final class FullScreenTitlebarRepair {
   private var hidden: [Hidden] = []
   private var observers: [NSObjectProtocol] = []
   private var pendingCheck: Task<Void, Never>?
+  /// Whether the last look found the window in full screen.
+  private var isFullScreen = false
 
   private struct Hidden {
     weak var view: NSView?
     /// Its moves: AppKit taking it back to the toolbar's window says so in no other way.
     let observer: NSObjectProtocol
+    /// AppKit showing it again, hidden at once rather than at the next look: shown even for a
+    /// moment, it flickers over the column.
+    let shown: NSKeyValueObservation
+
+    func forget() {
+      NotificationCenter.default.removeObserver(observer)
+      shown.invalidate()
+    }
   }
 
   /// Watches `window` from now on; another window replaces the one watched.
@@ -83,6 +96,7 @@ final class FullScreenTitlebarRepair {
 
   /// What `check` does, for the window's whole hierarchy under `root`.
   func update(root: NSView, isFullScreen: Bool) {
+    self.isFullScreen = isFullScreen
     guard isFullScreen else {
       showHidden()
       return
@@ -90,24 +104,41 @@ final class FullScreenTitlebarRepair {
     // Taken back by AppKit to the toolbar's window: its own place again, shown there.
     hidden.removeAll { entry in
       if let view = entry.view, view.superview is NSSplitView { return false }
+      entry.forget()
       entry.view?.isHidden = false
-      NotificationCenter.default.removeObserver(entry.observer)
       return true
     }
-    for view in Self.strayBackgrounds(in: root) where !view.isHidden {
-      view.isHidden = true
-      let observer = NotificationCenter.default.addObserver(
-        forName: NSView.frameDidChangeNotification, object: view, queue: .main
-      ) { [weak self] _ in
-        // After the move: from the notification, the view may still be on its way.
-        DispatchQueue.main.async { self?.check() }
+    for view in Self.strayBackgrounds(in: root) {
+      if hidden.contains(where: { $0.view === view }) {
+        view.isHidden = true
+      } else if !view.isHidden {
+        hide(view)
       }
-      hidden.append(Hidden(view: view, observer: observer))
     }
   }
 
-  /// The toolbar backgrounds held by a split view under `root`: in a full-screen window, none
-  /// should be, since they all belong to the toolbar's own window.
+  private func hide(_ view: NSView) {
+    view.isHidden = true
+    let observer = NotificationCenter.default.addObserver(
+      forName: NSView.frameDidChangeNotification, object: view, queue: .main
+    ) { [weak self] _ in
+      // After the move: from the notification, the view may still be on its way.
+      DispatchQueue.main.async { self?.check() }
+    }
+    let shown = view.observe(\.isHidden) { [weak self] view, _ in
+      MainActor.assumeIsolated {
+        guard let self, self.isFullScreen, !view.isHidden, view.superview is NSSplitView else {
+          return
+        }
+        view.isHidden = true
+      }
+    }
+    hidden.append(Hidden(view: view, observer: observer, shown: shown))
+  }
+
+  /// The toolbar backgrounds held by a split view under `root`, the inspector's one inside the
+  /// columns' one included: in a full-screen window, none should be, since they all belong to the
+  /// toolbar's own window.
   static func strayBackgrounds(in root: NSView) -> [NSView] {
     var found: [NSView] = []
     var queue = [root]
@@ -117,9 +148,9 @@ final class FullScreenTitlebarRepair {
         found += view.subviews.filter {
           NSStringFromClass(type(of: $0)) == backgroundClassName
         }
-        // The columns' contents hold no toolbar background: not walked.
-        continue
       }
+      // What scrolls — a conversation, a list — holds no toolbar background: not walked.
+      guard !(view is NSScrollView) else { continue }
       queue += view.subviews
     }
     return found
@@ -127,8 +158,8 @@ final class FullScreenTitlebarRepair {
 
   private func showHidden() {
     for entry in hidden {
+      entry.forget()
       entry.view?.isHidden = false
-      NotificationCenter.default.removeObserver(entry.observer)
     }
     hidden = []
   }
