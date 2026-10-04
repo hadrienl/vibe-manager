@@ -5,10 +5,14 @@ import VibeApplication
 
 /// What is behind a conversation: the theme's background colour, and its picture under a veil of
 /// that colour, when it has one (#118). Decorative: VoiceOver never hears it.
-struct ThemeBackdropView: View {
+public struct ThemeBackdropView: View {
   let theme: ConversationTheme
 
-  var body: some View {
+  public init(theme: ConversationTheme) {
+    self.theme = theme
+  }
+
+  public var body: some View {
     // The colour takes the place it is offered; the picture only covers it. A picture filling
     // that place is larger than it, and must not make the backdrop grow past its bounds (#224).
     theme.background.color

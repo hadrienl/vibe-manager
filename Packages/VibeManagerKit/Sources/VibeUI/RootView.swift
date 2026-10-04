@@ -183,7 +183,7 @@ public struct RootView: View {
       model.mainWindowVisibilityChanged(window.occlusionState.contains(.visible))
     }
     .background(HostWindowReader(host: hostWindow))
-    .background(FullScreenTitlebarRepairReader(columns: model.layout.columns))
+    .background(ToolbarBackgroundRemoverReader(columns: model.layout.columns))
   }
 
   private func session(_ id: SessionID?) -> WorkSession? {
@@ -956,6 +956,20 @@ public struct RootView: View {
           model: model, workspace: workspace, browser: workspace.browser(for: session.id))
       }
     }
+    // Under the toolbar, the conversation's backdrop goes on over the web view: the toolbar is
+    // one see-through band over the whole detail.
+    .background {
+      ThemeBackdropView(theme: sessionTheme(for: session)).ignoresSafeArea()
+    }
+  }
+
+  /// The theme `session`'s conversation is drawn with (#274).
+  private func sessionTheme(for session: WorkSession) -> ConversationTheme {
+    model.conversations.themes.displayed(
+      ConversationFonts.installedOnly(model.conversations.appearance),
+      session: model.displayedConversationTheme(of: session),
+      isDark: colorScheme == .dark, increasedContrast: colorSchemeContrast == .increased,
+      reducedTransparency: reduceTransparency)
   }
 
   /// The settings' theme for the system's appearance of the moment — or the one on trial in the

@@ -30,7 +30,8 @@ struct BrowserPanel: View {
       }
       .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    .background(.background)
+    // Not under the toolbar: there, the session's backdrop goes on from the conversation's.
+    .background(.background, ignoresSafeAreaEdges: [])
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Web view", bundle: .module))
   }
