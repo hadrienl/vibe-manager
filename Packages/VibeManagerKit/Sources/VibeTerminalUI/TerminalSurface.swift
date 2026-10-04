@@ -60,6 +60,9 @@ public struct TerminalSurface: NSViewRepresentable {
       view.accessibilityTitle = accessibilityTitle
     }
     view.setAccessibilityIdentifier("terminal")
+    // A terminal is a grid read from left to right, the scroller on its right, whatever the
+    // application's language: Arabic mirrors everything around it, never the terminal (#215).
+    view.userInterfaceLayoutDirection = .leftToRight
     // As long as the history the application keeps: at SwiftTerm's default of 500 lines, a history
     // replayed after a relaunch was cut on screen. Measured at about 17 MB for a full terminal of
     // 120 columns, which three sessions afford within the memory budget (#19).

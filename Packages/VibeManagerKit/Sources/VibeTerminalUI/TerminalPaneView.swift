@@ -57,6 +57,8 @@ public struct TerminalPaneView<Accessory: View>: View {
         accessibilityTitle: accessibilityTitle,
         claimsKeyboardOnActivation: claimsKeyboardOnActivation
       )
+      // From left to right in every language, Arabic included (#215).
+      .environment(\.layoutDirection, .leftToRight)
       // A terminal keeps its size while its column changes for a moment, and takes the last one
       // in a single reflow: what it leaves bare meanwhile is the colour of its own background.
       .frame(width: widthHold?.width, alignment: .leading)
