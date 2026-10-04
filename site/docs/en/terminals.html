@@ -29,10 +29,16 @@
 <table>
   <thead><tr><th></th><th>This Mac (<code>localhost</code>, <code>file:</code>)</th><th>Anywhere else</th></tr></thead>
   <tbody>
-    <tr><td>Read: tabs, text, console, screenshot</td><td>free</td><td>free</td></tr>
+    <tr><td>Read: text, console, screenshot</td><td>free</td><td>asked, once per site and session</td></tr>
     <tr><td>Navigate: open, reload, close</td><td>free</td><td>free</td></tr>
     <tr><td>Act: click, type, JavaScript</td><td>free</td><td>asked</td></tr>
   </tbody>
 </table>
 <p>When the agent wants to act on another site, a banner in the web view asks: <strong>Deny</strong>, <strong>Allow Once</strong>, or <strong>Always Allow</strong> for that site. The agent waits two minutes at most; the session's row shows a hand meanwhile. The tab the agent opened carries a mark, the element it clicks is outlined, and the <strong>Agent Actions</strong> log lists what it did.</p>
-<div class="callout warn"><p>Reading is free everywhere, pages you are signed in to included: an agent can read a private ticket. Turn off <strong>Give agents the web view</strong> in <a href="settings.html#web-view">Settings › Web View</a> if you do not want that.</p></div>
+<p>Before <strong>reading</strong> a page of another site, the agent asks too: “The agent wants to read a page of github.com.” Allowed, it can read that site until the session ends — what you see there once signed in included; refused, it gets a refusal and no new question. As long as a site is not readable, neither its title nor its full address is given to it. The <strong>Agent Actions</strong> log lists first the sites the session <strong>Can read</strong> and those <strong>Refused</strong>, each with <strong>Remove</strong>; archiving the session or relaunching the app forgets them too.</p>
+<ul>
+  <li>A tab the agent opened or acted on comes to the front before it loads a remote site, and marks its session's row if that session is not on screen. It stays the agent's until you click or type in it.</li>
+  <li>A <strong>download</strong> started in an agent's tab is asked; every downloaded file gets macOS's quarantine, in Vibe Manager's name.</li>
+  <li>A page that wants to <strong>open another application</strong> (<code>zoommtg:</code>, <code>x-apple.systempreferences:</code>…) always asks, even after your click; without a click, it is refused.</li>
+</ul>
+<div class="callout warn"><p>Once a site is allowed, the agent reads what you see there signed in, a private ticket for instance. Turn off <strong>Give agents the web view</strong> in <a href="settings.html#web-view">Settings › Web View</a> if you do not want that.</p></div>

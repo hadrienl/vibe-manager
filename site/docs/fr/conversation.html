@@ -24,9 +24,11 @@
   <li><kbd>↑</kbd> et <kbd>↓</kbd> sur la première ou la dernière ligne rappellent les messages déjà envoyés.</li>
   <li>Un message saisi pendant que l’agent travaille est envoyé à la fin de son tour.</li>
   <li><kbd>Esc</kbd> interrompt l’agent, comme la pastille <strong>Arrêter</strong> affichée pendant un tour.</li>
+  <li><code>/</code> en début de message ouvre la liste des <strong>skills et des commandes</strong> de l’agent, que la CLI elle-même fournit. La saisie la filtre ; <kbd>↑</kbd> <kbd>↓</kbd> choisissent, <kbd>⇥</kbd> ou un clic insère, <kbd>Esc</kbd> ferme. <kbd>Return</kbd> complète un nom commencé, et envoie tel quel un nom tapé en entier. Une commande qui répond par un panneau, comme <code>/mcp</code> ou <code>/model</code>, montre le vrai terminal au-dessus de la zone de saisie le temps de s’en servir.</li>
   <li>Un message qui commence par <code>!</code> est une <strong>commande shell</strong>, exécutée par le mode shell de l’agent lui-même ; la zone de saisie prend la couleur d’avertissement. Tapez <code>\!</code> pour envoyer un message qui commence par un point d’exclamation.</li>
 </ul>
 <p>Tant que l’agent attend une réponse dans son terminal — une autorisation, une question —, la zone de saisie est fermée et la demande s’affiche à sa place : voir <a href="requests.html">Répondre à vos agents</a>.</p>
 
 <h2 id="files">Joindre des fichiers</h2>
 <p>Déposez des fichiers sur la conversation, cliquez sur <strong>+</strong> dans la zone de saisie ou choisissez <strong>Session › Joindre des fichiers…</strong> (<kbd>⌘O</kbd>) : ils deviennent des pastilles dans la zone de saisie et sont envoyés sous forme de chemins avec votre message. Déposé sur le terminal, le chemin d’un fichier est saisi, échappé comme le fait Terminal, sans appuyer sur Retour. Vous pouvez aussi déposer des fichiers sur la ligne d’une session dans la barre latérale.</p>
+<p>Les pièces jointes d’un message envoyé restent visibles sous son texte : miniature d’une image, première page d’un PDF, premières lignes d’un fichier texte, petit lecteur pour un son. Un clic les ouvre dans Coup d’œil (<kbd>←</kbd> <kbd>→</kbd> passent d’une pièce à l’autre) ; un clic droit propose Ouvrir, Afficher dans le Finder, Copier et Ouvrir dans la vue web. Un programme ou un script ne s’ouvre jamais d’ici.</p>

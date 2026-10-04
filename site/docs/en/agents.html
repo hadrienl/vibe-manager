@@ -2,8 +2,19 @@
 <p class="lede">Change agent or model without losing the work, put a closed session back to work, and quit without interrupting an agent in the middle of its turn.</p>
 
 <h2 id="supported">Supported agents</h2>
-<p>Vibe Manager runs <strong>Claude Code</strong> and <strong>Codex CLI</strong>, each in its own terminal interface, with your account and your configuration. It passes no flag that lowers the permissions you set for your CLI, injects no API key, and reads no credential. What an agent may do inside a session is its own configuration: Vibe Manager neither widens nor narrows it.</p>
+<p>Vibe Manager runs <strong>Claude Code</strong> and <strong>Codex CLI</strong>, each in its own terminal interface, with your account and your configuration. It passes no flag that lowers the permissions you set for your CLI, and reads no credential of their accounts. The only key it knows is that of an <a href="#endpoints">endpoint</a> you declared yourself. What an agent may do inside a session is its own configuration: Vibe Manager neither widens nor narrows it.</p>
 <p>Two additions are made at launch, for that launch only: the agent's <strong>hooks</strong> report its activity — working, waiting, finished — once you have approved them (<a href="settings.html#agents">Settings › Agents</a>), and its <strong>tool server</strong> <code>vibe-browser</code> gives it the <a href="terminals.html#agent-browser">web view</a>.</p>
+
+<h2 id="endpoints">Agents on an endpoint</h2>
+<p>An <strong>endpoint</strong> is a model server reachable over HTTP: on this Mac (Ollama, LM Studio) or in the cloud (OpenRouter, your company's gateway). Its models appear beside Claude Code and Codex when you create a session, and the session runs Claude Code or Codex against them: same terminal, same conversation view, same requests, same resume after a relaunch.</p>
+<ol>
+  <li><strong>Settings › Endpoints › Add an Endpoint…</strong>, then a starting point: Ollama, LM Studio, OpenRouter, or an <strong>Other Server</strong>. A known server fills in the address, the protocol and the key it expects.</li>
+  <li><strong>Key</strong>: typed once, written to the login keychain (one item per endpoint, never synchronised) and never shown again. Deleting the endpoint deletes it.</li>
+  <li><strong>Models</strong>: <strong>Read from the Endpoint</strong> lists what the server offers. A model that cannot call tools is kept but not offered: without tools, an agent can read no file. Give each model its real context window.</li>
+  <li><strong>Driven by</strong>: <strong>Automatic</strong> picks Claude Code or Codex from the server's protocol; you can force either one.</li>
+  <li><strong>Test</strong> sends a short request asking the model to call a tool, and says what worked: reachable, authentication, streamed answer and speed, tool call, answer after the tool, tokens reported. An endpoint whose last test failed is not offered for new sessions.</li>
+</ol>
+<p>A server that follows no standard is described with the <strong>Custom</strong> protocol, in a JSON document: <strong>Insert the Example</strong> gives one to start from. The format is detailed in <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/endpoints.md">docs/endpoints.md</a>.</p>
 
 <h2 id="switch">Switch agent or model</h2>
 <p><strong>Session › Switch Agent…</strong> (<kbd>⌃⌘M</kbd>), or <strong>Switch…</strong> in the inspector's Agent section, changes the agent or the model of a session.</p>
