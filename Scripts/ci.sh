@@ -29,7 +29,7 @@ xcrun swift-format lint --recursive \
   Packages/ReleaseTools/Tests \
   Packages/ReleaseTools/Package.swift
 
-echo "Checking the French translations"
+echo "Checking the translations"
 Scripts/test-check-localizations.sh
 Scripts/check-localizations.sh
 
