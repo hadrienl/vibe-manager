@@ -29,10 +29,16 @@
 <table>
   <thead><tr><th></th><th>Ce Mac (<code>localhost</code>, <code>file:</code>)</th><th>Ailleurs</th></tr></thead>
   <tbody>
-    <tr><td>Lire : onglets, texte, console, capture d’écran</td><td>libre</td><td>libre</td></tr>
+    <tr><td>Lire : texte, console, capture d’écran</td><td>libre</td><td>sur demande, une fois par site et par session</td></tr>
     <tr><td>Naviguer : ouvrir, recharger, fermer</td><td>libre</td><td>libre</td></tr>
     <tr><td>Agir : cliquer, saisir, JavaScript</td><td>libre</td><td>sur demande</td></tr>
   </tbody>
 </table>
 <p>Quand l’agent veut agir sur un autre site, un bandeau dans la vue web vous demande : <strong>Refuser</strong>, <strong>Autoriser une fois</strong> ou <strong>Toujours autoriser pour</strong> ce site. L’agent attend deux minutes au plus ; la ligne de la session affiche une main pendant ce temps. L’onglet ouvert par l’agent porte une marque, l’élément sur lequel il clique est entouré, et le journal <strong>Actions de l’agent</strong> liste ce qu’il a fait.</p>
-<div class="callout warn"><p>La lecture est libre partout, y compris sur les pages où vous êtes connecté : un agent peut lire un ticket privé. Désactivez <strong>Donner la vue web aux agents</strong> dans <a href="settings.html#web-view">Réglages › Vue web</a> si vous ne le souhaitez pas.</p></div>
+<p>Avant de <strong>lire</strong> une page d’un autre site, l’agent demande aussi : « L’agent veut lire une page de github.com. » Autorisé, il peut lire ce site jusqu’à la fin de la session — y compris ce que vous y voyez une fois connecté ; refusé, il reçoit un refus sans nouvelle question. Tant qu’un site n’est pas lisible, ni son titre ni son adresse complète ne lui sont donnés. Le journal <strong>Actions de l’agent</strong> liste en tête les sites que la session <strong>Peut lire</strong> et ceux <strong>Refusé</strong>, chacun avec <strong>Retirer</strong> ; archiver la session ou relancer l’app les oublie aussi.</p>
+<ul>
+  <li>Un onglet que l’agent a ouvert ou fait agir passe au premier plan avant de charger un site distant, et marque la ligne de sa session si elle n’est pas affichée. Il reste à l’agent jusqu’à ce que vous cliquiez ou tapiez dedans.</li>
+  <li>Un <strong>téléchargement</strong> lancé dans un onglet de l’agent est demandé ; tout fichier téléchargé reçoit la quarantaine de macOS, au nom de Vibe Manager.</li>
+  <li>Une page qui veut <strong>ouvrir une autre application</strong> (<code>zoommtg:</code>, <code>x-apple.systempreferences:</code>…) le demande toujours, même après votre clic ; sans clic, c’est refusé.</li>
+</ul>
+<div class="callout warn"><p>Une fois un site autorisé, l’agent lit ce que vous y voyez connecté, un ticket privé par exemple. Désactivez <strong>Donner la vue web aux agents</strong> dans <a href="settings.html#web-view">Réglages › Vue web</a> si vous ne le souhaitez pas.</p></div>

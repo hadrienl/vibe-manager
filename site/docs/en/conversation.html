@@ -24,9 +24,11 @@
   <li><kbd>↑</kbd> and <kbd>↓</kbd> on the first or last line recall the messages you sent before.</li>
   <li>A message typed while the agent is working is sent when its turn ends.</li>
   <li><kbd>Esc</kbd> interrupts the agent, like the <strong>Stop</strong> pill that shows during a turn.</li>
+  <li><code>/</code> at the start opens the list of the agent's <strong>skills and commands</strong>, as its CLI gives them. Typing filters it; <kbd>↑</kbd> <kbd>↓</kbd> choose, <kbd>⇥</kbd> or a click inserts, <kbd>Esc</kbd> closes. <kbd>Return</kbd> completes a name you started, and sends a name typed in full as it is. A command that answers with a panel, such as <code>/mcp</code> or <code>/model</code>, shows the real terminal above the composer while you use it.</li>
   <li>A message starting with <code>!</code> is a <strong>shell command</strong>, run by the agent's own shell mode; the composer turns to the warning colour. Type <code>\!</code> to send a message that starts with an exclamation mark.</li>
 </ul>
 <p>While the agent waits for an answer in its terminal — a permission, a question — the composer is closed, and the request is shown instead: see <a href="requests.html">Answer your agents</a>.</p>
 
 <h2 id="files">Attaching files</h2>
 <p>Drop files on the conversation, click <strong>+</strong> in the composer, or choose <strong>Session › Attach Files…</strong> (<kbd>⌘O</kbd>): they become chips in the composer and are sent as paths with your message. Dropped on the terminal, a file's path is typed, escaped as Terminal does, without pressing Return. You can also drop files on a session's row in the sidebar.</p>
+<p>A sent message keeps its attachments under its text: an image's thumbnail, a PDF's first page, a text file's first lines, a small player for a sound. A click opens them in Quick Look (<kbd>←</kbd> <kbd>→</kbd> go from one to the next); a right-click offers Open, Show in Finder, Copy and Open in Web View. A program or a script is never opened from here.</p>

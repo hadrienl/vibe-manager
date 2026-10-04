@@ -2,8 +2,19 @@
 <p class="lede">Changez d’agent ou de modèle sans perdre le travail, remettez au travail une session fermée, et quittez sans interrompre un agent au milieu de son tour.</p>
 
 <h2 id="supported">Agents pris en charge</h2>
-<p>Vibe Manager fait tourner <strong>Claude Code</strong> et <strong>Codex CLI</strong>, chacun dans sa propre interface de terminal, avec votre compte et votre configuration. Il ne passe aucune option qui réduise les permissions réglées pour votre CLI, n’injecte aucune clé d’API et ne lit aucun identifiant. Ce qu’un agent a le droit de faire dans une session relève de sa propre configuration : Vibe Manager ne l’élargit ni ne la restreint.</p>
+<p>Vibe Manager fait tourner <strong>Claude Code</strong> et <strong>Codex CLI</strong>, chacun dans sa propre interface de terminal, avec votre compte et votre configuration. Il ne passe aucune option qui réduise les permissions réglées pour votre CLI, et ne lit aucun identifiant de leur compte. La seule clé qu’il connaisse est celle d’un <a href="#endpoints">endpoint</a> que vous avez déclaré vous-même. Ce qu’un agent a le droit de faire dans une session relève de sa propre configuration : Vibe Manager ne l’élargit ni ne la restreint.</p>
 <p>Deux ajouts sont faits au lancement, pour ce lancement seulement : les <strong>hooks</strong> de l’agent signalent son activité — il travaille, attend, a terminé — une fois que vous les avez approuvés (<a href="settings.html#agents">Réglages › Agents</a>), et son <strong>serveur d’outils</strong> <code>vibe-browser</code> lui donne la <a href="terminals.html#agent-browser">vue web</a>.</p>
+
+<h2 id="endpoints">Agents sur un endpoint</h2>
+<p>Un <strong>endpoint</strong> est un serveur de modèles joignable en HTTP : sur ce Mac (Ollama, LM Studio) ou dans le cloud (OpenRouter, la passerelle de votre entreprise). Ses modèles apparaissent à côté de Claude Code et de Codex quand vous créez une session, et la session fait tourner Claude Code ou Codex sur eux : même terminal, même vue conversation, mêmes demandes, même reprise après une relance.</p>
+<ol>
+  <li><strong>Réglages › Endpoints › Ajouter un endpoint…</strong>, puis un point de départ : Ollama, LM Studio, OpenRouter, ou un <strong>Autre serveur</strong>. Un serveur connu remplit l’adresse, le protocole et la clé attendue.</li>
+  <li><strong>Clé</strong> : saisie une fois, écrite dans le trousseau de session (un élément par endpoint, jamais synchronisé) et plus jamais affichée. Supprimer l’endpoint la supprime.</li>
+  <li><strong>Modèles</strong> : <strong>Lire depuis l’endpoint</strong> liste ce que le serveur propose. Un modèle qui ne sait pas appeler d’outils est gardé mais pas proposé : sans outils, un agent ne lit aucun fichier. Donnez à chaque modèle sa vraie fenêtre de contexte.</li>
+  <li><strong>Piloté par</strong> : <strong>Automatique</strong> choisit Claude Code ou Codex selon le protocole du serveur ; vous pouvez imposer l’un ou l’autre.</li>
+  <li><strong>Tester</strong> envoie une courte requête qui demande au modèle d’appeler un outil, et dit ce qui a marché : joignable, authentification, réponse en flux et vitesse, appel d’outil, réponse après l’outil, jetons comptés. Un endpoint dont le dernier test a échoué n’est plus proposé pour une nouvelle session.</li>
+</ol>
+<p>Un serveur qui ne suit aucun standard se décrit avec le protocole <strong>Personnalisé</strong>, dans un document JSON : <strong>Insérer l’exemple</strong> en donne un pour commencer. Le format est détaillé dans <a href="https://github.com/hadrienl/vibe-manager/blob/main/docs/endpoints.md">docs/endpoints.md</a>.</p>
 
 <h2 id="switch">Changer d’agent ou de modèle</h2>
 <p><strong>Session › Changer d’agent…</strong> (<kbd>⌃⌘M</kbd>), ou <strong>Changer…</strong> dans la section Agent de l’inspecteur, change l’agent ou le modèle d’une session.</p>
