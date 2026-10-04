@@ -1,7 +1,12 @@
 # Localization
 
-Vibe Manager speaks English and French. English is the development language, and the one a string
-falls back to; French is translated in full. The application follows the language macOS gives it —
+Vibe Manager speaks the 17 languages of its website (`site/i18n/`): Arabic (`ar`), German (`de`),
+English (`en`), Spanish (`es`), French (`fr`), Hindi (`hi`), Italian (`it`), Japanese (`ja`), Korean
+(`ko`), Dutch (`nl`), Polish (`pl`), Brazilian Portuguese (`pt-BR`), Russian (`ru`), Turkish
+(`tr`), Ukrainian (`uk`), Simplified Chinese (`zh-Hans`, the site's `zh-CN`) and Traditional
+Chinese (`zh-Hant`, the site's `zh-TW`). English is the development language, and the one a string
+falls back to; every other language is translated in full. The project's `knownRegions` is the
+list of the languages. The application follows the language macOS gives it —
 System Settings › General › Language & Region, including the language chosen for this application
 alone. There is no language setting in the application.
 
@@ -56,7 +61,11 @@ the bundle: build a second time before testing a translation.
 - **`Text(someString)` is never translated.** A `String` reaches the screen as it is: it is either
   the user's own text, a name, or something already resolved.
 - **A count is a plural**, written with its number in the sentence (`"\(count) files"`) and given
-  its plural variants in the catalog — English `one` and `other`, French `one`, `many` and `other`.
+  its plural variants in the catalog, every category of each language (Unicode CLDR): `one` and
+  `other` in English, German, Dutch, Hindi and Turkish; `one`, `many` and `other` in French,
+  Spanish, Italian and Portuguese; `one`, `few`, `many` and `other` in Polish, Russian and
+  Ukrainian; the six of Arabic, `zero` to `other`; `other` alone in Japanese, Korean and Chinese.
+  Each variant keeps the number's placeholder.
   French puts 0 with 1: « 0 fichier ». The number is formatted in the user's locale, so it is grouped
   by thousands: “6,000 files”, « 6 000 fichiers ». An identifier that happens to be a number — a
   process identifier, an exit status, a revision, a byte limit quoted to the user — is interpolated
@@ -80,6 +89,32 @@ the bundle: build a second time before testing a translation.
 - Git's own words: Git runs in English, because that is how its errors are recognised.
 - What the user wrote: session names, notes, templates. The two example templates are written in
   the application's language on the day they are added; from then on they are the user's.
+
+## Every language, every time
+
+A change that adds or rewords a string ships it in the 17 languages at once — the check of the
+continuous integration refuses a string missing in one of them (see Guards). There is no review
+before a translation is merged: the users proofread it, and a wrong or clumsy one is the subject of
+a ticket.
+
+What French asks below holds for every language, in its own terms:
+
+- **Apple's words** for what a Mac already says in that language — the names of Settings, Cancel,
+  Close, Don't Save, Show in Finder, System Settings, Full Disk Access — and the register macOS uses
+  in it, formal or informal.
+- **Its typography**: its quotation marks for the English “ ” (« » in Russian and Ukrainian,
+  „ “ in German and Polish, 「」 in Japanese and Traditional Chinese), `…` as one character, and the
+  capitals of the language — title case is English alone.
+- **Short labels**: the sidebar's lines, the buttons and the columns have little room; German,
+  Russian and Polish run longer than French.
+- **A template and a model of an agent never share a word**, in any language (#221): the word of a
+  model is listed in `TemplateWordingTests.modelWords`, and a template takes another one.
+
+### Arabic, from right to left
+
+Arabic mirrors the interface: the sidebar and the inspector change sides, the toolbar and the
+lists read from the right, as SwiftUI and AppKit lay them out. What is not language stays from left
+to right — the terminal and its content, a path, a command, code.
 
 ## French style
 
@@ -151,8 +186,11 @@ A word that names a model of an agent never names a template, in any language, n
 
 ## Guards
 
-- `Scripts/check-localizations.sh`, run by `Scripts/ci.sh`, fails when a string of a catalog has no
-  French translation — each plural variant included — or is marked stale or in need of review.
+- `Scripts/check-localizations.sh`, run by `Scripts/ci.sh`, fails when a string of a catalog is
+  missing in one of the project's `knownRegions` — each plural category of the language included —
+  or is marked stale or in need of review. A language added to the project adds its plural
+  categories to the script. `Scripts/test-check-localizations.sh` tries it on catalogs made for the
+  occasion.
 - The unit tests resolve the labels in both languages through `VibeLocalizationTesting`, which reads
   the `fr.lproj` of a module's bundle: `String(localized:bundle:locale:)` formats with the locale it
   is given, but still picks the table of the process's language. A test runner declares no

@@ -9,8 +9,25 @@ import Testing
 @Suite("A template never takes the word of a model")
 struct TemplateWordingTests {
   /// The word each language gives a model of an agent, as a pattern that matches its inflections.
-  /// A language added to the catalogs (#215) adds its word here.
-  static let modelWords: [String: String] = ["fr": #"mod[eè]le"#]
+  /// A language added to the catalogs adds its word here.
+  static let modelWords: [String: String] = [
+    "ar": #"نموذج|نماذج"#,
+    "de": #"modell"#,
+    "es": #"\bmodelos?\b"#,
+    "fr": #"mod[eè]le"#,
+    "hi": #"मॉडल"#,
+    "it": #"modell[oi]"#,
+    "ja": #"モデル"#,
+    "ko": #"모델"#,
+    "nl": #"model"#,
+    "pl": #"\bmodel"#,
+    "pt-BR": #"\bmodelos?\b"#,
+    "ru": #"модел"#,
+    "tr": #"model"#,
+    "uk": #"модел"#,
+    "zh-Hans": #"模型"#,
+    "zh-Hant": #"模型"#,
+  ]
 
   /// What is wrong with a translation, or nil: a template named with the word of a model, or that
   /// word used for something that is not a model.

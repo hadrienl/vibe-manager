@@ -1,7 +1,8 @@
 #!/bin/zsh
 
 # `Scripts/check-localizations.sh` against catalogs written for the occasion: it accepts a complete
-# one, and refuses each way a string can be left unfinished. Run by `Scripts/ci.sh`.
+# one, and refuses each way a string can be left unfinished, in one language or in several. Run by
+# `Scripts/ci.sh`.
 
 set -euo pipefail
 
@@ -26,9 +27,10 @@ plural_en='{"variations": {"plural": {
   "one": {"stringUnit": {"state": "translated", "value": "%lld file"}},
   "other": {"stringUnit": {"state": "translated", "value": "%lld files"}}}}}'
 
+# `expect <accepted|refused> <description> <catalog> [languages]`, French alone by default.
 expect() {
-  local outcome="$1" description="$2" file="$3"
-  if "$check" "$file" > /dev/null 2>&1; then
+  local outcome="$1" description="$2" file="$3" languages="${4:-fr}"
+  if "$check" --languages "$languages" "$file" > /dev/null 2>&1; then
     [[ "$outcome" == accepted ]] || { echo "FAIL: $description was accepted" >&2; exit 1; }
   else
     [[ "$outcome" == refused ]] || { echo "FAIL: $description was refused" >&2; exit 1; }
@@ -59,3 +61,34 @@ expect refused "a plural variant left untranslated" "$(catalog variant "{
     \"one\": {\"stringUnit\": {\"state\": \"translated\", \"value\": \"%lld fichier\"}},
     \"other\": {\"stringUnit\": {\"state\": \"new\", \"value\": \"%lld files\"}}}}}}}
 }")"
+
+translated_de='{"stringUnit": {"state": "translated", "value": "Schließen"}}'
+plural_ru='{"variations": {"plural": {
+  "one": {"stringUnit": {"state": "translated", "value": "%lld файл"}},
+  "few": {"stringUnit": {"state": "translated", "value": "%lld файла"}},
+  "many": {"stringUnit": {"state": "translated", "value": "%lld файлов"}},
+  "other": {"stringUnit": {"state": "translated", "value": "%lld файла"}}}}}'
+plural_ru_short='{"variations": {"plural": {
+  "one": {"stringUnit": {"state": "translated", "value": "%lld файл"}},
+  "other": {"stringUnit": {"state": "translated", "value": "%lld файла"}}}}}'
+
+expect accepted "a catalog complete in two languages" "$(catalog two "{
+  \"Close\": {\"localizations\": {\"de\": $translated_de, \"fr\": $translated}}
+}")" fr,de
+expect refused "a string translated into French alone" "$(catalog french-only "{
+  \"Close\": {\"localizations\": {\"fr\": $translated}}
+}")" fr,de
+expect accepted "a plural with every Russian variant" "$(catalog russian "{
+  \"%lld files\": {\"localizations\": {\"en\": $plural_en, \"fr\": $plural_fr, \"ru\": $plural_ru}}
+}")" fr,ru
+expect refused "a Russian plural without few and many" "$(catalog russian-short "{
+  \"%lld files\": {\"localizations\": {\"en\": $plural_en, \"fr\": $plural_fr, \"ru\": $plural_ru_short}}
+}")" fr,ru
+expect refused "a French plural without many" "$(catalog french-short "{
+  \"%lld files\": {\"localizations\": {\"en\": $plural_en, \"fr\": {\"variations\": {\"plural\": {
+    \"one\": {\"stringUnit\": {\"state\": \"translated\", \"value\": \"%lld fichier\"}},
+    \"other\": {\"stringUnit\": {\"state\": \"translated\", \"value\": \"%lld fichiers\"}}}}}}}
+}")"
+expect refused "a language whose plural categories are unknown" "$(catalog unknown "{
+  \"Close\": {\"localizations\": {\"fr\": $translated, \"xx\": $translated}}
+}")" fr,xx

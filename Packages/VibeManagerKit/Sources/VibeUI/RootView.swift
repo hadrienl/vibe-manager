@@ -2558,7 +2558,9 @@ private struct SessionConversationSlot: View {
                   pane: pane, session: pane.session, isActive: isActive,
                   focusRequest: focusRequest,
                   accessibilityTitle: terminalTitle(for: listed, pane: pane, in: model),
-                  isMirror: true, onEscape: onEscape, onScreen: onScreen))
+                  isMirror: true, onEscape: onEscape, onScreen: onScreen
+                )
+                .environment(\.layoutDirection, .leftToRight))
             }
           }
         )

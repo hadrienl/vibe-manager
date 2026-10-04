@@ -5,13 +5,103 @@
       "comment" : "The application's name, shown in the Finder.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
         "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager"
@@ -23,13 +113,103 @@
       "comment" : "The application's short name, in the menu bar.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager"
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
         "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager"
@@ -41,16 +221,106 @@
       "comment" : "Why the application asks for access to the Desktop.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتيح Vibe Manager لوكيل البرمجة الذي شغّلته قراءة المجلد الذي اخترته."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager erlaubt dem von dir gestarteten Coding-Agent, den gewählten Ordner zu lesen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager lets the coding agent you launched read the folder you chose."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager permite que el agente de código que has abierto lea la carpeta que has elegido."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager permet à l’agent de code que vous avez lancé de lire le dossier que vous avez choisi."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager आपके द्वारा लॉन्च किए गए कोडिंग एजेंट को आपका चुना हुआ फ़ोल्डर पढ़ने देता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager consente all’agente di programmazione che hai avviato di leggere la cartella che hai scelto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、起動したコーディングエージェントが選択したフォルダを読み取れるようにします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 사용자가 실행한 코딩 에이전트가 사용자가 선택한 폴더를 읽을 수 있도록 합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager laat de codeeragent die je hebt gestart de door jou gekozen map lezen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager pozwala uruchomionemu przez Ciebie agentowi kodującemu czytać wybrany folder."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager permite que o agente de código que você abriu leia a pasta que você escolheu."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager позволяет запущенному вами агенту для программирования читать выбранную вами папку."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, başlattığınız kodlama ajanının seçtiğiniz klasörü okumasına izin verir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager дозволяє запущеному вами агенту для програмування читати вибрану вами папку."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 让你启动的编程智能体读取你选择的文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 讓你啟動的程式碼代理程式讀取你所選的資料夾。"
           }
         }
       }
@@ -59,16 +329,106 @@
       "comment" : "Why the application asks for access to the Documents folder.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتيح Vibe Manager لوكيل البرمجة الذي شغّلته قراءة المجلد الذي اخترته."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager erlaubt dem von dir gestarteten Coding-Agent, den gewählten Ordner zu lesen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager lets the coding agent you launched read the folder you chose."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager permite que el agente de código que has abierto lea la carpeta que has elegido."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager permet à l’agent de code que vous avez lancé de lire le dossier que vous avez choisi."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager आपके द्वारा लॉन्च किए गए कोडिंग एजेंट को आपका चुना हुआ फ़ोल्डर पढ़ने देता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager consente all’agente di programmazione che hai avviato di leggere la cartella che hai scelto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、起動したコーディングエージェントが選択したフォルダを読み取れるようにします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 사용자가 실행한 코딩 에이전트가 사용자가 선택한 폴더를 읽을 수 있도록 합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager laat de codeeragent die je hebt gestart de door jou gekozen map lezen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager pozwala uruchomionemu przez Ciebie agentowi kodującemu czytać wybrany folder."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager permite que o agente de código que você abriu leia a pasta que você escolheu."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager позволяет запущенному вами агенту для программирования читать выбранную вами папку."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, başlattığınız kodlama ajanının seçtiğiniz klasörü okumasına izin verir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager дозволяє запущеному вами агенту для програмування читати вибрану вами папку."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 让你启动的编程智能体读取你选择的文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 讓你啟動的程式碼代理程式讀取你所選的資料夾。"
           }
         }
       }
@@ -77,16 +437,106 @@
       "comment" : "Why the application asks for access to the Downloads folder.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتيح Vibe Manager لوكيل البرمجة الذي شغّلته قراءة المجلد الذي اخترته."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager erlaubt dem von dir gestarteten Coding-Agent, den gewählten Ordner zu lesen."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager lets the coding agent you launched read the folder you chose."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager permite que el agente de código que has abierto lea la carpeta que has elegido."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager permet à l’agent de code que vous avez lancé de lire le dossier que vous avez choisi."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager आपके द्वारा लॉन्च किए गए कोडिंग एजेंट को आपका चुना हुआ फ़ोल्डर पढ़ने देता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager consente all’agente di programmazione che hai avviato di leggere la cartella che hai scelto."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、起動したコーディングエージェントが選択したフォルダを読み取れるようにします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 사용자가 실행한 코딩 에이전트가 사용자가 선택한 폴더를 읽을 수 있도록 합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager laat de codeeragent die je hebt gestart de door jou gekozen map lezen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager pozwala uruchomionemu przez Ciebie agentowi kodującemu czytać wybrany folder."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager permite que o agente de código que você abriu leia a pasta que você escolheu."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager позволяет запущенному вами агенту для программирования читать выбранную вами папку."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, başlattığınız kodlama ajanının seçtiğiniz klasörü okumasına izin verir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager дозволяє запущеному вами агенту для програмування читати вибрану вами папку."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 让你启动的编程智能体读取你选择的文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 讓你啟動的程式碼代理程式讀取你所選的資料夾。"
           }
         }
       }
@@ -95,16 +545,106 @@
       "comment" : "Why the application asks for access to iCloud Drive.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح Vibe Manager مجلد العمل الذي اخترته في iCloud Drive."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager öffnet den gewählten Arbeitsordner in iCloud Drive."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager opens the working folder you chose in iCloud Drive."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager abre la carpeta de trabajo que has elegido en iCloud Drive."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager ouvre le dossier de travail que vous avez choisi dans iCloud Drive."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager iCloud Drive में आपके द्वारा चुना गया कार्य फ़ोल्डर खोलता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager apre la cartella di lavoro che hai scelto in iCloud Drive."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、iCloud Driveで選択した作業フォルダを開きます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 사용자가 선택한 iCloud Drive의 작업 폴더를 엽니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager opent de werkmap die je in iCloud Drive hebt gekozen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager otwiera wybrany przez Ciebie folder roboczy na iCloud Drive."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager abre a pasta de trabalho que você escolheu no iCloud Drive."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager открывает выбранную вами рабочую папку в iCloud Drive."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, iCloud Drive’da seçtiğiniz çalışma klasörünü açar."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager відкриває вибрану вами робочу папку в iCloud Drive."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 会打开你在 iCloud 云盘中选择的工作文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 會打開你在 iCloud 雲碟中所選的工作資料夾。"
           }
         }
       }
@@ -113,16 +653,106 @@
       "comment" : "Why the application asks to reach the local network.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتصل Vibe Manager بخوادم النماذج التي أضفتها على شبكتك المحلية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager erreicht die Modellserver, die du in deinem lokalen Netzwerk angegeben hast."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager reaches the model servers you declared on your local network."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager se conecta a los servidores de modelos que has declarado en tu red local."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager joint les serveurs de modèles que vous avez déclarés sur votre réseau local."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager आपके लोकल नेटवर्क पर आपके द्वारा घोषित मॉडल सर्वर से जुड़ता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager raggiunge i server di modelli che hai dichiarato sulla rete locale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、ローカルネットワーク上に登録したモデルサーバに接続します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 로컬 네트워크에 등록한 모델 서버에 연결합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager maakt verbinding met de modelservers die je op je lokale netwerk hebt opgegeven."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager łączy się z serwerami modeli zadeklarowanymi w Twojej sieci lokalnej."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager acessa os servidores de modelos que você declarou na sua rede local."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager подключается к указанным вами серверам моделей в вашей локальной сети."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, yerel ağınızda tanımladığınız model sunucularına bağlanır."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager звертається до серверів моделей, які ви вказали у своїй локальній мережі."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 会连接你在本地网络上声明的模型服务器。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 會連線至你在區域網路上設定的模型伺服器。"
           }
         }
       }
@@ -131,16 +761,106 @@
       "comment" : "Why the application asks for the microphone: a page of the web view wants it.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يستخدم Vibe Manager الميكروفون عندما تطلبه منك صفحة في عرض الويب، مثلًا للإملاء."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager verwendet das Mikrofon, wenn eine Seite in der Webansicht danach fragt, zum Beispiel für das Diktieren."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager uses the microphone when a page in the web view asks you for it, for example for dictation."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager usa el micrófono cuando una página de la vista web te lo pide, por ejemplo para el dictado."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager utilise le micro quand une page de la vue web vous le demande, par exemple pour une dictée."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "जब वेब दृश्य का कोई पेज आपसे माँगता है, जैसे डिक्टेशन के लिए, तब Vibe Manager माइक्रोफ़ोन का उपयोग करता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager usa il microfono quando una pagina della vista web te lo chiede, ad esempio per la dettatura."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、Webビューのページが要求したとき（音声入力など）にマイクを使用します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 웹 보기의 페이지가 요청할 때(예: 받아쓰기) 마이크를 사용합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager gebruikt de microfoon wanneer een pagina in de webweergave daarom vraagt, bijvoorbeeld voor dicteren."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager używa mikrofonu, gdy prosi o to strona w widoku www, na przykład do dyktowania."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager usa o microfone quando uma página da visualização web pede, por exemplo, para ditado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager использует микрофон, когда его запрашивает страница в веб-панели, например для диктовки."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, web görünümündeki bir sayfa sizden istediğinde, örneğin dikte için mikrofonu kullanır."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager використовує мікрофон, коли сторінка у вебперегляді запитує його, наприклад для диктування."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当网页视图中的页面请求使用麦克风时（例如用于听写），Vibe Manager 会使用麦克风。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當網頁視圖中的頁面要求使用麥克風時（例如聽寫），Vibe Manager 會使用麥克風。"
           }
         }
       }
@@ -149,16 +869,106 @@
       "comment" : "Why the application asks for access to a network volume.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح Vibe Manager مجلد العمل الذي اخترته على وحدة التخزين هذه."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager öffnet den gewählten Arbeitsordner auf diesem Volume."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager opens the working folder you chose on this volume."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager abre la carpeta de trabajo que has elegido en este volumen."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager ouvre le dossier de travail que vous avez choisi sur ce volume."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager इस वॉल्यूम पर आपके द्वारा चुना गया कार्य फ़ोल्डर खोलता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager apre la cartella di lavoro che hai scelto su questo volume."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、このボリューム上で選択した作業フォルダを開きます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 이 볼륨에서 사용자가 선택한 작업 폴더를 엽니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager opent de werkmap die je op dit volume hebt gekozen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager otwiera wybrany przez Ciebie folder roboczy na tym woluminie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager abre a pasta de trabalho que você escolheu neste volume."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager открывает выбранную вами рабочую папку на этом томе."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, bu bölümde seçtiğiniz çalışma klasörünü açar."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager відкриває вибрану вами робочу папку на цьому томі."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 会打开你在此宗卷上选择的工作文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 會打開你在此卷宗上所選的工作資料夾。"
           }
         }
       }
@@ -167,16 +977,106 @@
       "comment" : "Why the application asks for access to a removable volume.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يفتح Vibe Manager مجلد العمل الذي اخترته على وحدة التخزين هذه."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager öffnet den gewählten Arbeitsordner auf diesem Volume."
+          }
+        },
         "en" : {
           "stringUnit" : {
             "state" : "new",
             "value" : "Vibe Manager opens the working folder you chose on this volume."
           }
         },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager abre la carpeta de trabajo que has elegido en este volumen."
+          }
+        },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager ouvre le dossier de travail que vous avez choisi sur ce volume."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager इस वॉल्यूम पर आपके द्वारा चुना गया कार्य फ़ोल्डर खोलता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager apre la cartella di lavoro che hai scelto su questo volume."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Managerは、このボリューム上で選択した作業フォルダを開きます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager는 이 볼륨에서 사용자가 선택한 작업 폴더를 엽니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager opent de werkmap die je op dit volume hebt gekozen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager otwiera wybrany przez Ciebie folder roboczy na tym woluminie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager abre a pasta de trabalho que você escolheu neste volume."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager открывает выбранную вами рабочую папку на этом томе."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager, bu bölümde seçtiğiniz çalışma klasörünü açar."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager відкриває вибрану вами робочу папку на цьому томі."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 会打开你在此宗卷上选择的工作文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 會打開你在此卷宗上所選的工作資料夾。"
           }
         }
       }
