@@ -6,7 +6,7 @@ import Testing
 /// The toolbar backgrounds AppKit draws under the toolbar (#317). The views are AppKit's own, in a
 /// hierarchy never put on screen.
 @MainActor
-@Suite("The toolbar backgrounds are hidden, and stay hidden")
+@Suite("The toolbar backgrounds are transparent, and stay transparent")
 struct ToolbarBackgroundRemoverTests {
   private func background() throws -> NSView {
     let type = try #require(
@@ -48,30 +48,40 @@ struct ToolbarBackgroundRemoverTests {
     #expect(ToolbarBackgroundRemover.backgrounds(in: root).isEmpty)
   }
 
-  @Test("They are hidden, in every window looked at")
-  func hidden() throws {
+  @Test("They are transparent, in every window looked at")
+  func transparent() throws {
     let (root, backgrounds) = try hierarchy()
     let toolbarWindowRoot = NSView()
     let inToolbarWindow = try background()
     toolbarWindowRoot.addSubview(inToolbarWindow)
     let remover = ToolbarBackgroundRemover()
     remover.update(roots: [root, toolbarWindowRoot])
-    let allHidden = (backgrounds + [inToolbarWindow]).allSatisfy { $0.isHidden }
-    #expect(allHidden)
+    let allTransparent = (backgrounds + [inToolbarWindow]).allSatisfy { $0.alphaValue == 0 }
+    #expect(allTransparent)
   }
 
-  @Test("Shown again by AppKit, one is hidden at once")
-  func hiddenAgainAtOnce() throws {
+  @Test("Shown again by AppKit, one is made transparent at once")
+  func transparentAgainAtOnce() throws {
     let (root, backgrounds) = try hierarchy()
     let remover = ToolbarBackgroundRemover()
     remover.update(roots: [root])
-    backgrounds[0].isHidden = false
-    #expect(backgrounds[0].isHidden)
+    backgrounds[0].alphaValue = 1
+    #expect(backgrounds[0].alphaValue == 0)
     // Moved to another window, as in full screen, it is still watched.
     let elsewhere = NSView()
     elsewhere.addSubview(backgrounds[2])
-    backgrounds[2].isHidden = false
-    #expect(backgrounds[2].isHidden)
+    backgrounds[2].alphaValue = 1
+    #expect(backgrounds[2].alphaValue == 0)
+  }
+
+  /// Hidden, a background no longer sees the pointer: in full screen, AppKit then never shows the
+  /// window's buttons on hover.
+  @Test("They are never hidden")
+  func neverHidden() throws {
+    let (root, backgrounds) = try hierarchy()
+    let remover = ToolbarBackgroundRemover()
+    remover.update(roots: [root])
+    #expect(backgrounds.allSatisfy { !$0.isHidden })
   }
 
   @Test("Stopped, it shows them and lets them be")
@@ -81,10 +91,10 @@ struct ToolbarBackgroundRemoverTests {
     remover.update(roots: [root])
     remover.update(roots: [root])
     remover.stop()
-    let allShown = backgrounds.allSatisfy { !$0.isHidden }
+    let allShown = backgrounds.allSatisfy { $0.alphaValue == 1 }
     #expect(allShown)
-    backgrounds[0].isHidden = true
-    backgrounds[0].isHidden = false
-    #expect(!backgrounds[0].isHidden)
+    backgrounds[0].alphaValue = 0
+    backgrounds[0].alphaValue = 1
+    #expect(backgrounds[0].alphaValue == 1)
   }
 }

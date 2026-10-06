@@ -12,8 +12,11 @@ import VibeApplication
 /// take it away too).
 ///
 /// Nothing here moves or resizes AppKit's views: the backgrounds of the window, and of the window
-/// that holds the toolbar in full screen, are hidden, and hidden again as soon as AppKit shows one,
-/// before it is drawn. Stopped, it shows them again.
+/// that holds the toolbar in full screen, are made transparent, and transparent again as soon as
+/// AppKit shows one, before it is drawn. Stopped, it shows them again.
+///
+/// Transparent, not hidden: a hidden background no longer sees the pointer, and in full screen
+/// AppKit then never shows the window's close, minimize and full-screen buttons on hover.
 @MainActor
 final class ToolbarBackgroundRemover {
   /// AppKit's private classes: matched by name, nothing is found if they are renamed.
@@ -29,7 +32,7 @@ final class ToolbarBackgroundRemover {
   private struct Hidden {
     weak var view: NSView?
     /// AppKit showing it again — each time the inspector opens, or the window enters full
-    /// screen — hidden at once: shown even for a moment, it flickers over the column.
+    /// screen — made transparent at once: shown even for a moment, it flickers over the column.
     let shown: NSKeyValueObservation
   }
 
@@ -85,18 +88,18 @@ final class ToolbarBackgroundRemover {
     hidden.removeAll { $0.view == nil }
     for view in roots.flatMap(Self.backgrounds(in:)) {
       if hidden.contains(where: { $0.view === view }) {
-        view.isHidden = true
-      } else if !view.isHidden {
+        view.alphaValue = 0
+      } else if view.alphaValue > 0 {
         hide(view)
       }
     }
   }
 
   private func hide(_ view: NSView) {
-    view.isHidden = true
-    let shown = view.observe(\.isHidden) { view, _ in
+    view.alphaValue = 0
+    let shown = view.observe(\.alphaValue) { view, _ in
       MainActor.assumeIsolated {
-        if !view.isHidden { view.isHidden = true }
+        if view.alphaValue > 0 { view.alphaValue = 0 }
       }
     }
     hidden.append(Hidden(view: view, shown: shown))
@@ -123,7 +126,7 @@ final class ToolbarBackgroundRemover {
   func stop() {
     for entry in hidden {
       entry.shown.invalidate()
-      entry.view?.isHidden = false
+      entry.view?.alphaValue = 1
     }
     hidden = []
     pendingCheck?.cancel()
