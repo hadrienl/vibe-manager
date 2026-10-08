@@ -117,6 +117,13 @@ struct PromptComposer: View {
             return .handled
           }
           .onKeyPress(.escape) {
+            // A dictation under way is thrown away first (#340).
+            if let dictation = model.dictation, dictation.concerns(ObjectIdentifier(model)),
+              dictation.phase == .recording
+            {
+              dictation.cancel()
+              return .handled
+            }
             // The list of commands closes first (#219).
             if !Self.isComposingText, model.dismissCommandSuggestions() { return .handled }
             // A message recalled is put back first: the draft, then the shell mode, then the agent.
@@ -138,10 +145,24 @@ struct PromptComposer: View {
             .foregroundStyle(theme.warning.color)
             .frame(width: 28, height: 28)
             .accessibilityHidden(true)
+          // A recording begun before the `!` can still be stopped.
+          if let dictation = model.dictation, dictation.concerns(ObjectIdentifier(model)) {
+            DictationButton(
+              model: model, dictation: dictation, isEnabled: false, isActive: isActive)
+          }
         } else {
           attachMenu(state)
+          if let dictation = model.dictation {
+            DictationButton(
+              model: model, dictation: dictation, isEnabled: state == .ready, isActive: isActive)
+          }
         }
-        if state == .awaitingAnswer || state == .answeringQuestion {
+        if let dictation = model.dictation, let line = dictationHint(dictation) {
+          line
+            .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
+            .foregroundStyle(theme.secondaryText.color)
+            .lineLimit(1)
+        } else if state == .awaitingAnswer || state == .answeringQuestion {
           RequestHint(model: model)
         } else {
           hint(state)
@@ -226,6 +247,36 @@ struct PromptComposer: View {
     let end = NSRange(location: (textView.string as NSString).length, length: 0)
     textView.setSelectedRange(end)
     textView.scrollRangeToVisible(end)
+  }
+
+  /// The composer's own text view, when it has the keyboard and shows `draft`: never a search
+  /// field's editor, whose text may be as empty as the draft.
+  @MainActor static func composerTextView(showing draft: String) -> NSTextView? {
+    guard let textView = focusedTextView(), !textView.isFieldEditor, textView.string == draft
+    else { return nil }
+    return textView
+  }
+
+  /// Puts what was dictated where the cursor is, as typing would — so ⌘Z takes it back — when
+  /// `field`, the composer's text view when the dictation began, still has the keyboard; at the
+  /// end of the draft otherwise (#340).
+  @MainActor static func insertDictation(
+    _ text: String, into model: ConversationModel, field: NSTextView?
+  ) {
+    if let textView = field, textView === composerTextView(showing: model.draft) {
+      let range = textView.selectedRange()
+      let string = textView.string as NSString
+      let previous =
+        range.location > 0
+        ? string.substring(with: NSRange(location: range.location - 1, length: 1)).first : nil
+      let end = range.location + range.length
+      let next =
+        end < string.length ? string.substring(with: NSRange(location: end, length: 1)).first : nil
+      textView.insertText(
+        DictationTranscript.spaced(text, after: previous, before: next), replacementRange: range)
+    } else {
+      model.draft += DictationTranscript.spaced(text, after: model.draft.last, before: nil)
+    }
   }
 
   /// An input method — Japanese, Chinese — is still composing: Return confirms its text, and
@@ -329,6 +380,20 @@ struct PromptComposer: View {
         bundle: .module)
     case .stopped: Text("The session is stopped.", bundle: .module)
     case .unavailable: Text("Write to the agent in the terminal.", bundle: .module)
+    }
+  }
+
+  /// What the dictation of this composer is doing, in place of the hint while it records or
+  /// transcribes.
+  private func dictationHint(_ dictation: DictationController) -> Text? {
+    guard dictation.concerns(ObjectIdentifier(model)) else { return nil }
+    switch dictation.phase {
+    case .recording:
+      return Text("Listening… click ■ to insert what you said · Esc to cancel", bundle: .module)
+    case .transcribing:
+      return Text("Transcribing…", bundle: .module)
+    case .idle, .offeringDownload, .downloading, .preparing:
+      return nil
     }
   }
 

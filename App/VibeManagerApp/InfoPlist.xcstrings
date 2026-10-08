@@ -758,109 +758,109 @@
       }
     },
     "NSMicrophoneUsageDescription" : {
-      "comment" : "Why the application asks for the microphone: a page of the web view wants it.",
+      "comment" : "Why the application asks for the microphone: to dictate a message, or a page of the web view wants it.",
       "extractionState" : "extracted_with_value",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يستخدم Vibe Manager الميكروفون عندما تطلبه منك صفحة في عرض الويب، مثلًا للإملاء."
+            "value" : "يستخدم Vibe Manager الميكروفون عندما تُملي رسالة، تُنسخ على هذا الـ Mac، وعندما تطلبه منك صفحة في عرض الويب."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager verwendet das Mikrofon, wenn eine Seite in der Webansicht danach fragt, zum Beispiel für das Diktieren."
+            "value" : "Vibe Manager verwendet das Mikrofon, wenn du eine Nachricht diktierst – sie wird auf diesem Mac transkribiert – und wenn eine Seite in der Webansicht danach fragt."
           }
         },
         "en" : {
           "stringUnit" : {
             "state" : "new",
-            "value" : "Vibe Manager uses the microphone when a page in the web view asks you for it, for example for dictation."
+            "value" : "Vibe Manager uses the microphone when you dictate a message, transcribed on this Mac, and when a page in the web view asks you for it."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager usa el micrófono cuando una página de la vista web te lo pide, por ejemplo para el dictado."
+            "value" : "Vibe Manager usa el micrófono cuando dictas un mensaje, transcrito en este Mac, y cuando una página de la vista web te lo pide."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager utilise le micro quand une page de la vue web vous le demande, par exemple pour une dictée."
+            "value" : "Vibe Manager utilise le micro quand vous dictez un message, transcrit sur ce Mac, et quand une page de la vue web vous le demande."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "जब वेब दृश्य का कोई पेज आपसे माँगता है, जैसे डिक्टेशन के लिए, तब Vibe Manager माइक्रोफ़ोन का उपयोग करता है।"
+            "value" : "जब आप कोई संदेश बोलकर लिखते हैं, जिसे इसी Mac पर लिप्यंतरित किया जाता है, और जब वेब दृश्य का कोई पेज आपसे माँगता है, तब Vibe Manager माइक्रोफ़ोन का उपयोग करता है।"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager usa il microfono quando una pagina della vista web te lo chiede, ad esempio per la dettatura."
+            "value" : "Vibe Manager usa il microfono quando detti un messaggio, trascritto su questo Mac, e quando una pagina della vista web te lo chiede."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Managerは、Webビューのページが要求したとき（音声入力など）にマイクを使用します。"
+            "value" : "Vibe Managerは、メッセージを音声入力するとき（このMacで文字起こし）と、Webビューのページが要求したときにマイクを使用します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager는 웹 보기의 페이지가 요청할 때(예: 받아쓰기) 마이크를 사용합니다."
+            "value" : "Vibe Manager는 메시지를 받아쓸 때(이 Mac에서 변환)와 웹 보기의 페이지가 요청할 때 마이크를 사용합니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager gebruikt de microfoon wanneer een pagina in de webweergave daarom vraagt, bijvoorbeeld voor dicteren."
+            "value" : "Vibe Manager gebruikt de microfoon wanneer je een bericht dicteert, uitgeschreven op deze Mac, en wanneer een pagina in de webweergave daarom vraagt."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager używa mikrofonu, gdy prosi o to strona w widoku www, na przykład do dyktowania."
+            "value" : "Vibe Manager używa mikrofonu, gdy dyktujesz wiadomość, transkrybowaną na tym Macu, oraz gdy prosi o to strona w widoku www."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O Vibe Manager usa o microfone quando uma página da visualização web pede, por exemplo, para ditado."
+            "value" : "O Vibe Manager usa o microfone quando você dita uma mensagem, transcrita neste Mac, e quando uma página da visualização web pede."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager использует микрофон, когда его запрашивает страница в веб-панели, например для диктовки."
+            "value" : "Vibe Manager использует микрофон, когда вы диктуете сообщение (оно распознаётся на этом Mac) и когда его запрашивает страница в веб-панели."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager, web görünümündeki bir sayfa sizden istediğinde, örneğin dikte için mikrofonu kullanır."
+            "value" : "Vibe Manager, bu Mac'te yazıya dökülen bir mesajı dikte ettiğinizde ve web görünümündeki bir sayfa sizden istediğinde mikrofonu kullanır."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Vibe Manager використовує мікрофон, коли сторінка у вебперегляді запитує його, наприклад для диктування."
+            "value" : "Vibe Manager використовує мікрофон, коли ви диктуєте повідомлення (воно розпізнається на цьому Mac) і коли сторінка у вебперегляді запитує його."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "当网页视图中的页面请求使用麦克风时（例如用于听写），Vibe Manager 会使用麦克风。"
+            "value" : "当你听写消息（在这台 Mac 上转写）以及网页视图中的页面请求使用麦克风时，Vibe Manager 会使用麦克风。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "當網頁視圖中的頁面要求使用麥克風時（例如聽寫），Vibe Manager 會使用麥克風。"
+            "value" : "當你聽寫訊息（在這台 Mac 上轉寫）以及網頁視圖中的頁面要求使用麥克風時，Vibe Manager 會使用麥克風。"
           }
         }
       }

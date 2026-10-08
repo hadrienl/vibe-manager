@@ -24,6 +24,7 @@ let package = Package(
     .library(name: "VibeComposition", targets: ["VibeComposition"]),
     .library(name: "VibeUpdates", targets: ["VibeUpdates"]),
     .library(name: "VibeEndpoints", targets: ["VibeEndpoints"]),
+    .library(name: "VibeDictation", targets: ["VibeDictation"]),
     .executable(name: "vibe-gateway", targets: ["vibe-gateway"]),
   ],
   dependencies: [
@@ -36,6 +37,9 @@ let package = Package(
     // Pinned exactly: it replaces the application on disk, and `Scripts/release.sh` signs the
     // archives with the `sign_update` of this very version (#92).
     .package(url: "https://github.com/sparkle-project/Sparkle.git", exact: "2.10.0"),
+    // Pinned exactly: Whisper on this Mac for the composer's dictation (#340). The package is
+    // named after Argmax's whole kit; only its WhisperKit library is linked.
+    .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "1.1.1"),
   ],
   targets: [
     // Every target whose text reaches the user carries its own string catalog.
@@ -106,12 +110,18 @@ let package = Package(
       ],
       resources: [.process("Localizable.xcstrings")]
     ),
+    // The composer's dictation (#340): the microphone through an audio engine, and Whisper on
+    // this Mac through WhisperKit, behind the ports of VibeApplication. No view, no sentence.
+    .target(
+      name: "VibeDictation",
+      dependencies: ["VibeApplication", .product(name: "WhisperKit", package: "WhisperKit")]
+    ),
     // The application, composed. Out of the application target so that a test can compose it.
     .target(
       name: "VibeComposition",
       dependencies: [
-        "VibeAgents", "VibeApplication", "VibeAvatar", "VibeBrowser", "VibeDomain", "VibeEndpoints",
-        "VibeGit", "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI",
+        "VibeAgents", "VibeApplication", "VibeAvatar", "VibeBrowser", "VibeDictation", "VibeDomain",
+        "VibeEndpoints", "VibeGit", "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI",
         "VibeConversationUI", "VibeUI",
       ]
     ),

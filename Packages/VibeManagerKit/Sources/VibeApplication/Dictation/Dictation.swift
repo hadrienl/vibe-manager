@@ -1,0 +1,189 @@
+import Foundation
+
+/// A speech model the composer's dictation can run (#340): Whisper, on this Mac, downloaded once.
+///
+/// None ships with the application: a model weighs hundreds of megabytes, which every update would
+/// carry for users who never dictate. The first dictation offers to download the one chosen.
+public enum DictationModelVariant: String, CaseIterable, Codable, Sendable {
+  /// Lighter, for a Mac short of memory; it stumbles on jargon.
+  case small
+  /// Whisper large-v3 turbo, compressed: the default, and the one whose French holds.
+  case largeTurbo
+
+  /// Its folder in the repository WhisperKit downloads from, `argmaxinc/whisperkit-coreml`.
+  public var repositoryFolder: String {
+    switch self {
+    case .small: "openai_whisper-small_216MB"
+    case .largeTurbo: "openai_whisper-large-v3-v20240930_626MB"
+    }
+  }
+
+  /// What it weighs once downloaded, as its repository names it: said before it is downloaded.
+  public var downloadSize: Int64 {
+    switch self {
+    case .small: 216_000_000
+    case .largeTurbo: 626_000_000
+    }
+  }
+}
+
+/// What the user chose for dictation.
+public struct DictationSettings: Equatable, Codable, Sendable {
+  public var variant: DictationModelVariant
+  /// A Whisper language code, `fr`, `en`… `nil` lets the model tell which language it hears.
+  public var language: String?
+
+  public init(variant: DictationModelVariant = .largeTurbo, language: String? = nil) {
+    self.variant = variant
+    self.language = language
+  }
+
+  /// The languages offered by name: the application's own. Whisper knows more, but a list of a
+  /// hundred buries the few anyone means, and "Automatic" hears the others.
+  public static let languages = [
+    "ar", "de", "en", "es", "fr", "hi", "it", "ja", "ko", "nl", "pl", "pt", "ru", "tr", "uk", "zh",
+  ]
+}
+
+/// Where the choice is kept.
+@MainActor
+public protocol DictationSettingsStore: AnyObject {
+  var settings: DictationSettings { get set }
+}
+
+@MainActor
+public final class InMemoryDictationSettingsStore: DictationSettingsStore {
+  public var settings: DictationSettings
+
+  public init(settings: DictationSettings = DictationSettings()) {
+    self.settings = settings
+  }
+}
+
+/// Whether the application may hear the microphone.
+public enum MicrophoneAccess: Sendable, Equatable {
+  case granted
+  case denied
+  /// Never asked: the system asks the first time it is opened.
+  case undetermined
+}
+
+/// The microphone, recorded as Whisper hears: mono, at 16 kHz, in samples between -1 and 1.
+@MainActor
+public protocol AudioRecording: AnyObject {
+  var access: MicrophoneAccess { get }
+  /// Asks the system, which asks the user once; `true` when granted.
+  func requestAccess() async -> Bool
+  func start() throws
+  /// Stops and gives back everything heard since `start`.
+  func stop() -> [Float]
+}
+
+/// A speech model on this Mac: downloaded, loaded, and asked what was said.
+public protocol SpeechTranscribing: AnyObject, Sendable {
+  /// What the model weighs on disk; `nil` when it is not downloaded.
+  func installedSize(of variant: DictationModelVariant) -> Int64?
+  /// Downloads the model, `progress` going from 0 to 1. A download interrupted is started again.
+  func download(
+    _ variant: DictationModelVariant, progress: @escaping @Sendable (Double) -> Void
+  ) async throws
+  /// Loads the model, compiling it for this Mac the first time — which can take a minute.
+  func prepare(_ variant: DictationModelVariant) async throws
+  /// What was said in `samples`, guided by `prompt`: the words the speaker is likely to use.
+  func transcribe(
+    _ samples: [Float], with variant: DictationModelVariant, language: String?, prompt: String
+  ) async throws -> String
+  /// Deletes the model from the disk, and forgets it if it was loaded.
+  func remove(_ variant: DictationModelVariant) async throws
+}
+
+/// What dictation does with what it heard, before and after the model: pure, so it is tested.
+public enum DictationTranscript {
+  /// Samples per second, as Whisper hears.
+  public static let sampleRate = 16_000
+
+  /// Whether anything louder than the room was heard. Whisper given a silence makes up a sentence
+  /// — in French, the credits of the subtitles it was trained on — so a silence is never given to
+  /// it: the loudest tenth of a second must stand above the background noise.
+  public static func containsSpeech(_ samples: [Float]) -> Bool {
+    let window = sampleRate / 10
+    guard samples.count >= window else { return false }
+    var loudest: Float = 0
+    var start = 0
+    while start + window <= samples.count {
+      var sum: Float = 0
+      for sample in samples[start..<start + window] { sum += sample * sample }
+      loudest = max(loudest, (sum / Float(window)).squareRoot())
+      start += window
+    }
+    return loudest >= speechThreshold
+  }
+
+  /// The root mean square of a tenth of a second that is speech: a voice at a normal distance
+  /// from a laptop's microphone stands well above it, a quiet room well below.
+  static let speechThreshold: Float = 0.015
+
+  /// The sentences Whisper is known to make up over a pause — the credits and sign-offs of the
+  /// videos it learnt from — taken out of what it heard. Compared without case or punctuation.
+  static let hallucinations = [
+    "sous-titres réalisés par la communauté d'amara.org",
+    "sous-titrage st' 501",
+    "sous-titrage société radio-canada",
+    "merci d'avoir regardé cette vidéo",
+    "thank you for watching",
+    "thanks for watching",
+    "subtitles by the amara.org community",
+  ]
+
+  /// The text to insert: what the model said, without its made-up sentences and spaces.
+  public static func cleaned(_ text: String) -> String {
+    var result = text
+    for phrase in hallucinations {
+      while let range = result.range(
+        of: phrase, options: [.caseInsensitive, .diacriticInsensitive])
+      {
+        result.removeSubrange(range)
+      }
+    }
+    let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
+    // What is left of a sentence taken out: its full stop, alone.
+    return trimmed.allSatisfy { $0.isPunctuation || $0.isWhitespace } ? "" : trimmed
+  }
+
+  /// `text` as it is inserted between two characters of the draft: a space on either side where
+  /// it would otherwise touch a word.
+  public static func spaced(_ text: String, after previous: Character?, before next: Character?)
+    -> String
+  {
+    var result = text
+    if let previous, !previous.isWhitespace { result = " " + result }
+    if let next, !next.isWhitespace, !next.isPunctuation { result += " " }
+    return result
+  }
+
+  /// The words the speaker is likely to say, given to the model as the text that came before:
+  /// the terms of the trade, a few files at the root of the project, its branch and its name.
+  /// Whisper keeps the end of a prompt, and every word of it costs time before the first one heard
+  /// is written: it is kept short, the most particular words last, so they are the ones kept.
+  public static func prompt(projectName: String?, branch: String?, fileNames: [String]) -> String {
+    var words = commonTerms
+    words.append(contentsOf: fileNames.prefix(5))
+    if let branch, !branch.isEmpty { words.append(branch) }
+    if let projectName, !projectName.isEmpty { words.append(projectName) }
+    var seen = Set<String>()
+    let unique = words.filter { seen.insert($0).inserted }
+    var prompt = unique.joined(separator: ", ")
+    while prompt.count > maximumPromptLength, let comma = prompt.firstIndex(of: ",") {
+      prompt = String(prompt[prompt.index(after: comma)...]).trimmingCharacters(in: .whitespaces)
+    }
+    return prompt
+  }
+
+  /// About fifty tokens: what the transcriber keeps of a prompt.
+  static let maximumPromptLength = 200
+
+  /// The words of a developer's prompts that a general model writes wrong.
+  static let commonTerms = [
+    "Claude Code", "Codex", "commit", "pull request", "CI", "GitHub", "worktree", "build",
+  ]
+}

@@ -79,7 +79,7 @@ extension AppModel {
   }
 
   /// The branch the session works on: as last read on disk, or as recorded when it started.
-  private func branch(of session: WorkSession) -> String? {
+  func branch(of session: WorkSession) -> String? {
     guard let repository = session.repositories.first else { return nil }
     let live = repositoryStatus(for: session.id, path: repository.path)?.lastValid?.branch
       .branchName

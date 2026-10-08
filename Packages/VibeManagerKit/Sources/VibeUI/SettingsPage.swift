@@ -26,6 +26,8 @@ public enum SettingsPage: Hashable, Sendable {
   case webView
   /// The prompt templates: a list, an editor and a preview.
   case templates
+  /// The composer's dictation (#340): the speech model, and the language spoken.
+  case dictation
   /// The titles of the tickets a new session names (#89).
   case tickets
   /// The resolvers that recognise a ticket's address, reached from the tickets.
@@ -102,6 +104,9 @@ public enum SettingsPage: Hashable, Sendable {
     case .templates:
       LocalizedStringResource(
         "Templates", bundle: .module, comment: "A page of the Settings window.")
+    case .dictation:
+      LocalizedStringResource(
+        "Dictation", bundle: .module, comment: "A page of the Settings window.")
     case .tickets:
       LocalizedStringResource("Tickets", bundle: .module, comment: "A page of the Settings window.")
     case .ticketResolvers:
@@ -127,6 +132,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .newEndpoint: "plus"
     case .webView: "globe"
     case .templates: "text.badge.plus"
+    case .dictation: "mic.fill"
     case .tickets, .ticketResolvers: "ticket.fill"
     case .privacy: "hand.raised.fill"
     case .updates: "arrow.down.circle.fill"
@@ -145,6 +151,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .newEndpoint: .secondary
     case .webView: .cyan
     case .templates: .purple
+    case .dictation: .red
     case .tickets, .ticketResolvers: .orange
     case .privacy: .blue
     }

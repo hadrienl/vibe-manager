@@ -5,6 +5,7 @@ import VibeApplication
 import VibeAvatar
 import VibeBrowser
 import VibeConversationUI
+import VibeDictation
 import VibeDomain
 import VibeEndpoints
 import VibeGit
@@ -463,6 +464,13 @@ public final class AppEnvironment {
       appearancePalette: UserDefaultsSessionAppearancePaletteStore(suiteName: data.defaultsSuite),
       beep: { NSSound.beep() }
     )
+    // The composer's dictation (#340): Whisper on this Mac, its models beside this copy's data —
+    // never in the bundle — and the choice of model and language in the user defaults.
+    appModel.dictation = DictationController(
+      transcriber: WhisperSpeechTranscriber(
+        directory: dataFolder.appendingPathComponent("SpeechModels", isDirectory: true)),
+      recorder: MicrophoneRecorder(),
+      store: UserDefaultsDictationSettingsStore(suiteName: data.defaultsSuite))
     // The first launch's tour (#338), before the window loads and resumes it.
     appModel.onboarding = OnboardingModel(
       preferences: UserDefaultsOnboardingPreferences(suiteName: data.defaultsSuite))

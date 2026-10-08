@@ -140,6 +140,13 @@ extension AppModel {
       model.showTerminal = { [weak self] in
         self?.setPresentation(.terminal, of: id)
       }
+      model.dictation = self?.dictation
+      model.dictationVocabulary = { [weak self] in
+        guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
+          return ""
+        }
+        return Self.dictationVocabulary(of: session, branch: self.branch(of: session))
+      }
       model.chooseFiles = { [weak self] in
         guard let self else { return }
         if self.selectedSessionID != id { self.select(id) }
@@ -179,6 +186,23 @@ extension AppModel {
       model.activity = self?.activity(for: id)?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activity(for: id))
     }
+  }
+}
+
+extension AppModel {
+  /// The words a prompt to `session` is likely to use (#340): its folder's name, its branch, and
+  /// what lies at the root of its folder — read when a dictation stops, a listing of one folder.
+  static func dictationVocabulary(of session: WorkSession, branch: String?) -> String {
+    guard let path = RestartSession.workingDirectoryPath(of: session) else {
+      return DictationTranscript.prompt(projectName: nil, branch: branch, fileNames: [])
+    }
+    let folder = URL(fileURLWithPath: path, isDirectory: true)
+    let names =
+      (try? FileManager.default.contentsOfDirectory(
+        at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]))?
+      .map(\.lastPathComponent).sorted() ?? []
+    return DictationTranscript.prompt(
+      projectName: folder.lastPathComponent, branch: branch, fileNames: names)
   }
 }
 
