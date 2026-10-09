@@ -106,6 +106,9 @@ public struct ConversationView: View {
     .environment(\.readAloud, model.readAloud)
     // The voice loaded while the conversation is read, not when its first answer is (#357).
     .task { model.readAloud?.warmUp() }
+    // The audio mode (#357): the answers that arrive are read, in the conversation on screen.
+    .onChange(of: model.agentAnswers.map(\.id), initial: true) { followAnswers() }
+    .onChange(of: isActive) { followAnswers() }
     .environment(\.colorScheme, theme.colorScheme)
     // Coming on screen is when the composer takes the keyboard, as the terminal does (#105): only
     // then, never for a message that arrives or a state that changes. Asked of the model rather
@@ -113,7 +116,10 @@ public struct ConversationView: View {
     .onAppear { if isActive { claimKeyboardOnActivation() } }
     // Every conversation shown lately stays mounted: only the one on screen is laid out (#250).
     .onChange(of: isActive, initial: true) { _, isActive in model.setShown(isActive) }
-    .onDisappear { model.setShown(false) }
+    .onDisappear {
+      model.setShown(false)
+      model.readAloud?.forget(ObjectIdentifier(model))
+    }
     .onChange(of: isActive) { _, isActive in
       if isActive {
         claimKeyboardOnActivation()
@@ -449,5 +455,13 @@ private struct ToolbarVeil: ViewModifier {
     } else {
       content
     }
+  }
+}
+
+extension ConversationView {
+  /// Tells the reading aloud the answers this conversation has now, and whether it is on screen.
+  fileprivate func followAnswers() {
+    model.readAloud?.follow(
+      model.agentAnswers, in: ObjectIdentifier(model), isOnScreen: isActive)
   }
 }

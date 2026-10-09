@@ -300,6 +300,16 @@ public final class ConversationModel {
   /// The application's dictation (#340); `nil` where there is none, and the composer shows no
   /// microphone.
   @ObservationIgnored public var dictation: DictationController?
+  /// The agent's answers, in their order: what the audio mode reads as they arrive (#357).
+  public var agentAnswers: [(id: String, text: String)] {
+    blocks.compactMap { block in
+      guard case .entry(let entry) = block, case .agentText(let text) = entry.content else {
+        return nil
+      }
+      return (entry.id, text)
+    }
+  }
+
   /// The application's reading aloud (#357); `nil` before macOS 15.
   @ObservationIgnored public var readAloud: ReadAloudController?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.

@@ -54,10 +54,25 @@ public enum SpeechLanguage: String, CaseIterable, Codable, Sendable {
 public struct SpeechSettings: Equatable, Codable, Sendable {
   public var voice: SpeechVoice
   public var language: SpeechLanguage
+  /// The audio mode: every new answer of the agent in the conversation on screen is read as
+  /// it arrives.
+  public var readsAnswers: Bool
 
-  public init(voice: SpeechVoice = .serena, language: SpeechLanguage = .preferred()) {
+  public init(
+    voice: SpeechVoice = .serena, language: SpeechLanguage = .preferred(),
+    readsAnswers: Bool = false
+  ) {
     self.voice = voice
     self.language = language
+    self.readsAnswers = readsAnswers
+  }
+
+  /// A choice kept before the audio mode existed keeps its voice and language.
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    voice = try container.decode(SpeechVoice.self, forKey: .voice)
+    language = try container.decode(SpeechLanguage.self, forKey: .language)
+    readsAnswers = try container.decodeIfPresent(Bool.self, forKey: .readsAnswers) ?? false
   }
 }
 
@@ -85,6 +100,9 @@ public protocol SpeechSynthesizing: AnyObject, Sendable {
   /// Loads the model, compiling it for this Mac's Neural Engine the first time a copy of the
   /// application loads it — minutes, the first time.
   func prepare() async throws
+  /// Prepares what reading in this voice and language needs, so that the first answer read in
+  /// them starts at once.
+  func prepare(voice: SpeechVoice, language: SpeechLanguage) async throws
   /// Reads `text` aloud and returns once it is heard to its end. Cancelling the task stops the
   /// voice at once.
   func speak(_ text: String, voice: SpeechVoice, language: SpeechLanguage) async throws
