@@ -47613,6 +47613,208 @@
         }
       }
     },
+    "Click ▶ under an answer of the agent to hear it." : {
+      "comment" : "The body of the notification said when the voice is ready. ▶ is the button under each answer.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقر ▶ أسفل إجابة من الوكيل لسماعها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klicke auf ▶ unter einer Antwort des Agenten, um sie zu hören."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en ▶ debajo de una respuesta del agente para escucharla."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquez sur ▶ sous une réponse de l’agent pour l’écouter."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "किसी उत्तर को सुनने के लिए एजेंट के उत्तर के नीचे ▶ पर क्लिक करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic su ▶ sotto una risposta dell’agente per ascoltarla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エージェントの回答の下にある ▶ をクリックすると聞けます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에이전트 답변 아래의 ▶를 클릭하면 들을 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klik op ▶ onder een antwoord van de agent om het te horen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kliknij ▶ pod odpowiedzią agenta, aby ją usłyszeć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clique em ▶ abaixo de uma resposta do agente para ouvi-la."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите ▶ под ответом агента, чтобы прослушать его."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dinlemek için aracının yanıtının altındaki ▶ simgesini tıklayın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Натисніть ▶ під відповіддю агента, щоб прослухати її."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按代理回答下方的 ▶ 即可收听。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按一下代理回答下方的 ▶ 即可收聽。"
+          }
+        }
+      }
+    },
+    "Click ▶ under an answer of the agent to hear it. The voice runs on this Mac: nothing is sent anywhere." : {
+      "comment" : "The footer of Settings › Voice › Reading Aloud. ▶ is the button under each answer.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقر ▶ أسفل إجابة من الوكيل لسماعها. يعمل الصوت على هذا الـ Mac: لا يُرسل أي شيء إلى أي مكان."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klicke auf ▶ unter einer Antwort des Agenten, um sie zu hören. Die Stimme läuft auf diesem Mac: Nichts wird irgendwohin gesendet."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Haz clic en ▶ debajo de una respuesta del agente para escucharla. La voz funciona en este Mac: no se envía nada a ningún sitio."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cliquez sur ▶ sous une réponse de l’agent pour l’écouter. La voix fonctionne sur ce Mac : rien n’est envoyé nulle part."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "किसी उत्तर को सुनने के लिए एजेंट के उत्तर के नीचे ▶ पर क्लिक करें। आवाज़ इसी Mac पर चलती है: कुछ भी कहीं नहीं भेजा जाता।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fai clic su ▶ sotto una risposta dell’agente per ascoltarla. La voce funziona su questo Mac: non viene inviato nulla."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エージェントの回答の下にある ▶ をクリックすると聞けます。音声はこのMac上で動作し、何も送信されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에이전트 답변 아래의 ▶를 클릭하면 들을 수 있습니다. 음성은 이 Mac에서 실행되며 아무것도 전송되지 않습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klik op ▶ onder een antwoord van de agent om het te horen. De stem werkt op deze Mac: er wordt niets verstuurd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kliknij ▶ pod odpowiedzią agenta, aby ją usłyszeć. Głos działa na tym Macu: nic nie jest nigdzie wysyłane."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Clique em ▶ abaixo de uma resposta do agente para ouvi-la. A voz funciona neste Mac: nada é enviado."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нажмите ▶ под ответом агента, чтобы прослушать его. Голос работает на этом Mac: ничего никуда не отправляется."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dinlemek için aracının yanıtının altındaki ▶ simgesini tıklayın. Ses bu Mac'te çalışır: hiçbir şey bir yere gönderilmez."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Натисніть ▶ під відповіддю агента, щоб прослухати її. Голос працює на цьому Mac: нічого нікуди не надсилається."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "点按代理回答下方的 ▶ 即可收听。语音在这台 Mac 上运行：不会发送任何内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "按一下代理回答下方的 ▶ 即可收聽。語音在這台 Mac 上執行：不會傳送任何內容。"
+          }
+        }
+      }
+    },
     "Close" : {
       "comment" : "Closes a side terminal.",
       "localizations" : {
@@ -109914,208 +110116,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "修訂版本 %@"
-          }
-        }
-      }
-    },
-    "Right-click an answer of the agent, then choose Read Aloud." : {
-      "comment" : "The body of the notification said when the voice is ready.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "انقر بزر الماوس الأيمن على إجابة من الوكيل، ثم اختر «القراءة بصوت عالٍ»."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klicke mit der rechten Maustaste auf eine Antwort des Agenten und wähle „Vorlesen“."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Haz clic derecho en una respuesta del agente y elige Leer en voz alta."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faites un clic droit sur une réponse de l’agent, puis choisissez Lire à voix haute."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "एजेंट के किसी उत्तर पर राइट-क्लिक करें, फिर ज़ोर से पढ़ें चुनें।"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fai clic con il tasto destro su una risposta dell’agente, poi scegli Leggi ad alta voce."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "エージェントの回答を右クリックして「読み上げる」を選択します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "에이전트의 답변을 오른쪽 클릭한 다음 소리 내어 읽기를 선택하십시오."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klik met de rechtermuisknop op een antwoord van de agent en kies Voorlezen."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kliknij prawym przyciskiem odpowiedź agenta, a potem wybierz Czytaj na głos."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clique com o botão direito em uma resposta do agente e escolha Ler em voz alta."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Щёлкните правой кнопкой по ответу агента и выберите «Прочитать вслух»."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aracının bir yanıtına sağ tıklayın, sonra Sesli oku'yu seçin."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Клацніть правою кнопкою на відповіді агента й виберіть «Прочитати вголос»."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "右键点按代理的回答，然后选择“朗读”。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "以右鍵按一下代理的回答，然後選擇「朗讀」。"
-          }
-        }
-      }
-    },
-    "Right-click an answer of the agent, then choose Read Aloud. The voice runs on this Mac: nothing is sent anywhere." : {
-      "comment" : "The footer of Settings › Voice › Reading Aloud.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "انقر بزر الماوس الأيمن على إجابة من الوكيل، ثم اختر «القراءة بصوت عالٍ». يعمل الصوت على هذا الـ Mac: لا يُرسل أي شيء إلى أي مكان."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klicke mit der rechten Maustaste auf eine Antwort des Agenten und wähle „Vorlesen“. Die Stimme läuft auf diesem Mac: Nichts wird irgendwohin gesendet."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Haz clic derecho en una respuesta del agente y elige Leer en voz alta. La voz funciona en este Mac: no se envía nada a ningún sitio."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Faites un clic droit sur une réponse de l’agent, puis choisissez Lire à voix haute. La voix fonctionne sur ce Mac : rien n’est envoyé nulle part."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "एजेंट के किसी उत्तर पर राइट-क्लिक करें, फिर ज़ोर से पढ़ें चुनें। आवाज़ इसी Mac पर चलती है: कुछ भी कहीं नहीं भेजा जाता।"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fai clic con il tasto destro su una risposta dell’agente, poi scegli Leggi ad alta voce. La voce funziona su questo Mac: non viene inviato nulla."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "エージェントの回答を右クリックして「読み上げる」を選択します。音声はこのMac上で動作し、何も送信されません。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "에이전트의 답변을 오른쪽 클릭한 다음 소리 내어 읽기를 선택하십시오. 음성은 이 Mac에서 실행되며 아무것도 전송되지 않습니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klik met de rechtermuisknop op een antwoord van de agent en kies Voorlezen. De stem werkt op deze Mac: er wordt niets verstuurd."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kliknij prawym przyciskiem odpowiedź agenta, a potem wybierz Czytaj na głos. Głos działa na tym Macu: nic nie jest nigdzie wysyłane."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clique com o botão direito em uma resposta do agente e escolha Ler em voz alta. A voz funciona neste Mac: nada é enviado."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Щёлкните правой кнопкой по ответу агента и выберите «Прочитать вслух». Голос работает на этом Mac: ничего никуда не отправляется."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Aracının bir yanıtına sağ tıklayın, sonra Sesli oku'yu seçin. Ses bu Mac'te çalışır: hiçbir şey bir yere gönderilmez."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Клацніть правою кнопкою на відповіді агента й виберіть «Прочитати вголос». Голос працює на цьому Mac: нічого нікуди не надсилається."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "右键点按代理的回答，然后选择“朗读”。语音在这台 Mac 上运行：不会发送任何内容。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "以右鍵按一下代理的回答，然後選擇「朗讀」。語音在這台 Mac 上執行：不會傳送任何內容。"
           }
         }
       }

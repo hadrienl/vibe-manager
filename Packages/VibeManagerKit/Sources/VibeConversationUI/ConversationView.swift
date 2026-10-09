@@ -419,7 +419,7 @@ struct BlockView: View {
       case .userPrompt(let text, let attachments):
         UserPromptView(text: text, attachments: attachments, date: entry.date)
       case .agentText(let text):
-        AgentTextView(text: text)
+        AgentTextView(text: text, readAloud: model.readAloud)
       case .reasoning(let text):
         ReasoningRow(id: entry.id, text: text, model: model)
       case .tool(let call) where call.kind == .subagent:

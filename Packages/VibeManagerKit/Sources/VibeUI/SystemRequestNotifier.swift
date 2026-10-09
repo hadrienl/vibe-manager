@@ -131,7 +131,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       notifies: notifies, identifier: Self.speechKey,
       title: LocalizedStringResource("The voice is ready.", bundle: .module),
       body: LocalizedStringResource(
-        "Right-click an answer of the agent, then choose Read Aloud.", bundle: .module))
+        "Click ▶ under an answer of the agent to hear it.", bundle: .module))
   }
 
   /// A model downloaded and prepared, minutes after it was asked for, when the user may have
