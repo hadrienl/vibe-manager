@@ -42,14 +42,7 @@ struct DictationButton: View {
         hidesProgress = false
         return
       }
-      hidesProgress = false
-      // The field the text goes to, if it has the keyboard now: another field that has it by the
-      // time the text is heard must not receive it.
-      let field = WeakTextView(PromptComposer.composerTextView(showing: model.draft))
-      dictation.toggle(
-        DictationController.Request(
-          owner: owner, vocabulary: { model.dictationVocabulary() },
-          insert: { text in PromptComposer.insertDictation(text, into: model, field: field.view) }))
+      toggle()
     } label: {
       Group {
         if isWorking {
@@ -82,8 +75,19 @@ struct DictationButton: View {
         ? Text("Stop and insert what you said", bundle: .module)
         : Text("Dictate a message, transcribed on this Mac", bundle: .module))
     .popover(isPresented: popoverBinding, arrowEdge: .top) {
-      DictationPopover(dictation: dictation)
+      DictationPopover(dictation: dictation, dictate: toggle)
     }
+  }
+
+  private func toggle() {
+    hidesProgress = false
+    // The field the text goes to, if it has the keyboard now: another field that has it by the
+    // time the text is heard must not receive it.
+    let field = WeakTextView(PromptComposer.composerTextView(showing: model.draft))
+    dictation.toggle(
+      DictationController.Request(
+        owner: owner, vocabulary: { model.dictationVocabulary() },
+        insert: { text in PromptComposer.insertDictation(text, into: model, field: field.view) }))
   }
 
   /// Shown while the dictation that this composer asked for waits on something, or stopped.
@@ -91,7 +95,7 @@ struct DictationButton: View {
     Binding(
       get: {
         guard isMine else { return false }
-        if dictation.problem != nil { return true }
+        if dictation.problem != nil || dictation.isReadyToDictate { return true }
         switch dictation.phase {
         case .offeringDownload: return true
         case .downloading, .preparing: return !hidesProgress
@@ -115,6 +119,8 @@ struct DictationButton: View {
 /// What the dictation waits on, or what stopped it.
 struct DictationPopover: View {
   let dictation: DictationController
+  /// Starts the dictation, once the model is ready.
+  let dictate: () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 10) {
@@ -133,6 +139,19 @@ struct DictationPopover: View {
   private var content: some View {
     if let problem = dictation.problem {
       problemContent(problem)
+    } else if dictation.isReadyToDictate {
+      Text("The speech model is ready.", bundle: .module).font(.headline)
+      Text("Click the microphone to dictate.", bundle: .module)
+        .fixedSize(horizontal: false, vertical: true)
+      HStack {
+        Spacer()
+        Button {
+          dictate()
+        } label: {
+          Text("Dictate", bundle: .module)
+        }
+        .keyboardShortcut(.defaultAction)
+      }
     } else {
       switch dictation.phase {
       case .offeringDownload:

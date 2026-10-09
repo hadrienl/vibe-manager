@@ -7,7 +7,8 @@ import VibeApplication
 ///
 /// One for the whole application: one model loaded, one microphone. A composer asks for it and
 /// owns it until its text is inserted; the others wait. The model is downloaded the first time,
-/// once the user agreed, and the dictation that asked starts as soon as it is ready.
+/// once the user agreed. Ready, it records nothing by itself: the user, who may have turned to
+/// something else meanwhile, is told, and clicks the microphone again.
 @MainActor
 @Observable
 public final class DictationController {
@@ -53,6 +54,11 @@ public final class DictationController {
   public private(set) var problem: Problem?
   /// The composer the phase or the problem belongs to; `nil` for a download asked from Settings.
   public private(set) var owner: ObjectIdentifier?
+  /// The model the owner asked for is ready: its composer says so until the next click.
+  public private(set) var isReadyToDictate = false
+  /// Called once a model is downloaded and prepared: the application tells the user, who may be
+  /// elsewhere — a download and its preparation take minutes.
+  @ObservationIgnored public var modelDidBecomeReady: (() -> Void)?
   /// What each model downloaded weighs on disk.
   public private(set) var installedSizes: [DictationModelVariant: Int64] = [:]
 
@@ -85,7 +91,7 @@ public final class DictationController {
 
   /// Whether a dictation, or what stopped one, belongs to this composer.
   public func concerns(_ owner: ObjectIdentifier) -> Bool {
-    self.owner == owner && (phase != .idle || problem != nil)
+    self.owner == owner && (phase != .idle || problem != nil || isReadyToDictate)
   }
 
   /// Whether another composer, or Settings, holds the dictation: this one waits.
@@ -104,6 +110,7 @@ public final class DictationController {
     self.request = request
     owner = request.owner
     problem = nil
+    isReadyToDictate = false
     guard isModelInstalled else {
       phase = .offeringDownload
       return
@@ -111,10 +118,10 @@ public final class DictationController {
     Task { await startRecording() }
   }
 
-  /// The user agreed to download the model: the dictation that asked starts once it is ready.
+  /// The user agreed to download the model.
   public func acceptDownload() {
     guard phase == .offeringDownload else { return }
-    downloadModel(then: true)
+    downloadModel()
   }
 
   /// Settings › Dictation: the model chosen, downloaded now, for no dictation in particular.
@@ -123,10 +130,11 @@ public final class DictationController {
     request = nil
     owner = nil
     problem = nil
-    downloadModel(then: false)
+    isReadyToDictate = false
+    downloadModel()
   }
 
-  private func downloadModel(then records: Bool) {
+  private func downloadModel() {
     let variant = settings.variant
     phase = .downloading(fraction: 0)
     download = Task {
@@ -145,7 +153,10 @@ public final class DictationController {
       refreshInstalledSizes()
       guard !Task.isCancelled else { return }
       phase = .idle
-      if records, request != nil { await startRecording() } else { owner = nil }
+      request = nil
+      // Never a recording started by itself: the composer that asked says the model is ready.
+      isReadyToDictate = owner != nil
+      modelDidBecomeReady?()
     }
   }
 
@@ -196,6 +207,7 @@ public final class DictationController {
 
   public func dismissProblem() {
     problem = nil
+    isReadyToDictate = false
     if phase == .idle { owner = nil }
   }
 

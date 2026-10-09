@@ -23,6 +23,8 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   nonisolated static let requestKey = "request"
   /// Marks a notification about a session's outcome (#236), which names no request.
   nonisolated static let outcomeKey = "outcome"
+  /// Marks the notification that the dictation's model is ready (#340).
+  nonisolated static let dictationKey = "dictation"
 
   private let center: UNUserNotificationCenter
   private weak var model: AppModel?
@@ -106,6 +108,27 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       content.sound = .default
       content.threadIdentifier = session
       content.userInfo = [Self.sessionKey: session, Self.outcomeKey: true]
+      deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
+  /// The speech model is downloaded and prepared (#340): minutes after the user asked, when they
+  /// may have turned to something else. Said with a sound even with the application in front,
+  /// where the notification itself is not shown.
+  public func postDictationReady() {
+    if NSApp?.isActive == true { NSSound(named: "Glass")?.play() }
+    let identifier = Self.dictationKey
+    wanted.insert(identifier)
+    Task {
+      guard await authorized() else { return }
+      let content = UNMutableNotificationContent()
+      content.title = String(
+        localized: LocalizedStringResource("The speech model is ready.", bundle: .module))
+      content.body = String(
+        localized: LocalizedStringResource(
+          "Click the microphone in the composer to dictate.", bundle: .module))
+      content.sound = .default
+      content.userInfo = [Self.dictationKey: true]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
   }
@@ -235,6 +258,10 @@ extension SystemRequestNotifier: UNUserNotificationCenterDelegate {
     let userInfo = response.notification.request.content.userInfo
     if let session = Self.outcomeSessionID(from: userInfo) {
       await open(session)
+      return
+    }
+    if userInfo[Self.dictationKey] as? Bool == true {
+      await NSApp.activate()
       return
     }
     guard let id = Self.requestID(from: userInfo) else {

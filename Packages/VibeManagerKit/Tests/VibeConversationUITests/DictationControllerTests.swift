@@ -133,12 +133,14 @@ struct DictationControllerTests {
     #expect(!dictation.concerns(ObjectIdentifier(composer)))
   }
 
-  @Test("Without the model, the download is offered; accepted, the dictation starts once ready")
+  @Test("Without the model, the download is offered; ready, the user is told and clicks again")
   func offersDownload() async {
     let recorder = FakeRecorder()
     let transcriber = FakeTranscriber()
     let dictation = DictationController(
       transcriber: transcriber, recorder: recorder, store: InMemoryDictationSettingsStore())
+    var readyCount = 0
+    dictation.modelDidBecomeReady = { readyCount += 1 }
     let composer = Composer()
     #expect(!dictation.isModelInstalled)
 
@@ -147,10 +149,18 @@ struct DictationControllerTests {
     #expect(!recorder.isRecording)
 
     dictation.acceptDownload()
-    await until { dictation.phase == .recording }
-    #expect(dictation.phase == .recording)
-    #expect(dictation.isModelInstalled)
+    await until { dictation.isReadyToDictate }
+    // Minutes may have gone by: nothing records until the user clicks again.
+    #expect(dictation.phase == .idle)
+    #expect(!recorder.isRecording)
+    #expect(readyCount == 1)
+    #expect(dictation.concerns(ObjectIdentifier(composer)))
     #expect(dictation.installedSizes[.largeTurbo] == DictationModelVariant.largeTurbo.downloadSize)
+
+    dictation.toggle(request(composer))
+    await until { dictation.phase == .recording }
+    #expect(recorder.isRecording)
+    #expect(!dictation.isReadyToDictate)
   }
 
   @Test("Declined, the offer goes and nothing is downloaded")
@@ -241,6 +251,7 @@ struct DictationControllerTests {
     #expect(dictation.phase == .idle)
     #expect(!recorder.isRecording)
     #expect(dictation.owner == nil)
+    #expect(!dictation.isReadyToDictate)
   }
 
   @Test("Escape throws the recording away")

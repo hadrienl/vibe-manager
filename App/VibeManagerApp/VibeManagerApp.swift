@@ -70,8 +70,12 @@ struct VibeManagerApp: App {
           // Notifications need the application's bundle: the notifier is made here, not in the
           // package, whose tests have none (#40).
           if environment.appModel.requestNotifier == nil {
-            environment.appModel.requestNotifier = SystemRequestNotifier(
-              model: environment.appModel)
+            let notifier = SystemRequestNotifier(model: environment.appModel)
+            environment.appModel.requestNotifier = notifier
+            // The speech model ready, minutes after it was asked for (#340).
+            environment.appModel.dictation?.modelDidBecomeReady = { [weak notifier] in
+              notifier?.postDictationReady()
+            }
           }
           // The requests above the other applications (#41): a window of its own, shown only
           // when the option is on and Vibe Manager is not in front.
