@@ -25,6 +25,8 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   nonisolated static let outcomeKey = "outcome"
   /// Marks the notification that the dictation's model is ready (#340).
   nonisolated static let dictationKey = "dictation"
+  /// Marks the notification that the voice reading the answers is ready (#357).
+  nonisolated static let speechKey = "speech"
 
   private let center: UNUserNotificationCenter
   private weak var model: AppModel?
@@ -116,20 +118,39 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   /// may have turned to something else. A sound alone when the application is in front, or may
   /// not notify.
   public func postDictationReady(notifies: Bool) {
+    postReady(
+      notifies: notifies, identifier: Self.dictationKey,
+      title: LocalizedStringResource("The speech model is ready.", bundle: .module),
+      body: LocalizedStringResource(
+        "Click the microphone in the composer to dictate.", bundle: .module))
+  }
+
+  /// The voice that reads the answers is ready (#357).
+  public func postSpeechReady(notifies: Bool) {
+    postReady(
+      notifies: notifies, identifier: Self.speechKey,
+      title: LocalizedStringResource("The voice is ready.", bundle: .module),
+      body: LocalizedStringResource(
+        "Right-click an answer of the agent, then choose Read Aloud.", bundle: .module))
+  }
+
+  /// A model downloaded and prepared, minutes after it was asked for, when the user may have
+  /// turned to something else. A sound alone when the application is in front, or may not
+  /// notify.
+  private func postReady(
+    notifies: Bool, identifier: String, title: LocalizedStringResource,
+    body: LocalizedStringResource
+  ) {
     guard notifies else {
       NSSound(named: "Glass")?.play()
       return
     }
-    let identifier = Self.dictationKey
     wanted.insert(identifier)
     Task {
       guard await authorized() else { return }
       let content = UNMutableNotificationContent()
-      content.title = String(
-        localized: LocalizedStringResource("The speech model is ready.", bundle: .module))
-      content.body = String(
-        localized: LocalizedStringResource(
-          "Click the microphone in the composer to dictate.", bundle: .module))
+      content.title = String(localized: title)
+      content.body = String(localized: body)
       content.sound = .default
       content.userInfo = [Self.dictationKey: true]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))

@@ -417,7 +417,7 @@ struct SettingsPageView: View {
         conversationAppearance: model.conversations.appearance)
     case .dictation:
       if let dictation = model.dictation {
-        DictationSettingsView(dictation: dictation)
+        DictationSettingsView(dictation: dictation, readAloud: model.readAloud)
       }
     case .archiveRules:
       if let rules = model.archiveRules {

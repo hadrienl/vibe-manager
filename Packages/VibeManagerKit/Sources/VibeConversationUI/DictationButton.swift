@@ -81,6 +81,8 @@ struct DictationButton: View {
 
   private func toggle() {
     hidesProgress = false
+    // The microphone would hear the voice.
+    model.readAloud?.stop()
     // The field the text goes to, if it has the keyboard now: another field that has it by the
     // time the text is heard must not receive it.
     let field = WeakTextView(PromptComposer.composerTextView(showing: model.draft))

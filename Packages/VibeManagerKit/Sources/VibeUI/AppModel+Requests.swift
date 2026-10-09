@@ -36,6 +36,8 @@ public protocol RequestNotifying: AnyObject {
   /// An automatic archive rule archived sessions (#405): a discreet notification, turned off in
   /// the Settings.
   func postArchiveRun(ruleName: String, count: Int)
+  /// The voice that reads the answers is ready (#357).
+  func postSpeechReady(notifies: Bool)
 }
 
 extension RequestNotifying {
@@ -43,6 +45,7 @@ extension RequestNotifying {
   public func postDictationReady(notifies: Bool) {}
   public func postAlertSound(title: String, body: String) {}
   public func postArchiveRun(ruleName: String, count: Int) {}
+  public func postSpeechReady(notifies: Bool) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.

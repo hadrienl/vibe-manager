@@ -32,7 +32,8 @@ public enum SettingsPage: Hashable, Sendable {
   case companion
   /// The prompt templates: a list, an editor and a preview.
   case templates
-  /// The composer's dictation (#340): the speech model, and the language spoken.
+  /// The composer's dictation (#340): the speech model, and the language spoken; the voice that
+  /// reads the answers aloud (#357).
   case dictation
   /// The rules that archive finished sessions on their own (#405).
   case archiveRules
@@ -129,7 +130,8 @@ public enum SettingsPage: Hashable, Sendable {
         "Templates", bundle: .module, comment: "A page of the Settings window.")
     case .dictation:
       LocalizedStringResource(
-        "Dictation", bundle: .module, comment: "A page of the Settings window.")
+        "Voice", bundle: .module,
+        comment: "A page of the Settings window: dictation, and the answers read aloud.")
     case .archiveRules:
       LocalizedStringResource(
         "Automatic Archive", bundle: .module,

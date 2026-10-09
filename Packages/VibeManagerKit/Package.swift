@@ -115,10 +115,14 @@ let package = Package(
       resources: [.process("Localizable.xcstrings")]
     ),
     // The composer's dictation (#340): the microphone through an audio engine, and Whisper on
-    // this Mac through WhisperKit, behind the ports of VibeApplication. No view, no sentence.
+    // this Mac through WhisperKit; the answers read aloud with Qwen3-TTS through TTSKit (#357).
+    // Behind the ports of VibeApplication. No view, no sentence.
     .target(
       name: "VibeDictation",
-      dependencies: ["VibeApplication", .product(name: "WhisperKit", package: "WhisperKit")]
+      dependencies: [
+        "VibeApplication", .product(name: "WhisperKit", package: "WhisperKit"),
+        .product(name: "TTSKit", package: "WhisperKit"),
+      ]
     ),
     // The mobile companion (#347): the link to the companion agent embedded in the bundle, which
     // alone holds the iCloud entitlement, and the alert of a test received. No CloudKit here.
