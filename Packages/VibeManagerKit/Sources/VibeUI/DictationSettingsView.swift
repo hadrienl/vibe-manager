@@ -181,8 +181,8 @@ private struct ReadAloudSettingsSection: View {
     } footer: {
       Text(
         """
-        Right-click an answer of the agent, then choose Read Aloud. The voice runs on this Mac: \
-        nothing is sent anywhere.
+        Click ▶ under an answer of the agent to hear it. The voice runs on this Mac: nothing is \
+        sent anywhere.
         """,
         bundle: .module
       )

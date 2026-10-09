@@ -483,7 +483,7 @@ struct BlockView: View {
         UserPromptView(text: text, attachments: attachments, date: entry.date)
           .environment(\.selectionBlock, selectionBlock)
       case .agentText(let text):
-        AgentTextView(text: text)
+        AgentTextView(text: text, readAloud: model.readAloud)
           .environment(\.selectionBlock, selectionBlock)
       case .reasoning(let text):
         ReasoningRow(id: entry.id, text: text, model: model)
