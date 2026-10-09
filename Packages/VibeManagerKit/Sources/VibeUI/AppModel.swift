@@ -2,6 +2,7 @@ import AppKit
 import Foundation
 import Observation
 import VibeApplication
+import VibeConversationUI
 import VibeBrowser
 import VibeDomain
 import VibeTerminalUI
@@ -147,6 +148,9 @@ public final class AppModel {
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
   /// workspace assembled without it has no Updates tab.
   public var updates: UpdatesModel?
+  /// Dictation in the composers (#340). Set by the composition: a workspace assembled without it
+  /// shows no microphone and no Dictation tab.
+  public var dictation: DictationController?
   /// The application's name, as its bundle gives it, at the head of the window's title (#159).
   /// A workspace assembled without a bundle — the tests' — goes by the product's name.
   public var applicationName = "Vibe Manager"

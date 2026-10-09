@@ -38,9 +38,9 @@ INFOPLIST_KEY_NSNetworkVolumesUsageDescription = Vibe Manager opens the working 
 INFOPLIST_KEY_NSFileProviderDomainUsageDescription = Vibe Manager opens the working folder you chose in iCloud Drive.
 // The gateway of #107 reaches a model server on the local network, such as Ollama on another Mac.
 INFOPLIST_KEY_NSLocalNetworkUsageDescription = Vibe Manager reaches the model servers you declared on your local network.
-// A page of the web view asks for the microphone, for dictation (#315): without this key, WebKit
-// does not even give pages `navigator.mediaDevices`.
-INFOPLIST_KEY_NSMicrophoneUsageDescription = Vibe Manager uses the microphone when a page in the web view asks you for it, for example for dictation.
+// The composer's dictation (#340), and a page of the web view that asks for the microphone (#315):
+// without this key, WebKit does not even give pages `navigator.mediaDevices`.
+INFOPLIST_KEY_NSMicrophoneUsageDescription = Vibe Manager uses the microphone when you dictate a message, transcribed on this Mac, and when a page in the web view asks you for it.
 // The hardened runtime of a release refuses the microphone without its entitlement, and only it is
 // granted (ADR 0021).
 CODE_SIGN_ENTITLEMENTS = App/VibeManagerApp/VibeManager.entitlements

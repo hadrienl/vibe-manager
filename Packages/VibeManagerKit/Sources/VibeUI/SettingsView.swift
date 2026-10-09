@@ -247,6 +247,7 @@ struct SettingsSidebarContent {
     var tools: [SettingsPage] = []
     if model.browser != nil { tools.append(.webView) }
     tools.append(.templates)
+    if model.dictation != nil { tools.append(.dictation) }
     if model.ticketTitles.canReadPages { tools.append(.tickets) }
     groups.append(
       Group(
@@ -395,6 +396,10 @@ struct SettingsPageView: View {
       PromptTemplatesView(
         model: model.templates, themes: model.conversations.themes,
         conversationAppearance: model.conversations.appearance)
+    case .dictation:
+      if let dictation = model.dictation {
+        DictationSettingsView(dictation: dictation)
+      }
     case .tickets:
       TicketSettingsView(model: model.ticketTitles, pane: .general) { model.settingsPage = $0 }
     case .ticketResolvers:

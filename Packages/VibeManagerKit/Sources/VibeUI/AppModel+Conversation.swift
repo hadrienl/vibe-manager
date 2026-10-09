@@ -140,6 +140,18 @@ extension AppModel {
       model.showTerminal = { [weak self] in
         self?.setPresentation(.terminal, of: id)
       }
+      model.dictation = self?.dictation
+      model.dictationVocabulary = { [weak self] in
+        guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
+          return ""
+        }
+        let path = RestartSession.workingDirectoryPath(of: session)
+        let branch = self.branch(of: session)
+        // Its folder listed away from the main thread: it may be on a network volume.
+        return await Task.detached {
+          Self.dictationVocabulary(atPath: path, branch: branch)
+        }.value
+      }
       model.chooseFiles = { [weak self] in
         guard let self else { return }
         if self.selectedSessionID != id { self.select(id) }
@@ -179,6 +191,30 @@ extension AppModel {
       model.activity = self?.activity(for: id)?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activity(for: id))
     }
+  }
+}
+
+extension AppModel {
+  /// The speech model is ready, minutes after it was asked for (#340): notified as the agents'
+  /// requests are — out of sight, when the user lets the application notify — and heard
+  /// otherwise, the composer saying it on screen.
+  public func announceDictationReady() {
+    requestNotifier?.postDictationReady(notifies: notifiesRequests && !isApplicationActive)
+  }
+
+  /// The words a prompt to a session is likely to use (#340): its folder's name, its branch, and
+  /// what lies at the root of its folder — read while the user speaks, a listing of one folder.
+  nonisolated static func dictationVocabulary(atPath path: String?, branch: String?) -> String {
+    guard let path else {
+      return DictationTranscript.prompt(projectName: nil, branch: branch, fileNames: [])
+    }
+    let folder = URL(fileURLWithPath: path, isDirectory: true)
+    let names =
+      (try? FileManager.default.contentsOfDirectory(
+        at: folder, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles]))?
+      .map(\.lastPathComponent).sorted() ?? []
+    return DictationTranscript.prompt(
+      projectName: folder.lastPathComponent, branch: branch, fileNames: names)
   }
 }
 

@@ -297,6 +297,11 @@ public final class ConversationModel {
   @ObservationIgnored public var chooseFiles: (() -> Void)?
   /// Brings the terminal forward and gives it the keyboard.
   @ObservationIgnored public var showTerminal: (() -> Void)?
+  /// The application's dictation (#340); `nil` where there is none, and the composer shows no
+  /// microphone.
+  @ObservationIgnored public var dictation: DictationController?
+  /// The words a prompt to this session is likely to use: its project, its branch, its files.
+  @ObservationIgnored public var dictationVocabulary: @MainActor () async -> String = { "" }
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
   /// rather than the user asking: the web view's own preference then decides whether it comes
   /// forward. `nil` without a web view.

@@ -26,10 +26,14 @@ public protocol RequestNotifying: AnyObject {
   func setBadge(_ count: Int?)
   /// Whether the system lets the application notify; `nil` when it has not been asked yet.
   func isAuthorized() async -> Bool?
+  /// The dictation's speech model is ready (#340): a notification when `notifies`, a sound
+  /// otherwise.
+  func postDictationReady(notifies: Bool)
 }
 
 extension RequestNotifying {
   public func postOutcome(_ notification: SessionOutcomeNotification) {}
+  public func postDictationReady(notifies: Bool) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.
@@ -79,7 +83,7 @@ extension AppModel {
   }
 
   /// The branch the session works on: as last read on disk, or as recorded when it started.
-  private func branch(of session: WorkSession) -> String? {
+  func branch(of session: WorkSession) -> String? {
     guard let repository = session.repositories.first else { return nil }
     let live = repositoryStatus(for: session.id, path: repository.path)?.lastValid?.branch
       .branchName
