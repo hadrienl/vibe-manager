@@ -221,6 +221,7 @@ struct DictationPopover: View {
           if let url = URL(
             string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone")
           {
+            // Opens outside: the constant address of System Settings' Microphone privacy page.
             NSWorkspace.shared.open(url)
           }
         } label: {
