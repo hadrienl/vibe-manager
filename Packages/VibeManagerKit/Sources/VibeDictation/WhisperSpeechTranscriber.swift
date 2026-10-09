@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import VibeApplication
 import WhisperKit
 
@@ -50,6 +51,22 @@ public actor WhisperSpeechTranscriber: SpeechTranscribing {
   }
 
   public func download(
+    _ variant: DictationModelVariant, progress: @escaping @Sendable (Double) -> Void
+  ) async throws {
+    do {
+      try await downloadAndPrepare(variant, progress: progress)
+    } catch {
+      // What failed — the network, the disk, the compilation — is said in the system's log: the
+      // interface only says that it failed.
+      Self.log.error(
+        "Speech model not installed: \(String(describing: error), privacy: .public)")
+      throw error
+    }
+  }
+
+  private static let log = Logger(subsystem: "eu.hadrien.VibeManager", category: "dictation")
+
+  private func downloadAndPrepare(
     _ variant: DictationModelVariant, progress: @escaping @Sendable (Double) -> Void
   ) async throws {
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)

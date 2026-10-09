@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import TTSKit
 import VibeApplication
 
@@ -25,7 +26,7 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
   }
 
   nonisolated public func installedSize() -> Int64? {
-    guard FileManager.default.fileExists(atPath: mark.path) else { return nil }
+    guard installedFolder() != nil else { return nil }
     var total: Int64 = 0
     let files = FileManager.default.enumerator(
       at: directory, includingPropertiesForKeys: [.totalFileAllocatedSizeKey])
@@ -38,23 +39,52 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
   }
 
   public func download(progress: @escaping @Sendable (Double) -> Void) async throws {
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    _ = try await TTSKit.download(variant: .qwen3TTS_0_6b, downloadBase: directory) { value in
-      progress(value.fractionCompleted)
+    do {
+      try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+      let folder = try await TTSKit.download(variant: .qwen3TTS_0_6b, downloadBase: directory) {
+        value in progress(value.fractionCompleted)
+      }
+      // Loaded once now: the compilation for this Mac is the preparation the user waits for, and
+      // the first reading starts at once.
+      _ = try await loaded(from: folder)
+      // The mark keeps where the model is, relative to the directory: a model is loaded from its
+      // folder, never downloaded again to find it.
+      let relative = folder.standardizedFileURL.path
+        .replacingOccurrences(of: directory.standardizedFileURL.path + "/", with: "")
+      FileManager.default.createFile(atPath: mark.path, contents: Data(relative.utf8))
+    } catch {
+      // What failed — the network, the disk, the compilation — is said in the system's log: the
+      // interface only says that it failed.
+      Self.log.error("Voice model not installed: \(String(describing: error), privacy: .public)")
+      throw error
     }
-    // Loaded once now: the compilation for this Mac is the preparation the user waits for, and
-    // the first reading starts at once.
-    _ = try await loaded()
-    FileManager.default.createFile(atPath: mark.path, contents: Data())
   }
 
-  private func loaded() async throws -> TTSKit {
+  private static let log = Logger(subsystem: "eu.hadrien.VibeManager", category: "speech")
+
+  /// The model, loaded from `folder`, or from the one its mark keeps.
+  private func loaded(from folder: URL? = nil) async throws -> TTSKit {
     if let tts { return tts }
+    guard let folder = folder ?? installedFolder() else { throw SpeechModelError.notInstalled }
     let tts = try await TTSKit(
-      TTSKitConfig(model: .qwen3TTS_0_6b, downloadBase: directory, verbose: false, download: false))
+      TTSKitConfig(
+        model: .qwen3TTS_0_6b, modelFolder: folder, downloadBase: directory, verbose: false,
+        download: false))
     try await tts.loadModels()
     self.tts = tts
     return tts
+  }
+
+  /// The folder the mark names.
+  nonisolated private func installedFolder() -> URL? {
+    guard let data = FileManager.default.contents(atPath: mark.path),
+      let relative = String(data: data, encoding: .utf8), !relative.isEmpty
+    else { return nil }
+    return directory.appendingPathComponent(relative, isDirectory: true)
+  }
+
+  enum SpeechModelError: Error {
+    case notInstalled
   }
 
   public func speak(_ text: String, voice: SpeechVoice, language: SpeechLanguage) async throws {
