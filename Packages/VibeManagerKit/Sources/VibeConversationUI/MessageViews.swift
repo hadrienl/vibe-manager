@@ -168,8 +168,14 @@ private struct ReadAloudButton: View {
         if !readAloud.isModelInstalled { showSettings() }
       }
     } label: {
-      Image(systemName: isReading ? "stop.fill" : "play.fill")
-        .font(.system(size: 9, weight: .semibold))
+      Group {
+        if readAloud.isLoading(text) {
+          ProgressView().controlSize(.mini)
+        } else {
+          Image(systemName: isReading ? "stop.fill" : "play.fill")
+        }
+      }
+      .font(.system(size: 9, weight: .semibold))
         .foregroundStyle(isReading ? theme.onAccent.color : theme.secondaryText.color)
         .frame(width: 22, height: 22)
         .background(isReading ? theme.accent.color : theme.surface.color, in: Circle())

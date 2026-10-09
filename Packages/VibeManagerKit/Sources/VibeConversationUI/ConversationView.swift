@@ -104,6 +104,8 @@ public struct ConversationView: View {
     .environment(\.conversationAppearance, appearance)
     .environment(\.conversationIsLive, isActive)
     .environment(\.readAloud, model.readAloud)
+    // The voice loaded while the conversation is read, not when its first answer is (#357).
+    .task { model.readAloud?.warmUp() }
     .environment(\.colorScheme, theme.colorScheme)
     // Coming on screen is when the composer takes the keyboard, as the terminal does (#105): only
     // then, never for a message that arrives or a state that changes. Asked of the model rather

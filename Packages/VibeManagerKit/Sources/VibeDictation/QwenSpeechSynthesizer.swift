@@ -62,6 +62,10 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
 
   private static let log = Logger(subsystem: "eu.hadrien.VibeManager", category: "speech")
 
+  public func prepare() async throws {
+    _ = try await loaded()
+  }
+
   /// The model, loaded from `folder`, or from the one its mark keeps.
   private func loaded(from folder: URL? = nil) async throws -> TTSKit {
     if let tts { return tts }
