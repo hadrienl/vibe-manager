@@ -82,6 +82,9 @@ public protocol SpeechSynthesizing: AnyObject, Sendable {
   /// The download, about a gigabyte: said before it starts.
   var downloadSize: Int64 { get }
   func download(progress: @escaping @Sendable (Double) -> Void) async throws
+  /// Loads the model, compiling it for this Mac's Neural Engine the first time a copy of the
+  /// application loads it — minutes, the first time.
+  func prepare() async throws
   /// Reads `text` aloud and returns once it is heard to its end. Cancelling the task stops the
   /// voice at once.
   func speak(_ text: String, voice: SpeechVoice, language: SpeechLanguage) async throws

@@ -148,7 +148,7 @@ private struct ReadAloudSettingsSection: View {
           ProgressView(value: fraction).frame(width: 120)
         case .preparing:
           ProgressView().controlSize(.small)
-        case .idle, .reading:
+        case .idle, .reading, .loading:
           if readAloud.isModelInstalled {
             Button(role: .destructive) {
               Task { await readAloud.removeModel() }

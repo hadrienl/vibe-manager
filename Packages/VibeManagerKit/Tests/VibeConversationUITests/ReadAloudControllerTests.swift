@@ -39,6 +39,12 @@ private final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
     throw CancellationError()
   }
 
+  func prepare() async throws {
+    lock.withLock { _prepared += 1 }
+  }
+  private var _prepared = 0
+  var prepared: Int { lock.withLock { _prepared } }
+
   func remove() async throws { lock.withLock { installed = false } }
 }
 
@@ -115,6 +121,20 @@ struct ReadAloudControllerTests {
 
     await readAloud.removeModel()
     #expect(!readAloud.isModelInstalled)
+  }
+
+  @Test("The voice is loaded once in the background, when a conversation comes on screen")
+  func warmUp() async {
+    let synthesizer = FakeSynthesizer(installed: true, readsUntilCancelled: false)
+    let readAloud = ReadAloudController(
+      synthesizer: synthesizer, store: InMemorySpeechSettingsStore())
+
+    readAloud.warmUp()
+    readAloud.warmUp()
+    await until { synthesizer.prepared == 1 }
+    for _ in 0..<50 { await Task.yield() }
+    #expect(synthesizer.prepared == 1)
+    #expect(readAloud.phase == .idle)
   }
 
   @Test("An answer of code alone reads nothing")

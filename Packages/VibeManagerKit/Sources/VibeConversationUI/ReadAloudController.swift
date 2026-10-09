@@ -15,6 +15,8 @@ public final class ReadAloudController {
     case downloading(fraction: Double)
     /// Loaded — compiled for this Mac, the first time.
     case preparing
+    /// Loading the model before reading the answer of this identifier.
+    case loading(id: String)
     /// Reading the answer of this identifier aloud.
     case reading(id: String)
   }
@@ -45,6 +47,8 @@ public final class ReadAloudController {
   @ObservationIgnored private let synthesizer: any SpeechSynthesizing
   @ObservationIgnored private let store: any SpeechSettingsStore
   @ObservationIgnored private var task: Task<Void, Never>?
+  @ObservationIgnored private var isWarm = false
+  @ObservationIgnored private var warming: Task<Void, Never>?
 
   public init(synthesizer: any SpeechSynthesizing, store: any SpeechSettingsStore) {
     self.synthesizer = synthesizer
@@ -55,11 +59,32 @@ public final class ReadAloudController {
 
   public var isModelInstalled: Bool { installedSize != nil }
 
-  public func isReading(_ id: String) -> Bool { phase == .reading(id: id) }
+  /// Whether this answer is being read, or about to be: its button stops it.
+  public func isReading(_ id: String) -> Bool {
+    phase == .reading(id: id) || phase == .loading(id: id)
+  }
+
+  public func isLoading(_ id: String) -> Bool { phase == .loading(id: id) }
 
   public var isReading: Bool {
-    if case .reading = phase { return true }
+    switch phase {
+    case .reading, .loading: true
+    case .idle, .downloading, .preparing: false
+    }
+  }
+
+  public var isLoading: Bool {
+    if case .loading = phase { return true }
     return false
+  }
+
+  /// Loads the model in the background, once, so that the first answer read does not wait for
+  /// it: its compilation for this Mac takes minutes the first time. Called when a conversation
+  /// comes on screen.
+  public func warmUp() {
+    guard isModelInstalled, !isWarm, phase == .idle else { return }
+    isWarm = true
+    warming = Task { [synthesizer] in try? await synthesizer.prepare() }
   }
 
   /// Reads the answer `markdown` aloud, its code left out; another being read stops first. Without
@@ -71,22 +96,26 @@ public final class ReadAloudController {
     }
     switch phase {
     case .downloading, .preparing: return
-    case .idle, .reading: break
+    case .idle, .reading, .loading: break
     }
     task?.cancel()
     problem = nil
     let text = SpeechText.readable(fromMarkdown: markdown)
     guard !text.isEmpty else { return }
-    phase = .reading(id: id)
+    phase = .loading(id: id)
+    isWarm = true
     let settings = settings
     task = Task {
       do {
+        try await synthesizer.prepare()
+        guard !Task.isCancelled else { return }
+        phase = .reading(id: id)
         try await synthesizer.speak(text, voice: settings.voice, language: settings.language)
       } catch {
         if !Task.isCancelled { problem = .readingFailed }
       }
       // A reading stopped for another one leaves its place to it.
-      if !Task.isCancelled, phase == .reading(id: id) { phase = .idle }
+      if !Task.isCancelled, isReading(id) { phase = .idle }
     }
   }
 
@@ -149,9 +178,14 @@ struct ReadingAloudPill: View {
       readAloud.stop()
     } label: {
       HStack(spacing: 8) {
-        Image(systemName: "speaker.wave.2.fill")
-          .symbolEffect(.variableColor.iterative, options: .repeating)
-        Text("Reading aloud", bundle: .module)
+        if readAloud.isLoading {
+          ProgressView().controlSize(.mini)
+          Text("Preparing the voice…", bundle: .module)
+        } else {
+          Image(systemName: "speaker.wave.2.fill")
+            .symbolEffect(.variableColor.iterative, options: .repeating)
+          Text("Reading aloud", bundle: .module)
+        }
         Image(systemName: "stop.fill").font(.system(size: 9))
       }
       .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5), weight: .semibold))
