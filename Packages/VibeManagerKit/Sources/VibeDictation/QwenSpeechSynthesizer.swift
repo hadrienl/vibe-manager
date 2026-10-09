@@ -14,6 +14,9 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
 
   private let directory: URL
   private var tts: TTSKit?
+  /// How fast the model speaks for this Mac, measured on the readings before: seconds of audio
+  /// generated per second, and seconds of audio per character of text.
+  private var pace = SpeechPace()
 
   public init(directory: URL) {
     self.directory = directory
@@ -96,13 +99,21 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
     var options = GenerationOptions()
     // One sentence after the other: the order a voice reads in.
     options.concurrentWorkerCount = 1
+    // TTSKit's own `.auto` buffers for the longest a sentence may be, at the pace of its first,
+    // slowest steps: ten seconds and more before a word. Buffered here for this text, at the pace
+    // measured on the readings before.
+    let buffer = pace.buffer(for: text)
+    let start = Date()
     try await withTaskCancellationHandler {
-      _ = try await tts.play(
+      let result = try await tts.play(
         text: text,
         voice: (Qwen3Speaker(rawValue: voice.rawValue) ?? .serena).rawValue,
         language: (Qwen3Language(rawValue: language.rawValue) ?? .english).rawValue,
-        options: options, playbackStrategy: .auto
+        options: options, playbackStrategy: .buffered(seconds: buffer)
       ) { _ in Task.isCancelled ? false : true }
+      pace.record(
+        text: text, audio: result.audioDuration, generation: result.timings.fullPipeline,
+        wall: Date().timeIntervalSince(start))
     } onCancel: {
       // Stopped now: what was generated ahead is not played to its end.
       Task { await tts.audioOutput.stopPlayback(waitForCompletion: false) }
@@ -119,3 +130,4 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
     }
   }
 }
+

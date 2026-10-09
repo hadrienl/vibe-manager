@@ -139,3 +139,33 @@ public enum SpeechText {
       .joined(separator: "\n")
   }
 }
+
+/// The pace of the voice on this Mac, learnt from its readings: how much to buffer before the
+/// first word so that the voice is not cut, and no more.
+public struct SpeechPace: Sendable {
+  /// Seconds of audio generated per second of computation: just under 1 on an M2 Pro at rest.
+  public private(set) var speed = 0.9
+  /// Seconds of audio per character: about a fifteenth of a second in French.
+  public private(set) var secondsPerCharacter = 0.065
+
+  public init() {}
+
+  /// What to buffer before `text` is heard: what the generation would fall behind over the whole
+  /// of it, and a margin.
+  public func buffer(for text: String) -> Double {
+    let duration = Double(text.count) * secondsPerCharacter
+    let behind = duration * max(0, 1 - speed)
+    return min(max(behind + 0.4, 0.4), 6)
+  }
+
+  /// Learns from a reading: averaged with what was known, so that one slow reading — the Mac
+  /// busy — does not slow every next one down.
+  public mutating func record(text: String, audio: Double, generation: Double, wall: Double) {
+    guard audio > 1, !text.isEmpty else { return }
+    // The generation's own time when TTSKit gives it; the reading's otherwise, which includes
+    // the playback and so understates the speed.
+    let seconds = generation > 0 ? generation : wall
+    if seconds > 0 { speed = (speed + audio / seconds) / 2 }
+    secondsPerCharacter = (secondsPerCharacter + audio / Double(text.count)) / 2
+  }
+}
