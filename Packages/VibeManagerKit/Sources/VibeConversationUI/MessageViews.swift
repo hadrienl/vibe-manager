@@ -128,6 +128,8 @@ private struct SpokenPrompt: ViewModifier {
 /// What the agent answered, in full width.
 struct AgentTextView: View {
   let text: String
+  @Environment(\.readAloud) private var readAloud
+  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
     MarkdownView(text: text)
@@ -136,6 +138,24 @@ struct AgentTextView: View {
           copy(text)
         } label: {
           Text("Copy Message", bundle: .module)
+        }
+        // Read by a voice on this Mac (#357); the text itself identifies the answer.
+        if let readAloud {
+          if readAloud.isReading(text) {
+            Button {
+              readAloud.stop()
+            } label: {
+              Text("Stop Reading", bundle: .module)
+            }
+          } else {
+            Button {
+              readAloud.read(text, id: text)
+              // Without its model, Settings shows where it is downloaded.
+              if !readAloud.isModelInstalled { openSettings() }
+            } label: {
+              Text("Read Aloud", bundle: .module)
+            }
+          }
         }
       }
   }

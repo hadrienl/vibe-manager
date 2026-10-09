@@ -103,6 +103,7 @@ public struct ConversationView: View {
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.conversationIsLive, isActive)
+    .environment(\.readAloud, model.readAloud)
     .environment(\.colorScheme, theme.colorScheme)
     // Coming on screen is when the composer takes the keyboard, as the terminal does (#105): only
     // then, never for a message that arrives or a state that changes. Asked of the model rather
@@ -225,6 +226,11 @@ public struct ConversationView: View {
       .onChange(of: model.revealRequest) {
         guard let id = model.revealedBlockID else { return }
         withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .top) }
+      }
+      .overlay(alignment: .top) {
+        if let readAloud = model.readAloud, readAloud.isReading {
+          ReadingAloudPill(readAloud: readAloud)
+        }
       }
       .overlay(alignment: .bottom) {
         if model.scroll.unseenCount > 0 {

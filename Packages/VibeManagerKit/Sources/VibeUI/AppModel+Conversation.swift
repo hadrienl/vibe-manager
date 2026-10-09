@@ -141,6 +141,7 @@ extension AppModel {
         self?.setPresentation(.terminal, of: id)
       }
       model.dictation = self?.dictation
+      model.readAloud = self?.readAloud
       model.dictationVocabulary = { [weak self] in
         guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
           return ""
@@ -200,6 +201,11 @@ extension AppModel {
   /// otherwise, the composer saying it on screen.
   public func announceDictationReady() {
     requestNotifier?.postDictationReady(notifies: notifiesRequests && !isApplicationActive)
+  }
+
+  /// The voice that reads the answers is ready (#357), said as the dictation's model is.
+  public func announceSpeechReady() {
+    requestNotifier?.postSpeechReady(notifies: notifiesRequests && !isApplicationActive)
   }
 
   /// The words a prompt to a session is likely to use (#340): its folder's name, its branch, and

@@ -300,6 +300,8 @@ public final class ConversationModel {
   /// The application's dictation (#340); `nil` where there is none, and the composer shows no
   /// microphone.
   @ObservationIgnored public var dictation: DictationController?
+  /// The application's reading aloud (#357); `nil` before macOS 15.
+  @ObservationIgnored public var readAloud: ReadAloudController?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.
   @ObservationIgnored public var dictationVocabulary: @MainActor () async -> String = { "" }
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
