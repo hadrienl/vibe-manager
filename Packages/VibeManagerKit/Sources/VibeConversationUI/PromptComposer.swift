@@ -170,6 +170,10 @@ struct PromptComposer: View {
               font: theme.interfaceFont(size: appearance.textSize.scaled(11.5)), action: restart)
           }
         }
+        // The audio mode (#357): the answers read as they arrive.
+        if let readAloud = model.readAloud, !isShell {
+          AudioModeButton(readAloud: readAloud)
+        }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line
             .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))

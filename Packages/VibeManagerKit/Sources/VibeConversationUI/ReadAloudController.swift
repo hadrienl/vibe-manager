@@ -6,7 +6,8 @@ import VibeApplication
 /// The agent's answers read aloud (#357), by a voice model on this Mac.
 ///
 /// One for the whole application: one voice at a time — reading another answer stops the one
-/// being read. The model is downloaded from Settings; ready, it reads nothing by itself.
+/// being read. The model is downloaded from Settings; ready, it reads nothing by itself. In the
+/// audio mode, the answers that arrive in the conversation on screen are read one after the other.
 @MainActor
 @Observable
 public final class ReadAloudController {
@@ -36,6 +37,16 @@ public final class ReadAloudController {
     didSet {
       guard settings != oldValue else { return }
       store.settings = settings
+      // The audio mode turned off: what it was reading, and what it was going to, stops.
+      if oldValue.readsAnswers, !settings.readsAnswers {
+        queue = []
+        stop()
+      }
+      // Another voice or language: prepared now, rather than at the next answer.
+      if settings.voice != oldValue.voice || settings.language != oldValue.language, isWarm {
+        isWarm = false
+        warmUp()
+      }
     }
   }
 
@@ -49,6 +60,10 @@ public final class ReadAloudController {
   @ObservationIgnored private var task: Task<Void, Never>?
   @ObservationIgnored private var isWarm = false
   @ObservationIgnored private var warming: Task<Void, Never>?
+  /// The answers the audio mode will read next, in their order.
+  @ObservationIgnored private var queue: [(id: String, text: String)] = []
+  /// The answers each conversation already had: only the ones after are new.
+  @ObservationIgnored private var seen: [ObjectIdentifier: Set<String>] = [:]
 
   public init(synthesizer: any SpeechSynthesizing, store: any SpeechSettingsStore) {
     self.synthesizer = synthesizer
@@ -84,7 +99,33 @@ public final class ReadAloudController {
   public func warmUp() {
     guard isModelInstalled, !isWarm, phase == .idle else { return }
     isWarm = true
-    warming = Task { [synthesizer] in try? await synthesizer.prepare() }
+    let settings = settings
+    warming = Task { [synthesizer] in
+      try? await synthesizer.prepare(voice: settings.voice, language: settings.language)
+    }
+  }
+
+  /// The answers of a conversation, as they are now (#357). Those it did not have before are read
+  /// in the audio mode, one after the other, if the conversation is on screen; the ones it had
+  /// when first followed never are — the audio mode reads what arrives, not the history.
+  public func follow(
+    _ answers: [(id: String, text: String)], in conversation: ObjectIdentifier, isOnScreen: Bool
+  ) {
+    let known = seen[conversation]
+    seen[conversation, default: []].formUnion(answers.map(\.id))
+    guard let known, isOnScreen, settings.readsAnswers, isModelInstalled else { return }
+    for answer in answers where !known.contains(answer.id) {
+      if isReading || !queue.isEmpty {
+        queue.append(answer)
+      } else {
+        start(answer.text, id: answer.id)
+      }
+    }
+  }
+
+  /// The conversation is let go of: what it had is forgotten with it.
+  public func forget(_ conversation: ObjectIdentifier) {
+    seen[conversation] = nil
   }
 
   /// Reads the answer `markdown` aloud, its code left out; another being read stops first. Without
@@ -94,6 +135,12 @@ public final class ReadAloudController {
       showSettings?()
       return
     }
+    // A reading asked for takes the place of the audio mode's.
+    queue = []
+    start(markdown, id: id)
+  }
+
+  private func start(_ markdown: String, id: String) {
     switch phase {
     case .downloading, .preparing: return
     case .idle, .reading, .loading: break
@@ -101,7 +148,7 @@ public final class ReadAloudController {
     task?.cancel()
     problem = nil
     let text = SpeechText.readable(fromMarkdown: markdown)
-    guard !text.isEmpty else { return }
+    guard !text.isEmpty else { return readNext() }
     phase = .loading(id: id)
     isWarm = true
     let settings = settings
@@ -115,12 +162,22 @@ public final class ReadAloudController {
         if !Task.isCancelled { problem = .readingFailed }
       }
       // A reading stopped for another one leaves its place to it.
-      if !Task.isCancelled, isReading(id) { phase = .idle }
+      guard !Task.isCancelled, isReading(id) else { return }
+      phase = .idle
+      readNext()
     }
   }
 
-  /// Stops the voice at once.
+  /// The next answer the audio mode waits to read, if any.
+  private func readNext() {
+    guard !queue.isEmpty else { return }
+    let next = queue.removeFirst()
+    start(next.text, id: next.id)
+  }
+
+  /// Stops the voice at once, and what the audio mode was going to read with it.
   public func stop() {
+    queue = []
     guard isReading else { return }
     task?.cancel()
     task = nil
@@ -200,5 +257,39 @@ struct ReadingAloudPill: View {
     .accessibilityLabel(Text("Stop Reading", bundle: .module))
     .help(Text("Stop Reading", bundle: .module))
     .padding(.top, 10)
+  }
+}
+
+/// The audio mode's switch, beside the microphone: on, every answer that arrives is read aloud.
+struct AudioModeButton: View {
+  @Bindable var readAloud: ReadAloudController
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    let isOn = readAloud.settings.readsAnswers
+    Button {
+      readAloud.settings.readsAnswers.toggle()
+      // Without its model, Settings shows where it is downloaded.
+      if readAloud.settings.readsAnswers, !readAloud.isModelInstalled {
+        readAloud.showSettings?()
+        openSettings()
+      }
+    } label: {
+      Image(systemName: isOn ? "speaker.wave.2.fill" : "speaker.slash")
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(isOn ? theme.onAccent.color : theme.text.color)
+        .frame(width: 28, height: 28)
+        .background(isOn ? theme.accent.color : theme.surface.color, in: Circle())
+        .overlay(Circle().stroke(isOn ? Color.clear : theme.border.color))
+        .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(Text("Audio Mode", bundle: .module))
+    .accessibilityValue(isOn ? Text("On", bundle: .module) : Text("Off", bundle: .module))
+    .help(
+      isOn
+        ? Text("Audio mode on: answers are read as they arrive", bundle: .module)
+        : Text("Audio mode: read the answers as they arrive", bundle: .module))
   }
 }

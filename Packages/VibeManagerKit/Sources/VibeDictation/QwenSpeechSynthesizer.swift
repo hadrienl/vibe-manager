@@ -69,6 +69,14 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
     _ = try await loaded()
   }
 
+  public func prepare(voice: SpeechVoice, language: SpeechLanguage) async throws {
+    let tts = try await loaded()
+    // Kept by TTSKit and reused by every reading in this voice and language.
+    _ = try await tts.buildPromptCache(
+      speaker: Qwen3Speaker(rawValue: voice.rawValue) ?? .serena,
+      language: Qwen3Language(rawValue: language.rawValue) ?? .english)
+  }
+
   /// The model, loaded from `folder`, or from the one its mark keeps.
   private func loaded(from folder: URL? = nil) async throws -> TTSKit {
     if let tts { return tts }
