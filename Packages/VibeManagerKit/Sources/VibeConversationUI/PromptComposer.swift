@@ -190,15 +190,14 @@ struct PromptComposer: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
-    .background(
-      isShell ? theme.warningBackground.color : theme.raised.color,
-      in: RoundedRectangle(cornerRadius: 14)
+    .modifier(
+      ConversationGlass(
+        shape: RoundedRectangle(cornerRadius: 14),
+        fill: isShell ? theme.warningBackground.color : theme.raised.color,
+        border: isShell ? theme.warning.color : theme.border.color, lineWidth: isShell ? 1.5 : 1,
+        tint: isShell ? theme.warning.color.opacity(0.25) : nil,
+        shadowRadius: 2, shadowOpacity: theme.isDark ? 0.3 : 0.06)
     )
-    .overlay(
-      RoundedRectangle(cornerRadius: 14)
-        .stroke(isShell ? theme.warning.color : theme.border.color, lineWidth: isShell ? 1.5 : 1)
-    )
-    .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.06), radius: 2, y: 1)
     // Above the composer, as wide, over the end of the conversation (#219).
     // The guide is set outside the condition: set within it, SwiftUI drops it, and the list hangs
     // down from the composer's top instead.
@@ -569,8 +568,10 @@ struct ActivityLine: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 3)
-        .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(theme.border.color))
+        .modifier(
+          ConversationGlass(
+            shape: RoundedRectangle(cornerRadius: 7), fill: theme.raised.color,
+            border: theme.border.color, isInteractive: true))
       }
       .buttonStyle(.plain)
       .accessibilityLabel(Text("Interrupt the agent", bundle: .module))

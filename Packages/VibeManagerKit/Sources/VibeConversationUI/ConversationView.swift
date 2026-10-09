@@ -76,30 +76,31 @@ public struct ConversationView: View {
       default:
         conversation
       }
-      // Out of the footer: a session started on a command shows its panel while its conversation,
-      // empty, is still read and the composer not shown yet (#219).
-      if let panel = model.terminalPanel, let liveTerminal {
-        TerminalPanelBlock(
-          model: model, panel: panel,
-          terminal: liveTerminal(
-            model.terminalPanelFocusRequest,
-            { model.escapeInTerminalPanel() },
-            { model.terminalScreenChanged($0) })
-        )
-        .frame(maxWidth: layout.contentWidth)
-        .padding(.horizontal, layout.sideMargin)
-        .padding(.bottom, showsComposer ? 8 : 16)
-        .frame(maxWidth: .infinity)
-      }
-      // Outside the switch: the first prompt sent turns the empty conversation into a list, and a
-      // composer drawn in each case would be a new one then, the keyboard dropped with the old
-      // one (#105).
-      if showsComposer { footer }
     }
-    // The theme's picture, when it has one, stays where it is while the messages scroll (#118).
-    // Under the toolbar too, where the messages scroll: a view, unlike the colour it replaced,
-    // stops at the safe area, and the window's grey showed there instead of the theme.
-    .background { ThemeBackdropView(theme: theme).ignoresSafeArea() }
+    // Over the end of the messages, which scroll under it, rather than below them (#359).
+    .modifier(
+      ComposerBar(theme: theme) {
+        // Out of the footer: a session started on a command shows its panel while its
+        // conversation, empty, is still read and the composer not shown yet (#219).
+        if let panel = model.terminalPanel, let liveTerminal {
+          TerminalPanelBlock(
+            model: model, panel: panel,
+            terminal: liveTerminal(
+              model.terminalPanelFocusRequest,
+              { model.escapeInTerminalPanel() },
+              { model.terminalScreenChanged($0) })
+          )
+          .frame(maxWidth: layout.contentWidth)
+          .padding(.horizontal, layout.sideMargin)
+          .padding(.bottom, showsComposer ? 8 : 16)
+          .frame(maxWidth: .infinity)
+        }
+        // Outside the switch: the first prompt sent turns the empty conversation into a list, and
+        // a composer drawn in each case would be a new one then, the keyboard dropped with the old
+        // one (#105).
+        if showsComposer { footer }
+      }
+    )
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.conversationIsLive, isActive)
@@ -240,9 +241,10 @@ public struct ConversationView: View {
             .foregroundStyle(theme.text.color)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(theme.raised.color, in: Capsule())
-            .overlay(Capsule().stroke(theme.border.color))
-            .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+            .modifier(
+              ConversationGlass(
+                shape: Capsule(), fill: theme.raised.color, border: theme.border.color,
+                isInteractive: true, shadowRadius: 6, shadowOpacity: 0.2, shadowY: 2))
           }
           .buttonStyle(.plain)
           .padding(.bottom, 10)
@@ -332,8 +334,7 @@ public struct ConversationView: View {
     .padding(.horizontal, layout.sideMargin)
     .padding(.bottom, 16)
     .frame(maxWidth: .infinity)
-    // Behind the messages only: the composer keeps the plain background.
-    .background(theme.backdrop.area == .messages ? theme.background.color : .clear)
+    .modifier(PlainFooterBackground(theme: theme))
   }
 
   /// The way to the terminal, which says why, and Restart, for an agent that stopped on an error.
@@ -429,6 +430,50 @@ struct BlockView: View {
   }
 }
 
+/// The terminal panel and the footer, laid over the end of the messages on macOS 26: they scroll
+/// under the composer's glass, blurred by the edge effect, instead of stopping short above it
+/// (#359). Before, below the messages.
+///
+/// The theme's picture, when it has one, stays where it is while the messages scroll (#118). Under
+/// the toolbar too, where the messages scroll: a view, unlike the colour it replaced, stops at the
+/// safe area, and the window's grey showed there instead of the theme. Behind the messages only,
+/// it stops at the bar, over the plain background.
+private struct ComposerBar<Bar: View>: ViewModifier {
+  let theme: ConversationTheme
+  @ViewBuilder let bar: Bar
+
+  func body(content: Content) -> some View {
+    if #available(macOS 26, *) {
+      content
+        .background {
+          ThemeBackdropView(theme: theme)
+            .ignoresSafeArea(edges: theme.backdrop.area == .messages ? .top : .all)
+        }
+        .safeAreaBar(edge: .bottom, spacing: 0) { bar }
+        .background { theme.background.color.ignoresSafeArea() }
+    } else {
+      VStack(spacing: 0) {
+        content
+        bar
+      }
+      .background { ThemeBackdropView(theme: theme).ignoresSafeArea() }
+    }
+  }
+}
+
+/// Before macOS 26, a picture behind the messages only leaves the footer the plain background.
+private struct PlainFooterBackground: ViewModifier {
+  let theme: ConversationTheme
+
+  func body(content: Content) -> some View {
+    if #available(macOS 26, *) {
+      content
+    } else {
+      content.background(theme.backdrop.area == .messages ? theme.background.color : .clear)
+    }
+  }
+}
+
 /// What scrolls under the toolbar is blurred the whole height of it.
 ///
 /// The soft edge effect of macOS 26 blurs the top of the toolbar only and fades out towards its
@@ -437,7 +482,10 @@ struct BlockView: View {
 private struct ToolbarVeil: ViewModifier {
   func body(content: Content) -> some View {
     if #available(macOS 26, *) {
-      content.scrollEdgeEffectStyle(.hard, for: .top)
+      content
+        .scrollEdgeEffectStyle(.hard, for: .top)
+        // Under the composer, the messages fade as they go (#359).
+        .scrollEdgeEffectStyle(.soft, for: .bottom)
     } else {
       content
     }
