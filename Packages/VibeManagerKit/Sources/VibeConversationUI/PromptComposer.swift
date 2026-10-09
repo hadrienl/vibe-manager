@@ -145,17 +145,18 @@ struct PromptComposer: View {
             .foregroundStyle(theme.warning.color)
             .frame(width: 28, height: 28)
             .accessibilityHidden(true)
-          // A recording begun before the `!` can still be stopped.
-          if let dictation = model.dictation, dictation.concerns(ObjectIdentifier(model)) {
-            DictationButton(
-              model: model, dictation: dictation, isEnabled: false, isActive: isActive)
-          }
         } else {
           attachMenu(state)
-          if let dictation = model.dictation {
-            DictationButton(
-              model: model, dictation: dictation, isEnabled: state == .ready, isActive: isActive)
-          }
+        }
+        // One button whatever the mode: the same view, so that a `!` typed, or a question asked,
+        // during a recording does not remove it — which would throw the recording away. In shell
+        // mode it stays only to stop a recording begun before.
+        if let dictation = model.dictation,
+          !isShell || dictation.concerns(ObjectIdentifier(model))
+        {
+          DictationButton(
+            model: model, dictation: dictation, isEnabled: state == .ready && !isShell,
+            isActive: isActive)
         }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line

@@ -34,6 +34,10 @@ struct DictationTranscriptTests {
         == "Ajoute un test.")
     #expect(DictationTranscript.cleaned("  Fix the build  ") == "Fix the build")
     #expect(DictationTranscript.cleaned(" … ") == "")
+    // Said within a sentence, the words are the user's.
+    #expect(
+      DictationTranscript.cleaned("Add a footer that says thanks for watching")
+        == "Add a footer that says thanks for watching")
   }
 
   @Test("Dictated text is spaced from the words it lands between, not from spaces or punctuation")

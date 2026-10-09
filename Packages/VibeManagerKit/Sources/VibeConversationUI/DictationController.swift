@@ -36,12 +36,12 @@ public final class DictationController {
   /// The composer a dictation is asked from, and what it does with the text.
   public struct Request {
     public let owner: ObjectIdentifier
-    /// The words the speaker is likely to say: read when the recording stops.
-    public let vocabulary: @MainActor () -> String
+    /// The words the speaker is likely to say: read while the user speaks.
+    public let vocabulary: @MainActor () async -> String
     public let insert: @MainActor (String) -> Void
 
     public init(
-      owner: ObjectIdentifier, vocabulary: @escaping @MainActor () -> String,
+      owner: ObjectIdentifier, vocabulary: @escaping @MainActor () async -> String,
       insert: @escaping @MainActor (String) -> Void
     ) {
       self.owner = owner
@@ -74,6 +74,13 @@ public final class DictationController {
   @ObservationIgnored private let store: any DictationSettingsStore
   @ObservationIgnored private var request: Request?
   @ObservationIgnored private var download: Task<Void, Never>?
+  /// Which download is the current one: one cancelled that still finishes is told apart.
+  @ObservationIgnored private var downloadGeneration = 0
+  /// Which click a recording about to start answers: the system's question about the microphone
+  /// can stay on screen while the composer is put away, or another one clicked.
+  @ObservationIgnored private var attempt = 0
+  /// The prompt of the recording under way, read while the user speaks.
+  @ObservationIgnored private var vocabulary: Task<String, Never>?
 
   public init(
     transcriber: any SpeechTranscribing, recorder: any AudioRecording,
@@ -103,10 +110,14 @@ public final class DictationController {
   /// what was said.
   public func toggle(_ request: Request) {
     if phase == .recording, owner == request.owner {
-      Task { await finishRecording() }
+      // Stopped now, not when the task runs: a second click must find it stopped.
+      let samples = recorder.stop()
+      phase = .transcribing
+      Task { await finishRecording(samples) }
       return
     }
     guard phase == .idle else { return }
+    attempt += 1
     self.request = request
     owner = request.owner
     problem = nil
@@ -115,7 +126,7 @@ public final class DictationController {
       phase = .offeringDownload
       return
     }
-    Task { await startRecording() }
+    Task { [attempt] in await startRecording(answering: attempt) }
   }
 
   /// The user agreed to download the model.
@@ -137,6 +148,8 @@ public final class DictationController {
   private func downloadModel() {
     let variant = settings.variant
     phase = .downloading(fraction: 0)
+    downloadGeneration += 1
+    let generation = downloadGeneration
     download = Task {
       do {
         try await transcriber.download(variant) { fraction in
@@ -144,19 +157,33 @@ public final class DictationController {
         }
       } catch {
         refreshInstalledSizes()
-        guard !Task.isCancelled else { return }
+        guard generation == downloadGeneration else { return }
+        download = nil
         phase = .idle
         problem = .downloadFailed
         return
       }
+      guard generation == downloadGeneration else {
+        // Cancelled, it went to its end all the same: what it wrote goes, unless the same model is
+        // being downloaded again.
+        if !isDownloading(variant) { try? await transcriber.remove(variant) }
+        refreshInstalledSizes()
+        return
+      }
       download = nil
       refreshInstalledSizes()
-      guard !Task.isCancelled else { return }
       phase = .idle
       request = nil
       // Never a recording started by itself: the composer that asked says the model is ready.
       isReadyToDictate = owner != nil
       modelDidBecomeReady?()
+    }
+  }
+
+  private func isDownloading(_ variant: DictationModelVariant) -> Bool {
+    switch phase {
+    case .downloading, .preparing: settings.variant == variant
+    case .idle, .offeringDownload, .recording, .transcribing: false
     }
   }
 
@@ -172,12 +199,15 @@ public final class DictationController {
     switch phase {
     case .recording:
       _ = recorder.stop()
+      vocabulary?.cancel()
+      vocabulary = nil
       end()
     case .offeringDownload:
       end()
     case .downloading:
       download?.cancel()
       download = nil
+      downloadGeneration += 1
       end()
       // What was downloaded is not kept: it would take hundreds of megabytes nobody sees.
       let variant = settings.variant
@@ -199,6 +229,8 @@ public final class DictationController {
       request = nil
       self.owner = nil
     case .idle:
+      // A recording about to start — the system asking about the microphone — never will.
+      attempt += 1
       dismissProblem()
     case .transcribing:
       break
@@ -208,7 +240,9 @@ public final class DictationController {
   public func dismissProblem() {
     problem = nil
     isReadyToDictate = false
-    if phase == .idle { owner = nil }
+    guard phase == .idle else { return }
+    owner = nil
+    request = nil
   }
 
   /// Settings › Dictation › Delete: the model leaves the disk.
@@ -218,7 +252,8 @@ public final class DictationController {
     refreshInstalledSizes()
   }
 
-  private func startRecording() async {
+  /// - Parameter attempt: the click it answers, counted when it was made.
+  private func startRecording(answering attempt: Int) async {
     switch recorder.access {
     case .granted: break
     case .undetermined:
@@ -226,29 +261,32 @@ public final class DictationController {
     case .denied:
       return fail(.microphoneDenied)
     }
-    // The user may have cancelled while the system asked.
-    guard request != nil, phase == .idle else { return }
+    // The composer may have been put away, or another one clicked, while the system asked.
+    guard attempt == self.attempt, let request, owner == request.owner, phase == .idle else {
+      return
+    }
     do {
       try recorder.start()
     } catch {
       return fail(.noMicrophone)
     }
     phase = .recording
-    // Loaded while the user speaks: the model is ready, or nearly, when they stop.
+    // Loaded, and the prompt read, while the user speaks: both are ready, or nearly, when they
+    // stop.
     let variant = settings.variant
     Task { try? await transcriber.prepare(variant) }
+    vocabulary = Task { await request.vocabulary() }
   }
 
-  private func finishRecording() async {
-    let samples = recorder.stop()
+  private func finishRecording(_ samples: [Float]) async {
+    let prompt = await vocabulary?.value ?? ""
+    vocabulary = nil
     guard let request else { return end() }
     // Nothing said is nothing inserted: a silence given to Whisper comes back as a made-up line.
     guard DictationTranscript.containsSpeech(samples) else { return fail(.nothingHeard) }
-    phase = .transcribing
     do {
       let text = try await transcriber.transcribe(
-        samples, with: settings.variant, language: settings.language,
-        prompt: request.vocabulary())
+        samples, with: settings.variant, language: settings.language, prompt: prompt)
       let cleaned = DictationTranscript.cleaned(text)
       if !cleaned.isEmpty { request.insert(cleaned) }
       end()

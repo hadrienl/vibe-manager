@@ -254,6 +254,44 @@ struct DictationControllerTests {
     #expect(!dictation.isReadyToDictate)
   }
 
+  @Test("A composer put away while the system asks about the microphone records nothing")
+  func releasedWhileAsked() async {
+    let recorder = FakeRecorder()
+    recorder.access = .undetermined
+    let dictation = DictationController(
+      transcriber: FakeTranscriber(installed: [.largeTurbo]), recorder: recorder,
+      store: InMemoryDictationSettingsStore())
+    let composer = Composer()
+
+    dictation.toggle(request(composer))
+    dictation.release(ObjectIdentifier(composer))
+    await until { recorder.access == .granted }
+    for _ in 0..<100 { await Task.yield() }
+    #expect(!recorder.isRecording)
+    #expect(dictation.phase == .idle)
+    #expect(!dictation.isBusy(for: ObjectIdentifier(Composer())))
+  }
+
+  @Test("A second click on Stop transcribes once")
+  func doubleStop() async {
+    let recorder = FakeRecorder()
+    recorder.heard = speech
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Fix the build."
+    let dictation = DictationController(
+      transcriber: transcriber, recorder: recorder, store: InMemoryDictationSettingsStore())
+    let composer = Composer()
+
+    dictation.toggle(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.toggle(request(composer))
+    dictation.toggle(request(composer))
+    await until { dictation.phase == .idle }
+    #expect(composer.inserted == ["Fix the build."])
+    #expect(transcriber.requests.count == 1)
+    #expect(dictation.problem == nil)
+  }
+
   @Test("Escape throws the recording away")
   func cancelsRecording() async {
     let recorder = FakeRecorder()

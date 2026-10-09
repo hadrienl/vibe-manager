@@ -301,7 +301,7 @@ public final class ConversationModel {
   /// microphone.
   @ObservationIgnored public var dictation: DictationController?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.
-  @ObservationIgnored public var dictationVocabulary: () -> String = { "" }
+  @ObservationIgnored public var dictationVocabulary: @MainActor () async -> String = { "" }
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
   /// rather than the user asking: the web view's own preference then decides whether it comes
   /// forward. `nil` without a web view.

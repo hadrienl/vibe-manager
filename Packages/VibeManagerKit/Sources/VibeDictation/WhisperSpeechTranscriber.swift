@@ -73,6 +73,9 @@ public actor WhisperSpeechTranscriber: SpeechTranscribing {
   @discardableResult
   private func load(_ variant: DictationModelVariant, from folder: URL) async throws -> WhisperKit {
     if let loading, loading.variant == variant { return try await loading.task.value.whisper }
+    // Another model on its way is let arrive first, then unloaded: two are never kept.
+    if let loading { _ = try? await loading.task.value }
+    if let loaded, loaded.variant == variant { return loaded.whisper }
     if let loaded {
       self.loaded = nil
       await loaded.whisper.unloadModels()
@@ -114,7 +117,10 @@ public actor WhisperSpeechTranscriber: SpeechTranscribing {
   /// a longer one would cut the end of a long dictation and slow every one down.
   private func promptTokens(_ prompt: String, for whisper: WhisperKit) -> [Int]? {
     guard !prompt.isEmpty, let tokenizer = whisper.tokenizer else { return nil }
-    return Array(tokenizer.encode(text: " " + prompt).suffix(Self.promptTokenLimit))
+    // Its words only: a special token left at its end would read as the end of the text.
+    let words = tokenizer.encode(text: " " + prompt)
+      .filter { $0 < tokenizer.specialTokens.specialTokenBegin }
+    return words.isEmpty ? nil : Array(words.suffix(Self.promptTokenLimit))
   }
 
   /// Measured on an eleven seconds French prompt: about 0.6 s more than none, where the 200 tokens

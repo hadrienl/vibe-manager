@@ -113,10 +113,13 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   }
 
   /// The speech model is downloaded and prepared (#340): minutes after the user asked, when they
-  /// may have turned to something else. Said with a sound even with the application in front,
-  /// where the notification itself is not shown.
-  public func postDictationReady() {
-    if NSApp?.isActive == true { NSSound(named: "Glass")?.play() }
+  /// may have turned to something else. A sound alone when the application is in front, or may
+  /// not notify.
+  public func postDictationReady(notifies: Bool) {
+    guard notifies else {
+      NSSound(named: "Glass")?.play()
+      return
+    }
     let identifier = Self.dictationKey
     wanted.insert(identifier)
     Task {

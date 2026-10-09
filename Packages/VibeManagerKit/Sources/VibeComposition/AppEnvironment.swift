@@ -471,6 +471,9 @@ public final class AppEnvironment {
         directory: dataFolder.appendingPathComponent("SpeechModels", isDirectory: true)),
       recorder: MicrophoneRecorder(),
       store: UserDefaultsDictationSettingsStore(suiteName: data.defaultsSuite))
+    appModel.dictation?.modelDidBecomeReady = { [weak appModel] in
+      appModel?.announceDictationReady()
+    }
     // The first launch's tour (#338), before the window loads and resumes it.
     appModel.onboarding = OnboardingModel(
       preferences: UserDefaultsOnboardingPreferences(suiteName: data.defaultsSuite))

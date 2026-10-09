@@ -135,19 +135,25 @@ public enum DictationTranscript {
     "subtitles by the amara.org community",
   ]
 
-  /// The text to insert: what the model said, without its made-up sentences and spaces.
+  /// The text to insert: what the model said, without the sentence it made up over the pause
+  /// that ends it. Only a sentence of its own is taken out — the whole text, or its last
+  /// sentence: the same words said within a sentence are the user's.
   public static func cleaned(_ text: String) -> String {
-    var result = text
+    var result = text.trimmingCharacters(in: .whitespacesAndNewlines)
+    let ending = CharacterSet.punctuationCharacters.union(.whitespacesAndNewlines)
     for phrase in hallucinations {
-      while let range = result.range(
-        of: phrase, options: [.caseInsensitive, .diacriticInsensitive])
-      {
-        result.removeSubrange(range)
-      }
+      let body = result.trimmingCharacters(in: ending)
+      guard
+        let range = body.range(
+          of: phrase, options: [.caseInsensitive, .diacriticInsensitive, .anchored, .backwards])
+      else { continue }
+      let before = body[..<range.lowerBound].trimmingCharacters(in: .whitespaces)
+      // The phrase is its own sentence: the text, or after the end of another.
+      guard before.isEmpty || before.last.map({ ".!?…".contains($0) }) == true else { continue }
+      result = before
     }
-    let trimmed = result.trimmingCharacters(in: .whitespacesAndNewlines)
-    // What is left of a sentence taken out: its full stop, alone.
-    return trimmed.allSatisfy { $0.isPunctuation || $0.isWhitespace } ? "" : trimmed
+    // A pause written as a lone ellipsis or full stop is no text.
+    return result.unicodeScalars.allSatisfy(ending.contains) ? "" : result
   }
 
   /// `text` as it is inserted between two characters of the draft: a space on either side where

@@ -86,7 +86,7 @@ struct DictationButton: View {
     let field = WeakTextView(PromptComposer.composerTextView(showing: model.draft))
     dictation.toggle(
       DictationController.Request(
-        owner: owner, vocabulary: { model.dictationVocabulary() },
+        owner: owner, vocabulary: { await model.dictationVocabulary() },
         insert: { text in PromptComposer.insertDictation(text, into: model, field: field.view) }))
   }
 

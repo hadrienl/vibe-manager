@@ -145,7 +145,12 @@ extension AppModel {
         guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
           return ""
         }
-        return Self.dictationVocabulary(of: session, branch: self.branch(of: session))
+        let path = RestartSession.workingDirectoryPath(of: session)
+        let branch = self.branch(of: session)
+        // Its folder listed away from the main thread: it may be on a network volume.
+        return await Task.detached {
+          Self.dictationVocabulary(atPath: path, branch: branch)
+        }.value
       }
       model.chooseFiles = { [weak self] in
         guard let self else { return }
@@ -190,10 +195,17 @@ extension AppModel {
 }
 
 extension AppModel {
-  /// The words a prompt to `session` is likely to use (#340): its folder's name, its branch, and
-  /// what lies at the root of its folder — read when a dictation stops, a listing of one folder.
-  static func dictationVocabulary(of session: WorkSession, branch: String?) -> String {
-    guard let path = RestartSession.workingDirectoryPath(of: session) else {
+  /// The speech model is ready, minutes after it was asked for (#340): notified as the agents'
+  /// requests are — out of sight, when the user lets the application notify — and heard
+  /// otherwise, the composer saying it on screen.
+  public func announceDictationReady() {
+    requestNotifier?.postDictationReady(notifies: notifiesRequests && !isApplicationActive)
+  }
+
+  /// The words a prompt to a session is likely to use (#340): its folder's name, its branch, and
+  /// what lies at the root of its folder — read while the user speaks, a listing of one folder.
+  nonisolated static func dictationVocabulary(atPath path: String?, branch: String?) -> String {
+    guard let path else {
       return DictationTranscript.prompt(projectName: nil, branch: branch, fileNames: [])
     }
     let folder = URL(fileURLWithPath: path, isDirectory: true)
