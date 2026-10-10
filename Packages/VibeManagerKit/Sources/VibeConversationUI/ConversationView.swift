@@ -381,11 +381,17 @@ public struct ConversationView: View {
     }
   }
 
+  /// In a scroll view, as the messages are: without one under it, the composer's bar of macOS 26
+  /// lays a veil of its own over the empty view until the first message comes (#359).
   private func placeholder<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-    VStack(spacing: 10, content: content)
-      .font(theme.interfaceFont(size: appearance.textSize.scaled(13)))
-      .foregroundStyle(theme.secondaryText.color)
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
+    ScrollView {
+      VStack(spacing: 10, content: content)
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(13)))
+        .foregroundStyle(theme.secondaryText.color)
+        .containerRelativeFrame([.horizontal, .vertical])
+    }
+    .scrollDisabled(true)
+    .modifier(ToolbarVeil())
   }
 
   private static func rotorLabel(_ block: ConversationBlock) -> String {
