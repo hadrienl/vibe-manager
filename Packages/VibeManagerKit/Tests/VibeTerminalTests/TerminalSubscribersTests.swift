@@ -65,7 +65,7 @@ struct TerminalSubscribersTests {
     ).events
 
     for _ in 0..<1_000 {
-      subscribers.output([UInt8]("x".utf8), historyDropped: 1)
+      subscribers.output([UInt8]("x".utf8))
     }
     subscribers.stateChanged(.exited(code: 0))
     subscribers.finishAll()
@@ -88,11 +88,11 @@ struct TerminalSubscribersTests {
       .pulses(every: .milliseconds(250)), state: .starting, history: Self.empty, hasEnded: false
     ).events
 
-    #expect(subscribers.output([1, 2, 3], historyDropped: 0, at: at(0)).isEmpty)
-    let planned = subscribers.output([4], historyDropped: 0, at: at(10))
+    #expect(subscribers.output([1, 2, 3], at: at(0)).isEmpty)
+    let planned = subscribers.output([4], at: at(10))
     #expect(planned.count == 1)
     #expect(planned.first?.deadline == at(250))
-    #expect(subscribers.output([5], historyDropped: 0, at: at(20)).isEmpty)
+    #expect(subscribers.output([5], at: at(20)).isEmpty)
     if let id = planned.first?.subscriberID { subscribers.deliverPulse(to: id, at: at(250)) }
     subscribers.finishAll()
 
@@ -105,7 +105,7 @@ struct TerminalSubscribersTests {
   func notesTheLastOutput() {
     let subscribers = TerminalSubscribers(schedule: { _, _ in })
     #expect(subscribers.lastOutputAt == nil)
-    subscribers.output([1], historyDropped: 0, at: at(40))
+    subscribers.output([1], at: at(40))
     #expect(subscribers.lastOutputAt == at(40))
   }
 

@@ -95,8 +95,8 @@ public actor HostedTerminalSession: HostedTerminal {
   // MARK: - Fed by the supervisor, in the order the host sent it
 
   func receive(output bytes: [UInt8]) {
-    let dropped = historyBuffer.append(bytes)
-    subscribers.output(bytes, historyDropped: dropped)
+    historyBuffer.append(bytes)
+    subscribers.output(bytes)
   }
 
   func receive(truncated byteCount: Int) {
