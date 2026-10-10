@@ -53,6 +53,9 @@ public final class AppEnvironment {
     /// given `--browser-bridge`. `nil` gives the agents no web view tools — outside an application
     /// bundle, the test runner would be started instead.
     public var browserBridgeExecutable: String?
+    /// The mobile companion's agent (#347): the one embedded in the bundle, when this build carries
+    /// it. `nil` starts no companion, as in a test.
+    public var companionAgent: URL?
 
     public init(
       environment: [String: String] = ProcessInfo.processInfo.environment,
@@ -66,7 +69,8 @@ public final class AppEnvironment {
       codeIdentity: any CodeIdentityReading = SecCodeIdentityReader(),
       crashReports: URL = FileManager.default.homeDirectoryForCurrentUser
         .appendingPathComponent("Library/Logs/DiagnosticReports", isDirectory: true),
-      browserBridgeExecutable: String? = AppEnvironment.bundledExecutable()
+      browserBridgeExecutable: String? = AppEnvironment.bundledExecutable(),
+      companionAgent: URL? = AppEnvironment.bundledCompanionAgent()
     ) {
       self.environment = environment
       self.hostLaunch = hostLaunch
@@ -78,6 +82,7 @@ public final class AppEnvironment {
       self.codeIdentity = codeIdentity
       self.crashReports = crashReports
       self.browserBridgeExecutable = browserBridgeExecutable
+      self.companionAgent = companionAgent
     }
   }
 
@@ -112,6 +117,8 @@ public final class AppEnvironment {
   private let browserChannel: BrowserChannelListener
   /// The endpoints the user declared, as agents (#107).
   public let endpointCatalog: EndpointCatalog
+  /// The mobile companion (#347), when this build embeds its agent.
+  private var companion: CompanionComposition?
 
   public init(configuration: Configuration = Configuration()) {
     let data = Self.dataLocation(
@@ -501,6 +508,11 @@ public final class AppEnvironment {
         await appModel?.refreshAgents()
         await appModel?.conversations.refreshReadableAgents()
       })
+    // The mobile companion (#347): the active sessions to the agent embedded in the bundle, which
+    // alone holds the iCloud entitlement, and the phone's tests back as alerts.
+    companion = CompanionComposition.start(
+      agent: configuration.companionAgent, appModel: appModel, dataFolder: dataFolder,
+      diagnostics: diagnostics)
     // The endpoints are registered before the first sheet asks for the agents, and the gateway is
     // relieved of the tokens of sessions that ended: at launch, then every five minutes.
     Task { [repository] in
@@ -647,6 +659,8 @@ public final class AppEnvironment {
       ])
     memorySampler.stop()
     bodyEvaluations?.stop()
+    // The agent sees its socket close and writes the Mac offline, whatever happens to the agents.
+    await companion?.stop()
     hangDetector?.stop()
     // The pending layout is written first: quitting is exactly when the delayed save that keeps
     // a separator drag cheap would otherwise be thrown away.
@@ -681,6 +695,11 @@ public final class AppEnvironment {
     // Said rather than left to the host to infer: a client that simply vanished reads as a crash.
     await terminalSupervisor.relinquish(keepRunning: false)
     diagnostics.flush()
+  }
+
+  /// The mobile companion's agent embedded in this bundle (#347), when the build carries it.
+  public nonisolated static func bundledCompanionAgent() -> URL? {
+    CompanionComposition.bundledAgent()
   }
 
   /// This application's binary, when it runs from its bundle: what the agents start as their web

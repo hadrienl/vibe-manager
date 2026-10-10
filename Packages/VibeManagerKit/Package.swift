@@ -25,6 +25,7 @@ let package = Package(
     .library(name: "VibeUpdates", targets: ["VibeUpdates"]),
     .library(name: "VibeEndpoints", targets: ["VibeEndpoints"]),
     .library(name: "VibeDictation", targets: ["VibeDictation"]),
+    .library(name: "VibeCompanionLink", targets: ["VibeCompanionLink"]),
     .executable(name: "vibe-gateway", targets: ["vibe-gateway"]),
   ],
   dependencies: [
@@ -40,6 +41,9 @@ let package = Package(
     // Pinned exactly: Whisper on this Mac for the composer's dictation (#340). The package is
     // named after Argmax's whole kit; only its WhisperKit library is linked.
     .package(url: "https://github.com/argmaxinc/WhisperKit.git", exact: "1.1.1"),
+    // The mobile companion of #347: what the Mac and the iPhone share. Only its wire is linked
+    // here, never its CloudKit side, which lives in the companion agent (ADR 0021).
+    .package(path: "../CompanionKit"),
   ],
   targets: [
     // Every target whose text reaches the user carries its own string catalog.
@@ -116,12 +120,25 @@ let package = Package(
       name: "VibeDictation",
       dependencies: ["VibeApplication", .product(name: "WhisperKit", package: "WhisperKit")]
     ),
+    // The mobile companion (#347): the link to the companion agent embedded in the bundle, which
+    // alone holds the iCloud entitlement, and the alert of a test received. No CloudKit here.
+    .target(
+      name: "VibeCompanionLink",
+      dependencies: [
+        "VibeApplication", "VibeTerminal",
+        .product(name: "CompanionCore", package: "CompanionKit"),
+        .product(name: "CompanionWire", package: "CompanionKit"),
+      ],
+      resources: [.process("Localizable.xcstrings")]
+    ),
     // The application, composed. Out of the application target so that a test can compose it.
     .target(
       name: "VibeComposition",
       dependencies: [
-        "VibeAgents", "VibeApplication", "VibeAvatar", "VibeBrowser", "VibeDictation", "VibeDomain",
-        "VibeEndpoints", "VibeGit", "VibePersistence", "VibeProcess", "VibeTerminal", "VibeTerminalUI",
+        "VibeAgents", "VibeApplication", "VibeAvatar", "VibeBrowser", "VibeCompanionLink",
+        "VibeDictation", "VibeDomain",
+        "VibeEndpoints", "VibeGit", "VibePersistence", "VibeProcess", "VibeTerminal",
+        "VibeTerminalUI",
         "VibeConversationUI", "VibeUI",
       ]
     ),
