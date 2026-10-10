@@ -213,7 +213,7 @@ public struct ConversationView: View {
         model.scrollGeometryChanged(contentFrame: contentFrame, viewportHeight: height)
       }
       .defaultScrollAnchor(.bottom)
-      .modifier(ToolbarVeil(hasMessagesUnderComposer: contentFrame.maxY - viewportHeight > 1))
+      .modifier(ToolbarVeil())
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
       }
@@ -381,17 +381,11 @@ public struct ConversationView: View {
     }
   }
 
-  /// In a scroll view, as the messages are: without one under it, the composer's bar of macOS 26
-  /// lays a veil of its own over the empty view until the first message comes (#359).
   private func placeholder<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-    ScrollView {
-      VStack(spacing: 10, content: content)
-        .font(theme.interfaceFont(size: appearance.textSize.scaled(13)))
-        .foregroundStyle(theme.secondaryText.color)
-        .containerRelativeFrame([.horizontal, .vertical])
-    }
-    .scrollDisabled(true)
-    .modifier(ToolbarVeil(hasMessagesUnderComposer: false))
+    VStack(spacing: 10, content: content)
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(13)))
+      .foregroundStyle(theme.secondaryText.color)
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
   }
 
   private static func rotorLabel(_ block: ConversationBlock) -> String {
@@ -437,8 +431,7 @@ struct BlockView: View {
 }
 
 /// The terminal panel and the footer, laid over the end of the messages on macOS 26: they scroll
-/// under the composer's glass, blurred by the edge effect, instead of stopping short above it
-/// (#359). Before, below the messages.
+/// under the composer's glass instead of stopping short above it (#359). Before, below them.
 ///
 /// The theme's picture, when it has one, stays where it is while the messages scroll (#118). Under
 /// the toolbar too, where the messages scroll: a view, unlike the colour it replaced, stops at the
@@ -455,7 +448,9 @@ private struct ComposerBar<Bar: View>: ViewModifier {
           ThemeBackdropView(theme: theme)
             .ignoresSafeArea(edges: theme.backdrop.area == .messages ? .top : .all)
         }
-        .safeAreaBar(edge: .bottom, spacing: 0) { bar }
+        // An inset, not a bar: under a bar, macOS 26 blurs its whole height as soon as it grows
+        // for the agent's activity, cut sharp at the top — the very break the glass removes.
+        .safeAreaInset(edge: .bottom, spacing: 0) { bar }
         .background { theme.background.color.ignoresSafeArea() }
     } else {
       VStack(spacing: 0) {
@@ -485,19 +480,10 @@ private struct PlainFooterBackground: ViewModifier {
 /// The soft edge effect of macOS 26 blurs the top of the toolbar only and fades out towards its
 /// foot: a message level with the title or the pickers stayed legible under them. The hard one
 /// blurs it all, under a veil of the window's background. Before macOS 26 there is no edge effect.
-///
-/// Under the composer, the messages fade as they go (#359): only while some pass under it. With
-/// nothing there, macOS 26 still lays the edge effect, a lighter band across the composer's bar,
-/// while the agent writes its first answer.
 private struct ToolbarVeil: ViewModifier {
-  let hasMessagesUnderComposer: Bool
-
   func body(content: Content) -> some View {
     if #available(macOS 26, *) {
-      content
-        .scrollEdgeEffectStyle(.hard, for: .top)
-        .scrollEdgeEffectStyle(.soft, for: .bottom)
-        .scrollEdgeEffectHidden(!hasMessagesUnderComposer, for: .bottom)
+      content.scrollEdgeEffectStyle(.hard, for: .top)
     } else {
       content
     }
