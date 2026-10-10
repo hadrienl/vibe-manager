@@ -19,6 +19,7 @@ private final class FakeRecorder: AudioRecording {
     return grants
   }
 
+  var level: Float = 0
   /// What the microphone hears next in a discussion, a tenth of a second at a time.
   var stream: [[Float]] = []
   private(set) var cancelsEcho = false
@@ -523,5 +524,33 @@ struct DiscussionTests {
     dictation.release(ObjectIdentifier(composer))
     #expect(dictation.phase == .idle)
     #expect(!recorder.isRecording)
+  }
+}
+
+@Suite("The wave of a dictation (#357)")
+@MainActor
+struct DictationWaveTests {
+  @Test("While a dictation records, the level follows the microphone; it falls back once done")
+  func followsTheMicrophone() async {
+    let recorder = FakeRecorder()
+    recorder.heard = speech
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    let dictation = DictationController(
+      transcriber: transcriber, recorder: recorder, store: InMemoryDictationSettingsStore())
+    final class Composer {}
+    let composer = Composer()
+    let request = DictationController.Request(
+      owner: ObjectIdentifier(composer), vocabulary: { "" }, insert: { _ in })
+
+    dictation.toggle(request)
+    await until { dictation.phase == .recording }
+    recorder.level = 0.2
+    for _ in 0..<40 where dictation.level == 0 { try? await Task.sleep(for: .milliseconds(25)) }
+    #expect(dictation.level == 0.2)
+
+    dictation.toggle(request)
+    await until { dictation.phase == .idle }
+    for _ in 0..<40 where dictation.level != 0 { try? await Task.sleep(for: .milliseconds(25)) }
+    #expect(dictation.level == 0)
   }
 }

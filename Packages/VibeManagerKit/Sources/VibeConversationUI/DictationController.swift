@@ -116,6 +116,8 @@ public final class DictationController {
   private enum EarlyRelease { case click, hold }
   @ObservationIgnored private var detector = UtteranceDetector()
   @ObservationIgnored private var listening: Task<Void, Never>?
+  /// The level of a dictation, read for its wave.
+  @ObservationIgnored private var metering: Task<Void, Never>?
   /// The sentences of the discussion, transcribed and sent one after the other.
   @ObservationIgnored private var sentences: Task<Void, Never>?
   @ObservationIgnored private var pendingSentences = 0
@@ -443,6 +445,14 @@ public final class DictationController {
       return end()
     case nil:
       break
+    }
+    // The wave of the dictation follows the voice, twenty times a second.
+    metering = Task {
+      while !Task.isCancelled, phase == .recording {
+        level = recorder.level
+        try? await Task.sleep(for: .milliseconds(50))
+      }
+      if phase != .discussing { level = 0 }
     }
     // Loaded, and the prompt read, while the user speaks: both are ready, or nearly, when they
     // stop.
