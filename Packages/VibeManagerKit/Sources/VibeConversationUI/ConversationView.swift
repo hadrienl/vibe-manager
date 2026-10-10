@@ -109,7 +109,12 @@ public struct ConversationView: View {
     .environment(\.conversationIsLive, isActive)
     .environment(\.readAloud, model.readAloud)
     // The voice loaded while the conversation is read, not when its first answer is (#357).
-    .task { model.readAloud?.warmUp() }
+    // The models loaded while the conversation is read, the dictation's first (#357): their
+    // first load compiles them for this Mac, which takes minutes. One at a time.
+    .task {
+      model.dictation?.warmUp()
+      model.readAloud?.warmUp()
+    }
     // Space as the microphone, in the conversation on screen (#357).
     .background(WindowReader { window = $0 })
     .onChange(of: isActive, initial: true) { updateVoiceKeys() }

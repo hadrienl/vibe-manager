@@ -97,10 +97,15 @@ public actor WhisperSpeechTranscriber: SpeechTranscribing {
       self.loaded = nil
       await loaded.whisper.unloadModels()
     }
-    let config = WhisperKitConfig(
-      downloadBase: directory, modelRepo: Self.repository, modelFolder: folder.path,
-      tokenizerFolder: directory, verbose: false, prewarm: true, load: true, download: false)
-    let task = Task { LoadedWhisper(whisper: try await WhisperKit(config)) }
+    let directory = directory
+    let task = Task {
+      try await ModelLoading.shared.run("Whisper \(variant.rawValue)") {
+        let config = WhisperKitConfig(
+          downloadBase: directory, modelRepo: Self.repository, modelFolder: folder.path,
+          tokenizerFolder: directory, verbose: false, prewarm: true, load: true, download: false)
+        return LoadedWhisper(whisper: try await WhisperKit(config))
+      }
+    }
     loading = (variant, task)
     defer { if loading?.variant == variant { loading = nil } }
     let whisper = try await task.value.whisper
@@ -125,7 +130,11 @@ public actor WhisperSpeechTranscriber: SpeechTranscribing {
       promptTokens: promptTokens(prompt, for: whisper),
       // Past thirty seconds, the audio is cut at its pauses rather than in the middle of a word.
       chunkingStrategy: .vad)
+    let start = Date()
     let results = try await whisper.transcribe(audioArray: samples, decodeOptions: options)
+    voiceLog.notice(
+      "Transcribed \(Double(samples.count) / 16_000, format: .fixed(precision: 1)) s of speech in \(Date().timeIntervalSince(start), format: .fixed(precision: 1)) s"
+    )
     return results.map(\.text).joined(separator: " ")
   }
 

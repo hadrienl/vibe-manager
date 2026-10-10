@@ -81,11 +81,16 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
   private func loaded(from folder: URL? = nil) async throws -> TTSKit {
     if let tts { return tts }
     guard let folder = folder ?? installedFolder() else { throw SpeechModelError.notInstalled }
-    let tts = try await TTSKit(
-      TTSKitConfig(
-        model: .qwen3TTS_0_6b, modelFolder: folder, downloadBase: directory, verbose: false,
-        download: false))
-    try await tts.loadModels()
+    let directory = directory
+    let tts = try await ModelLoading.shared.run("voice") {
+      let tts = try await TTSKit(
+        TTSKitConfig(
+          model: .qwen3TTS_0_6b, modelFolder: folder, downloadBase: directory, verbose: false,
+          download: false))
+      try await tts.loadModels()
+      return tts
+    }
+    if let loaded = self.tts { return loaded }
     self.tts = tts
     return tts
   }
