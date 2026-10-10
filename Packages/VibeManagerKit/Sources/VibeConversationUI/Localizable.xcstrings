@@ -10003,107 +10003,6 @@
         }
       }
     },
-    "Click to discuss aloud · hold to dictate · or Space" : {
-      "comment" : "The help tag of the composer's microphone. Space is the key that does the same where no text is being written.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "انقر للتحدث بصوت عالٍ · اضغط مطولًا للإملاء · أو مفتاح المسافة"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klicken zum Sprechen · gedrückt halten zum Diktieren · oder Leertaste"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Haz clic para conversar · mantén pulsado para dictar · o la barra espaciadora"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cliquez pour discuter à voix haute · maintenez pour dicter · ou Espace"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "बोलकर बातचीत के लिए क्लिक करें · बोलकर लिखने के लिए दबाए रखें · या स्पेस"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fai clic per parlare · tieni premuto per dettare · o Spazio"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "クリックで会話 · 長押しで音声入力 · またはスペース"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "클릭하여 대화 · 길게 눌러 받아쓰기 · 또는 스페이스"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Klik om hardop te praten · houd ingedrukt om te dicteren · of spatie"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Kliknij, aby rozmawiać · przytrzymaj, aby dyktować · lub spacja"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Clique para conversar · mantenha pressionado para ditar · ou Espaço"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Нажмите, чтобы говорить · удерживайте для диктовки · или пробел"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sesli konuşmak için tıklayın · dikte için basılı tutun · veya Boşluk"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Натисніть, щоб говорити · утримуйте для диктування · або пробіл"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "点按以语音对话 · 按住以听写 · 或按空格键"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "按一下以語音對話 · 按住以聽寫 · 或按空白鍵"
-          }
-        }
-      }
-    },
     "Click to end the discussion" : {
       "comment" : "The help tag of the microphone during a spoken discussion.",
       "localizations" : {
@@ -13009,103 +12908,204 @@
         }
       }
     },
-    "Dictating… let go to insert what you said · Esc to cancel" : {
-      "comment" : "The composer's hint while the microphone is held to dictate.",
+    "Dictate a message, transcribed on this Mac" : {
+      "comment" : "The help tag of the composer's microphone button.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "جارٍ الإملاء… أفلت لإدراج ما قلته · Esc للإلغاء"
+            "value" : "أملِ رسالة، تُنسخ على هذا الـ Mac"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Diktat läuft … loslassen, um das Gesagte einzufügen · Esc zum Abbrechen"
+            "value" : "Eine Nachricht diktieren, auf diesem Mac transkribiert"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dictando… suelta para insertar lo que dijiste · Esc para cancelar"
+            "value" : "Dicta un mensaje, transcrito en este Mac"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dictée… relâchez pour insérer ce que vous avez dit · Échap pour annuler"
+            "value" : "Dicter un message, transcrit sur ce Mac"
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "बोलकर लिखा जा रहा है… जो कहा उसे जोड़ने के लिए छोड़ें · रद्द करने के लिए Esc"
+            "value" : "संदेश बोलकर लिखें, इसी Mac पर लिप्यंतरित"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dettatura… rilascia per inserire ciò che hai detto · Esc per annullare"
+            "value" : "Detta un messaggio, trascritto su questo Mac"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "音声入力中… 離すと挿入 · Esc でキャンセル"
+            "value" : "メッセージを音声入力（このMacで文字起こし）"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "받아쓰는 중… 놓으면 삽입 · Esc로 취소"
+            "value" : "메시지 받아쓰기, 이 Mac에서 변환"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dicteren… laat los om in te voegen wat je zei · Esc om te annuleren"
+            "value" : "Een bericht dicteren, uitgeschreven op deze Mac"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dyktowanie… puść, aby wstawić to, co powiedziano · Esc, aby anulować"
+            "value" : "Podyktuj wiadomość, transkrybowaną na tym Macu"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ditando… solte para inserir o que você disse · Esc para cancelar"
+            "value" : "Dite uma mensagem, transcrita neste Mac"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Диктовка… отпустите, чтобы вставить сказанное · Esc для отмены"
+            "value" : "Продиктовать сообщение, распознаётся на этом Mac"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Dikte ediliyor… söylediklerinizi eklemek için bırakın · iptal için Esc"
+            "value" : "Bir mesaj dikte edin, bu Mac'te yazıya dökülür"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Диктування… відпустіть, щоб вставити сказане · Esc для скасування"
+            "value" : "Продиктувати повідомлення, розпізнається на цьому Mac"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在听写… 松开以插入你说的内容 · 按 Esc 取消"
+            "value" : "听写一条消息，在这台 Mac 上转写"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "正在聽寫… 放開以插入你說的內容 · 按 Esc 取消"
+            "value" : "聽寫一則訊息，在這台 Mac 上轉寫"
+          }
+        }
+      }
+    },
+    "Dictating… click ■ to insert what you said · Esc to cancel" : {
+      "comment" : "The composer's hint while a dictation records. ■ is the microphone's stop symbol.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ الإملاء… انقر ■ لإدراج ما قلته · Esc للإلغاء"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diktat läuft … ■ klicken, um das Gesagte einzufügen · Esc zum Abbrechen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictando… haz clic en ■ para insertar lo que dijiste · Esc para cancelar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dictée… cliquez sur ■ pour insérer ce que vous avez dit · Échap pour annuler"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बोलकर लिखा जा रहा है… जो कहा उसे जोड़ने के लिए ■ क्लिक करें · रद्द करने के लिए Esc"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dettatura… fai clic su ■ per inserire ciò che hai detto · Esc per annullare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力中… ■ をクリックして挿入 · Esc でキャンセル"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "받아쓰는 중… ■ 클릭하여 삽입 · Esc로 취소"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dicteren… klik op ■ om in te voegen wat je zei · Esc om te annuleren"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dyktowanie… kliknij ■, aby wstawić to, co powiedziano · Esc, aby anulować"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ditando… clique em ■ para inserir o que você disse · Esc para cancelar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Диктовка… нажмите ■, чтобы вставить сказанное · Esc для отмены"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dikte ediliyor… söylediklerinizi eklemek için ■ simgesini tıklayın · iptal için Esc"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Диктування… натисніть ■, щоб вставити сказане · Esc для скасування"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在听写… 点按 ■ 插入你说的内容 · 按 Esc 取消"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在聽寫… 按一下 ■ 插入你說的內容 · 按 Esc 取消"
           }
         }
       }
@@ -13207,6 +13207,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "聽寫在這台 Mac 上透過 Whisper 執行。其模型（%@）只需下載一次並保留：你說的話絕不會離開你的 Mac。"
+          }
+        }
+      }
+    },
+    "Discuss aloud: each pause sends what you said, the answers are read" : {
+      "comment" : "The help tag of the discussion's button, beside the microphone.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحدّث بصوت عالٍ: كل توقف يرسل ما قلته، وتُقرأ الإجابات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laut sprechen: Jede Pause sendet das Gesagte, die Antworten werden vorgelesen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversa en voz alta: cada pausa envía lo que dijiste y las respuestas se leen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Discuter à voix haute : chaque pause envoie ce que vous avez dit, les réponses sont lues"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बोलकर बातचीत करें: हर ठहराव पर आपकी बात भेजी जाती है, उत्तर पढ़े जाते हैं"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parla ad alta voce: ogni pausa invia ciò che hai detto, le risposte vengono lette"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "声で会話：間を置くと話した内容が送信され、回答が読み上げられます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "소리 내어 대화: 말을 멈출 때마다 내용이 전송되고 답변을 읽어 줍니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hardop praten: elke pauze verstuurt wat je zei, de antwoorden worden voorgelezen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rozmawiaj na głos: każda pauza wysyła to, co powiedziano, odpowiedzi są czytane"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Converse em voz alta: cada pausa envia o que você disse, as respostas são lidas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Говорите вслух: каждая пауза отправляет сказанное, ответы читаются"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sesli konuşun: her duraklama söylediklerinizi gönderir, yanıtlar okunur"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Говоріть уголос: кожна пауза надсилає сказане, відповіді читаються"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "语音对话：每次停顿都会发送你说的话，回答会被朗读"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "語音對話：每次停頓都會傳送你說的話，回答會被朗讀"
           }
         }
       }
@@ -13615,103 +13716,103 @@
         }
       }
     },
-    "Discussion · your turn · click the microphone or Esc to end" : {
-      "comment" : "The composer's hint in a spoken discussion, waiting for the user to speak.",
+    "Discussion · your turn · click the wave or Esc to end" : {
+      "comment" : "The composer's hint in a spoken discussion, waiting for the user to speak. The wave is the discussion's button.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "نقاش · دورك · انقر الميكروفون أو Esc للإنهاء"
+            "value" : "نقاش · دورك · انقر الموجة أو Esc للإنهاء"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gespräch · du bist dran · Mikrofon oder Esc zum Beenden"
+            "value" : "Gespräch · du bist dran · Welle oder Esc zum Beenden"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conversación · tu turno · haz clic en el micrófono o Esc para terminar"
+            "value" : "Conversación · tu turno · haz clic en la onda o Esc para terminar"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Discussion · à vous · cliquez sur le micro ou Échap pour terminer"
+            "value" : "Discussion · à vous · cliquez sur l’onde ou Échap pour terminer"
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "बातचीत · आपकी बारी · समाप्त करने के लिए माइक्रोफ़ोन या Esc"
+            "value" : "बातचीत · आपकी बारी · समाप्त करने के लिए तरंग या Esc"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conversazione · tocca a te · fai clic sul microfono o Esc per terminare"
+            "value" : "Conversazione · tocca a te · fai clic sull’onda o Esc per terminare"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "会話 · あなたの番 · マイクか Esc で終了"
+            "value" : "会話 · あなたの番 · 波形か Esc で終了"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "대화 · 내 차례 · 마이크 또는 Esc로 종료"
+            "value" : "대화 · 내 차례 · 파형 또는 Esc로 종료"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Gesprek · jouw beurt · klik op de microfoon of Esc om te stoppen"
+            "value" : "Gesprek · jouw beurt · klik op de golf of Esc om te stoppen"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rozmowa · twoja kolej · kliknij mikrofon lub Esc, aby zakończyć"
+            "value" : "Rozmowa · twoja kolej · kliknij falę lub Esc, aby zakończyć"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conversa · sua vez · clique no microfone ou Esc para encerrar"
+            "value" : "Conversa · sua vez · clique na onda ou Esc para encerrar"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Разговор · ваша очередь · микрофон или Esc для завершения"
+            "value" : "Разговор · ваша очередь · волна или Esc для завершения"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sohbet · sıra sizde · bitirmek için mikrofona tıklayın veya Esc"
+            "value" : "Sohbet · sıra sizde · bitirmek için dalgaya tıklayın veya Esc"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Розмова · ваша черга · мікрофон або Esc, щоб завершити"
+            "value" : "Розмова · ваша черга · хвиля або Esc, щоб завершити"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "对话 · 轮到你 · 点按麦克风或按 Esc 结束"
+            "value" : "对话 · 轮到你 · 点按波形或按 Esc 结束"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "對話 · 輪到你 · 按一下麥克風或按 Esc 結束"
+            "value" : "對話 · 輪到你 · 按一下波形或按 Esc 結束"
           }
         }
       }
@@ -28622,6 +28723,107 @@
         }
       }
     },
+    "Stop Dictation" : {
+      "comment" : "The composer's microphone button while it records, for VoiceOver.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إيقاف الإملاء"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diktat beenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener el dictado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêter la dictée"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "डिक्टेशन रोकें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompi la dettatura"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "音声入力を停止"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "받아쓰기 중지"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dicteren stoppen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zatrzymaj dyktowanie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar o ditado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить диктовку"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dikteyi durdur"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити диктування"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止听写"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止聽寫"
+          }
+        }
+      }
+    },
     "Stop Reading" : {
       "comment" : "Stops the voice reading an answer.",
       "localizations" : {
@@ -28719,6 +28921,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "停止朗讀"
+          }
+        }
+      }
+    },
+    "Stop and insert what you said" : {
+      "comment" : "The help tag of the composer's microphone button while it records.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إيقاف وإدراج ما قلته"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beenden und das Gesagte einfügen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Detener e insertar lo que dijiste"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Arrêter et insérer ce que vous avez dit"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "रोकें और जो आपने कहा उसे जोड़ें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompi e inserisci ciò che hai detto"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止して話した内容を挿入"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "중지하고 말한 내용 삽입"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stoppen en invoegen wat je zei"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zatrzymaj i wstaw to, co powiedziano"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Parar e inserir o que você disse"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Остановить и вставить сказанное"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Durdur ve söylediklerinizi ekle"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Зупинити й вставити сказане"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止并插入你说的内容"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "停止並插入你說的內容"
           }
         }
       }

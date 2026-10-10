@@ -166,6 +166,10 @@ struct PromptComposer: View {
           DictationButton(
             model: model, dictation: dictation, isEnabled: state == .ready && !isShell,
             isActive: isActive)
+          if model.readAloud != nil {
+            DiscussionButton(
+              model: model, dictation: dictation, isEnabled: state == .ready && !isShell)
+          }
         }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line
@@ -399,7 +403,7 @@ struct PromptComposer: View {
     guard dictation.concerns(ObjectIdentifier(model)) else { return nil }
     switch dictation.phase {
     case .recording:
-      return Text("Dictating… let go to insert what you said · Esc to cancel", bundle: .module)
+      return Text("Dictating… click ■ to insert what you said · Esc to cancel", bundle: .module)
     case .transcribing:
       return dictation.isModelReady
         ? Text("Transcribing…", bundle: .module)
@@ -407,7 +411,7 @@ struct PromptComposer: View {
     case .discussing:
       switch dictation.discussion {
       case .listening:
-        return Text("Discussion · your turn · click the microphone or Esc to end", bundle: .module)
+        return Text("Discussion · your turn · click the wave or Esc to end", bundle: .module)
       case .hearing:
         return Text("Discussion · listening…", bundle: .module)
       case .transcribing:

@@ -36,80 +36,53 @@ struct DictationButton: View {
     }
   }
 
-  /// Recording a dictation, held: the button is red.
-  private var isDiscussing: Bool { isMine && dictation.phase == .discussing }
-  @State private var isPressed = false
 
   var body: some View {
-    Group {
-      if isWorking {
-        ProgressView().controlSize(.small)
-      } else {
-        Image(systemName: isRecording || isDiscussing ? "mic.fill" : "mic")
-          .font(.system(size: 13, weight: .semibold))
-          .foregroundStyle(isRecording || isDiscussing ? Color.white : theme.text.color)
+    Button {
+      if isWaitingBehindButton {
+        hidesProgress = false
+        return
       }
+      toggle()
+    } label: {
+      Group {
+        if isWorking {
+          ProgressView().controlSize(.small)
+        } else {
+          Image(systemName: isRecording ? "stop.fill" : "mic")
+            .font(.system(size: isRecording ? 11 : 13, weight: .semibold))
+            .foregroundStyle(isRecording ? Color.white : theme.text.color)
+        }
+      }
+      .frame(width: 28, height: 28)
+      .background(isRecording ? Color.red : theme.surface.color, in: Circle())
+      .overlay(Circle().stroke(isRecording ? Color.clear : theme.border.color))
+      .contentShape(Circle())
     }
-    .frame(width: 28, height: 28)
-    .background(
-      isRecording ? Color.red : isDiscussing ? Color.green : theme.surface.color, in: Circle()
-    )
-    .overlay(Circle().stroke(isRecording || isDiscussing ? Color.clear : theme.border.color))
-    .contentShape(Circle())
-    .opacity(isUsable ? 1 : 0.4)
-    // Pressed, it listens at once; let go of, a click starts or ends the discussion, a hold
-    // inserts what was dictated (#357).
-    .gesture(
-      DragGesture(minimumDistance: 0)
-        .onChanged { _ in
-          guard !isPressed, isUsable else { return }
-          isPressed = true
-          if isWaitingBehindButton {
-            hidesProgress = false
-            return
-          }
-          hidesProgress = false
-          model.readAloud?.stop()
-          dictation.pressBegan(model.dictationRequest())
-        }
-        .onEnded { _ in
-          guard isPressed else { return }
-          isPressed = false
-          dictation.pressEnded(model.dictationRequest())
-        }
-    )
+    .buttonStyle(.plain)
+    // A recording can always be stopped: the agent may have asked something meanwhile.
+    .disabled(!isUsable)
     .onChange(of: isActive) { _, isActive in
       if !isActive { dictation.release(owner) }
     }
     .onDisappear { dictation.release(owner) }
-    .accessibilityElement()
-    .accessibilityAddTraits(.isButton)
     .accessibilityLabel(
-      isDiscussing
-        ? Text("End the Discussion", bundle: .module)
-        : Text("Start a Discussion", bundle: .module))
-    .accessibilityAction { click() }
-    .accessibilityAction(named: Text("Dictate", bundle: .module)) { toggle() }
+      isRecording
+        ? Text("Stop Dictation", bundle: .module) : Text("Dictate", bundle: .module))
     .help(
-      isDiscussing
-        ? Text("Click to end the discussion", bundle: .module)
-        : Text("Click to discuss aloud · hold to dictate · or Space", bundle: .module))
+      isRecording
+        ? Text("Stop and insert what you said", bundle: .module)
+        : Text("Dictate a message, transcribed on this Mac", bundle: .module))
     .popover(isPresented: popoverBinding, arrowEdge: .top) {
       DictationPopover(dictation: dictation, dictate: toggle)
     }
   }
 
-  /// Whether the button can be pressed: a recording or a discussion can always be stopped.
+  /// Whether the button can be pressed: a recording can always be stopped.
   private var isUsable: Bool {
-    isRecording || isDiscussing || isWaitingBehindButton
-      || (isEnabled && !dictation.isBusy(for: owner) && !isWorking)
-  }
-
-  /// A click, as VoiceOver gives it: the discussion starts, or ends.
-  private func click() {
-    let request = model.dictationRequest()
-    dictation.pressBegan(request)
-    dictation.pressEnded(request)
+    isRecording || isWaitingBehindButton
+      || (isEnabled && !dictation.isBusy(for: owner) && !isWorking
+        && dictation.phase != .discussing)
   }
 
   /// The dictation of old: a click starts it, a second inserts what was said. VoiceOver's
@@ -319,5 +292,46 @@ extension ConversationModel {
     request.interrupt = { [weak self] in await self?.interrupt() }
     request.isAgentWorking = { [weak self] in self?.isAgentWorking ?? false }
     return request
+  }
+}
+
+/// The discussion's button, beside the microphone (#357): a click opens a spoken discussion with
+/// the agent — sentences sent at each pause, answers read aloud — and a second one ends it.
+struct DiscussionButton: View {
+  let model: ConversationModel
+  let dictation: DictationController
+  let isEnabled: Bool
+  @Environment(\.conversationTheme) private var theme
+
+  private var isDiscussing: Bool {
+    dictation.concerns(ObjectIdentifier(model)) && dictation.phase == .discussing
+  }
+
+  var body: some View {
+    Button {
+      model.readAloud?.stop()
+      dictation.toggleDiscussion(model.dictationRequest())
+    } label: {
+      Image(systemName: "waveform")
+        .font(.system(size: 13, weight: .semibold))
+        .foregroundStyle(isDiscussing ? Color.white : theme.text.color)
+        .frame(width: 28, height: 28)
+        .background(isDiscussing ? Color.green : theme.surface.color, in: Circle())
+        .overlay(Circle().stroke(isDiscussing ? Color.clear : theme.border.color))
+        .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .disabled(
+      !isDiscussing
+        && (!isEnabled || dictation.isBusy(for: ObjectIdentifier(model))
+          || dictation.phase != .idle && !dictation.concerns(ObjectIdentifier(model))))
+    .accessibilityLabel(
+      isDiscussing
+        ? Text("End the Discussion", bundle: .module)
+        : Text("Start a Discussion", bundle: .module))
+    .help(
+      isDiscussing
+        ? Text("Click to end the discussion", bundle: .module)
+        : Text("Discuss aloud: each pause sends what you said, the answers are read", bundle: .module))
   }
 }

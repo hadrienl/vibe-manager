@@ -251,7 +251,13 @@ public struct UtteranceDetector: Sendable {
   /// What a voice must stand above: the room, three times over — and much more while the Mac
   /// speaks, so that only the user cutting in is heard over the echo the filter lets through.
   public func threshold(whileSpeaking: Bool) -> Float {
-    whileSpeaking ? max(0.04, floor * 8) : max(0.01, floor * 3)
+    whileSpeaking ? max(0.06, floor * 10) : max(0.01, floor * 3)
+  }
+
+  /// So long above the threshold to begin a sentence — longer over the Mac's own voice, whose
+  /// echo comes in bursts.
+  static func framesToStart(whileSpeaking: Bool) -> Int {
+    whileSpeaking ? 5 : speechFrames
   }
 
   /// Feeds what was heard; `whileSpeaking` when the voice reads an answer.
@@ -289,7 +295,7 @@ public struct UtteranceDetector: Sendable {
       lead.append(frame)
       if isLoud {
         loud += 1
-        if loud >= Self.speechFrames {
+        if loud >= Self.framesToStart(whileSpeaking: whileSpeaking) {
           sentence = lead.suffix(Self.leadFrames + Self.speechFrames).flatMap { $0 }
           sentenceFrames = loud
           quiet = 0

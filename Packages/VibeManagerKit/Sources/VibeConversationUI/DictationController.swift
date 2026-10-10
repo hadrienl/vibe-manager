@@ -196,6 +196,32 @@ public final class DictationController {
     }
   }
 
+  /// The discussion's own button (#357): starts the discussion, or ends the one under way.
+  public func toggleDiscussion(_ request: Request) {
+    if phase == .discussing, owner == request.owner { return endDiscussion() }
+    guard phase == .idle else { return }
+    attempt += 1
+    self.request = request
+    owner = request.owner
+    problem = nil
+    isReadyToDictate = false
+    guard isModelInstalled else {
+      phase = .offeringDownload
+      return
+    }
+    Task { [attempt] in
+      switch recorder.access {
+      case .granted: break
+      case .undetermined:
+        guard await recorder.requestAccess() else { return fail(.microphoneDenied) }
+      case .denied:
+        return fail(.microphoneDenied)
+      }
+      guard attempt == self.attempt, owner == request.owner, phase == .idle else { return }
+      startDiscussion()
+    }
+  }
+
   /// The microphone pressed — its button, or Space (#357). It listens at once: what is said
   /// before the press is known to be held is kept.
   public func pressBegan(_ request: Request) {
@@ -239,8 +265,11 @@ public final class DictationController {
   private func startDiscussion() {
     Self.log.notice("Discussion started")
     guard let request else { return end() }
+    // Without the system's echo cancellation: turned on, it gave nothing but silence, and it only
+    // removes what this engine plays — the voice is played by another. The Mac's own voice is
+    // kept out by the detector instead.
     do {
-      try recorder.start(cancellingEcho: true)
+      try recorder.start(cancellingEcho: false)
     } catch {
       return fail(.noMicrophone)
     }
@@ -267,7 +296,12 @@ public final class DictationController {
     for event in detector.feed(recorder.takeSamples(), whileSpeaking: isSpeaking) {
       switch event {
       case .speechStarted:
-        if isSpeaking { readAloud?.stop() }
+        if isSpeaking {
+          // The user cuts in: the voice stops, and what was heard while it spoke — its echo with
+          // the user's first words — is not sent. The sentence is heard again from now.
+          readAloud?.stop()
+          _ = detector.flush()
+        }
       case .utterance(let samples):
         queue(samples)
       }
