@@ -416,7 +416,9 @@ struct PromptComposer: View {
     case .recording:
       return Text("Dictating… let go to insert what you said · Esc to cancel", bundle: .module)
     case .transcribing:
-      return Text("Transcribing…", bundle: .module)
+      return dictation.isModelReady
+        ? Text("Transcribing…", bundle: .module)
+        : Text("Preparing the speech model…", bundle: .module)
     case .discussing:
       switch dictation.discussion {
       case .listening:
@@ -424,7 +426,9 @@ struct PromptComposer: View {
       case .hearing:
         return Text("Discussion · listening…", bundle: .module)
       case .transcribing:
-        return Text("Discussion · transcribing…", bundle: .module)
+        return dictation.isModelReady
+          ? Text("Discussion · transcribing…", bundle: .module)
+          : Text("Preparing the speech model…", bundle: .module)
       case .agentWorking:
         return Text("Discussion · \(model.agentName) is working", bundle: .module)
       case .agentSpeaking:

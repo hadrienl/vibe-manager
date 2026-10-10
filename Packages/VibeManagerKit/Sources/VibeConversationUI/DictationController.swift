@@ -80,6 +80,9 @@ public final class DictationController {
   /// Called once a model is downloaded and prepared: the application tells the user, who may be
   /// elsewhere — a download and its preparation take minutes.
   @ObservationIgnored public var modelDidBecomeReady: (() -> Void)?
+  /// Whether the model is loaded in this run: until it is, the first transcription waits for its
+  /// compilation for this Mac — minutes, the first time a copy of the application loads it.
+  public private(set) var isModelReady = false
   /// Where the discussion is; meaningful while the phase is `.discussing`.
   public private(set) var discussion = DiscussionState.listening
   /// How loud the microphone is now, between 0 and about 0.3: the wave the composer draws.
@@ -94,6 +97,10 @@ public final class DictationController {
     didSet {
       guard settings != oldValue else { return }
       store.settings = settings
+      if settings.variant != oldValue.variant {
+        isModelReady = false
+        isWarming = false
+      }
     }
   }
 
@@ -118,6 +125,7 @@ public final class DictationController {
   @ObservationIgnored private var listening: Task<Void, Never>?
   /// The level of a dictation, read for its wave.
   @ObservationIgnored private var metering: Task<Void, Never>?
+  @ObservationIgnored private var isWarming = false
   /// The sentences of the discussion, transcribed and sent one after the other.
   @ObservationIgnored private var sentences: Task<Void, Never>?
   @ObservationIgnored private var pendingSentences = 0
@@ -171,6 +179,18 @@ public final class DictationController {
       return
     }
     Task { [attempt] in await startRecording(answering: attempt) }
+  }
+
+  /// Loads the model in the background, once, when a conversation comes on screen: its first
+  /// load in a copy of the application compiles it for this Mac, which takes minutes (#357).
+  public func warmUp() {
+    guard isModelInstalled, !isWarming, !isModelReady else { return }
+    isWarming = true
+    let variant = settings.variant
+    Task {
+      try? await transcriber.prepare(variant)
+      isModelReady = true
+    }
   }
 
   /// The microphone pressed — its button, or Space (#357). It listens at once: what is said
@@ -462,6 +482,15 @@ public final class DictationController {
   }
 
   private func finishRecording(_ samples: [Float]) async {
+    // A transcription that never ends is said, rather than shown under way for ever — counted
+    // once the model is loaded, whose first load takes minutes.
+    let watchdog = Task { [attempt] in
+      while !isModelReady, !Task.isCancelled { try? await Task.sleep(for: .seconds(1)) }
+      try? await Task.sleep(for: .seconds(60))
+      guard !Task.isCancelled, phase == .transcribing, self.attempt == attempt else { return }
+      fail(.transcriptionFailed)
+    }
+    defer { watchdog.cancel() }
     let prompt = await vocabulary?.value ?? ""
     vocabulary = nil
     guard let request else { return end() }
@@ -470,6 +499,7 @@ public final class DictationController {
     do {
       let text = try await transcriber.transcribe(
         samples, with: settings.variant, language: settings.language, prompt: prompt)
+      isModelReady = true
       let cleaned = DictationTranscript.cleaned(text)
       if !cleaned.isEmpty { request.insert(cleaned) }
       end()
