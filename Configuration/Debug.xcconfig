@@ -3,6 +3,3 @@
 SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG
 SWIFT_OPTIMIZATION_LEVEL = -Onone
 ONLY_ACTIVE_ARCH = YES
-
-// The mobile companion's agent (#347), embedded in development builds.
-VIBE_EMBED_COMPANION = YES

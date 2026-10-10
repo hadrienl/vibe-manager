@@ -47,8 +47,11 @@ CODE_SIGN_ENTITLEMENTS = App/VibeManagerApp/VibeManager.entitlements
 
 // The mobile companion's agent (#347) in Contents/Helpers: YES in Debug and Scripts/local-build.sh,
 // NO otherwise, and so in every build of Scripts/release.sh, which checks it is absent. NO also
-// leaves the agent's target unbuilt: it needs a provisioning profile a release does not have.
-VIBE_EMBED_COMPANION = NO
+// leaves the agent's target unbuilt: it needs a provisioning profile a release does not have, nor
+// a contributor's team, which Local.xcconfig can say with VIBE_EMBED_COMPANION = NO.
+VIBE_EMBED_COMPANION_Debug = YES
+VIBE_EMBED_COMPANION_Release = NO
+VIBE_EMBED_COMPANION = $(VIBE_EMBED_COMPANION_$(CONFIGURATION))
 VIBE_COMPANION_EXCLUDED_DEPENDENCIES_NO = VibeCompanionAgent
 VIBE_COMPANION_EXCLUDED_DEPENDENCIES_YES =
 EXCLUDED_EXPLICIT_TARGET_DEPENDENCIES = $(VIBE_COMPANION_EXCLUDED_DEPENDENCIES_$(VIBE_EMBED_COMPANION))
