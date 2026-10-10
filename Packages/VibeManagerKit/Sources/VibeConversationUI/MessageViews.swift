@@ -125,19 +125,67 @@ private struct SpokenPrompt: ViewModifier {
   }
 }
 
-/// What the agent answered, in full width.
+/// What the agent answered, in full width, and the button that reads it aloud (#357).
 struct AgentTextView: View {
   let text: String
+  /// `nil` before macOS 15, or in a sub-agent's result: no button.
+  var readAloud: ReadAloudController?
+  @Environment(\.openSettings) private var openSettings
 
   var body: some View {
-    MarkdownView(text: text)
-      .contextMenu {
-        Button {
-          copy(text)
-        } label: {
-          Text("Copy Message", bundle: .module)
+    VStack(alignment: .leading, spacing: 6) {
+      MarkdownView(text: text)
+        .contextMenu {
+          Button {
+            copy(text)
+          } label: {
+            Text("Copy Message", bundle: .module)
+          }
+        }
+      if let readAloud {
+        ReadAloudButton(text: text, readAloud: readAloud) { openSettings() }
+      }
+    }
+  }
+}
+
+/// ▶ under an answer: reads it aloud, or stops it while it is read. The text itself identifies
+/// the answer.
+private struct ReadAloudButton: View {
+  let text: String
+  let readAloud: ReadAloudController
+  let showSettings: () -> Void
+  @Environment(\.conversationTheme) private var theme
+
+  var body: some View {
+    let isReading = readAloud.isReading(text)
+    Button {
+      if isReading {
+        readAloud.stop()
+      } else {
+        readAloud.read(text, id: text)
+        // Without its model, Settings shows where it is downloaded.
+        if !readAloud.isModelInstalled { showSettings() }
+      }
+    } label: {
+      Group {
+        if readAloud.isLoading(text) {
+          ProgressView().controlSize(.mini)
+        } else {
+          Image(systemName: isReading ? "stop.fill" : "play.fill")
         }
       }
+      .font(.system(size: 9, weight: .semibold))
+        .foregroundStyle(isReading ? theme.onAccent.color : theme.secondaryText.color)
+        .frame(width: 22, height: 22)
+        .background(isReading ? theme.accent.color : theme.surface.color, in: Circle())
+        .overlay(Circle().stroke(isReading ? Color.clear : theme.border.color))
+        .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(
+      isReading ? Text("Stop Reading", bundle: .module) : Text("Read Aloud", bundle: .module))
+    .help(isReading ? Text("Stop Reading", bundle: .module) : Text("Read Aloud", bundle: .module))
   }
 }
 

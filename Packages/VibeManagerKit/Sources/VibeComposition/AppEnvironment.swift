@@ -474,6 +474,15 @@ public final class AppEnvironment {
     appModel.dictation?.modelDidBecomeReady = { [weak appModel] in
       appModel?.announceDictationReady()
     }
+    // The answers read aloud (#357): Qwen3-TTS, which needs macOS 15, its model beside Whisper's.
+    if #available(macOS 15.0, *) {
+      let readAloud = ReadAloudController(
+        synthesizer: QwenSpeechSynthesizer(
+          directory: dataFolder.appendingPathComponent("VoiceModels", isDirectory: true)),
+        store: UserDefaultsSpeechSettingsStore(suiteName: data.defaultsSuite))
+      readAloud.modelDidBecomeReady = { [weak appModel] in appModel?.announceSpeechReady() }
+      appModel.readAloud = readAloud
+    }
     // The first launch's tour (#338), before the window loads and resumes it.
     appModel.onboarding = OnboardingModel(
       preferences: UserDefaultsOnboardingPreferences(suiteName: data.defaultsSuite))

@@ -23,9 +23,14 @@ public final class MicrophoneRecorder: AudioRecording {
     await AVCaptureDevice.requestAccess(for: .audio)
   }
 
-  public func start() throws {
+  public func start(cancellingEcho: Bool) throws {
     buffer.reset()
     let input = engine.inputNode
+    // The system's voice processing: echo cancellation, against what this Mac plays. Turned on
+    // before the format is read — it changes it.
+    if input.isVoiceProcessingEnabled != cancellingEcho {
+      try? input.setVoiceProcessingEnabled(cancellingEcho)
+    }
     let format = input.outputFormat(forBus: 0)
     guard format.sampleRate > 0,
       let target = AVAudioFormat(
@@ -45,7 +50,14 @@ public final class MicrophoneRecorder: AudioRecording {
     }
   }
 
+  public var level: Float { buffer.level }
+
+  public func takeSamples() -> [Float] {
+    buffer.take()
+  }
+
   public func stop() -> [Float] {
+    defer { buffer.reset() }
     engine.inputNode.removeTap(onBus: 0)
     engine.stop()
     return buffer.take()
@@ -95,13 +107,26 @@ public final class MicrophoneRecorder: AudioRecording {
 private final class SampleBuffer: @unchecked Sendable {
   private let lock = NSLock()
   private var samples: [Float] = []
+  private var lastLevel: Float = 0
+
+  /// The loudness of the last buffer heard.
+  var level: Float { lock.withLock { lastLevel } }
 
   func reset() {
-    lock.withLock { samples = [] }
+    lock.withLock {
+      samples = []
+      lastLevel = 0
+    }
   }
 
   func append(_ more: [Float]) {
-    lock.withLock { samples.append(contentsOf: more) }
+    var sum: Float = 0
+    for sample in more { sum += sample * sample }
+    let level = more.isEmpty ? 0 : (sum / Float(more.count)).squareRoot()
+    lock.withLock {
+      samples.append(contentsOf: more)
+      lastLevel = level
+    }
   }
 
   func take() -> [Float] {

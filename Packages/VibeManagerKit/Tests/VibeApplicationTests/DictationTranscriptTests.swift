@@ -68,3 +68,88 @@ struct DictationTranscriptTests {
     #expect(!prompt.contains("SomeRatherLongFileName5.swift"))
   }
 }
+
+@Suite("Where a sentence of the discussion begins and ends (#357)")
+struct UtteranceDetectorTests {
+  private static let silence = [Float](repeating: 0.001, count: 1_600)
+  private static func voice(_ amplitude: Float) -> [Float] {
+    (0..<1_600).map { amplitude * sin(Float($0) * 2 * .pi * 220 / 16_000) }
+  }
+
+  @Test("A voice begins a sentence; a pause of 1.2 s ends it, its start kept")
+  func sentence() {
+    var detector = UtteranceDetector()
+    var events: [UtteranceDetector.Event] = []
+    for _ in 0..<5 { events += detector.feed(Self.silence) }
+    #expect(events.isEmpty)
+    for _ in 0..<8 { events += detector.feed(Self.voice(0.2)) }
+    #expect(events == [.speechStarted])
+    #expect(detector.isHearingSpeech)
+    for _ in 0..<(UtteranceDetector.pauseFrames - 1) { events += detector.feed(Self.silence) }
+    #expect(events.count == 1)
+    events += detector.feed(Self.silence)
+    guard case .utterance(let samples) = events.last else {
+      Issue.record("No sentence ended")
+      return
+    }
+    // Its eight tenths of voice, the tenths before it, and the first tenth of the pause.
+    #expect(samples.count >= 9 * 1_600)
+    #expect(!detector.isHearingSpeech)
+  }
+
+  @Test("A click, two tenths of a second, is no sentence")
+  func click() {
+    var detector = UtteranceDetector()
+    var events: [UtteranceDetector.Event] = []
+    events += detector.feed(Self.voice(0.3) + Self.voice(0.3))
+    for _ in 0..<20 { events += detector.feed(Self.silence) }
+    #expect(events.isEmpty)
+  }
+
+  @Test("While the Mac speaks, its echo is learnt, and a voice well above it cuts in")
+  func overTheVoice() {
+    var detector = UtteranceDetector()
+    var events: [UtteranceDetector.Event] = []
+    for _ in 0..<5 { events += detector.feed(Self.silence) }
+    // The voice's echo, louder than a quiet room, for two seconds: not a sentence.
+    for _ in 0..<20 { events += detector.feed(Self.voice(0.06), whileSpeaking: true) }
+    #expect(events.isEmpty)
+    #expect(detector.echo > 0.03)
+    // The user, louder than the echo, for 0.4 s: a sentence begins.
+    for _ in 0..<3 { events += detector.feed(Self.voice(0.3), whileSpeaking: true) }
+    #expect(events.isEmpty)
+    events += detector.feed(Self.voice(0.3), whileSpeaking: true)
+    #expect(events == [.speechStarted])
+  }
+
+  @Test("A loud room is learnt, not taken for a voice: a sentence over it still ends")
+  func loudRoom() {
+    var detector = UtteranceDetector()
+    var events: [UtteranceDetector.Event] = []
+    // A fan at 0.03, louder than the threshold of a quiet room.
+    for _ in 0..<60 { events += detector.feed(Self.voice(0.03)) }
+    #expect(!events.contains(.speechStarted) || events.contains { if case .utterance = $0 { true } else { false } })
+    events = []
+    for _ in 0..<8 { events += detector.feed(Self.voice(0.3)) }
+    #expect(events == [.speechStarted])
+    for _ in 0..<UtteranceDetector.pauseFrames { events += detector.feed(Self.voice(0.03)) }
+    #expect(events.count == 2)
+  }
+
+  @Test("A sentence under way when the discussion ends is given back; a breath is not")
+  func flush() {
+    var detector = UtteranceDetector()
+    _ = detector.feed(Self.silence)
+    for _ in 0..<6 { _ = detector.feed(Self.voice(0.2)) }
+    #expect((detector.flush()?.count ?? 0) >= 6 * 1_600)
+    #expect(detector.flush() == nil)
+    #expect(!detector.isHearingSpeech)
+  }
+
+  @Test("« Stop » and « arrête » stop the agent; a sentence that contains them does not")
+  func stopWords() {
+    #expect(UtteranceDetector.isStop("Stop."))
+    #expect(UtteranceDetector.isStop(" Arrête ! "))
+    #expect(!UtteranceDetector.isStop("Arrête le serveur de dev."))
+  }
+}
