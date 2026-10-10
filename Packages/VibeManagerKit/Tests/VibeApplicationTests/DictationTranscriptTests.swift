@@ -116,6 +116,30 @@ struct UtteranceDetectorTests {
     #expect(events == [.speechStarted])
   }
 
+  @Test("A loud room is learnt, not taken for a voice: a sentence over it still ends")
+  func loudRoom() {
+    var detector = UtteranceDetector()
+    var events: [UtteranceDetector.Event] = []
+    // A fan at 0.03, louder than the threshold of a quiet room.
+    for _ in 0..<60 { events += detector.feed(Self.voice(0.03)) }
+    #expect(!events.contains(.speechStarted) || events.contains { if case .utterance = $0 { true } else { false } })
+    events = []
+    for _ in 0..<8 { events += detector.feed(Self.voice(0.3)) }
+    #expect(events == [.speechStarted])
+    for _ in 0..<UtteranceDetector.pauseFrames { events += detector.feed(Self.voice(0.03)) }
+    #expect(events.count == 2)
+  }
+
+  @Test("A sentence under way when the discussion ends is given back; a breath is not")
+  func flush() {
+    var detector = UtteranceDetector()
+    _ = detector.feed(Self.silence)
+    for _ in 0..<6 { _ = detector.feed(Self.voice(0.2)) }
+    #expect((detector.flush()?.count ?? 0) >= 6 * 1_600)
+    #expect(detector.flush() == nil)
+    #expect(!detector.isHearingSpeech)
+  }
+
   @Test("« Stop » and « arrête » stop the agent; a sentence that contains them does not")
   func stopWords() {
     #expect(UtteranceDetector.isStop("Stop."))

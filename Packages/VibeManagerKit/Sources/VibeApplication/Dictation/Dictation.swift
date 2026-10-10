@@ -205,7 +205,11 @@ public enum DictationTranscript {
 }
 
 /// Where a sentence begins and ends in what the microphone hears, for the discussion (#357): a
-/// voice louder than the room for a moment begins one, a pause ends it. Pure, so it is tested.
+/// voice above the room for a moment begins one, a pause ends it. Pure, so it is tested.
+///
+/// The room is the quietest the last seconds were — a fan, a street, the echo the filter lets
+/// through — learnt all the time, voice or not: a room louder than expected must not turn every
+/// tenth of a second into speech, and so a sentence that never ends.
 public struct UtteranceDetector: Sendable {
   public enum Event: Equatable, Sendable {
     /// The user began to speak.
@@ -224,10 +228,15 @@ public struct UtteranceDetector: Sendable {
   static let leadFrames = 3
   /// A sentence never lasts longer: past it, it is ended where it is.
   static let longestFrames = 600
+  /// The seconds the room is learnt over: the quietest tenth among them is its noise.
+  static let roomFrames = 50
+  /// A sentence shorter than this, ended by hand, is a breath rather than words.
+  static let shortestFrames = speechFrames
 
-  /// The loudness of the room, learnt while nobody speaks.
-  private var noise: Float = 0.005
   public private(set) var level: Float = 0
+  /// The room's noise: the quietest of the last five seconds, rising slowly.
+  public private(set) var floor: Float = 0.005
+  private var recent: [Float] = []
   private var carry: [Float] = []
   private var lead: [[Float]] = []
   private var loud = 0
@@ -239,10 +248,10 @@ public struct UtteranceDetector: Sendable {
 
   public var isHearingSpeech: Bool { sentence != nil }
 
-  /// What a voice must stand above: the room's noise, three times over — and much more while the
-  /// Mac speaks, so that only the user cutting in is heard over the echo the filter lets through.
-  func threshold(whileSpeaking: Bool) -> Float {
-    whileSpeaking ? max(0.04, noise * 8) : max(0.015, noise * 3)
+  /// What a voice must stand above: the room, three times over — and much more while the Mac
+  /// speaks, so that only the user cutting in is heard over the echo the filter lets through.
+  public func threshold(whileSpeaking: Bool) -> Float {
+    whileSpeaking ? max(0.04, floor * 8) : max(0.01, floor * 3)
   }
 
   /// Feeds what was heard; `whileSpeaking` when the voice reads an answer.
@@ -256,6 +265,12 @@ public struct UtteranceDetector: Sendable {
       for sample in frame { sum += sample * sample }
       let rms = (sum / Float(frame.count)).squareRoot()
       level = rms
+      recent.append(rms)
+      if recent.count > Self.roomFrames { recent.removeFirst(recent.count - Self.roomFrames) }
+      // Down at once, up slowly: a voice that begins with the discussion is not taken for the
+      // room, while a louder room is learnt within seconds.
+      let quietest = max(0.002, recent.min() ?? rms)
+      floor = quietest < floor ? quietest : min(quietest, floor * 1.05)
       let isLoud = rms >= threshold(whileSpeaking: whileSpeaking)
       if var current = sentence {
         current.append(contentsOf: frame)
@@ -265,18 +280,15 @@ public struct UtteranceDetector: Sendable {
           // The pause itself is not part of it, but for its first tenth.
           let trailing = max(0, quiet - 1) * Self.frame
           events.append(.utterance(Array(current.dropLast(trailing))))
-          sentence = nil
-          quiet = 0
-          loud = 0
-          lead = []
+          reset()
         } else {
           sentence = current
         }
         continue
       }
+      lead.append(frame)
       if isLoud {
         loud += 1
-        lead.append(frame)
         if loud >= Self.speechFrames {
           sentence = lead.suffix(Self.leadFrames + Self.speechFrames).flatMap { $0 }
           sentenceFrames = loud
@@ -285,13 +297,26 @@ public struct UtteranceDetector: Sendable {
         }
       } else {
         loud = 0
-        lead.append(frame)
         if lead.count > Self.leadFrames { lead.removeFirst(lead.count - Self.leadFrames) }
-        // The room is learnt from its quiet frames only, slowly.
-        noise = noise * 0.95 + rms * 0.05
       }
     }
     return events
+  }
+
+  /// The sentence under way, ended now — the discussion closed before its pause: what was said is
+  /// still sent. `nil` when nothing, or too little to be words, was being said.
+  public mutating func flush() -> [Float]? {
+    defer { reset() }
+    guard let sentence, sentenceFrames >= Self.shortestFrames else { return nil }
+    return sentence
+  }
+
+  private mutating func reset() {
+    sentence = nil
+    sentenceFrames = 0
+    quiet = 0
+    loud = 0
+    lead = []
   }
 
   /// Whether a sentence asks the agent to stop rather than says something to it.
