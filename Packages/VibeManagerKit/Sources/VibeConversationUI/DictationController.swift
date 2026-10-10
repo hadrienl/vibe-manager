@@ -199,8 +199,11 @@ public final class DictationController {
   /// The microphone pressed — its button, or Space (#357). It listens at once: what is said
   /// before the press is known to be held is kept.
   public func pressBegan(_ request: Request) {
+    Self.log.notice("Microphone pressed, \(String(describing: self.phase), privacy: .public)")
     pressedAt = Date()
-    if phase == .discussing { return }
+    // Pressed again while it listens — a gesture the interface repeats — changes nothing: only
+    // letting go does.
+    guard phase == .idle else { return }
     earlyRelease = nil
     toggle(request)
   }
@@ -208,7 +211,11 @@ public final class DictationController {
   /// The microphone let go of: held, what was said is inserted in the draft; clicked, the
   /// discussion starts — or ends, if it was on.
   public func pressEnded(_ request: Request) {
-    let held = Date().timeIntervalSince(pressedAt ?? .distantPast) >= holdThreshold
+    // A release without its press is a click: never a dictation ended by surprise.
+    let held = pressedAt.map { Date().timeIntervalSince($0) >= holdThreshold } ?? false
+    Self.log.notice(
+      "Microphone released, \(held ? "held" : "clicked", privacy: .public), \(String(describing: self.phase), privacy: .public)"
+    )
     pressedAt = nil
     guard owner == request.owner else { return }
     switch phase {
@@ -230,6 +237,7 @@ public final class DictationController {
   }
 
   private func startDiscussion() {
+    Self.log.notice("Discussion started")
     guard let request else { return end() }
     do {
       try recorder.start(cancellingEcho: true)
@@ -268,16 +276,16 @@ public final class DictationController {
     // What the detector makes of the room, once a second: to tune it where it hears wrong.
     ticks += 1
     if ticks % 10 == 0 {
-      Self.log.debug(
+      Self.log.notice(
         "Discussion: level \(self.detector.level, format: .fixed(precision: 3)) room \(self.detector.floor, format: .fixed(precision: 3)) threshold \(self.detector.threshold(whileSpeaking: isSpeaking), format: .fixed(precision: 3)) hearing \(self.detector.isHearingSpeech)"
       )
     }
     discussion =
-      if detector.isHearingSpeech { .hearing }
-      else if pendingSentences > 0 { .transcribing }
-      else if readAloud?.isReading == true { .agentSpeaking }
-      else if request?.isAgentWorking() == true { .agentWorking }
-      else { .listening }
+      if detector.isHearingSpeech { .hearing } else if pendingSentences > 0 {
+        .transcribing
+      } else if readAloud?.isReading == true {
+        .agentSpeaking
+      } else if request?.isAgentWorking() == true { .agentWorking } else { .listening }
   }
 
   /// A sentence to transcribe and send, after those before it.
@@ -315,6 +323,7 @@ public final class DictationController {
   /// transcribed and sent — the user ended the discussion on it.
   public func endDiscussion() {
     guard phase == .discussing else { return }
+    Self.log.notice("Discussion ended")
     listening?.cancel()
     listening = nil
     _ = detector.feed(recorder.stop())
@@ -504,6 +513,8 @@ public final class DictationController {
   }
 
   private func finishRecording(_ samples: [Float]) async {
+    Self.log.notice(
+      "Dictation ended: \(Double(samples.count) / 16_000, format: .fixed(precision: 1)) s heard")
     // A transcription that never ends is said, rather than shown under way for ever — counted
     // once the model is loaded, whose first load takes minutes.
     let watchdog = Task { [attempt] in
