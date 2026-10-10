@@ -187,12 +187,14 @@ struct TerminalHostTests {
     let supervisor = host.supervisor()
     let session = try await supervisor.start(
       TerminalTestSupport.spec(
-        // A line at a time, each read as a block of its own: a history drops whole blocks.
-        script:
-          "i=0; while [ $i -lt 40 ]; do echo line-$i; sleep 0.02; i=$((i + 1)); done; echo done-now",
+        // Held until the application is attached, so that nothing is trimmed before; then a line
+        // at a time, each read as a block of its own: a history drops whole blocks.
+        script: "read go; i=0; "
+          + "while [ $i -lt 40 ]; do echo line-$i; sleep 0.02; i=$((i + 1)); done; echo done-now",
         scrollback: TerminalScrollbackLimits(maximumLineCount: 5, maximumByteCount: 8_000_000)),
       for: TerminalID())
     let transcript = await Transcript.follow(session)
+    await session.write([UInt8]("go\n".utf8))
 
     #expect(await transcript.waitFor("done-now"))
     #expect(await transcript.waitForEnd())

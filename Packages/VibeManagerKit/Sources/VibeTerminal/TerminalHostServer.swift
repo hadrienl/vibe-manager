@@ -422,8 +422,8 @@ public actor TerminalHostServer {
           // serves each of its subscribers what it reads.
           continue
         case .historyTruncated:
-          // The host's history trimmed bytes it forwarded already: the application holds them,
-          // and trims its own history by itself (#364). Said, it was a notice on every write.
+          // Not served for a trim of the host's own history, whose bytes were forwarded already
+          // and are trimmed by the application's history by itself (#364).
           continue
         case .outputDropped(let count):
           // Output this forward dropped never reaches the application: lost to its history too.
