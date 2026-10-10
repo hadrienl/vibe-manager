@@ -181,6 +181,29 @@ struct TerminalHostTests {
     await host.shutDown()
   }
 
+  @Test("A history trimmed by the host is not lost to the application: it trims its own (#364)")
+  func hostTrimIsNotALoss() async throws {
+    let host = try InProcessTerminalHost()
+    let supervisor = host.supervisor()
+    let session = try await supervisor.start(
+      TerminalTestSupport.spec(
+        // A line at a time, each read as a block of its own: a history drops whole blocks.
+        script:
+          "i=0; while [ $i -lt 40 ]; do echo line-$i; sleep 0.02; i=$((i + 1)); done; echo done-now",
+        scrollback: TerminalScrollbackLimits(maximumLineCount: 5, maximumByteCount: 8_000_000)),
+      for: TerminalID())
+    let transcript = await Transcript.follow(session)
+
+    #expect(await transcript.waitFor("done-now"))
+    #expect(await transcript.waitForEnd())
+    // What the application's history dropped is what it trimmed itself, counted once.
+    let history = await session.attach().history
+    #expect(history.startOffset > 0)
+    #expect(history.droppedByteCount == history.startOffset)
+    await supervisor.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
   @Test("Output larger than a frame crosses whole, and the connection survives it")
   func largeOutputIsCut() async throws {
     let host = try InProcessTerminalHost()

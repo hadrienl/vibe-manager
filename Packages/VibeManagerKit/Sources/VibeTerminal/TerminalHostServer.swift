@@ -421,7 +421,11 @@ public actor TerminalHostServer {
           // Not asked for: the host forwards everything, and the application's own session
           // serves each of its subscribers what it reads.
           continue
-        case .historyTruncated(let count), .outputDropped(let count):
+        case .historyTruncated:
+          // The host's history trimmed bytes it forwarded already: the application holds them,
+          // and trims its own history by itself (#364). Said, it was a notice on every write.
+          continue
+        case .outputDropped(let count):
           // Output this forward dropped never reaches the application: lost to its history too.
           await connection.sendAndWait(
             .control(
