@@ -59,6 +59,9 @@ final class CompanionAgent {
   private var handled: Set<String> = []
   private var timers: [Timer] = []
   private var isDeparting = false
+  /// Keeps App Nap away: a process without a window is its first candidate, and a napping agent's
+  /// heartbeat could come later than the phone's tolerance. The Mac may still sleep.
+  private var activity: (any NSObjectProtocol)?
 
   init(arguments: Arguments) {
     self.arguments = arguments
@@ -67,6 +70,9 @@ final class CompanionAgent {
   }
 
   func start() async {
+    activity = ProcessInfo.processInfo.beginActivity(
+      options: .userInitiatedAllowingIdleSystemSleep,
+      reason: "The mobile companion's presence and tests")
     await sync.start { [weak self] update in
       Task { @MainActor in self?.apply(update) }
     }

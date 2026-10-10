@@ -38,9 +38,12 @@ struct CompanionScreen: View {
   }
 
   private var macPicker: some View {
-    @Bindable var model = model
+    // The Mac shown by default — the one seen last — is the one selected until another is picked.
+    let selection = Binding(
+      get: { model.selectedMac?.installationID },
+      set: { model.selectedMacID = $0 })
     return Section {
-      Picker("Mac", selection: $model.selectedMacID) {
+      Picker("Mac", selection: selection) {
         ForEach(model.macs, id: \.installationID) { mac in
           Text(verbatim: mac.buildLabel.isEmpty ? mac.name : "\(mac.name) (\(mac.buildLabel))")
             .tag(Optional(mac.installationID))
