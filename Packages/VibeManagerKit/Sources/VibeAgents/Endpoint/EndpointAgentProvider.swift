@@ -424,6 +424,15 @@ extension EndpointAgentProvider: AgentToolServing {
   }
 }
 
+extension EndpointAgentProvider: AgentInstructing {
+  public func instructing(_ instructions: String, to plan: AgentLaunchPlan) -> AgentLaunchPlan {
+    switch harness {
+    case .claudeCode(let provider): return provider.instructing(instructions, to: plan)
+    case .codex(let provider): return provider.instructing(instructions, to: plan)
+    }
+  }
+}
+
 extension EndpointAgentProvider: AgentConversationReporting {
   private var conversation: any AgentConversationReporting {
     switch harness {
@@ -498,8 +507,12 @@ public struct CodexEndpointAgentProvider: AgentProvider, AgentHookTrusting {
 }
 
 extension CodexEndpointAgentProvider: AgentLaunchPreparing, AgentLaunchObserverProviding,
-  AgentActivityReporting, AgentToolServing, AgentConversationReporting
+  AgentActivityReporting, AgentToolServing, AgentInstructing, AgentConversationReporting
 {
+  public func instructing(_ instructions: String, to plan: AgentLaunchPlan) -> AgentLaunchPlan {
+    base.instructing(instructions, to: plan)
+  }
+
   public func preparingLaunch(_ plan: AgentLaunchPlan, session: SessionID) async throws
     -> AgentLaunchPlan
   {

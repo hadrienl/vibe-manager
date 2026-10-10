@@ -24,6 +24,8 @@ public enum SettingsPage: Hashable, Sendable {
   case newEndpoint
   /// The session's web view (#69): what agents may do there, and where links go.
   case webView
+  /// Coordinator sessions and their children (#352): how many children may run at once.
+  case coordination
   /// The prompt templates: a list, an editor and a preview.
   case templates
   /// The composer's dictation (#340): the speech model, and the language spoken.
@@ -101,6 +103,10 @@ public enum SettingsPage: Hashable, Sendable {
     case .webView:
       LocalizedStringResource(
         "Web View", bundle: .module, comment: "A page of the Settings window.")
+    case .coordination:
+      LocalizedStringResource(
+        "Coordination", bundle: .module,
+        comment: "A page of the Settings window: coordinator sessions and their children.")
     case .templates:
       LocalizedStringResource(
         "Templates", bundle: .module, comment: "A page of the Settings window.")
@@ -131,6 +137,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .endpoint: "server.rack"
     case .newEndpoint: "plus"
     case .webView: "globe"
+    case .coordination: "person.2.fill"
     case .templates: "text.badge.plus"
     case .dictation: "mic.fill"
     case .tickets, .ticketResolvers: "ticket.fill"
@@ -150,6 +157,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .endpoint: .indigo
     case .newEndpoint: .secondary
     case .webView: .cyan
+    case .coordination: .teal
     case .templates: .purple
     case .dictation: .red
     case .tickets, .ticketResolvers: .orange

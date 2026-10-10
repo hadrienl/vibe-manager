@@ -231,7 +231,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       ?? ReportedLaunch(plan: plan, decoder: nil)
     // After the hooks: Codex's approval of them is keyed on the plan they were read from, and the
     // tool server is not theirs to approve.
-    let toolsPlan = await provideTools?(reported.plan) ?? reported.plan
+    let toolsPlan = await provideTools?(reported.plan, for: session) ?? reported.plan
     // Last, and only now: an endpoint's gateway is started for a launch that is really happening,
     // never for a plan built to check a form.
     let plan: AgentLaunchPlan
@@ -392,6 +392,35 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
     await pane.write(keystrokes.submit)
     commandTyped?(id, command)
+  }
+
+  /// Types a message into a session's agent as its composer would, and submits it (#352): a
+  /// coordinator's message to a child, or Vibe Manager's to a coordinator. Queued as the agent
+  /// queues one while it works. The caller has checked the agent waits for no answer and shows
+  /// no panel: keys typed into a dialog would answer it. Whether it was typed.
+  @discardableResult
+  public func typeMessage(
+    _ text: String, into id: SessionID, whileWorking: Bool,
+    submitsIf isStillSafe: @MainActor () -> Bool = { true }
+  ) async -> Bool {
+    guard let pane = pane(for: id), pane.status == .running, let terminal = pane.session,
+      let providerID = ((try? await repository.session(id: id)) ?? nil)?.agent?.providerID
+    else { return false }
+    let format =
+      (await agents.provider(id: AgentProviderID(providerID)) as? any AgentConversationReporting)?
+      .promptFormat ?? AgentPromptFormat()
+    let keystrokes = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: PromptEncoding.sanitized(text)), format: format,
+      whileWorking: whileWorking)
+    for (index, keys) in keystrokes.writes.enumerated() {
+      if index > 0 { try? await Task.sleep(for: keystrokes.delay(before: index)) }
+      guard pane.session === terminal else { return false }
+      await pane.write(keys)
+    }
+    try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
+    guard pane.session === terminal, isStillSafe() else { return false }
+    await pane.write(keystrokes.submit)
+    return true
   }
 
   /// From the launch to the first byte the agent writes, for Instruments.

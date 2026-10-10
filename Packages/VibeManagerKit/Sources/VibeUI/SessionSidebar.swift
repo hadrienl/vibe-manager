@@ -252,7 +252,10 @@ struct SessionSidebar: View {
     guard let first = source.first, sessions.indices.contains(first) else { return }
     closeSwipe(animated: false)
     let id = sessions[first].id
-    let index = destination > first ? destination - 1 : destination
+    // Counted among the rows the session moves with — the coordinators, or its siblings (#352).
+    let movable = Set((model.reorderingSubset(of: id) ?? sessions).map(\.id))
+    let index = sessions[..<min(destination, sessions.count)]
+      .filter { $0.id != id && movable.contains($0.id) }.count
     Task { await model.move(id, toIndex: index) }
   }
 

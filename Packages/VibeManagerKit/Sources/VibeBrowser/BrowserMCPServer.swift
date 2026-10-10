@@ -43,7 +43,7 @@ public struct BrowserToolResult: Hashable, Sendable {
   }
 }
 
-/// Runs one tool for one session.
+/// Runs one tool for one session: the web view's tools, or another server's (#352).
 @MainActor
 public protocol BrowserToolRunning: AnyObject {
   func run(tool: String, arguments: JSONValue, session: SessionID) async -> BrowserToolResult
@@ -60,7 +60,8 @@ public enum BrowserMCPServer {
   /// The answer to one line, or `nil` for a notification, which is not answered.
   @MainActor
   public static func respond(
-    to line: Data, session: SessionID, runner: any BrowserToolRunning
+    to line: Data, session: SessionID, runner: any BrowserToolRunning,
+    server: AgentToolServerDefinition = .browser
   ) async -> Data? {
     guard let message = try? JSONDecoder().decode(JSONValue.self, from: line),
       case .object(let object) = message
@@ -80,16 +81,16 @@ public enum BrowserMCPServer {
       let version =
         requested.flatMap { supportedProtocolVersions.contains($0) ? $0 : nil }
         ?? supportedProtocolVersions[0]
-      return encode(result: initializeResult(version: version), id: id)
+      return encode(result: initializeResult(version: version, server: server), id: id)
     case "ping":
       return encode(result: [:], id: id)
     case "tools/list":
-      return encode(result: BrowserToolCatalog.listResult, id: id)
+      return encode(result: server.listResult, id: id)
     case "tools/call":
       guard let name = parameters["name"]?.stringValue else {
         return encode(error: -32602, message: "Missing tool name", id: id)
       }
-      guard BrowserToolCatalog.tool(named: name) != nil else {
+      guard server.knows(tool: name) else {
         return encode(error: -32602, message: "Unknown tool: \(name)", id: id)
       }
       let result = await runner.run(
@@ -104,18 +105,14 @@ public enum BrowserMCPServer {
     }
   }
 
-  public static func initializeResult(version: String) -> JSONValue {
+  public static func initializeResult(
+    version: String, server: AgentToolServerDefinition = .browser
+  ) -> JSONValue {
     [
       "protocolVersion": .string(version),
       "capabilities": ["tools": ["listChanged": false]],
-      "serverInfo": ["name": .string(BrowserToolCatalog.serverName), "version": "1"],
-      "instructions": """
-      These tools drive the web view of this Vibe Manager session, beside its terminal: open \
-      a preview, reload it, read it, look at its console, click and type in it. The user sees \
-      every tab and every action. Whenever the user should see a page — a preview, a document \
-      or an artifact you made, a pull request, a ticket — open it with tab_open rather than in a \
-      browser: it appears beside this terminal.
-      """,
+      "serverInfo": ["name": .string(server.name), "version": "1"],
+      "instructions": .string(server.instructions),
     ]
   }
 

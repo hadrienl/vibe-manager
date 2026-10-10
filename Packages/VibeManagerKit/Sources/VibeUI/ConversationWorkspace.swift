@@ -118,6 +118,32 @@ public final class ConversationWorkspace {
     session.conversationAgents.contains { readableAgents[$0.providerID] != nil }
   }
 
+  /// What a session's conversation holds now, read once — for a coordinator reading a child
+  /// (#352), never for a view. The model of a conversation already followed holds it; otherwise
+  /// its transcripts are read once, and let go. `nil` when it cannot be read in a few seconds.
+  public func entries(of session: WorkSession) async -> [ConversationEntry]? {
+    if let model = models[session.id], model.snapshot.availability == .available {
+      return model.snapshot.entries
+    }
+    guard let follow else { return nil }
+    let stream = await follow.follow(session, live: false)
+    return await withTaskGroup(of: [ConversationEntry]?.self) { group in
+      group.addTask {
+        for await snapshot in stream where snapshot.availability != .loading {
+          return snapshot.entries
+        }
+        return nil
+      }
+      group.addTask {
+        try? await Task.sleep(for: .seconds(5))
+        return nil
+      }
+      let first = await group.next() ?? nil
+      group.cancelAll()
+      return first
+    }
+  }
+
   /// Readies the session's model: created — and its transcripts followed — the first time, and
   /// moved to the front of those kept. Not for a view's body: it changes what is observed.
   @discardableResult

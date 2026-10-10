@@ -50,10 +50,12 @@ struct BrowserChannelTests {
   }
 
   /// Starts the bridge, writes `lines` to it, and reads back as many answers as there are requests.
-  private func exchange(socket: String, lines: [String], answers: Int) async throws -> [JSONValue] {
+  private func exchange(
+    socket: String, server: String? = nil, lines: [String], answers: Int
+  ) async throws -> [JSONValue] {
     let process = Process()
     process.executableURL = try Self.fixtureURL()
-    process.arguments = [socket]
+    process.arguments = [socket] + (server.map { [BrowserBridge.serverFlag, $0] } ?? [])
     let input = Pipe()
     let output = Pipe()
     process.standardInput = input
@@ -131,6 +133,69 @@ struct BrowserChannelTests {
     defer { listener.stop() }
 
     let answers = try await exchange(socket: path, lines: [call], answers: 1)
+    #expect(answers.first?["result"]?["isError"] == true)
+    #expect(runner.sessions.isEmpty)
+  }
+
+  @Test(
+    "A bridge that names the coordination server reaches it, and only for the sessions it serves")
+  func namedServer() async throws {
+    let coordinator = SessionID()
+    let browserRunner = RecordingRunner()
+    let coordinationRunner = RecordingRunner()
+    let path = Self.socketPath()
+    let process = try Self.thisProcess(as: coordinator)
+    let listener = BrowserChannelListener(
+      socketPath: path,
+      prepare: {
+        // Nothing to prepare in a test.
+      },
+      servers: [
+        .init(definition: .browser, runner: browserRunner, sessions: { [process] }),
+        .init(definition: .coordination, runner: coordinationRunner, sessions: { [process] }),
+      ])
+    try listener.start()
+    defer { listener.stop() }
+
+    let list = #"{"jsonrpc":"2.0","id":1,"method":"tools/list"}"#
+    let call =
+      #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"sessions_list","arguments":{}}}"#
+    let answers = try await exchange(
+      socket: path, server: AgentToolServerDefinition.coordination.name, lines: [list, call],
+      answers: 2)
+
+    guard case .array(let tools) = answers.first(where: { $0["id"] == 1 })?["result"]?["tools"]
+    else {
+      Issue.record("no tools")
+      return
+    }
+    #expect(tools.count == AgentToolServerDefinition.coordination.tools.count)
+    #expect(coordinationRunner.sessions == [coordinator])
+    #expect(browserRunner.sessions.isEmpty)
+  }
+
+  @Test("A session the coordination server does not serve is refused there, web view or not")
+  func namedServerRefuses() async throws {
+    let session = SessionID()
+    let runner = RecordingRunner()
+    let path = Self.socketPath()
+    let process = try Self.thisProcess(as: session)
+    let listener = BrowserChannelListener(
+      socketPath: path,
+      prepare: {
+        // Nothing to prepare in a test.
+      },
+      servers: [
+        .init(definition: .browser, runner: runner, sessions: { [process] }),
+        .init(definition: .coordination, runner: runner, sessions: { [] }),
+      ])
+    try listener.start()
+    defer { listener.stop() }
+
+    let call =
+      #"{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"sessions_list","arguments":{}}}"#
+    let answers = try await exchange(
+      socket: path, server: AgentToolServerDefinition.coordination.name, lines: [call], answers: 1)
     #expect(answers.first?["result"]?["isError"] == true)
     #expect(runner.sessions.isEmpty)
   }
