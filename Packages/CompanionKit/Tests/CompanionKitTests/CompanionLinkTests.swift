@@ -81,6 +81,17 @@ func connectionsExchangeMessages() async throws {
   #expect(await iterator.next() == nil)
 }
 
+@Test("Accepting with no connection waiting returns at once instead of holding the caller")
+func acceptWithoutConnectionReturns() throws {
+  let path = NSTemporaryDirectory() + "companion-\(getpid()).sock"
+  defer { unlink(path) }
+  let listener = try CompanionSocket.listen(at: path)
+  defer { close(listener) }
+
+  #expect(accept(listener, nil, nil) == -1)
+  #expect(errno == EAGAIN)
+}
+
 @Test("The requirement names the team and the identifier, or the identifier alone ad hoc")
 func requirementText() {
   #expect(

@@ -13,6 +13,9 @@
       let descriptor = socket(AF_UNIX, SOCK_STREAM, 0)
       guard descriptor >= 0 else { throw lastError() }
       _ = fcntl(descriptor, F_SETFD, FD_CLOEXEC)
+      // Non-blocking: a read source may fire once more than there are connections waiting, and a
+      // blocking `accept` would then hold its caller — the link's actor — for good.
+      _ = fcntl(descriptor, F_SETFL, fcntl(descriptor, F_GETFL, 0) | O_NONBLOCK)
       do {
         try withAddress(path) { address, length in
           guard bind(descriptor, address, length) == 0 else { throw lastError() }
