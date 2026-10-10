@@ -76,30 +76,31 @@ public struct ConversationView: View {
       default:
         conversation
       }
-      // Out of the footer: a session started on a command shows its panel while its conversation,
-      // empty, is still read and the composer not shown yet (#219).
-      if let panel = model.terminalPanel, let liveTerminal {
-        TerminalPanelBlock(
-          model: model, panel: panel,
-          terminal: liveTerminal(
-            model.terminalPanelFocusRequest,
-            { model.escapeInTerminalPanel() },
-            { model.terminalScreenChanged($0) })
-        )
-        .frame(maxWidth: layout.contentWidth)
-        .padding(.horizontal, layout.sideMargin)
-        .padding(.bottom, showsComposer ? 8 : 16)
-        .frame(maxWidth: .infinity)
-      }
-      // Outside the switch: the first prompt sent turns the empty conversation into a list, and a
-      // composer drawn in each case would be a new one then, the keyboard dropped with the old
-      // one (#105).
-      if showsComposer { footer }
     }
-    // The theme's picture, when it has one, stays where it is while the messages scroll (#118).
-    // Under the toolbar too, where the messages scroll: a view, unlike the colour it replaced,
-    // stops at the safe area, and the window's grey showed there instead of the theme.
-    .background { ThemeBackdropView(theme: theme).ignoresSafeArea() }
+    // Over the end of the messages, which scroll under it, rather than below them (#359).
+    .modifier(
+      ComposerBar(theme: theme) {
+        // Out of the footer: a session started on a command shows its panel while its
+        // conversation, empty, is still read and the composer not shown yet (#219).
+        if let panel = model.terminalPanel, let liveTerminal {
+          TerminalPanelBlock(
+            model: model, panel: panel,
+            terminal: liveTerminal(
+              model.terminalPanelFocusRequest,
+              { model.escapeInTerminalPanel() },
+              { model.terminalScreenChanged($0) })
+          )
+          .frame(maxWidth: layout.contentWidth)
+          .padding(.horizontal, layout.sideMargin)
+          .padding(.bottom, showsComposer ? 8 : 16)
+          .frame(maxWidth: .infinity)
+        }
+        // Outside the switch: the first prompt sent turns the empty conversation into a list, and
+        // a composer drawn in each case would be a new one then, the keyboard dropped with the old
+        // one (#105).
+        if showsComposer { footer }
+      }
+    )
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.conversationIsLive, isActive)
@@ -240,9 +241,10 @@ public struct ConversationView: View {
             .foregroundStyle(theme.text.color)
             .padding(.horizontal, 12)
             .padding(.vertical, 6)
-            .background(theme.raised.color, in: Capsule())
-            .overlay(Capsule().stroke(theme.border.color))
-            .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
+            .modifier(
+              ConversationGlass(
+                shape: Capsule(), fill: theme.raised.color, border: theme.border.color,
+                isInteractive: true, shadowRadius: 6, shadowOpacity: 0.2, shadowY: 2))
           }
           .buttonStyle(.plain)
           .padding(.bottom, 10)
@@ -279,7 +281,7 @@ public struct ConversationView: View {
         SubagentTray(model: model)
       }
       if model.isAgentWorking {
-        ActivityLine(model: model)
+        ActivityLine(model: model).modifier(StatusGlass())
       }
       if model.composerState == .stopped, let failure = model.shownLaunchFailure {
         HStack(alignment: .firstTextBaseline) {
@@ -297,6 +299,7 @@ public struct ConversationView: View {
           Spacer()
           stoppedActions
         }
+        .modifier(StatusGlass())
       } else if model.composerState == .stopped, model.hasStoppedOnError {
         HStack {
           Label {
@@ -311,6 +314,7 @@ public struct ConversationView: View {
           Spacer()
           stoppedActions
         }
+        .modifier(StatusGlass())
       } else if model.composerState == .stopped, model.canRestart(), let restart = model.restart {
         HStack {
           Label {
@@ -325,6 +329,7 @@ public struct ConversationView: View {
             Text("Restart", bundle: .module)
           }
         }
+        .modifier(StatusGlass())
       }
       PromptComposer(model: model, isActive: isActive)
     }
@@ -332,8 +337,7 @@ public struct ConversationView: View {
     .padding(.horizontal, layout.sideMargin)
     .padding(.bottom, 16)
     .frame(maxWidth: .infinity)
-    // Behind the messages only: the composer keeps the plain background.
-    .background(theme.backdrop.area == .messages ? theme.background.color : .clear)
+    .modifier(PlainFooterBackground(theme: theme))
   }
 
   /// The way to the terminal, which says why, and Restart, for an agent that stopped on an error.
@@ -425,6 +429,64 @@ struct BlockView: View {
       case .notice(let notice):
         NoticeRow(notice: notice)
       }
+    }
+  }
+}
+
+/// The terminal panel and the footer, laid over the end of the messages on macOS 26: they scroll
+/// under the composer's glass instead of stopping short above it (#359). Before, below them.
+///
+/// The theme's picture, when it has one, stays where it is while the messages scroll (#118), and
+/// as the bar grows: laid over the whole view, never over the messages' part of it, which shrinks
+/// for a long draft or the agent's activity, and the picture filling it would be cropped anew.
+/// Behind the messages only, the plain background covers it under the bar, behind the messages
+/// that scroll there.
+private struct ComposerBar<Bar: View>: ViewModifier {
+  let theme: ConversationTheme
+  @ViewBuilder let bar: Bar
+  @State private var barHeight = 0.0
+
+  func body(content: Content) -> some View {
+    if #available(macOS 26, *) {
+      content
+        // An inset, not a bar: under a bar, macOS 26 blurs its whole height as soon as it grows
+        // for the agent's activity, cut sharp at the top — the very break the glass removes.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          VStack(spacing: 0) { bar }
+            .onGeometryChange(for: Double.self) {
+              $0.size.height
+            } action: {
+              barHeight = $0
+            }
+        }
+        .background {
+          ThemeBackdropView(theme: theme)
+            .overlay(alignment: .bottom) {
+              if theme.backdrop.area == .messages {
+                theme.background.color.frame(height: barHeight)
+              }
+            }
+            .ignoresSafeArea()
+        }
+    } else {
+      VStack(spacing: 0) {
+        content
+        bar
+      }
+      .background { ThemeBackdropView(theme: theme).ignoresSafeArea() }
+    }
+  }
+}
+
+/// Before macOS 26, a picture behind the messages only leaves the footer the plain background.
+private struct PlainFooterBackground: ViewModifier {
+  let theme: ConversationTheme
+
+  func body(content: Content) -> some View {
+    if #available(macOS 26, *) {
+      content
+    } else {
+      content.background(theme.backdrop.area == .messages ? theme.background.color : .clear)
     }
   }
 }

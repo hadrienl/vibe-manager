@@ -122,7 +122,8 @@ struct ComposerDropTests {
     pasteboard.writeObjects(objects)
     let types = pasteboard.types ?? []
     let destination = try #require(Self.dropDestination(in: host, at: location, for: types))
-    // AppKit's own choice, where it can be asked: the same view.
+    // AppKit's own choice, where it can be asked: the same view. Asked, it must answer — or a
+    // file dropped from the Finder could miss the catcher while the walk above still finds it.
     if let chosen = Self.appKitDestination(in: window, at: location, for: types) {
       #expect(chosen === destination)
     }
@@ -154,12 +155,15 @@ struct ComposerDropTests {
   private static func dropDestination(
     in view: NSView, at location: NSPoint, for types: [NSPasteboard.PasteboardType]
   ) -> NSView? {
-    guard !view.isHidden, view.bounds.contains(view.convert(location, from: nil)) else {
-      return nil
-    }
+    guard !view.isHidden else { return nil }
+    // A view of no size is no destination, but what it holds may be: the composer's glass, on
+    // macOS 26, lays it inside such a view, which AppKit looks through (#359).
+    let isEmpty = view.bounds.isEmpty
+    guard isEmpty || view.bounds.contains(view.convert(location, from: nil)) else { return nil }
     for subview in view.subviews.reversed() {
       if let found = dropDestination(in: subview, at: location, for: types) { return found }
     }
+    guard !isEmpty else { return nil }
     let registered = Set(view.registeredDraggedTypes)
     let general = registered.compactMap { UTType($0.rawValue) }
     let takes = types.contains { type in
@@ -169,11 +173,12 @@ struct ComposerDropTests {
     return takes ? view : nil
   }
 
-  /// AppKit's own lookup, `-[NSView _hitTest:dragTypes:]`, when it answers: a private method,
-  /// asked here only, to check the test's reading of it.
+  /// AppKit's own lookup, `-[NSView _hitTest:dragTypes:]`, when it can be asked — a private
+  /// method, asked here only, to check the test's reading of it: `nil` when it cannot, `.some(nil)`
+  /// when it finds no destination.
   private static func appKitDestination(
     in window: NSWindow, at location: NSPoint, for types: [NSPasteboard.PasteboardType]
-  ) -> NSView? {
+  ) -> NSView?? {
     typealias Lookup =
       @convention(c) (NSObject, Selector, UnsafeMutablePointer<NSPoint>, NSSet) -> NSView?
     let selector = NSSelectorFromString("_hitTest:dragTypes:")
@@ -182,7 +187,7 @@ struct ComposerDropTests {
     else { return nil }
     var point = frame.convert(location, from: nil)
     let lookup = unsafeBitCast(implementation, to: Lookup.self)
-    return lookup(frame, selector, &point, NSSet(array: types.map(\.rawValue)))
+    return .some(lookup(frame, selector, &point, NSSet(array: types.map(\.rawValue))))
   }
 
   private func file(named name: String, in fixture: Fixture) throws -> URL {
