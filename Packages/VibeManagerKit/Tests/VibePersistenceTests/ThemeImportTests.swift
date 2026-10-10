@@ -33,6 +33,11 @@ private let font =
   (try? Data(contentsOf: URL(fileURLWithPath: "/System/Library/Fonts/Apple Braille.ttf")))
   ?? Data()
 
+/// The family the test faces stand for: every one is Apple Braille, which CoreText names so.
+private func standing(for family: String) -> GoogleThemeFonts.FaceFamilies {
+  { GoogleThemeFonts.isFont($0) ? [family] : [] }
+}
+
 private let css = """
   @font-face { font-family: 'Zz Test'; font-style: normal; font-weight: 400;
     src: url(https://fonts.gstatic.com/s/zz/v1/regular.ttf) format('truetype'); }
@@ -73,7 +78,8 @@ struct ThemeImportTests {
     return FileConversationThemeLibrary(
       directory: folder,
       fonts: GoogleThemeFonts(
-        directory: folder.appendingPathComponent("Fonts"), fetch: google.fetch),
+        directory: folder.appendingPathComponent("Fonts"), fetch: google.fetch,
+        faceFamilies: standing(for: "Zz Test")),
       images: FileThemeImageStore(directory: folder.appendingPathComponent("Images")))
   }
 
@@ -119,6 +125,29 @@ struct ThemeImportTests {
     #expect(reloaded.backdrop.localImage != nil)
     // The font came from the archive: this Mac never asked Google.
     #expect(files(in: "here/Fonts") == ["Zz Test"])
+  }
+
+  @Test("A theme that cannot be written leaves neither its picture nor its fonts")
+  func couldNotWrite() async throws {
+    defer { try? FileManager.default.removeItem(at: root) }
+    var theme = ConversationTheme.named("Aurore", from: .night)
+    theme.fonts.message = "Zz Test"
+    let archive = zip([
+      ("theme.json", ConversationThemeFile.encode(theme)), ("backdrop.jpg", png()),
+      ("fonts/Zz Test/0.ttf", font),
+    ])
+    let here = library("here")
+    // The pictures can be written, the themes cannot.
+    let folder = root.appendingPathComponent("here", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: folder.appendingPathComponent("Images"), withIntermediateDirectories: true)
+    try FileManager.default.setAttributes([.posixPermissions: 0o500], ofItemAtPath: folder.path)
+    defer {
+      try? FileManager.default.setAttributes([.posixPermissions: 0o700], ofItemAtPath: folder.path)
+    }
+    await #expect(throws: ThemeImportError.couldNotWrite) { try await here.importArchive(archive) }
+    #expect(files(in: "here") == ["Images"])
+    #expect(files(in: "here/Images").isEmpty)
   }
 
   @Test("A name taken gets a number, and the same archive twice is two themes")
@@ -245,42 +274,73 @@ struct ThemeExportFontsTests {
   private let root = FileManager.default.temporaryDirectory
     .appendingPathComponent("vibe-export-\(UUID().uuidString)", isDirectory: true)
 
-  @Test("A Google family installed on the Mac, never fetched, is fetched for the export")
-  func installedGoogleFamily() async throws {
+  @Test("A family never fetched is fetched for the export once, held in memory and never kept")
+  func fetchedForTheExport() async throws {
     defer { try? FileManager.default.removeItem(at: root) }
-    // Menlo stands for a family installed here: Google answers for it as for one of its own.
+    // Installed here or not, what Google serves is not kept: kept, it would be activated over
+    // the family installed at the next launch.
     let google = FakeGoogle { url in
       url.host == "fonts.googleapis.com" ? (Data(css.utf8), 200) : (font, 200)
     }
     let fonts = GoogleThemeFonts(
       directory: root.appendingPathComponent("Fonts"), fetch: google.fetch)
-    #expect(await fonts.prepare("Menlo") == .available)
-    #expect(google.count == 0)
-    let exported = await fonts.exportedFiles(of: "Menlo")
-    #expect(exported.count == 1)
-    #expect(await fonts.exportedFiles(of: "Menlo") == exported)
+    let exported = await fonts.exportedFaces(of: "Zz Test")
+    #expect(exported.map(\.name) == ["0.ttf"])
+    #expect(exported.first?.contents == font)
+    let asked = google.count
+    #expect(await fonts.exportedFaces(of: "Zz Test").map(\.contents) == [font])
+    #expect(google.count == asked)
+    #expect(await fonts.files(of: "Zz Test").isEmpty)
+    #expect(!FileManager.default.fileExists(atPath: root.appendingPathComponent("Fonts").path))
   }
 
-  @Test("A family Google does not serve, or every Mac has, is not carried; offline, none is")
+  @Test("A family that comes with macOS is not asked about; one Google does not serve, once")
   func notCarried() async {
     defer { try? FileManager.default.removeItem(at: root) }
     let unknown = FakeGoogle { _ in (Data("Bad Request".utf8), 400) }
     let fonts = GoogleThemeFonts(
       directory: root.appendingPathComponent("Fonts"), fetch: unknown.fetch)
-    #expect(await fonts.exportedFiles(of: "Menlo").isEmpty)
+    #expect(await fonts.exportedFaces(of: "Menlo").isEmpty)
+    #expect(await fonts.exportedFaces(of: "SF Mono").isEmpty)
+    #expect(unknown.count == 0)
+    #expect(await fonts.exportedFaces(of: "Zz Nowhere Sans").isEmpty)
     let asked = unknown.count
-    #expect(await fonts.exportedFiles(of: "SF Mono").isEmpty)
+    #expect(asked > 0)
+    #expect(await fonts.exportedFaces(of: "Zz Nowhere Sans").isEmpty)
     #expect(unknown.count == asked)
     let away = GoogleThemeFonts(
       directory: root.appendingPathComponent("Away"), fetch: FakeGoogle.offline.fetch)
-    #expect(await away.exportedFiles(of: "Menlo").isEmpty)
+    #expect(await away.exportedFaces(of: "Zz Nowhere Sans").isEmpty)
+  }
+
+  @Test("Faces of another family than the one declared are not kept")
+  func anotherFamily() async {
+    defer { try? FileManager.default.removeItem(at: root) }
+    // As CoreText reads them: these faces are Apple Braille's.
+    let fonts = GoogleThemeFonts(
+      directory: root.appendingPathComponent("Fonts"), fetch: FakeGoogle.offline.fetch)
+    #expect(!(await fonts.install("Zz Carried", faces: [font])))
+    #expect(await fonts.files(of: "Zz Carried").isEmpty)
+  }
+
+  @Test("A family kept is not drawn under another case: CoreText's names are exact")
+  func otherCase() async {
+    defer { try? FileManager.default.removeItem(at: root) }
+    let fonts = GoogleThemeFonts(
+      directory: root.appendingPathComponent("Fonts"), fetch: FakeGoogle.offline.fetch,
+      faceFamilies: standing(for: "Zz Carried"))
+    #expect(await fonts.install("Zz Carried", faces: [font]))
+    #expect(await fonts.prepare("zz carried") != .available)
+    #expect(!(await fonts.install("zz carried", faces: [font])))
   }
 
   @Test("Faces carried by an archive are kept once, and not over a family already here")
   func install() async throws {
     defer { try? FileManager.default.removeItem(at: root) }
     let folder = root.appendingPathComponent("Fonts")
-    let fonts = GoogleThemeFonts(directory: folder, fetch: FakeGoogle.offline.fetch)
+    let fonts = GoogleThemeFonts(
+      directory: folder, fetch: FakeGoogle.offline.fetch,
+      faceFamilies: standing(for: "Zz Carried"))
     #expect(await fonts.install("Zz Carried", faces: [font, Data("x".utf8)]))
     #expect(await fonts.files(of: "Zz Carried").count == 1)
     #expect(await fonts.install("Zz Carried", faces: [font, font]))

@@ -1,5 +1,6 @@
 import Compression
 import Foundation
+import VibeApplication
 
 /// Why an archive was refused, whole.
 public enum ZipArchiveError: Error, Hashable, Sendable {
@@ -20,7 +21,7 @@ public enum ZipArchiveError: Error, Hashable, Sendable {
 /// anything else is neither.
 public enum ZipArchiveReader {
   public struct Limits: Sendable {
-    public var archiveBytes = 30 * 1024 * 1024
+    public var archiveBytes = ChosenArchive.maximumSize
     public var entries = 64
     public var entryBytes = 25 * 1024 * 1024
     public var totalBytes = 100 * 1024 * 1024

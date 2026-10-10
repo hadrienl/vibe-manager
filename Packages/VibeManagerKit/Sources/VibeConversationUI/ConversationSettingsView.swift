@@ -274,15 +274,22 @@ public struct ConversationSettingsView: View {
       }
       // Making a theme needs an agent; importing one does not (#361).
       NewThemeCard(
-        canCreate: themes.canCreate, isOpen: themes.isOpen,
+        canCreate: themes.canCreate, isOpen: themes.isOpen, canImport: !themes.isSaving,
         create: { themes.toggle(systemIsDark: colorScheme == .dark) },
-        importArchive: { isChoosingArchive = true })
-    }
-    // A theme's archive dropped on the grid is imported, as one chosen in the open panel.
-    .dropDestination(for: URL.self) { urls, _ in
-      guard urls.count == 1, let url = urls.first, url.pathExtension.lowercased() == "zip" else {
-        return false
+        importArchive: { isChoosingArchive = true }
+      )
+      // On the card, not on the grid that presents the export: one file panel per view.
+      .fileImporter(isPresented: $isChoosingArchive, allowedContentTypes: [.zip]) { result in
+        guard case .success(let url) = result else { return }
+        importArchive(at: url)
       }
+    }
+    // A theme's archive dropped on the grid is imported, as one chosen in the open panel; while
+    // a theme is being kept, it goes back where it came from.
+    .dropDestination(for: URL.self) { urls, _ in
+      guard !themes.isSaving, urls.count == 1, let url = urls.first,
+        url.pathExtension.lowercased() == "zip"
+      else { return false }
       importArchive(at: url)
       return true
     } isTargeted: {
@@ -308,10 +315,6 @@ public struct ConversationSettingsView: View {
           .padding(-4)
           .allowsHitTesting(false)
       }
-    }
-    .fileImporter(isPresented: $isChoosingArchive, allowedContentTypes: [.zip]) { result in
-      guard case .success(let url) = result else { return }
-      importArchive(at: url)
     }
     .alert(
       Text("Delete the Theme “\(deleting?.displayName ?? "")”?", bundle: .module),
@@ -422,26 +425,19 @@ public struct ConversationSettingsView: View {
     }
   }
 
-  /// Reads the archive at `url` — chosen, or dropped — with the bound of the archive itself: a
-  /// larger file is not read at all.
+  /// Imports the archive at `url`, chosen or dropped.
   private func importArchive(at url: URL) {
     let fileName = url.lastPathComponent
-    let scoped = url.startAccessingSecurityScopedResource()
-    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-    guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else {
-      themes.refuseImport(fileName, .notATheme)
-      return
-    }
-    guard size <= ConversationThemesModel.maximumArchiveSize else {
-      themes.refuseImport(fileName, .tooLarge)
-      return
-    }
-    guard let data = try? Data(contentsOf: url) else {
-      themes.refuseImport(fileName, .notATheme)
-      return
+    let data: Data
+    switch ChosenArchive.contents(of: url) {
+    case .success(let contents): data = contents
+    case .failure(.tooLarge): return themes.refuseImport(fileName, .tooLarge)
+    case .failure(.unreadable): return themes.refuseImport(fileName, .notATheme)
     }
     Task {
-      if let updated = await themes.importArchive(data, named: fileName, into: appearance) {
+      if let updated = await themes.importArchive(
+        data, named: fileName, appearance: { appearance })
+      {
         appearance = updated
       }
     }

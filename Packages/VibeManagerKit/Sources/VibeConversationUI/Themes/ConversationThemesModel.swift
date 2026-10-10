@@ -580,13 +580,14 @@ public final class ConversationThemesModel {
   }
 
   /// Keeps the theme of an archive (#361) and gives it to the mode it was made for, as saving one
-  /// does; the panel, if unfolded, is folded first. The appearance to put in force, `nil` when
-  /// nothing was imported.
+  /// does; the panel, if unfolded, is folded once the theme is kept — a refused archive leaves it
+  /// as it was. `appearance` is read once the import is done: fetching a font can take a while,
+  /// and what the user changes meanwhile stays. The appearance to put in force, `nil` when nothing
+  /// was imported.
   public func importArchive(
-    _ data: Data, named fileName: String, into appearance: ConversationAppearance
+    _ data: Data, named fileName: String, appearance: () -> ConversationAppearance
   ) async -> ConversationAppearance? {
     guard !isSaving else { return nil }
-    close()
     dismissConfirmation()
     isSaving = true
     defer { isSaving = false }
@@ -597,8 +598,10 @@ public final class ConversationThemesModel {
       refuseImport(fileName, (error as? ThemeImportError) ?? .couldNotWrite)
       return nil
     }
+    close()
+    await load()
     let kept = imported.theme
-    var updated = appearance
+    var updated = appearance()
     let mode: SavedMode
     if !updated.followsSystemAppearance {
       updated.lightTheme = kept.id
@@ -612,17 +615,12 @@ public final class ConversationThemesModel {
     }
     // The theme as it was made, its accent with it.
     updated.accent = .theme
-    await load()
     let name = kept.personalName ?? ""
     lastImported = (name, mode, imported.missingFonts)
     announce(Self.importedSentence(name, mode))
     for family in imported.missingFonts { announce(Self.missingFontSentence(family)) }
     return updated
   }
-
-  /// No archive of a theme weighs more — its file, its picture, a few fonts —: a larger file is
-  /// not read at all.
-  public static let maximumArchiveSize = 30 * 1024 * 1024
 
   /// Says why an archive was refused: by the library, or before it was even read.
   public func refuseImport(_ fileName: String, _ error: ThemeImportError) {

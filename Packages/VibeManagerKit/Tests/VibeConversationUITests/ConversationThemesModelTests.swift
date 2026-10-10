@@ -515,7 +515,7 @@ struct ConversationThemesModelTests {
       ConversationThemeLibraryRules.kept(.night, name: "Aurore"))
     let appearance = ConversationAppearance(accent: .blue)
     let updated = try #require(
-      await fixture.model.importArchive(archive, named: "Aurore.zip", into: appearance))
+      await fixture.model.importArchive(archive, named: "Aurore.zip", appearance: { appearance }))
     let kept = try #require(fixture.model.personal.first)
     #expect(kept.personalName == "Aurore")
     #expect(updated.darkTheme == kept.id)
@@ -536,20 +536,23 @@ struct ConversationThemesModelTests {
       ConversationThemeLibraryRules.kept(.paper, name: "Papier clair"))
     let appearance = ConversationAppearance(followsSystemAppearance: false)
     let updated = try #require(
-      await fixture.model.importArchive(archive, named: "Papier.zip", into: appearance))
+      await fixture.model.importArchive(archive, named: "Papier.zip", appearance: { appearance }))
     #expect(updated.lightTheme == fixture.model.personal.first?.id)
     #expect(updated.darkTheme == appearance.darkTheme)
     #expect(fixture.model.lastImported?.mode == .always)
     #expect(fixture.spoken.last == "Papier clair is imported and applied.")
   }
 
-  @Test("An archive refused is said with its name and why, and nothing is kept")
+  @Test("An archive refused is said with its name and why; nothing is kept, the workshop stays")
   func importRefused() async throws {
     let fixture = Fixture()
+    try await fixture.generate("une forêt la nuit")
     let updated = await fixture.model.importArchive(
-      Data("{".utf8), named: "Néon.zip", into: ConversationAppearance())
+      Data("{".utf8), named: "Néon.zip", appearance: { ConversationAppearance() })
     #expect(updated == nil)
     #expect(fixture.model.personal.isEmpty)
+    #expect(fixture.model.isOpen)
+    #expect(fixture.model.trial != nil)
     #expect(fixture.model.lastImported == nil)
     let problem = try #require(fixture.model.problem)
     #expect(problem == .couldNotImport(fileName: "Néon.zip", .file(.notJSON)))
@@ -559,9 +562,9 @@ struct ConversationThemesModelTests {
     #expect(
       String(localized: try #require(fixture.model.problem).message)
         == "“Énorme.zip” was not imported: too large to be a theme.")
-    // Choosing a card forgets it.
+    // Said in the workshop, which stays unfolded: choosing a card does not forget it there.
     fixture.model.dismissConfirmation()
-    #expect(fixture.model.problem == nil)
+    #expect(fixture.model.problem != nil)
   }
 
   @Test("A font the imported theme asks for that this Mac could not get is said")
@@ -573,7 +576,7 @@ struct ConversationThemesModelTests {
     let archive = ConversationThemeFile.encode(
       ConversationThemeLibraryRules.kept(.night, name: "Aurore"))
     _ = try #require(
-      await model.importArchive(archive, named: "Aurore.zip", into: ConversationAppearance()))
+      await model.importArchive(archive, named: "Aurore.zip", appearance: { ConversationAppearance() }))
     #expect(model.lastImported?.missingFonts == ["Berkeley Mono"])
     #expect(
       spoken == [

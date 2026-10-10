@@ -260,6 +260,8 @@ struct ThemeWorkshopPanel: View {
 struct NewThemeCard: View {
   let canCreate: Bool
   let isOpen: Bool
+  /// False while a theme is being kept: one import at a time.
+  let canImport: Bool
   let create: () -> Void
   let importArchive: () -> Void
 
@@ -284,12 +286,14 @@ struct NewThemeCard: View {
           )
           .accessibilityLabel(Text("Import a Theme…", bundle: .module))
           .help(Text("Import a theme exported as a .zip archive", bundle: .module))
+          .disabled(!canImport)
         } else {
           half(
             Text("Import a Theme…", bundle: .module), symbol: "square.and.arrow.down", isOn: false,
             action: importArchive
           )
           .help(Text("Import a theme exported as a .zip archive", bundle: .module))
+          .disabled(!canImport)
         }
       }
       .frame(maxWidth: .infinity, minHeight: 56)

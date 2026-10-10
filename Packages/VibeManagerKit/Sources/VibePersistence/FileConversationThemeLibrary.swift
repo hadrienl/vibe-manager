@@ -102,10 +102,8 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
     // imports the theme has them without Google (#361).
     if let fonts, let theme {
       for family in Self.families(of: theme) {
-        for file in await fonts.exportedFiles(of: family) {
-          guard let contents = try? Data(contentsOf: file) else { continue }
-          files.append(
-            DiagnosticFile(name: "fonts/\(family)/\(file.lastPathComponent)", contents: contents))
+        for face in await fonts.exportedFaces(of: family) {
+          files.append(DiagnosticFile(name: "fonts/\(family)/\(face.name)", contents: face.contents))
         }
       }
     }
@@ -141,15 +139,6 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
       diagnostics.record(.store, .notice, "theme.importRefused")
       throw ThemeImportError.file(error)
     }
-    // Its fonts: the archive's, or else found as a generation finds them.
-    var missing: [String] = []
-    for family in Self.families(of: theme) {
-      let prefix = "fonts/\(family)/"
-      let faces = entries.filter { $0.name.hasPrefix(prefix) }.map(\.contents)
-      if let fonts, !faces.isEmpty, await fonts.install(family, faces: faces) { continue }
-      if await fonts?.prepare(family) == .available { continue }
-      missing.append(family)
-    }
     // Its picture, decoded and encoded again under a name of this Mac's; without it, none.
     theme.backdrop.image = nil
     if let images, let picture = entries.first(where: { $0.name == "backdrop.jpg" }) {
@@ -159,7 +148,22 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
     do {
       kept = try await save(theme, name: theme.personalName ?? "")
     } catch {
+      // Refused, it leaves nothing behind: its picture goes, unless another theme draws it too.
+      if let name = theme.backdrop.image, let url = images?.location(of: name),
+        !read(recording: false).themes.contains(where: { $0.backdrop.image == name })
+      {
+        try? FileManager.default.removeItem(at: url)
+      }
       throw ThemeImportError.couldNotWrite
+    }
+    // Its fonts once it is kept: the archive's, or else found as a generation finds them.
+    var missing: [String] = []
+    for family in Self.families(of: theme) {
+      let prefix = "fonts/\(family)/"
+      let faces = entries.filter { $0.name.hasPrefix(prefix) }.map(\.contents)
+      if let fonts, !faces.isEmpty, await fonts.install(family, faces: faces) { continue }
+      if await fonts?.prepare(family) == .available { continue }
+      missing.append(family)
     }
     diagnostics.record(
       .store, .info, "theme.imported",
