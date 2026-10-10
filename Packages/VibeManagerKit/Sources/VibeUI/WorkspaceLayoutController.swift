@@ -246,6 +246,21 @@ public final class WorkspaceLayoutController {
     }
   }
 
+  public var collapsedCoordinators: Set<SessionID> {
+    settings.collapsedCoordinators
+  }
+
+  /// Folds or unfolds the children of coordinators in the sidebar (#352).
+  public func setCollapsed(_ isCollapsed: Bool, coordinators: Set<SessionID>) {
+    updateIntent {
+      if isCollapsed {
+        $0.collapsedCoordinators.formUnion(coordinators)
+      } else {
+        $0.collapsedCoordinators.subtract(coordinators)
+      }
+    }
+  }
+
   // MARK: - The sections of the context column (#66)
 
   public var inspectorSections: InspectorArrangement {

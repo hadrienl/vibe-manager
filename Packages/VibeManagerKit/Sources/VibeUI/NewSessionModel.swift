@@ -14,6 +14,9 @@ public final class NewSessionModel {
   public typealias AgentOption = VibeUI.AgentOption
 
   public private(set) var agents: [AgentOption] = []
+  /// The agents that can coordinate other sessions (#352): their CLI is handed the tools and the
+  /// instructions at launch.
+  public private(set) var coordinatingAgentIDs: Set<AgentProviderID> = []
   public private(set) var models: [AgentModel] = []
   public private(set) var issues: [SessionDraftIssue] = []
   public private(set) var isSubmitting = false
@@ -186,6 +189,17 @@ public final class NewSessionModel {
       comment: "A protected place: “your Desktop”, “your Documents folder”, “iCloud Drive”.")
   }
 
+  /// Whether the session will coordinate sessions of its own (#352).
+  public var isCoordinator: Bool {
+    get { draft.coordination == .coordinator }
+    set { draft.coordination = newValue ? .coordinator : nil }
+  }
+
+  /// Whether the agent chosen can coordinate: only one handed the tools at launch can.
+  public var canCoordinate: Bool {
+    selectedAgent.map { coordinatingAgentIDs.contains($0.id) } ?? false
+  }
+
   public var selectedAgent: AgentOption? {
     guard let providerID = draft.providerID else { return nil }
     return agents.first { $0.id.rawValue == providerID }
@@ -235,6 +249,7 @@ public final class NewSessionModel {
       && (folder.isEmpty || draft.workingDirectoryPath == preselectedFolder)
       && (draft.providerID == nil || draft.providerID == defaultProviderID)
       && draft.modelID == nil && draft.appearance == nil && draft.conversationTheme == nil
+      && draft.coordination == nil
       && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && draft.attachments.isEmpty
       && draft.templateFill == nil
@@ -477,6 +492,14 @@ public final class NewSessionModel {
     defer { isLoadingAgents = false }
 
     agents = await AgentOption.detect(in: registry, forceRefresh: forceRefresh)
+    var coordinating: Set<AgentProviderID> = []
+    for option in agents {
+      let provider = await registry.provider(id: option.id)
+      if provider is any AgentToolServing, provider is any AgentInstructing {
+        coordinating.insert(option.id)
+      }
+    }
+    coordinatingAgentIDs = coordinating
 
     // Every agent stays listed, including the ones that cannot run — disappearing teaches the
     // user nothing. Only the default selection skips them.
@@ -520,6 +543,10 @@ public final class NewSessionModel {
   /// the disk and the agents on every character, and finish out of order — an early verdict
   /// landing last would post "A name is required." over a name that is now there.
   public func draftChanged() {
+    // An agent that cannot coordinate makes an ordinary session (#352).
+    if draft.coordination == .coordinator, !agents.isEmpty, !canCoordinate {
+      draft.coordination = nil
+    }
     // An icon found in another folder is not this one's; coming back to that folder looks again.
     if iconFolderPath != nil, draft.resolvedWorkingDirectoryPath != iconFolderPath {
       iconSearch?.cancel()

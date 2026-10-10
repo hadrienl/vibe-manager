@@ -31,7 +31,7 @@ struct SessionRankStoreTests {
       session("Middle", updatedAt: 200),
     ]
     let v7 = String(decoding: try codec.encode(sessions: sessions), as: UTF8.self)
-      .replacingOccurrences(of: #""schemaVersion" : 9"#, with: #""schemaVersion" : 7"#)
+      .replacingOccurrences(of: #""schemaVersion" : 10"#, with: #""schemaVersion" : 7"#)
 
     let decoded = try codec.decode(Data(v7.utf8))
 

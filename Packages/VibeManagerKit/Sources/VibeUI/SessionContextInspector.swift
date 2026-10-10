@@ -28,6 +28,9 @@ struct SessionContextInspector: View {
   private let leaveNotes: () -> Void
   private let usage: UsageModel?
   private let journal: SessionJournalModel?
+  /// The workspace, for the coordination section (#352): a coordinator's children, a child's
+  /// coordinator.
+  private let coordination: AppModel?
 
   init(
     session: WorkSession,
@@ -46,9 +49,11 @@ struct SessionContextInspector: View {
     ticketTitles: TicketTitlesModel? = nil,
     leaveNotes: @escaping () -> Void = {},
     usage: UsageModel? = nil,
-    journal: SessionJournalModel? = nil
+    journal: SessionJournalModel? = nil,
+    coordination: AppModel? = nil
   ) {
     self.session = session
+    self.coordination = coordination
     self.journal = journal
     self.notes = notes
     self.ticketTitles = ticketTitles
@@ -79,6 +84,9 @@ struct SessionContextInspector: View {
   /// usage — is left out, and keeps its place in the arrangement for when it comes back.
   private var sections: [InspectorSectionDescriptor] {
     var sections: [InspectorSectionDescriptor] = []
+    if let coordination, session.coordination != nil {
+      sections.append(coordinationSection(coordination))
+    }
     if let journal {
       sections.append(activitySection(journal))
     }
@@ -115,6 +123,25 @@ extension SessionContextInspector {
             ?? "",
           journal: journal)),
       accessibilityIdentifier: "inspector-activity-section"
+    )
+  }
+
+  fileprivate func coordinationSection(_ model: AppModel) -> InspectorSectionDescriptor {
+    let isCoordinator = session.coordination?.isCoordinator == true
+    return InspectorSectionDescriptor(
+      id: .coordination,
+      title: isCoordinator
+        ? String(
+          localized: "Children", bundle: .module,
+          comment: "A section of the inspector: a coordinator's child sessions.")
+        : String(
+          localized: "Coordination", bundle: .module,
+          comment: "A section of the inspector: a child session's coordinator."),
+      systemImage: "person.2",
+      sizing: .fill(minimum: 90),
+      summary: AnyView(CoordinationSummaryText(model: model, session: session)),
+      content: AnyView(CoordinationPane(model: model, session: session)),
+      accessibilityIdentifier: "inspector-coordination-section"
     )
   }
 

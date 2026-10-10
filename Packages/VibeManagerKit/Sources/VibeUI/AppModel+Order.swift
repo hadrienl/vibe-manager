@@ -31,13 +31,21 @@ extension AppModel {
 
   /// The rows a session is moved among: its group when the sidebar is grouped, its column
   /// otherwise. A folded group's sessions are counted: the order is the group's, not the screen's.
+  ///
+  /// A coordinator moves among the sessions that are not children, its children with it; a child
+  /// moves among its siblings only, never out of its coordinator (#352).
   func reorderingSubset(of id: SessionID) -> [WorkSession]? {
+    let rows: [WorkSession]?
     switch sidebarContent {
     case .flat(let sessions):
-      return sessions.contains(where: { $0.id == id }) ? sessions : nil
+      rows = sessions.contains(where: { $0.id == id }) ? sessions : nil
     case .grouped(let groups):
-      return groups.first { $0.sessions.contains { $0.id == id } }?.sessions
+      rows = groups.first { $0.sessions.contains { $0.id == id } }?.sessions
     }
+    guard let rows, let session = rows.first(where: { $0.id == id }) else { return nil }
+    let byID = SessionHierarchy.index(sessions)
+    let parent = SessionHierarchy.parent(of: session, in: byID)?.id
+    return rows.filter { SessionHierarchy.parent(of: $0, in: byID)?.id == parent }
   }
 
   /// Whether Move Up (-1) or Move Down (+1) has somewhere to go. At the top of a group there is

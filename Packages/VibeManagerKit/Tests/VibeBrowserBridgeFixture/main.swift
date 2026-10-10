@@ -16,8 +16,12 @@ case BrowserBridge.commandLineFlag:
       Array(arguments.dropFirst(2)), environment: ProcessInfo.processInfo.environment,
       verifier: SameUserPeerVerifier()))
 case BrowserBridge.bridgeFlag where arguments.count >= 3:
-  BrowserBridge.runBridge(socketPath: arguments[2], verifier: SameUserPeerVerifier())
+  guard let server = BrowserBridge.server(in: Array(arguments.dropFirst(3))) else { exit(64) }
+  BrowserBridge.runBridge(
+    socketPath: arguments[2], server: server, verifier: SameUserPeerVerifier())
 default:
-  // The tests of the channel start it with the socket alone.
-  BrowserBridge.runBridge(socketPath: arguments[1], verifier: SameUserPeerVerifier())
+  // The tests of the channel start it with the socket, and the server it stands for if any.
+  guard let server = BrowserBridge.server(in: Array(arguments.dropFirst(2))) else { exit(64) }
+  BrowserBridge.runBridge(
+    socketPath: arguments[1], server: server, verifier: SameUserPeerVerifier())
 }

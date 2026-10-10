@@ -229,6 +229,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
         let pane = self.pane
         switch command {
         case .write(let bytes):
+          // Typed by the user in the terminal: nothing is typed over it meanwhile (#352).
+          pane.noteKeyboardInput()
           await pane.write(bytes)
         case .resize(let size):
           if self.isMirror {

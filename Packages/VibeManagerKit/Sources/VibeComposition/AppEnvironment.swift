@@ -254,21 +254,31 @@ public final class AppEnvironment {
       at: hostLocation, executable: configuration.browserBridgeExecutable)
     let bridge = configuration.browserBridgeExecutable
     let socketPath = hostLocation.browserSocketPath
-    let provideTools = ProvideAgentTools(agents: registry) { [browserSettings] in
-      guard browserSettings.givesAgentsWebView, let bridge else { return nil }
-      return ProvideAgentTools.Setup(
-        servers: [
+    let provideTools = ProvideAgentTools(
+      agents: registry,
+      setup: { [browserSettings] in
+        guard browserSettings.givesAgentsWebView, let bridge else { return nil }
+        return ProvideAgentTools.Setup(
+          servers: [
+            AgentToolServer(
+              name: BrowserToolCatalog.serverName, executablePath: bridge,
+              arguments: BrowserBridge.arguments(socketPath: socketPath, server: .browser))
+          ],
+          pathPrefix: commandDirectory?.path,
+          environment: [BrowserBridge.socketEnvironmentKey: socketPath].merging(
+            commandDirectory.map {
+              ["BROWSER": $0.appendingPathComponent("open", isDirectory: false).path]
+            } ?? [:]
+          ) { $1 })
+      },
+      // A coordinator's tools (#352), through the same bridge and channel, whatever the web view.
+      coordination: {
+        bridge.map {
           AgentToolServer(
-            name: BrowserToolCatalog.serverName, executablePath: bridge,
-            arguments: [BrowserBridge.bridgeFlag, socketPath])
-        ],
-        pathPrefix: commandDirectory?.path,
-        environment: [BrowserBridge.socketEnvironmentKey: socketPath].merging(
-          commandDirectory.map {
-            ["BROWSER": $0.appendingPathComponent("open", isDirectory: false).path]
-          } ?? [:]
-        ) { $1 })
-    }
+            name: CoordinationToolCatalog.serverName, executablePath: $0,
+            arguments: BrowserBridge.arguments(socketPath: socketPath, server: .coordination))
+        }
+      })
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
@@ -462,8 +472,26 @@ public final class AppEnvironment {
       iconStore: FileSessionIconStore(directory: data.icons),
       dropStore: FileSessionDropStore(directory: data.drops),
       appearancePalette: UserDefaultsSessionAppearancePaletteStore(suiteName: data.defaultsSuite),
+      // Coordinators and their children (#352): traces and wake-ups beside the store.
+      coordination: CoordinationModel(
+        store: FileCoordinationStore(
+          directory: dataFolder.appendingPathComponent("Coordination", isDirectory: true)),
+        preferences: UserDefaultsCoordinationPreferences(suiteName: data.defaultsSuite)),
       beep: { NSSound.beep() }
     )
+    // The coordinators' tools are answered on the web view's channel (#352), for the processes of
+    // coordinator sessions alone.
+    let coordinationTools = CoordinationToolRunner(model: appModel)
+    browserChannel.serve(
+      BrowserChannelListener.Server(
+        definition: .coordination, runner: coordinationTools,
+        sessions: { [weak launcher] in
+          guard let launcher else { return [] }
+          let coordinators = coordinationTools.coordinators()
+          return await launcher.runningProcessIdentifiers().compactMap { id, pid in
+            coordinators.contains(id) ? agentProcesses.process(id, pid) : nil
+          }
+        }))
     // The composer's dictation (#340): Whisper on this Mac, its models beside this copy's data —
     // never in the bundle — and the choice of model and language in the user defaults.
     appModel.dictation = DictationController(

@@ -11,8 +11,16 @@ enum BrowserChannelHandshake {
   /// A line longer than this closes the connection: a screenshot is well under it.
   static let lineLimit = 16 * 1024 * 1024
 
-  static func hello() -> Data {
-    BrowserMCPServer.line(["vibe": "hello", "protocol": .number(Double(protocolVersion))])
+  /// - Parameter server: the tool server the bridge stands for (#352). The web view's is not named,
+  ///   as no bridge named it before.
+  static func hello(server: String? = nil) -> Data {
+    var hello: [String: JSONValue] = [
+      "vibe": "hello", "protocol": .number(Double(protocolVersion)),
+    ]
+    if let server, server != AgentToolServerDefinition.browser.name {
+      hello["server"] = .string(server)
+    }
+    return BrowserMCPServer.line(.object(hello))
   }
 
   static func welcome() -> Data {
@@ -79,25 +87,60 @@ func writeAll(_ data: Data, to descriptor: Int32) -> Bool {
 /// descends from (`BrowserChannelAuthorizer`). Nothing else is asked of it — no secret, no
 /// signature: whatever runs in a session's terminal speaks for that session's agent, and nothing
 /// else can.
+///
+/// The channel serves several tool servers (#352): the bridge names its own in its hello, and is
+/// let in only for the sessions that server serves.
 @MainActor
 public final class BrowserChannelListener {
+  /// A tool server the channel answers for.
+  public struct Server {
+    public let definition: AgentToolServerDefinition
+    public let runner: any BrowserToolRunning
+    /// The processes of the sessions this server serves: any other is refused.
+    public let sessions: @MainActor () async -> [SessionProcess]
+
+    public init(
+      definition: AgentToolServerDefinition, runner: any BrowserToolRunning,
+      sessions: @escaping @MainActor () async -> [SessionProcess]
+    ) {
+      self.definition = definition
+      self.runner = runner
+      self.sessions = sessions
+    }
+  }
+
   private let socketPath: String
   private let prepare: () throws -> Void
-  private let runner: any BrowserToolRunning
-  private let sessions: @MainActor () async -> [SessionProcess]
+  private var servers: [String: Server]
   private var listener: Int32 = -1
   private var source: (any DispatchSourceRead)?
 
   public init(
     socketPath: String,
     prepare: @escaping () throws -> Void,
-    runner: any BrowserToolRunning,
-    sessions: @escaping @MainActor () async -> [SessionProcess]
+    servers: [Server]
   ) {
     self.socketPath = socketPath
     self.prepare = prepare
-    self.runner = runner
-    self.sessions = sessions
+    self.servers = Dictionary(servers.map { ($0.definition.name, $0) }) { first, _ in first }
+  }
+
+  /// The web view's server alone.
+  public convenience init(
+    socketPath: String,
+    prepare: @escaping () throws -> Void,
+    runner: any BrowserToolRunning,
+    sessions: @escaping @MainActor () async -> [SessionProcess]
+  ) {
+    self.init(
+      socketPath: socketPath, prepare: prepare,
+      servers: [Server(definition: .browser, runner: runner, sessions: sessions)])
+  }
+
+  /// Adds a server, or replaces the one of the same name: its runner may only exist once the
+  /// channel does.
+  public func serve(_ server: Server) {
+    servers[server.definition.name] = server
   }
 
   public func start() throws {
@@ -164,26 +207,41 @@ public final class BrowserChannelListener {
         parentProcessIdentifier: $0.parentProcessIdentifier,
         startedAt: ProcessStartTime(seconds: $0.startSeconds, microseconds: $0.startMicroseconds))
     }
-    let known = await sessions()
     let connection = BrowserChannelConnection(descriptor: client)
-    guard let session = BrowserChannelAuthorizer.session(of: lineage, among: known) else {
-      connection.refuse(
-        "This process cannot drive a session's web view: it does not run in the terminal of a "
-          + "Vibe Manager session, or agents are not given the web view (Settings › Web View).")
-      return
-    }
-    connection.serve { [weak self] line in
+    // Whom the connection speaks for is settled at its hello, which names the server; a line
+    // before it is the web view's, as it was before servers were named.
+    let admission = Admission()
+    connection.serve { [weak self, weak connection] line in
       guard let self else { return nil }
-      return await self.respond(to: line, session: session)
+      let hello = try? JSONDecoder().decode(JSONValue.self, from: line)
+      let isHello = hello?["vibe"] != nil
+      if admission.current == nil || isHello {
+        let name = isHello ? hello?["server"]?.stringValue : nil
+        guard let server = AgentToolServerDefinition.named(name).flatMap({ self.servers[$0.name] }),
+          let session = BrowserChannelAuthorizer.session(
+            of: lineage, among: await server.sessions())
+        else {
+          let refusal =
+            AgentToolServerDefinition.named(name)?.refusal
+            ?? "Vibe Manager has no tool server of that name."
+          connection?.refuse(refusal)
+          return nil
+        }
+        admission.current = (session, server)
+        if isHello { return BrowserChannelHandshake.welcome() }
+      }
+      guard let admitted = admission.current else { return nil }
+      return await BrowserMCPServer.respond(
+        to: line, session: admitted.session, runner: admitted.server.runner,
+        server: admitted.server.definition)
     }
   }
+}
 
-  private func respond(to line: Data, session: SessionID) async -> Data? {
-    if let hello = try? JSONDecoder().decode(JSONValue.self, from: line), hello["vibe"] != nil {
-      return BrowserChannelHandshake.welcome()
-    }
-    return await BrowserMCPServer.respond(to: line, session: session, runner: runner)
-  }
+/// Whom one connection speaks for, once its hello has said which server it wants.
+@MainActor
+private final class Admission {
+  var current: (session: SessionID, server: BrowserChannelListener.Server)?
 }
 
 /// One accepted connection: lines in on a thread of their own, each answered on the main actor,

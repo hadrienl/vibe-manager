@@ -336,6 +336,8 @@ public enum WorkSessionValidationError: Error, Equatable, Sendable {
   case duplicateRepositoryIdentifier
   case emptyRepositoryPath
   case emptyConversationTheme
+  /// A session said to be the child of itself (#352).
+  case selfCoordinated
 }
 
 public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
@@ -366,6 +368,8 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   /// The theme its conversation is drawn with, whatever the system's mode (#274). `nil` follows
   /// the settings. An identifier that names no theme any more is kept, and drawn as `nil`.
   public var conversationTheme: String?
+  /// Whether it coordinates other sessions, or is one of them (#352). `nil` for most sessions.
+  public var coordination: SessionCoordination?
 
   public var status: SessionStatus {
     lifecycle.status
@@ -418,6 +422,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     taskStatus: SessionTaskStatus? = nil,
     rank: Int = 0,
     conversationTheme: String? = nil,
+    coordination: SessionCoordination? = nil,
     /// See `SessionLifecycle.init`: whether a `nil` start is inferred or means never started.
     infersStartedAt: Bool = true
   ) {
@@ -445,6 +450,7 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
       ?? SessionTaskStatus.inferred(from: status, hasEverStarted: lifecycle.startedAt != nil)
     self.rank = rank
     self.conversationTheme = conversationTheme
+    self.coordination = coordination
   }
 
   public mutating func close(at date: Date) throws {
@@ -564,6 +570,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     }
     guard conversationTheme.map({ !$0.isEmpty }) ?? true else {
       throw WorkSessionValidationError.emptyConversationTheme
+    }
+    guard coordination != .child(of: id) else {
+      throw WorkSessionValidationError.selfCoordinated
     }
   }
 

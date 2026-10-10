@@ -30,6 +30,7 @@ extension AppModel {
     _ id: SessionID, from previous: AgentActivityState?, to state: AgentActivityState,
     isReplayed: Bool = false
   ) {
+    coordinationActivityChanged(id, from: previous, to: state, isReplayed: isReplayed)
     guard !isReplayed, let previous, previous.unreadSince == nil, state.unreadSince != nil,
       state.requests.isEmpty
     else { return }
@@ -48,6 +49,7 @@ extension AppModel {
     case .failed(let error): status = .failed(message: error.errorDescription ?? "")
     case .starting, .running: return
     }
+    coordinationProcessEnded(id)
     sessionDidEnd(id, as: status, activity: nil, launchFailed: launchFailed)
   }
 
