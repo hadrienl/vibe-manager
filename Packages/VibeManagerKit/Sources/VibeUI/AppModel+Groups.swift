@@ -14,11 +14,13 @@ extension AppModel {
   /// The column on screen as it is drawn: the same sessions as `visibleSessions`, in the same
   /// order, cut into groups when the user asked for them.
   public var sidebarContent: SidebarContent {
-    let visible = visibleSessions
+    let visible = hidingFoldedChildren(visibleSessions)
     guard sidebarMode == .byFolder else { return .flat(visible) }
+    let byID = SessionHierarchy.index(sessions)
     return SessionGrouping.content(
       of: visible,
-      key: { self.folderKey(for: $0) },
+      // A child is filed with its coordinator, whatever folder it works in (#352).
+      key: { self.folderKey(for: SessionHierarchy.parent(of: $0, in: byID) ?? $0) },
       customNames: folderLabels,
       missingFolders: folderResolution.missing)
   }
@@ -145,10 +147,16 @@ extension AppModel {
 
   /// Unfolds whatever hides a session.
   func reveal(_ id: SessionID) {
+    // A child is under its coordinator, which unfolds to show it (#352).
+    if let session = sessions.first(where: { $0.id == id }), let parent = coordinator(of: session),
+      layout.collapsedCoordinators.contains(parent.id)
+    {
+      layout.setCollapsed(false, coordinators: [parent.id])
+    }
     guard sidebarMode == .byFolder,
       let session = sessions.first(where: { $0.id == id }), session.taskStatus != .archived
     else { return }
-    let key = folderKey(for: session) ?? .unfiled
+    let key = folderKey(for: coordinator(of: session) ?? session) ?? .unfiled
     if layout.collapsedFolders.contains(key) {
       layout.setCollapsed(false, folders: [key])
     }

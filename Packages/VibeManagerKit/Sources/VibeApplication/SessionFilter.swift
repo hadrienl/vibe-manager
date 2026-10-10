@@ -161,7 +161,7 @@ public struct SessionFilter: Equatable, Sendable, Codable {
 
   /// Every ordering ends on the identifier, so it is total: two sessions can share a name or a
   /// timestamp, and the list must still come back in the same order at the next launch.
-  private func ordering(_ lhs: WorkSession, _ rhs: WorkSession) -> Bool {
+  func ordering(_ lhs: WorkSession, _ rhs: WorkSession) -> Bool {
     switch sort {
     case .lastActivity:
       if lhs.updatedAt != rhs.updatedAt { return lhs.updatedAt > rhs.updatedAt }

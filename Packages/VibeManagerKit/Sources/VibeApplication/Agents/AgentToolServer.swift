@@ -27,6 +27,15 @@ public protocol AgentToolServing: Sendable {
   func providingTools(_ servers: [AgentToolServer], to plan: AgentLaunchPlan) -> AgentLaunchPlan
 }
 
+/// Implemented by the providers whose CLI can be given instructions of the application's at launch,
+/// on top of its own system prompt: a coordinator's (#352).
+///
+/// For this launch alone, like the tools: nothing is written in the user's configuration, and the
+/// instructions are given again at every launch, a resume included.
+public protocol AgentInstructing: Sendable {
+  func instructing(_ instructions: String, to plan: AgentLaunchPlan) -> AgentLaunchPlan
+}
+
 extension AgentLaunchPlan {
   /// The same plan with `options` placed before any `--`, where the CLI still reads options, and
   /// `environment` added to its own.
