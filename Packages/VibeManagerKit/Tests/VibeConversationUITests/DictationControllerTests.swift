@@ -432,7 +432,7 @@ struct DiscussionTests {
     return dictation
   }
 
-  @Test("A click starts the discussion: the microphone stays open, echo cancelled")
+  @Test("A click starts the discussion: the microphone stays open")
   func clickStarts() async {
     let recorder = FakeRecorder()
     let dictation = controller(recorder, FakeTranscriber(installed: [.largeTurbo]))
@@ -443,7 +443,6 @@ struct DiscussionTests {
     dictation.pressEnded(request(composer))
     #expect(dictation.phase == .discussing)
     #expect(recorder.isRecording)
-    #expect(recorder.cancelsEcho)
 
     // A second click ends it.
     dictation.pressBegan(request(composer))
@@ -510,6 +509,23 @@ struct DiscussionTests {
     await until { dictation.phase == .idle }
     #expect(composer.inserted == ["Fix the build."])
     #expect(composer.sent.isEmpty)
+  }
+
+  @Test("The discussion's button opens the microphone, and closes it")
+  func discussionButton() async {
+    let recorder = FakeRecorder()
+    let dictation = controller(recorder, FakeTranscriber(installed: [.largeTurbo]))
+    let composer = Composer()
+
+    dictation.toggleDiscussion(request(composer))
+    await until { dictation.phase == .discussing }
+    #expect(dictation.phase == .discussing)
+    #expect(recorder.isRecording)
+    #expect(!recorder.cancelsEcho)
+
+    dictation.toggleDiscussion(request(composer))
+    #expect(dictation.phase == .idle)
+    #expect(!recorder.isRecording)
   }
 
   @Test("Ending the discussion in the middle of a sentence still sends it")

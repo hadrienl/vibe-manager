@@ -110,9 +110,12 @@ struct UtteranceDetectorTests {
   func overTheVoice() {
     var detector = UtteranceDetector()
     var events: [UtteranceDetector.Event] = []
-    for _ in 0..<5 { events += detector.feed(Self.voice(0.03), whileSpeaking: true) }
+    // The voice's echo, even in bursts, is not a sentence.
+    for _ in 0..<5 { events += detector.feed(Self.voice(0.05), whileSpeaking: true) }
+    for _ in 0..<4 { events += detector.feed(Self.voice(0.3), whileSpeaking: true) }
     #expect(events.isEmpty)
-    for _ in 0..<5 { events += detector.feed(Self.voice(0.2), whileSpeaking: true) }
+    // Half a second of a loud voice is.
+    events += detector.feed(Self.voice(0.3), whileSpeaking: true)
     #expect(events == [.speechStarted])
   }
 
