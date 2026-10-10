@@ -211,6 +211,7 @@ xcodebuild \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="$identity" \
   OTHER_CODE_SIGN_FLAGS="--timestamp" \
+  VIBE_EMBED_COMPANION=NO \
   archive
 
 step "Exporting"
@@ -254,6 +255,10 @@ readonly update_key="$(defaults read "$app/Contents/Info.plist" SUPublicEDKey 2>
   || fail "the bundle does not carry version $version"
 [[ -n "$(find "$app" -name mock-agent.sh)" ]] \
   || fail "mock-agent.sh is missing: the smoke test runs against it (security review A8)"
+# The mobile companion (#347) is not released: its agent, which holds the iCloud entitlement and a
+# provisioning profile of its own, is only embedded in development builds.
+[[ ! -e "$app/Contents/Helpers/Vibe Manager Companion.app" ]] \
+  || fail "the companion agent was embedded: it is not released (#347)"
 if [[ -n "$(find "$app" -name 'Local.xcconfig')" ]]; then
   fail "a Local.xcconfig was bundled"
 fi

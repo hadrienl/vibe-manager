@@ -23,6 +23,17 @@
 		A0000000000000000000000E /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000009 /* SmokeTests.swift */; };
 		A0000000000000000000000F /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000C /* Localizable.xcstrings */; };
 		A00000000000000000000010 /* InfoPlist.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000D /* InfoPlist.xcstrings */; };
+		A00000000000000000000012 /* CompanionAgentMain.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000E /* CompanionAgentMain.swift */; };
+		A00000000000000000000013 /* CompanionAgent.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000000F /* CompanionAgent.swift */; };
+		A00000000000000000000014 /* CompanionCore in Frameworks */ = {isa = PBXBuildFile; productRef = J0000000000000000000000B /* CompanionCore */; };
+		A00000000000000000000015 /* CompanionWire in Frameworks */ = {isa = PBXBuildFile; productRef = J0000000000000000000000C /* CompanionWire */; };
+		A00000000000000000000016 /* CompanionKit in Frameworks */ = {isa = PBXBuildFile; productRef = J0000000000000000000000D /* CompanionKit */; };
+		A00000000000000000000017 /* VibeCompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* VibeCompanionApp.swift */; };
+		A00000000000000000000018 /* CompanionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000013 /* CompanionModel.swift */; };
+		A00000000000000000000019 /* CompanionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000014 /* CompanionScreen.swift */; };
+		A0000000000000000000001A /* CompanionCore in Frameworks */ = {isa = PBXBuildFile; productRef = J0000000000000000000000E /* CompanionCore */; };
+		A0000000000000000000001B /* CompanionKit in Frameworks */ = {isa = PBXBuildFile; productRef = J0000000000000000000000F /* CompanionKit */; };
+		A0000000000000000000001C /* Vibe Manager Companion.app in Embed the companion agent */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* Vibe Manager Companion.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +49,19 @@
 		B0000000000000000000000B /* UITests.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = UITests.xcconfig; sourceTree = "<group>"; };
 		B0000000000000000000000C /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		B0000000000000000000000D /* InfoPlist.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = InfoPlist.xcstrings; sourceTree = "<group>"; };
+		B0000000000000000000000E /* CompanionAgentMain.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionAgentMain.swift; sourceTree = "<group>"; };
+		B0000000000000000000000F /* CompanionAgent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionAgent.swift; sourceTree = "<group>"; };
+		B00000000000000000000010 /* VibeCompanionAgent.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VibeCompanionAgent.entitlements; sourceTree = "<group>"; };
+		B00000000000000000000011 /* Vibe Manager Companion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Vibe Manager Companion.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00000000000000000000012 /* VibeCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeCompanionApp.swift; sourceTree = "<group>"; };
+		B00000000000000000000013 /* CompanionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionModel.swift; sourceTree = "<group>"; };
+		B00000000000000000000014 /* CompanionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionScreen.swift; sourceTree = "<group>"; };
+		B00000000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B00000000000000000000016 /* VibeCompanion.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VibeCompanion.entitlements; sourceTree = "<group>"; };
+		B00000000000000000000017 /* Vibe Companion.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Vibe Companion.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00000000000000000000018 /* CompanionBase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CompanionBase.xcconfig; sourceTree = "<group>"; };
+		B00000000000000000000019 /* Companion.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Companion.xcconfig; sourceTree = "<group>"; };
+		B0000000000000000000001A /* CompanionAgent.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CompanionAgent.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -48,7 +72,28 @@
 			remoteGlobalIDString = E00000000000000000000001;
 			remoteInfo = VibeManager;
 		};
+		L00000000000000000000002 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E00000000000000000000003;
+			remoteInfo = VibeCompanionAgent;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		D0000000000000000000000C /* Embed the companion agent */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 1;
+			files = (
+				A0000000000000000000001C /* Vibe Manager Companion.app in Embed the companion agent */,
+			);
+			name = "Embed the companion agent";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D00000000000000000000001 /* Frameworks */ = {
@@ -75,6 +120,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D00000000000000000000008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000014 /* CompanionCore in Frameworks */,
+				A00000000000000000000015 /* CompanionWire in Frameworks */,
+				A00000000000000000000016 /* CompanionKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0000000000000000000000B /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0000000000000000000001A /* CompanionCore in Frameworks */,
+				A0000000000000000000001B /* CompanionKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -92,6 +156,8 @@
 			isa = PBXGroup;
 			children = (
 				C00000000000000000000003 /* VibeManagerApp */,
+				C00000000000000000000008 /* VibeCompanionAgent */,
+				C00000000000000000000009 /* VibeCompanion */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -113,6 +179,8 @@
 			children = (
 				B00000000000000000000004 /* Vibe Manager.app */,
 				B0000000000000000000000A /* VibeManagerUITests.xctest */,
+				B00000000000000000000011 /* Vibe Manager Companion.app */,
+				B00000000000000000000017 /* Vibe Companion.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -124,6 +192,9 @@
 				B00000000000000000000005 /* Debug.xcconfig */,
 				B00000000000000000000006 /* Release.xcconfig */,
 				B0000000000000000000000B /* UITests.xcconfig */,
+				B00000000000000000000018 /* CompanionBase.xcconfig */,
+				B0000000000000000000001A /* CompanionAgent.xcconfig */,
+				B00000000000000000000019 /* Companion.xcconfig */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -144,6 +215,28 @@
 			path = VibeManagerUITests;
 			sourceTree = "<group>";
 		};
+		C00000000000000000000008 /* VibeCompanionAgent */ = {
+			isa = PBXGroup;
+			children = (
+				B0000000000000000000000E /* CompanionAgentMain.swift */,
+				B0000000000000000000000F /* CompanionAgent.swift */,
+				B00000000000000000000010 /* VibeCompanionAgent.entitlements */,
+			);
+			path = VibeCompanionAgent;
+			sourceTree = "<group>";
+		};
+		C00000000000000000000009 /* VibeCompanion */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000012 /* VibeCompanionApp.swift */,
+				B00000000000000000000013 /* CompanionModel.swift */,
+				B00000000000000000000014 /* CompanionScreen.swift */,
+				B00000000000000000000015 /* Info.plist */,
+				B00000000000000000000016 /* VibeCompanion.entitlements */,
+			);
+			path = VibeCompanion;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -155,10 +248,12 @@
 				D00000000000000000000003 /* Sources */,
 				D00000000000000000000001 /* Frameworks */,
 				D00000000000000000000002 /* Resources */,
+				D0000000000000000000000C /* Embed the companion agent */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				K00000000000000000000002 /* PBXTargetDependency */,
 			);
 			name = VibeManager;
 			packageProductDependencies = (
@@ -194,6 +289,47 @@
 			productReference = B0000000000000000000000A /* VibeManagerUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		E00000000000000000000003 /* VibeCompanionAgent */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000004 /* Build configuration list for PBXNativeTarget "VibeCompanionAgent" */;
+			buildPhases = (
+				D00000000000000000000007 /* Sources */,
+				D00000000000000000000008 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VibeCompanionAgent;
+			packageProductDependencies = (
+				J0000000000000000000000B /* CompanionCore */,
+				J0000000000000000000000C /* CompanionWire */,
+				J0000000000000000000000D /* CompanionKit */,
+			);
+			productName = VibeCompanionAgent;
+			productReference = B00000000000000000000011 /* Vibe Manager Companion.app */;
+			productType = "com.apple.product-type.application";
+		};
+		E00000000000000000000004 /* VibeCompanion */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000005 /* Build configuration list for PBXNativeTarget "VibeCompanion" */;
+			buildPhases = (
+				D0000000000000000000000A /* Sources */,
+				D0000000000000000000000B /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VibeCompanion;
+			packageProductDependencies = (
+				J0000000000000000000000E /* CompanionCore */,
+				J0000000000000000000000F /* CompanionKit */,
+			);
+			productName = VibeCompanion;
+			productReference = B00000000000000000000017 /* Vibe Companion.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -210,6 +346,12 @@
 					E00000000000000000000002 = {
 						CreatedOnToolsVersion = 27.0;
 						TestTargetID = E00000000000000000000001;
+					};
+					E00000000000000000000003 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					E00000000000000000000004 = {
+						CreatedOnToolsVersion = 27.0;
 					};
 				};
 			};
@@ -240,6 +382,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */,
+				I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C00000000000000000000004 /* Products */;
@@ -248,6 +391,8 @@
 			targets = (
 				E00000000000000000000001 /* VibeManager */,
 				E00000000000000000000002 /* VibeManagerUITests */,
+				E00000000000000000000003 /* VibeCompanionAgent */,
+				E00000000000000000000004 /* VibeCompanion */,
 			);
 		};
 /* End PBXProject section */
@@ -305,6 +450,25 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D00000000000000000000007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000012 /* CompanionAgentMain.swift in Sources */,
+				A00000000000000000000013 /* CompanionAgent.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0000000000000000000000A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000017 /* VibeCompanionApp.swift in Sources */,
+				A00000000000000000000018 /* CompanionModel.swift in Sources */,
+				A00000000000000000000019 /* CompanionScreen.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -312,6 +476,11 @@
 			isa = PBXTargetDependency;
 			target = E00000000000000000000001 /* VibeManager */;
 			targetProxy = L00000000000000000000001 /* PBXContainerItemProxy */;
+		};
+		K00000000000000000000002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E00000000000000000000003 /* VibeCompanionAgent */;
+			targetProxy = L00000000000000000000002 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -420,6 +589,34 @@
 			};
 			name = Release;
 		};
+		G00000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B0000000000000000000001A /* CompanionAgent.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		G00000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B0000000000000000000001A /* CompanionAgent.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
+		G00000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B00000000000000000000019 /* Companion.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		G0000000000000000000000A /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B00000000000000000000019 /* Companion.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -450,12 +647,34 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		H00000000000000000000004 /* Build configuration list for PBXNativeTarget "VibeCompanionAgent" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G00000000000000000000007 /* Debug */,
+				G00000000000000000000008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		H00000000000000000000005 /* Build configuration list for PBXNativeTarget "VibeCompanion" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G00000000000000000000009 /* Debug */,
+				G0000000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
 		I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/VibeManagerKit;
+		};
+		I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/CompanionKit;
 		};
 /* End XCLocalSwiftPackageReference section */
 
@@ -509,6 +728,31 @@
 			isa = XCSwiftPackageProductDependency;
 			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
 			productName = VibeUpdates;
+		};
+		J0000000000000000000000B /* CompanionCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */;
+			productName = CompanionCore;
+		};
+		J0000000000000000000000C /* CompanionWire */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */;
+			productName = CompanionWire;
+		};
+		J0000000000000000000000D /* CompanionKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */;
+			productName = CompanionKit;
+		};
+		J0000000000000000000000E /* CompanionCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */;
+			productName = CompanionCore;
+		};
+		J0000000000000000000000F /* CompanionKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */;
+			productName = CompanionKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

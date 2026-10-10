@@ -1,0 +1,18 @@
+// The Mac's companion agent (#347): `Vibe Manager Companion.app`, embedded in the application's
+// Contents/Helpers when VIBE_EMBED_COMPANION is YES. An application without a Dock icon, the only
+// bundle that holds the iCloud entitlement (ADR 0021), with an App ID and a profile of its own.
+#include "CompanionBase.xcconfig"
+
+SDKROOT = macosx
+MACOSX_DEPLOYMENT_TARGET = 14.0
+PRODUCT_BUNDLE_IDENTIFIER = eu.hadrien.VibeManager.CompanionAgent
+PRODUCT_NAME = Vibe Manager Companion
+INFOPLIST_KEY_CFBundleDisplayName = Vibe Manager Companion
+INFOPLIST_KEY_LSUIElement = YES
+INFOPLIST_KEY_LSApplicationCategoryType = public.app-category.developer-tools
+CODE_SIGN_ENTITLEMENTS = App/VibeCompanionAgent/VibeCompanionAgent.entitlements
+ENABLE_HARDENED_RUNTIME = YES
+COMBINE_HIDPI_IMAGES = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/../Frameworks
+// Inside the application, never an archive's second product.
+SKIP_INSTALL = YES

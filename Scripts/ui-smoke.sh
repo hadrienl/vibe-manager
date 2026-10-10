@@ -2,7 +2,8 @@
 
 # The interface smoke test (`UITests/VibeManagerUITests`), against a Debug build signed ad hoc, or
 # with the team of `Configuration/Local.xcconfig` when there is one. Run by the `ui-smoke` job and by
-# the release checklist; it needs a logged-in graphical session.
+# the release checklist; it needs a logged-in graphical session. Without the mobile companion's
+# agent (#347): signed ad hoc, it could not hold the iCloud entitlement it needs a profile for.
 
 set -euo pipefail
 
@@ -22,6 +23,7 @@ xcodebuild \
   -derivedDataPath "$derived_data_path" \
   -skipPackagePluginValidation \
   CODE_SIGN_IDENTITY=- \
+  VIBE_EMBED_COMPANION=NO \
   -resultBundlePath "$result_bundle_path" \
   test \
   -only-testing:VibeManagerUITests

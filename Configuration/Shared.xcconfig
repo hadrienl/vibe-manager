@@ -45,6 +45,19 @@ INFOPLIST_KEY_NSMicrophoneUsageDescription = Vibe Manager uses the microphone wh
 // granted (ADR 0021).
 CODE_SIGN_ENTITLEMENTS = App/VibeManagerApp/VibeManager.entitlements
 
+// The mobile companion's agent (#347) in Contents/Helpers: YES in Debug and Scripts/local-build.sh,
+// NO otherwise, and so in every build of Scripts/release.sh, which checks it is absent. NO also
+// leaves the agent's target unbuilt: it needs a provisioning profile a release does not have.
+VIBE_EMBED_COMPANION = NO
+VIBE_COMPANION_EXCLUDED_DEPENDENCIES_NO = VibeCompanionAgent
+VIBE_COMPANION_EXCLUDED_DEPENDENCIES_YES =
+EXCLUDED_EXPLICIT_TARGET_DEPENDENCIES = $(VIBE_COMPANION_EXCLUDED_DEPENDENCIES_$(VIBE_EMBED_COMPANION))
+// The copy into Contents/Helpers is left out with it. Copied as signed, with its own entitlements
+// and profile: the application's signature, made after, seals it without signing it again.
+VIBE_COMPANION_EXCLUDED_FILES_NO = *Companion.app
+VIBE_COMPANION_EXCLUDED_FILES_YES =
+EXCLUDED_SOURCE_FILE_NAMES = $(VIBE_COMPANION_EXCLUDED_FILES_$(VIBE_EMBED_COMPANION))
+
 // Signing is not cosmetic: macOS keys a privacy grant to the code identity of the application, so
 // an ad-hoc signature gets a new identity at every build, and every permission granted the day
 // before is asked for again. The maintainer's team is the default — a Team ID is public, it is in

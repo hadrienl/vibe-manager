@@ -1,0 +1,22 @@
+// Vibe Companion (#347): the iOS debug application that proves the connection with the Mac through
+// CloudKit. iOS 17, the first CKSyncEngine and the oldest system Xcode 27 debugs on a device.
+#include "CompanionBase.xcconfig"
+
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+IPHONEOS_DEPLOYMENT_TARGET = 17.0
+TARGETED_DEVICE_FAMILY = 1,2
+PRODUCT_BUNDLE_IDENTIFIER = eu.hadrien.VibeManager.Companion
+PRODUCT_NAME = Vibe Companion
+INFOPLIST_KEY_CFBundleDisplayName = Vibe Companion
+// Merged with the generated keys: the background mode of CloudKit's pushes has no setting.
+INFOPLIST_FILE = App/VibeCompanion/Info.plist
+// Required with the SDK 27: a launch screen and scenes, or the application does not start.
+INFOPLIST_KEY_UILaunchScreen_Generation = YES
+INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES
+INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES
+INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight
+INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO
+CODE_SIGN_ENTITLEMENTS = App/VibeCompanion/VibeCompanion.entitlements
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks

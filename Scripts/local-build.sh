@@ -45,7 +45,9 @@ xcodebuild \
   -destination 'generic/platform=macOS' \
   -derivedDataPath "$derived_data" \
   -skipPackagePluginValidation \
+  -allowProvisioningUpdates \
   MARKETING_VERSION="1.0.0-local" \
+  VIBE_EMBED_COMPANION=YES \
   build | grep -E '(error|warning):|\*\* BUILD' || true
 
 readonly built="$derived_data/Build/Products/Release/Vibe Manager.app"
@@ -69,6 +71,23 @@ readonly identity="$(codesign -dvv "$built" 2>&1 | sed -n 's/^Authority=//p' | h
 codesign --force --preserve-metadata=identifier,entitlements,flags,runtime \
   --sign "$identity" "$app"
 codesign --verify --strict "$app" || fail "the renamed application does not verify"
+
+# The mobile companion's agent (#347), embedded: it holds iCloud and the pushes, signed with its own
+# profile, and the application keeps the microphone alone (ADR 0021). Checked in the final bundle,
+# where an entitlement lost in a copy would only show when CloudKit refuses.
+readonly agent="$app/Contents/Helpers/Vibe Manager Companion.app"
+[[ -d "$agent" ]] || fail "the companion agent is not embedded"
+codesign --verify --deep --strict "$app" || fail "the embedded companion agent does not verify"
+[[ -f "$agent/Contents/embedded.provisionprofile" ]] \
+  || fail "the companion agent carries no provisioning profile"
+readonly agent_entitlements="$(codesign -d --entitlements - --xml "$agent" 2>/dev/null \
+  | plutil -convert json -o - - 2>/dev/null || true)"
+[[ "$agent_entitlements" == *'"com.apple.developer.icloud-services":["CloudKit"]'* \
+  && "$agent_entitlements" == *'"com.apple.developer.aps-environment"'* ]] \
+  || fail "the companion agent lacks its iCloud or push entitlement: $agent_entitlements"
+[[ "$(codesign -d --entitlements - --xml "$app" 2>/dev/null | plutil -convert json -o - -)" \
+  == '{"com.apple.security.device.audio-input":true}' ]] \
+  || fail "the application's entitlements are not the microphone's alone (ADR 0021)"
 
 rm -rf "$derived_data"
 print "==> $app"

@@ -1,0 +1,36 @@
+// What the two targets of the mobile companion (#347) share: the iOS application and the Mac's
+// companion agent. Not Shared.xcconfig, which is the Mac application's: its bundle identifier,
+// entitlements and Sparkle keys are not theirs.
+
+SWIFT_VERSION = 6.0
+SWIFT_STRICT_CONCURRENCY = complete
+SWIFT_TREAT_WARNINGS_AS_ERRORS = YES
+GCC_TREAT_WARNINGS_AS_ERRORS = YES
+CLANG_ENABLE_MODULES = YES
+ENABLE_USER_SCRIPT_SANDBOXING = YES
+GENERATE_INFOPLIST_FILE = YES
+MARKETING_VERSION = 0.1.0
+CURRENT_PROJECT_VERSION = 1
+PRODUCT_MODULE_NAME = $(TARGET_NAME)
+
+VIBE_SWIFT_OPTIMIZATION_Debug = -Onone
+VIBE_SWIFT_OPTIMIZATION_Release = -O
+SWIFT_OPTIMIZATION_LEVEL = $(VIBE_SWIFT_OPTIMIZATION_$(CONFIGURATION))
+VIBE_SWIFT_CONDITIONS_Debug = DEBUG
+SWIFT_ACTIVE_COMPILATION_CONDITIONS = $(VIBE_SWIFT_CONDITIONS_$(CONFIGURATION))
+VIBE_ONLY_ACTIVE_ARCH_Debug = YES
+ONLY_ACTIVE_ARCH = $(VIBE_ONLY_ACTIVE_ARCH_$(CONFIGURATION))
+
+// Development for the whole of #347: the schema is made by the first writes there, and must be
+// deployed to Production before any release. Both devices must be in the same environment: a build
+// run from Xcode or signed Apple Development is in Development.
+VIBE_CLOUDKIT_ENVIRONMENT = Development
+VIBE_APS_ENVIRONMENT = development
+
+// Signed automatically by the maintainer's team, which owns the container and the App IDs; a
+// contributor puts their own in Configuration/Local.xcconfig — and an iCloud container of their own
+// in the code, the entitlements naming a container of the team that signs.
+CODE_SIGN_STYLE = Automatic
+DEVELOPMENT_TEAM = QMJKZ67Z3H
+CODE_SIGN_IDENTITY = Apple Development
+#include? "Local.xcconfig"

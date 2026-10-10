@@ -27,7 +27,10 @@ xcrun swift-format lint --recursive \
   Packages/VibeManagerKit/Package.swift \
   Packages/ReleaseTools/Sources \
   Packages/ReleaseTools/Tests \
-  Packages/ReleaseTools/Package.swift
+  Packages/ReleaseTools/Package.swift \
+  Packages/CompanionKit/Sources \
+  Packages/CompanionKit/Tests \
+  Packages/CompanionKit/Package.swift
 
 echo "Checking the translations"
 Scripts/test-check-localizations.sh
@@ -39,6 +42,13 @@ Scripts/check-external-opens.sh
 
 echo "Testing the appcast generator"
 swift test --package-path "$repository_root/Packages/ReleaseTools"
+
+echo "Testing the mobile companion's package"
+# Offline: the records, the rules read from them and the link's wire. CloudKit itself needs an
+# iCloud account, which CI does not have.
+swift build --package-path "$repository_root/Packages/CompanionKit" --build-tests \
+  -Xswiftc -warnings-as-errors
+swift test --package-path "$repository_root/Packages/CompanionKit" --skip-build
 
 echo "Running package tests"
 # Validate package sources with warnings promoted to errors here. Do not pass the equivalent
@@ -77,6 +87,19 @@ xcodebuild \
   -scheme VibeManager \
   -configuration Release \
   -destination 'platform=macOS' \
+  -derivedDataPath "$derived_data_path" \
+  -clonedSourcePackagesDirPath "$source_packages_path" \
+  -skipPackagePluginValidation \
+  CODE_SIGNING_ALLOWED=NO \
+  build
+
+echo "Building the mobile companion for the iOS simulator"
+# Unsigned: its App ID, iCloud container and push entitlement are the maintainer's (#347).
+xcodebuild \
+  -project VibeManager.xcodeproj \
+  -scheme VibeCompanion \
+  -configuration Debug \
+  -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath "$derived_data_path" \
   -clonedSourcePackagesDirPath "$source_packages_path" \
   -skipPackagePluginValidation \
