@@ -21,6 +21,21 @@ public final class DictationController {
     case preparing
     case recording
     case transcribing
+    /// The discussion (#357): the microphone open, sentences sent as they end.
+    case discussing
+  }
+
+  /// Where a discussion is, as the composer says it.
+  public enum DiscussionState: Equatable, Sendable {
+    /// Waiting for the user to speak.
+    case listening
+    /// The user is speaking.
+    case hearing
+    /// A sentence is being transcribed.
+    case transcribing
+    case agentWorking
+    /// The voice reads an answer: speaking cuts it.
+    case agentSpeaking
   }
 
   /// What stopped a dictation, said by the composer that asked until it is dismissed.
@@ -39,6 +54,12 @@ public final class DictationController {
     /// The words the speaker is likely to say: read while the user speaks.
     public let vocabulary: @MainActor () async -> String
     public let insert: @MainActor (String) -> Void
+    /// Sends a sentence of the discussion to the agent; `nil` where there is no agent to send to.
+    public var send: (@MainActor (String) async -> Void)?
+    /// Interrupts the agent's turn: « stop » said in a discussion.
+    public var interrupt: (@MainActor () async -> Void)?
+    /// Whether the agent is at work, for the discussion to say so.
+    public var isAgentWorking: @MainActor () -> Bool = { false }
 
     public init(
       owner: ObjectIdentifier, vocabulary: @escaping @MainActor () async -> String,
@@ -59,6 +80,13 @@ public final class DictationController {
   /// Called once a model is downloaded and prepared: the application tells the user, who may be
   /// elsewhere — a download and its preparation take minutes.
   @ObservationIgnored public var modelDidBecomeReady: (() -> Void)?
+  /// Where the discussion is; meaningful while the phase is `.discussing`.
+  public private(set) var discussion = DiscussionState.listening
+  /// How loud the microphone is now, between 0 and about 0.3: the wave the composer draws.
+  public private(set) var level: Float = 0
+  /// The voice reading the answers: the discussion reads what arrives, and stops it when the user
+  /// speaks over it.
+  @ObservationIgnored public weak var readAloud: ReadAloudController?
   /// What each model downloaded weighs on disk.
   public private(set) var installedSizes: [DictationModelVariant: Int64] = [:]
 
@@ -81,6 +109,20 @@ public final class DictationController {
   @ObservationIgnored private var attempt = 0
   /// The prompt of the recording under way, read while the user speaks.
   @ObservationIgnored private var vocabulary: Task<String, Never>?
+  /// When the microphone was pressed: a press shorter than this is a click.
+  @ObservationIgnored private var pressedAt: Date?
+  /// A press let go of before the recording it asked for had started.
+  @ObservationIgnored private var earlyRelease: EarlyRelease?
+  private enum EarlyRelease { case click, hold }
+  @ObservationIgnored private var detector = UtteranceDetector()
+  @ObservationIgnored private var listening: Task<Void, Never>?
+  /// The sentences of the discussion, transcribed and sent one after the other.
+  @ObservationIgnored private var sentences: Task<Void, Never>?
+  @ObservationIgnored private var pendingSentences = 0
+
+  /// Shorter, a press is a click: it starts or ends the discussion; longer, it dictates.
+  /// Changed by the tests only, whose clock runs as the machine allows.
+  @ObservationIgnored var holdThreshold: TimeInterval = 0.3
 
   public init(
     transcriber: any SpeechTranscribing, recorder: any AudioRecording,
@@ -127,6 +169,122 @@ public final class DictationController {
       return
     }
     Task { [attempt] in await startRecording(answering: attempt) }
+  }
+
+  /// The microphone pressed — its button, or Space (#357). It listens at once: what is said
+  /// before the press is known to be held is kept.
+  public func pressBegan(_ request: Request) {
+    pressedAt = Date()
+    if phase == .discussing { return }
+    earlyRelease = nil
+    toggle(request)
+  }
+
+  /// The microphone let go of: held, what was said is inserted in the draft; clicked, the
+  /// discussion starts — or ends, if it was on.
+  public func pressEnded(_ request: Request) {
+    let held = Date().timeIntervalSince(pressedAt ?? .distantPast) >= holdThreshold
+    pressedAt = nil
+    guard owner == request.owner else { return }
+    switch phase {
+    case .discussing:
+      if !held { endDiscussion() }
+    case .recording:
+      if held {
+        toggle(request)
+      } else {
+        _ = recorder.stop()
+        startDiscussion()
+      }
+    case .idle:
+      // The system still asks about the microphone: the recording starts once it answered.
+      if self.request != nil { earlyRelease = held ? .hold : .click }
+    case .offeringDownload, .downloading, .preparing, .transcribing:
+      break
+    }
+  }
+
+  private func startDiscussion() {
+    guard let request else { return end() }
+    do {
+      try recorder.start(cancellingEcho: true)
+    } catch {
+      return fail(.noMicrophone)
+    }
+    phase = .discussing
+    discussion = .listening
+    detector = UtteranceDetector()
+    readAloud?.readsConversation = request.owner
+    let variant = settings.variant
+    Task { try? await transcriber.prepare(variant) }
+    vocabulary = Task { await request.vocabulary() }
+    listening = Task {
+      while !Task.isCancelled {
+        try? await Task.sleep(for: .milliseconds(100))
+        guard !Task.isCancelled, phase == .discussing else { return }
+        listen()
+      }
+    }
+  }
+
+  /// What the microphone heard in the last tenth of a second: a sentence begun, ended, or the
+  /// voice cut by the user speaking over it.
+  private func listen() {
+    let isSpeaking = readAloud?.isReading == true
+    for event in detector.feed(recorder.takeSamples(), whileSpeaking: isSpeaking) {
+      switch event {
+      case .speechStarted:
+        if isSpeaking { readAloud?.stop() }
+      case .utterance(let samples):
+        let previous = sentences
+        pendingSentences += 1
+        sentences = Task {
+          await previous?.value
+          await say(samples)
+          pendingSentences -= 1
+        }
+      }
+    }
+    level = detector.level
+    discussion =
+      if detector.isHearingSpeech { .hearing }
+      else if pendingSentences > 0 { .transcribing }
+      else if readAloud?.isReading == true { .agentSpeaking }
+      else if request?.isAgentWorking() == true { .agentWorking }
+      else { .listening }
+  }
+
+  /// A sentence of the discussion, transcribed and sent — or « stop », which interrupts the agent.
+  private func say(_ samples: [Float]) async {
+    guard phase == .discussing, DictationTranscript.containsSpeech(samples) else { return }
+    let prompt = await vocabulary?.value ?? ""
+    guard
+      let text = try? await transcriber.transcribe(
+        samples, with: settings.variant, language: settings.language, prompt: prompt)
+    else { return }
+    let sentence = DictationTranscript.cleaned(text)
+    guard !sentence.isEmpty, phase == .discussing, let request else { return }
+    if UtteranceDetector.isStop(sentence) {
+      readAloud?.stop()
+      await request.interrupt?()
+    } else {
+      await request.send?(sentence)
+    }
+  }
+
+  /// The discussion over: the microphone closed, the voice silent.
+  public func endDiscussion() {
+    guard phase == .discussing else { return }
+    listening?.cancel()
+    listening = nil
+    sentences?.cancel()
+    sentences = nil
+    pendingSentences = 0
+    _ = recorder.stop()
+    readAloud?.readsConversation = nil
+    readAloud?.stop()
+    level = 0
+    end()
   }
 
   /// The user agreed to download the model.
@@ -183,7 +341,7 @@ public final class DictationController {
   private func isDownloading(_ variant: DictationModelVariant) -> Bool {
     switch phase {
     case .downloading, .preparing: settings.variant == variant
-    case .idle, .offeringDownload, .recording, .transcribing: false
+    case .idle, .offeringDownload, .recording, .transcribing, .discussing: false
     }
   }
 
@@ -212,6 +370,8 @@ public final class DictationController {
       // What was downloaded is not kept: it would take hundreds of megabytes nobody sees.
       let variant = settings.variant
       Task { [transcriber] in try? await transcriber.remove(variant) }
+    case .discussing:
+      endDiscussion()
     case .idle, .preparing, .transcribing:
       break
     }
@@ -223,7 +383,7 @@ public final class DictationController {
   public func release(_ owner: ObjectIdentifier) {
     guard self.owner == owner else { return }
     switch phase {
-    case .recording, .offeringDownload:
+    case .recording, .offeringDownload, .discussing:
       cancel()
     case .downloading, .preparing:
       request = nil
@@ -271,6 +431,19 @@ public final class DictationController {
       return fail(.noMicrophone)
     }
     phase = .recording
+    switch earlyRelease {
+    case .click:
+      earlyRelease = nil
+      _ = recorder.stop()
+      return startDiscussion()
+    case .hold:
+      // Let go of while the system asked: there is nothing to dictate.
+      earlyRelease = nil
+      _ = recorder.stop()
+      return end()
+    case nil:
+      break
+    }
     // Loaded, and the prompt read, while the user speaks: both are ready, or nearly, when they
     // stop.
     let variant = settings.variant

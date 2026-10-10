@@ -50,6 +50,10 @@ public final class ReadAloudController {
     }
   }
 
+  /// The conversation in a discussion (#357): its answers are read as they arrive, whatever the
+  /// audio mode.
+  public var readsConversation: ObjectIdentifier?
+
   /// Opens Settings on the page where the model is downloaded: asked to read without it.
   @ObservationIgnored public var showSettings: (() -> Void)?
   /// Called once the model is downloaded and prepared: minutes after it was asked for.
@@ -113,7 +117,9 @@ public final class ReadAloudController {
   ) {
     let known = seen[conversation]
     seen[conversation, default: []].formUnion(answers.map(\.id))
-    guard let known, isOnScreen, settings.readsAnswers, isModelInstalled else { return }
+    guard let known, isOnScreen, isModelInstalled,
+      settings.readsAnswers || readsConversation == conversation
+    else { return }
     for answer in answers where !known.contains(answer.id) {
       if isReading || !queue.isEmpty {
         queue.append(answer)
@@ -260,36 +266,3 @@ struct ReadingAloudPill: View {
   }
 }
 
-/// The audio mode's switch, beside the microphone: on, every answer that arrives is read aloud.
-struct AudioModeButton: View {
-  @Bindable var readAloud: ReadAloudController
-  @Environment(\.conversationTheme) private var theme
-  @Environment(\.openSettings) private var openSettings
-
-  var body: some View {
-    let isOn = readAloud.settings.readsAnswers
-    Button {
-      readAloud.settings.readsAnswers.toggle()
-      // Without its model, Settings shows where it is downloaded.
-      if readAloud.settings.readsAnswers, !readAloud.isModelInstalled {
-        readAloud.showSettings?()
-        openSettings()
-      }
-    } label: {
-      Image(systemName: isOn ? "speaker.wave.2.fill" : "speaker.slash")
-        .font(.system(size: 12, weight: .semibold))
-        .foregroundStyle(isOn ? theme.onAccent.color : theme.text.color)
-        .frame(width: 28, height: 28)
-        .background(isOn ? theme.accent.color : theme.surface.color, in: Circle())
-        .overlay(Circle().stroke(isOn ? Color.clear : theme.border.color))
-        .contentShape(Circle())
-    }
-    .buttonStyle(.plain)
-    .accessibilityLabel(Text("Audio Mode", bundle: .module))
-    .accessibilityValue(isOn ? Text("On", bundle: .module) : Text("Off", bundle: .module))
-    .help(
-      isOn
-        ? Text("Audio mode on: answers are read as they arrive", bundle: .module)
-        : Text("Audio mode: read the answers as they arrive", bundle: .module))
-  }
-}
