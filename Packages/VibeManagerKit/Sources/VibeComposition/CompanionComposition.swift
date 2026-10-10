@@ -5,6 +5,7 @@ import VibeCompanionLink
 import VibeDomain
 import VibeTerminal
 import VibeUI
+import os
 
 /// The mobile companion of #347, wired: the sessions the workspace shows, published to the
 /// companion agent whenever they change, and the tests it hands back, acknowledged and shown.
@@ -13,6 +14,8 @@ import VibeUI
 /// test that composes the application, so neither listens nor starts anything.
 @MainActor
 final class CompanionComposition {
+  private static let logger = Logger(
+    subsystem: "eu.hadrien.VibeManager.companion", category: "composition")
   private let link: CompanionLink
   private let publish: PublishCompanionSnapshot
   private weak var appModel: AppModel?
@@ -75,6 +78,9 @@ final class CompanionComposition {
     } onChange: { [weak self] in
       Task { @MainActor in self?.observe() }
     }
+    Self.logger.notice(
+      "sessions read: \(snapshot.sessions.count, privacy: .public) active, handed to the publication"
+    )
     publish.update(snapshot)
   }
 

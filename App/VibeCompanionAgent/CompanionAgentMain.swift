@@ -42,6 +42,7 @@ private func holdsCloudKit() -> Bool {
 @MainActor
 final class CompanionAgentDelegate: NSObject, NSApplicationDelegate {
   private let agent: CompanionAgent
+  private let logger = Logger(subsystem: "eu.hadrien.VibeManager.companion", category: "agent")
 
   init(agent: CompanionAgent) {
     self.agent = agent
@@ -50,14 +51,32 @@ final class CompanionAgentDelegate: NSObject, NSApplicationDelegate {
   func applicationDidFinishLaunching(_ notification: Notification) {
     // The sync engine first, as early as possible: from then on it listens to pushes and to its
     // own scheduler. It registers for remote notifications itself.
-    Task { await agent.start() }
+    Task {
+      await agent.start()
+      // The engine registers for remote notifications itself on iOS; on the Mac the agent's
+      // pushes never showed in the trial of #347, so it asks too, and says what came of it.
+      NSApplication.shared.registerForRemoteNotifications()
+    }
   }
 
-  /// CloudKit's push, which the sync engine handles on its own: only noted for the journal.
+  func application(
+    _ application: NSApplication, didRegisterForRemoteNotificationsWithDeviceToken token: Data
+  ) {
+    logger.notice("push: registered, token of \(token.count, privacy: .public) bytes")
+  }
+
+  func application(
+    _ application: NSApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error
+  ) {
+    logger.error("push: registration failed: \(error.localizedDescription, privacy: .public)")
+  }
+
+  /// CloudKit's push. The engine handles it on its own; the agent notes it and fetches.
   func application(
     _ application: NSApplication, didReceiveRemoteNotification userInfo: [String: Any]
   ) {
-    Task { await agent.sync.notePush() }
+    logger.notice("push: received")
+    agent.pushReceived()
   }
 
   /// Whatever the way out — the link closed, a logout — the Mac is said offline first.

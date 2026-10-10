@@ -109,10 +109,17 @@ public actor CompanionLink: CompanionPublishing {
 
   public func publish(_ snapshot: CompanionSnapshot) {
     latest = snapshot
+    let state = connection == nil ? "kept until the agent connects" : "sent"
+    Self.logger.notice(
+      "snapshot of \(snapshot.sessions.count, privacy: .public) session(s), \(state, privacy: .public)"
+    )
     connection?.send(.snapshot(Self.wire(snapshot)))
   }
 
   public func acknowledge(_ test: CompanionTest, receivedAt: Date) {
+    let state = connection == nil ? "no agent connected, lost" : "sent"
+    Self.logger.notice(
+      "acknowledgement of test \(test.nonce, privacy: .public): \(state, privacy: .public)")
     connection?.send(.testAcknowledged(nonce: test.nonce, receivedAt: receivedAt))
   }
 
@@ -153,6 +160,7 @@ public actor CompanionLink: CompanionPublishing {
       // Whoever it is, it is not this application's companion agent.
       close(descriptor)
       diagnostics.record(.lifecycle, .error, "companion.peerRefused")
+      Self.logger.error("a peer that is not the companion agent was refused")
       return
     }
     connection?.close()
@@ -165,6 +173,8 @@ public actor CompanionLink: CompanionPublishing {
         buildLabel: configuration.buildLabel))
     if let latest { connection.send(.snapshot(Self.wire(latest))) }
     diagnostics.record(.lifecycle, .notice, "companion.agentConnected")
+    Self.logger.notice(
+      "agent connected, hello sent, snapshot: \(self.latest != nil, privacy: .public)")
     Task { await self.read(connection) }
   }
 
@@ -172,16 +182,22 @@ public actor CompanionLink: CompanionPublishing {
     for await message in connection.messages {
       switch message {
       case .testReceived(let ping):
+        Self.logger.notice(
+          "test \(ping.nonce, privacy: .public) received from \(ping.deviceName, privacy: .public)")
         let test = CompanionTest(
           nonce: ping.nonce, deviceName: ping.deviceName, sentAt: ping.sentAt)
-        await onTest?(test)
-      case .welcome, .hello, .snapshot, .testAcknowledged:
+        // Not awaited: the next message is never held up by this one's alert.
+        if let onTest { Task { await onTest(test) } }
+      case .welcome:
+        Self.logger.notice("agent says welcome")
+      case .hello, .snapshot, .testAcknowledged:
         break
       }
     }
     guard self.connection === connection else { return }
     self.connection = nil
     diagnostics.record(.lifecycle, .notice, "companion.agentDisconnected")
+    Self.logger.notice("agent disconnected")
     await launchAgent()
   }
 

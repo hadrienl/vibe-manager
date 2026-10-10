@@ -14,6 +14,8 @@ struct CompanionSyncStore: Codable {
 
   var entries: [String: Entry] = [:]
   var engineState: CKSyncEngine.State.Serialization?
+  /// Where the direct fetch of the zone stands (`fetchZone`), archived.
+  var zoneToken: Data?
 
   static func load(from url: URL) -> CompanionSyncStore {
     guard let data = try? Data(contentsOf: url),
@@ -66,26 +68,77 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
     await refreshAccountStatus()
   }
 
+  /// The engine's fetch, then the zone's own.
+  ///
+  /// The engine only fetches a zone it was told changed, by a push: without one — entitlement,
+  /// registration, a push lost — it says "no zone IDs needing to be fetched" and asks nothing (seen
+  /// on the Mac's agent in the trial of #347). The zone is then asked directly, with a change token
+  /// of its own: a fetch without changes costs one request and sends no push to anyone.
   public func fetchChanges() async {
     guard let engine else { return }
+    Self.logger.notice("fetch: engine")
     do {
       try await engine.fetchChanges()
     } catch {
       fail("récupération", error)
     }
+    await fetchZone()
   }
 
   public func sendChanges() async {
     guard let engine else { return }
+    let pending = engine.state.pendingRecordZoneChanges.count
+    Self.logger.notice("send: begin, \(pending, privacy: .public) pending")
     do {
       try await engine.sendChanges()
+      Self.logger.notice("send: end")
     } catch {
       fail("envoi", error)
     }
   }
 
+  /// The zone's changes since the last direct fetch, asked of the database itself.
+  private func fetchZone() async {
+    let database = container.privateCloudDatabase
+    var token = store.zoneToken.flatMap {
+      try? NSKeyedUnarchiver.unarchivedObject(ofClass: CKServerChangeToken.self, from: $0)
+    }
+    var more = true
+    while more {
+      do {
+        let changes = try await database.recordZoneChanges(
+          inZoneWith: CompanionCloud.zoneID, since: token)
+        let records = changes.modificationResultsByID.values.compactMap {
+          try? $0.get().record
+        }
+        Self.logger.notice(
+          "fetch: zone, \(records.count, privacy: .public) modified, \(changes.deletions.count, privacy: .public) deleted"
+        )
+        token = changes.changeToken
+        store.zoneToken = try? NSKeyedArchiver.archivedData(
+          withRootObject: changes.changeToken, requiringSecureCoding: true)
+        apply(fetched: records, deleted: changes.deletions.map(\.recordID))
+        more = changes.moreComing
+      } catch let error as CKError where error.code == .zoneNotFound {
+        // Nobody wrote in the zone yet: nothing to fetch.
+        Self.logger.notice("fetch: zone not found yet")
+        return
+      } catch let error as CKError where error.code == .changeTokenExpired {
+        store.zoneToken = nil
+        token = nil
+      } catch {
+        fail("récupération directe", error)
+        return
+      }
+    }
+    status.lastFetch = Date()
+    publish()
+  }
+
   public func save(_ records: [CompanionRecord]) async {
     guard !records.isEmpty else { return }
+    Self.logger.notice(
+      "save: \(records.map(\.recordName).joined(separator: ", "), privacy: .public)")
     for record in records {
       store.entries[record.recordName, default: .init(record: record)].record = record
     }
@@ -97,6 +150,7 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
 
   public func delete(_ recordNames: [String]) async {
     guard !recordNames.isEmpty else { return }
+    Self.logger.notice("delete: \(recordNames.joined(separator: ", "), privacy: .public)")
     for name in recordNames { store.entries[name] = nil }
     persist()
     engine?.state.add(
@@ -105,6 +159,7 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
   }
 
   public func notePush() async {
+    Self.logger.notice("push received")
     status.lastPush = Date()
     journal.record("push reçu")
     publish()
@@ -154,6 +209,7 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
   }
 
   public func handleEvent(_ event: CKSyncEngine.Event, syncEngine: CKSyncEngine) async {
+    Self.logger.notice("event: \(Self.name(of: event), privacy: .public)")
     switch event {
     case .stateUpdate(let update):
       store.engineState = update.stateSerialization
@@ -265,25 +321,52 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
   }
 
   private func handleFetched(_ changes: CKSyncEngine.Event.FetchedRecordZoneChanges) {
+    apply(
+      fetched: changes.modifications.map(\.record), deleted: changes.deletions.map(\.recordID))
+  }
+
+  /// Records from iCloud, by the engine or by the direct fetch. A record this device still has to
+  /// send keeps its own content — the server's is older — and only takes the server's change tag.
+  private func apply(fetched ckRecords: [CKRecord], deleted: [CKRecord.ID]) {
+    let pending = engine?.state.pendingRecordZoneChanges ?? []
+    let pendingSaves = Set(
+      pending.compactMap { change -> String? in
+        if case .saveRecord(let id) = change { return id.recordName }
+        return nil
+      })
+    // Deleted here, not yet in iCloud: the server's copy is not brought back.
+    let pendingDeletes = Set(
+      pending.compactMap { change -> String? in
+        if case .deleteRecord(let id) = change { return id.recordName }
+        return nil
+      })
     var fetched: [CompanionRecord] = []
-    for modification in changes.modifications {
-      let ckRecord = modification.record
+    for ckRecord in ckRecords {
       guard let record = CompanionRecordCodec.decode(ckRecord) else { continue }
-      store.entries[record.recordName] = .init(
-        record: record, systemFields: ckRecord.archivedSystemFields)
-      fetched.append(record)
+      let name = record.recordName
+      if pendingDeletes.contains(name) { continue }
+      if pendingSaves.contains(name), store.entries[name] != nil {
+        store.entries[name]?.systemFields = ckRecord.archivedSystemFields
+        continue
+      }
+      if store.entries[name]?.record != record { fetched.append(record) }
+      store.entries[name] = .init(record: record, systemFields: ckRecord.archivedSystemFields)
     }
-    for deletion in changes.deletions {
-      store.entries[deletion.recordID.recordName] = nil
+    var removed = 0
+    for id in deleted where store.entries.removeValue(forKey: id.recordName) != nil {
+      removed += 1
     }
     persist()
-    if !fetched.isEmpty || !changes.deletions.isEmpty {
+    if !fetched.isEmpty || removed > 0 {
       var line = "récupéré"
       if !fetched.isEmpty {
         line += " : " + CompanionJournal.summary(fetched.map(CompanionRecordCodec.recordType(of:)))
       }
-      if !changes.deletions.isEmpty { line += " ; \(changes.deletions.count) suppression(s)" }
+      if removed > 0 { line += " ; \(removed) suppression(s)" }
       journal.record(line)
+      Self.logger.notice(
+        "apply: \(fetched.map(\.recordName).joined(separator: ", "), privacy: .public); \(removed, privacy: .public) removed"
+      )
     }
     publish(fetched: fetched)
   }
@@ -335,6 +418,29 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
   }
 
   // MARK: - Bookkeeping
+
+  static func name(of event: CKSyncEngine.Event) -> String {
+    switch event {
+    case .stateUpdate: "stateUpdate"
+    case .accountChange(let change): "accountChange \(change.changeType)"
+    case .fetchedDatabaseChanges(let changes):
+      "fetchedDatabaseChanges \(changes.modifications.count) modified, \(changes.deletions.count) deleted"
+    case .fetchedRecordZoneChanges(let changes):
+      "fetchedRecordZoneChanges \(changes.modifications.count) modified, \(changes.deletions.count) deleted"
+    case .sentDatabaseChanges(let sent):
+      "sentDatabaseChanges \(sent.savedZones.count) saved, \(sent.failedZoneSaves.count) failed"
+    case .sentRecordZoneChanges(let sent):
+      "sentRecordZoneChanges \(sent.savedRecords.count) saved, \(sent.deletedRecordIDs.count) deleted, \(sent.failedRecordSaves.count) failed"
+    case .willFetchChanges: "willFetchChanges"
+    case .willFetchRecordZoneChanges: "willFetchRecordZoneChanges"
+    case .didFetchRecordZoneChanges(let done):
+      "didFetchRecordZoneChanges \(done.error.map { "\($0.code.rawValue)" } ?? "ok")"
+    case .didFetchChanges: "didFetchChanges"
+    case .willSendChanges: "willSendChanges"
+    case .didSendChanges: "didSendChanges"
+    @unknown default: "unknown"
+    }
+  }
 
   private func fail(_ step: String, _ error: any Error) {
     let text = CompanionErrorText.describe(error)

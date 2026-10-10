@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import VibeApplication
+import os
 
 /// The alert of a test from the phone (#347): who sent it, when, and how long it took.
 ///
@@ -9,6 +10,8 @@ import VibeApplication
 /// afterwards, one by one. The acknowledgement has already left: this alert only tells the user.
 @MainActor
 public final class AppKitCompanionTestAlert: CompanionTestAlerting {
+  private static let logger = Logger(
+    subsystem: "eu.hadrien.VibeManager.companion", category: "alert")
   private var queue: [(test: CompanionTest, receivedAt: Date)] = []
   private var isShowing = false
 
@@ -19,8 +22,12 @@ public final class AppKitCompanionTestAlert: CompanionTestAlerting {
   public func present(_ test: CompanionTest, receivedAt: Date) {
     queue.append((test, receivedAt))
     guard !isShowing else { return }
-    // Later, not within the caller: a modal alert runs a loop of its own until it is dismissed.
-    Task { @MainActor [weak self] in self?.showQueued() }
+    // Later, not within the caller, and from the run loop rather than a task: a modal alert runs a
+    // loop of its own until dismissed, and run from the main queue it would hold every task of the
+    // main actor behind it — the window, the terminals — for as long as it is up.
+    RunLoop.main.perform(inModes: [.default]) {
+      MainActor.assumeIsolated { [weak self] in self?.showQueued() }
+    }
   }
 
   private func showQueued() {
@@ -35,6 +42,7 @@ public final class AppKitCompanionTestAlert: CompanionTestAlerting {
       alert.icon = NSImage(systemSymbolName: "iphone", accessibilityDescription: nil)
       alert.addButton(withTitle: String(localized: "OK", bundle: .module))
       if !NSApp.isActive { NSApp.requestUserAttention(.informationalRequest) }
+      Self.logger.notice("alert shown for test \(test.nonce, privacy: .public)")
       alert.runModal()
     }
   }
