@@ -99,6 +99,13 @@ private func until(_ condition: () -> Bool) async {
   for _ in 0..<10_000 where !condition() { await Task.yield() }
 }
 
+/// Waits for a state reached on the controller's clock: the ceiling is only there for a test that
+/// would never reach it, never for a slow machine.
+@MainActor
+private func eventually(_ condition: () -> Bool) async {
+  for _ in 0..<3_000 where !condition() { try? await Task.sleep(for: .milliseconds(10)) }
+}
+
 /// A second of a voice.
 private let speech = (0..<16_000).map { 0.2 * sin(Float($0) * 2 * .pi * 220 / 16_000) }
 
@@ -389,16 +396,16 @@ struct DictationControllerTests {
 
     dictation.downloadSelectedModel()
     await until { dictation.phase == .idle && dictation.isModelInstalled }
-    #expect(dictation.installedSizes.keys.sorted { $0.rawValue < $1.rawValue } == [
-      .largeTurbo, .small,
-    ])
+    #expect(
+      dictation.installedSizes.keys.sorted { $0.rawValue < $1.rawValue } == [
+        .largeTurbo, .small,
+      ])
     #expect(dictation.owner == nil)
 
     await dictation.removeModel(.largeTurbo)
     #expect(dictation.installedSizes.keys.map(\.self) == [.small])
   }
 }
-
 
 /// A tenth of a second of silence, and of a voice.
 private let silentTenth = [Float](repeating: 0, count: 1_600)
@@ -417,7 +424,10 @@ struct DiscussionTests {
     var request = DictationController.Request(
       owner: ObjectIdentifier(composer), vocabulary: { "" },
       insert: { composer.inserted.append($0) })
-    request.send = { composer.sent.append($0) }
+    request.send = {
+      composer.sent.append($0)
+      return true
+    }
     request.interrupt = { composer.interrupted += 1 }
     return request
   }
@@ -429,6 +439,7 @@ struct DiscussionTests {
     let dictation = DictationController(
       transcriber: transcriber, recorder: recorder, store: InMemoryDictationSettingsStore())
     dictation.holdThreshold = holds ? 0 : 3_600
+    dictation.listenInterval = .milliseconds(5)
     return dictation
   }
 
@@ -465,9 +476,7 @@ struct DiscussionTests {
     dictation.pressBegan(request(composer))
     await until { dictation.phase == .recording }
     dictation.pressEnded(request(composer))
-    for _ in 0..<60 where composer.sent.isEmpty {
-      try? await Task.sleep(for: .milliseconds(50))
-    }
+    await eventually { !composer.sent.isEmpty }
     #expect(composer.sent == ["Ouvre la PR en brouillon."])
     #expect(dictation.phase == .discussing)
     dictation.endDiscussion()
@@ -486,9 +495,7 @@ struct DiscussionTests {
     dictation.pressBegan(request(composer))
     await until { dictation.phase == .recording }
     dictation.pressEnded(request(composer))
-    for _ in 0..<60 where composer.interrupted == 0 {
-      try? await Task.sleep(for: .milliseconds(50))
-    }
+    await eventually { composer.interrupted > 0 }
     #expect(composer.interrupted == 1)
     #expect(composer.sent.isEmpty)
     dictation.endDiscussion()
@@ -540,15 +547,34 @@ struct DiscussionTests {
     dictation.pressBegan(request(composer))
     await until { dictation.phase == .recording }
     dictation.pressEnded(request(composer))
-    for _ in 0..<40 where dictation.discussion != .hearing {
-      try? await Task.sleep(for: .milliseconds(50))
-    }
+    await eventually { dictation.discussion == .hearing }
     dictation.cancel()
     #expect(dictation.phase == .idle)
-    for _ in 0..<60 where composer.sent.isEmpty {
-      try? await Task.sleep(for: .milliseconds(50))
-    }
+    await eventually { !composer.sent.isEmpty }
     #expect(composer.sent == ["Mets le label v1.1.0."])
+  }
+
+  @Test("A discussion ended on a sentence that sent nothing reads nothing more, then or after")
+  func endOnNothingReadsNothing() async {
+    let recorder = FakeRecorder()
+    recorder.stream = Array(repeating: voicedTenth, count: 6)
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = ""
+    let dictation = controller(recorder, transcriber)
+    let readAloud = ReadAloudController(
+      synthesizer: FakeSynthesizer(installed: true), store: InMemorySpeechSettingsStore())
+    dictation.readAloud = readAloud
+    let composer = Composer()
+
+    dictation.toggleDiscussion(request(composer))
+    await eventually { dictation.discussion == .hearing }
+    #expect(readAloud.readsConversation == ObjectIdentifier(composer))
+    dictation.endDiscussion()
+    #expect(readAloud.readsNextAnswerOnly)
+    await eventually { readAloud.readsConversation == nil }
+    #expect(readAloud.readsConversation == nil)
+    #expect(!readAloud.readsNextAnswerOnly)
+    #expect(composer.sent.isEmpty)
   }
 
   @Test("Escape, or the composer put away, ends the discussion")
@@ -584,12 +610,12 @@ struct DictationWaveTests {
     dictation.toggle(request)
     await until { dictation.phase == .recording }
     recorder.level = 0.2
-    for _ in 0..<40 where dictation.level == 0 { try? await Task.sleep(for: .milliseconds(25)) }
+    await eventually { dictation.level != 0 }
     #expect(dictation.level == 0.2)
 
     dictation.toggle(request)
     await until { dictation.phase == .idle }
-    for _ in 0..<40 where dictation.level != 0 { try? await Task.sleep(for: .milliseconds(25)) }
+    await eventually { dictation.level == 0 }
     #expect(dictation.level == 0)
   }
 }
