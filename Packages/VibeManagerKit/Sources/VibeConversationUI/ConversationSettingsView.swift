@@ -74,6 +74,8 @@ public struct ConversationSettingsView: View {
   @State private var deleting: ConversationTheme?
   @State private var exportDocument: ThemeArchiveDocument?
   @State private var exportName = ""
+  @State private var isChoosingArchive = false
+  @State private var isDropTargeted = false
 
   public init(appearance: Binding<ConversationAppearance>, themes: ConversationThemesModel) {
     _appearance = appearance
@@ -111,6 +113,20 @@ public struct ConversationSettingsView: View {
           if let saved = themes.lastSaved {
             Label {
               Text(ConversationThemesModel.savedSentence(saved.name, saved.mode))
+            } icon: {
+              Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            }
+            .font(.callout)
+          }
+          if let imported = themes.lastImported {
+            Label {
+              VStack(alignment: .leading, spacing: 2) {
+                Text(ConversationThemesModel.importedSentence(imported.name, imported.mode))
+                ForEach(imported.missingFonts, id: \.self) { family in
+                  Text(ConversationThemesModel.missingFontSentence(family))
+                    .foregroundStyle(.secondary)
+                }
+              }
             } icon: {
               Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             }
@@ -256,18 +272,48 @@ public struct ConversationSettingsView: View {
       ForEach(ConversationTheme.builtIn + themes.personal) { theme in
         themeCard(theme)
       }
-      if themes.canCreate {
-        Button {
-          themes.toggle(systemIsDark: colorScheme == .dark)
-        } label: {
-          CreateThemeCard(isOpen: themes.isOpen)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text("Create My Theme", bundle: .module))
-        .accessibilityValue(
-          themes.isOpen ? Text("Unfolded", bundle: .module) : Text("Folded", bundle: .module)
-        )
-        .help(Text("Describe a theme to an agent, and see each version applied", bundle: .module))
+      // Making a theme needs an agent; importing one does not (#361).
+      NewThemeCard(
+        canCreate: themes.canCreate, isOpen: themes.isOpen, canImport: !themes.isSaving,
+        create: { themes.toggle(systemIsDark: colorScheme == .dark) },
+        importArchive: { isChoosingArchive = true }
+      )
+      // On the card, not on the grid that presents the export: one file panel per view.
+      .fileImporter(isPresented: $isChoosingArchive, allowedContentTypes: [.zip]) { result in
+        guard case .success(let url) = result else { return }
+        importArchive(at: url)
+      }
+    }
+    // A theme's archive dropped on the grid is imported, as one chosen in the open panel; while
+    // a theme is being kept, it goes back where it came from.
+    .dropDestination(for: URL.self) { urls, _ in
+      guard !themes.isSaving, urls.count == 1, let url = urls.first,
+        url.pathExtension.lowercased() == "zip"
+      else { return false }
+      importArchive(at: url)
+      return true
+    } isTargeted: {
+      isDropTargeted = $0
+    }
+    .overlay {
+      if isDropTargeted {
+        RoundedRectangle(cornerRadius: 10)
+          .fill(Color.accentColor.opacity(0.1))
+          .strokeBorder(Color.accentColor, style: StrokeStyle(lineWidth: 2, dash: [5, 4]))
+          .overlay {
+            Label {
+              Text("Drop to Import the Theme", bundle: .module)
+            } icon: {
+              Image(systemName: "square.and.arrow.down")
+            }
+            .font(.callout.weight(.semibold))
+            .foregroundStyle(Color.accentColor)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+          }
+          .padding(-4)
+          .allowsHitTesting(false)
       }
     }
     .alert(
@@ -376,6 +422,24 @@ public struct ConversationSettingsView: View {
         bundle: .module)
     case (false, false):
       return Text("Its file is deleted.", bundle: .module)
+    }
+  }
+
+  /// Imports the archive at `url`, chosen or dropped.
+  private func importArchive(at url: URL) {
+    let fileName = url.lastPathComponent
+    let data: Data
+    switch ChosenArchive.contents(of: url) {
+    case .success(let contents): data = contents
+    case .failure(.tooLarge): return themes.refuseImport(fileName, .tooLarge)
+    case .failure(.unreadable): return themes.refuseImport(fileName, .notATheme)
+    }
+    Task {
+      if let updated = await themes.importArchive(
+        data, named: fileName, appearance: { appearance })
+      {
+        appearance = updated
+      }
     }
   }
 

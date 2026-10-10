@@ -521,20 +521,11 @@ struct AvatarLibraryView: View {
       Task { await avatars.importArchive(Data()) }
       return
     }
-    let scoped = url.startAccessingSecurityScopedResource()
-    defer { if scoped { url.stopAccessingSecurityScopedResource() } }
-    // Read with the same bound as the archive itself: a larger file is not read at all.
-    guard let size = (try? url.resourceValues(forKeys: [.fileSizeKey]))?.fileSize else {
-      avatars.reject(.archiveUnreadable)
-      return
-    }
-    guard size <= 30 * 1024 * 1024 else {
-      avatars.reject(.archiveTooLarge)
-      return
-    }
-    guard let data = try? Data(contentsOf: url) else {
-      avatars.reject(.archiveUnreadable)
-      return
+    let data: Data
+    switch ChosenArchive.contents(of: url) {
+    case .success(let contents): data = contents
+    case .failure(.tooLarge): return avatars.reject(.archiveTooLarge)
+    case .failure(.unreadable): return avatars.reject(.archiveUnreadable)
     }
     Task {
       await avatars.importArchive(data)
