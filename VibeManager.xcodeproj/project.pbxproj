@@ -34,6 +34,7 @@
 		A0000000000000000000001A /* CompanionCore in Frameworks */ = {isa = PBXBuildFile; productRef = J0000000000000000000000E /* CompanionCore */; };
 		A0000000000000000000001B /* CompanionKit in Frameworks */ = {isa = PBXBuildFile; productRef = J0000000000000000000000F /* CompanionKit */; };
 		A0000000000000000000001C /* Vibe Manager Companion.app in Embed the companion agent */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* Vibe Manager Companion.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		A0000000000000000000001D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001B /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -62,6 +63,7 @@
 		B00000000000000000000018 /* CompanionBase.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CompanionBase.xcconfig; sourceTree = "<group>"; };
 		B00000000000000000000019 /* Companion.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Companion.xcconfig; sourceTree = "<group>"; };
 		B0000000000000000000001A /* CompanionAgent.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CompanionAgent.xcconfig; sourceTree = "<group>"; };
+		B0000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -231,6 +233,7 @@
 				B00000000000000000000012 /* VibeCompanionApp.swift */,
 				B00000000000000000000013 /* CompanionModel.swift */,
 				B00000000000000000000014 /* CompanionScreen.swift */,
+				B0000000000000000000001B /* Assets.xcassets */,
 				B00000000000000000000015 /* Info.plist */,
 				B00000000000000000000016 /* VibeCompanion.entitlements */,
 			);
@@ -316,6 +319,7 @@
 			buildPhases = (
 				D0000000000000000000000A /* Sources */,
 				D0000000000000000000000B /* Frameworks */,
+				D0000000000000000000000D /* Resources */,
 			);
 			buildRules = (
 			);
@@ -405,6 +409,14 @@
 				A00000000000000000000003 /* Assets.xcassets in Resources */,
 				A0000000000000000000000F /* Localizable.xcstrings in Resources */,
 				A00000000000000000000010 /* InfoPlist.xcstrings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D0000000000000000000000D /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0000000000000000000001D /* Assets.xcassets in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

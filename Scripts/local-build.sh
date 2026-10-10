@@ -85,8 +85,10 @@ readonly agent_entitlements="$(codesign -d --entitlements - --xml "$agent" 2>/de
 [[ "$agent_entitlements" == *'"com.apple.developer.icloud-services":["CloudKit"]'* \
   && "$agent_entitlements" == *'"com.apple.developer.aps-environment"'* ]] \
   || fail "the companion agent lacks its iCloud or push entitlement: $agent_entitlements"
-[[ "$(codesign -d --entitlements - --xml "$app" 2>/dev/null | plutil -convert json -o - -)" \
-  == '{"com.apple.security.device.audio-input":true}' ]] \
+# get-task-allow comes with the development signature of every local build, not from the project.
+[[ "$(codesign -d --entitlements - --xml "$app" 2>/dev/null \
+  | plutil -remove 'com\.apple\.security\.get-task-allow' -o - - 2>/dev/null \
+  | plutil -convert json -o - -)" == '{"com.apple.security.device.audio-input":true}' ]] \
   || fail "the application's entitlements are not the microphone's alone (ADR 0021)"
 
 rm -rf "$derived_data"

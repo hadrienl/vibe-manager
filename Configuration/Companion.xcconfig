@@ -20,3 +20,5 @@ INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = UIInterfaceOrientationPort
 INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO
 CODE_SIGN_ENTITLEMENTS = App/VibeCompanion/VibeCompanion.entitlements
 LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks
+// The same icon as Vibe Manager, set on white: an iOS icon has no transparency.
+ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon
