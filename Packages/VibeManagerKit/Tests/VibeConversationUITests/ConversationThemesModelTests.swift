@@ -503,4 +503,105 @@ struct ConversationThemesModelTests {
     some.model.prompt = "  "
     #expect(!some.model.canGenerate)
   }
+
+  // MARK: - Importing (#361)
+
+  @Test("An archive imported is kept, given to the mode it was made for, and said")
+  func importArchive() async throws {
+    let fixture = Fixture()
+    try await fixture.generate("une forêt la nuit")
+    #expect(fixture.model.isOpen)
+    let archive = ConversationThemeFile.encode(
+      ConversationThemeLibraryRules.kept(.night, name: "Aurore"))
+    let appearance = ConversationAppearance(accent: .blue)
+    let updated = try #require(
+      await fixture.model.importArchive(archive, named: "Aurore.zip", into: appearance))
+    let kept = try #require(fixture.model.personal.first)
+    #expect(kept.personalName == "Aurore")
+    #expect(updated.darkTheme == kept.id)
+    #expect(updated.lightTheme == appearance.lightTheme)
+    #expect(updated.accent == .theme)
+    // The theme on trial was dropped: importing is choosing another theme.
+    #expect(!fixture.model.isOpen)
+    #expect(fixture.model.trial == nil)
+    #expect(fixture.model.lastImported?.name == "Aurore")
+    #expect(fixture.model.lastSaved == nil)
+    #expect(fixture.spoken.last == "Aurore is imported and used in dark mode.")
+  }
+
+  @Test("Without following the system, a theme imported goes where every card goes")
+  func importNotFollowing() async throws {
+    let fixture = Fixture(agents: false)
+    let archive = ConversationThemeFile.encode(
+      ConversationThemeLibraryRules.kept(.paper, name: "Papier clair"))
+    let appearance = ConversationAppearance(followsSystemAppearance: false)
+    let updated = try #require(
+      await fixture.model.importArchive(archive, named: "Papier.zip", into: appearance))
+    #expect(updated.lightTheme == fixture.model.personal.first?.id)
+    #expect(updated.darkTheme == appearance.darkTheme)
+    #expect(fixture.model.lastImported?.mode == .always)
+    #expect(fixture.spoken.last == "Papier clair is imported and applied.")
+  }
+
+  @Test("An archive refused is said with its name and why, and nothing is kept")
+  func importRefused() async throws {
+    let fixture = Fixture()
+    let updated = await fixture.model.importArchive(
+      Data("{".utf8), named: "Néon.zip", into: ConversationAppearance())
+    #expect(updated == nil)
+    #expect(fixture.model.personal.isEmpty)
+    #expect(fixture.model.lastImported == nil)
+    let problem = try #require(fixture.model.problem)
+    #expect(problem == .couldNotImport(fileName: "Néon.zip", .file(.notJSON)))
+    #expect(String(localized: problem.message) == "“Néon.zip” was not imported: not a theme file.")
+    #expect(fixture.spoken.last == "“Néon.zip” was not imported: not a theme file.")
+    fixture.model.refuseImport("Énorme.zip", .tooLarge)
+    #expect(
+      String(localized: try #require(fixture.model.problem).message)
+        == "“Énorme.zip” was not imported: too large to be a theme.")
+    // Choosing a card forgets it.
+    fixture.model.dismissConfirmation()
+    #expect(fixture.model.problem == nil)
+  }
+
+  @Test("A font the imported theme asks for that this Mac could not get is said")
+  func importMissingFont() async throws {
+    let library = MissingFontsLibrary(missing: ["Berkeley Mono"])
+    let model = ConversationThemesModel(library: library)
+    var spoken: [String] = []
+    model.announce = { spoken.append(String(localized: $0)) }
+    let archive = ConversationThemeFile.encode(
+      ConversationThemeLibraryRules.kept(.night, name: "Aurore"))
+    _ = try #require(
+      await model.importArchive(archive, named: "Aurore.zip", into: ConversationAppearance()))
+    #expect(model.lastImported?.missingFonts == ["Berkeley Mono"])
+    #expect(
+      spoken == [
+        "Aurore is imported and used in dark mode.",
+        "The font “Berkeley Mono” is not on this Mac: the default font takes its place.",
+      ])
+  }
+}
+
+/// A library whose imports could not get some of their fonts.
+private actor MissingFontsLibrary: ConversationThemeLibrary {
+  private let base = InMemoryConversationThemeLibrary()
+  let missing: [String]
+
+  init(missing: [String]) {
+    self.missing = missing
+  }
+
+  func load() async -> ThemeLibraryContents { await base.load() }
+  func save(_ theme: ConversationTheme, name: String) async throws -> ConversationTheme {
+    await base.save(theme, name: name)
+  }
+  func remove(_ id: String) async throws { try await base.remove(id) }
+  func archive(_ id: String, preview: Data?) async throws -> Data {
+    try await base.archive(id, preview: preview)
+  }
+  func importArchive(_ data: Data) async throws -> ThemeImport {
+    ThemeImport(theme: try await base.importArchive(data).theme, missingFonts: missing)
+  }
+  nonisolated func location(ofFile _: String) -> URL? { nil }
 }

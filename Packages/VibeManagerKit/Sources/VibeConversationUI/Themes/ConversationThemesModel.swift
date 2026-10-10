@@ -31,6 +31,8 @@ public final class ConversationThemesModel {
     case couldNotSave
     case couldNotDelete
     case couldNotExport
+    /// The archive chosen or dropped was refused, whole (#361): nothing was written.
+    case couldNotImport(fileName: String, ThemeImportError)
     /// The address of the picture could not be fetched, or was not a picture.
     case pictureUnreachable
     /// No agent available can draw the picture.
@@ -65,6 +67,13 @@ public final class ConversationThemesModel {
         LocalizedStringResource("The theme could not be deleted.", bundle: .module)
       case .couldNotExport:
         LocalizedStringResource("The theme could not be exported.", bundle: .module)
+      case .couldNotImport(let fileName, let error):
+        LocalizedStringResource(
+          "“\(fileName)” was not imported: \(String(localized: ConversationThemesModel.reason(error))).",
+          bundle: .module,
+          comment:
+            "A theme archive refused. The reason is a lowercase fragment, such as “not a theme file”."
+        )
       case .pictureUnreachable:
         LocalizedStringResource(
           "The picture could not be fetched from its address: the theme is on trial without it.",
@@ -78,6 +87,17 @@ public final class ConversationThemesModel {
           "\(agent) could not draw the picture: the theme is on trial without it.",
           bundle: .module)
       }
+    }
+  }
+
+  /// Why an archive was refused, said after its name.
+  nonisolated static func reason(_ error: ThemeImportError) -> LocalizedStringResource {
+    switch error {
+    case .notATheme: LocalizedStringResource("not a theme file", bundle: .module)
+    case .tooLarge: LocalizedStringResource("too large to be a theme", bundle: .module)
+    case .file(let problem): ThemeLoadProblemsView.reason(problem)
+    case .couldNotWrite:
+      LocalizedStringResource("the theme could not be written", bundle: .module)
     }
   }
 
@@ -119,6 +139,9 @@ public final class ConversationThemesModel {
   /// The last theme saved, until something else happens: what the confirmation under the grid
   /// says.
   public private(set) var lastSaved: (name: String, mode: SavedMode)?
+  /// The last theme imported (#361), and the families it asks for that this Mac could not get,
+  /// until something else happens: what the confirmation under the grid says.
+  public private(set) var lastImported: (name: String, mode: SavedMode, missingFonts: [String])?
   /// Whether a theme is being written: nothing else is done meanwhile.
   public private(set) var isSaving = false
 
@@ -263,6 +286,7 @@ public final class ConversationThemesModel {
     isOpen = true
     targetDark = systemIsDark
     lastSaved = nil
+    lastImported = nil
     problem = nil
     optionsLoaded = false
     Task { await refreshOptions() }
@@ -305,6 +329,7 @@ public final class ConversationThemesModel {
     isRetrying = false
     problem = nil
     lastSaved = nil
+    lastImported = nil
     announce(
       versions.isEmpty
         ? LocalizedStringResource("\(agent) is making the theme.", bundle: .module)
@@ -522,6 +547,7 @@ public final class ConversationThemesModel {
     }
     versions = []
     close()
+    lastImported = nil
     lastSaved = (savedName, mode)
     announce(Self.savedSentence(savedName, mode))
     return updated
@@ -548,8 +574,83 @@ public final class ConversationThemesModel {
     if updated.darkTheme == id { updated.darkTheme = ConversationAppearance.defaultDarkTheme }
     await load()
     lastSaved = nil
+    lastImported = nil
     announce(LocalizedStringResource("\(deletedName) is deleted.", bundle: .module))
     return updated
+  }
+
+  /// Keeps the theme of an archive (#361) and gives it to the mode it was made for, as saving one
+  /// does; the panel, if unfolded, is folded first. The appearance to put in force, `nil` when
+  /// nothing was imported.
+  public func importArchive(
+    _ data: Data, named fileName: String, into appearance: ConversationAppearance
+  ) async -> ConversationAppearance? {
+    guard !isSaving else { return nil }
+    close()
+    dismissConfirmation()
+    isSaving = true
+    defer { isSaving = false }
+    let imported: ThemeImport
+    do {
+      imported = try await library.importArchive(data)
+    } catch {
+      refuseImport(fileName, (error as? ThemeImportError) ?? .couldNotWrite)
+      return nil
+    }
+    let kept = imported.theme
+    var updated = appearance
+    let mode: SavedMode
+    if !updated.followsSystemAppearance {
+      updated.lightTheme = kept.id
+      mode = .always
+    } else if kept.isDark {
+      updated.darkTheme = kept.id
+      mode = .dark
+    } else {
+      updated.lightTheme = kept.id
+      mode = .light
+    }
+    // The theme as it was made, its accent with it.
+    updated.accent = .theme
+    await load()
+    let name = kept.personalName ?? ""
+    lastImported = (name, mode, imported.missingFonts)
+    announce(Self.importedSentence(name, mode))
+    for family in imported.missingFonts { announce(Self.missingFontSentence(family)) }
+    return updated
+  }
+
+  /// No archive of a theme weighs more — its file, its picture, a few fonts —: a larger file is
+  /// not read at all.
+  public static let maximumArchiveSize = 30 * 1024 * 1024
+
+  /// Says why an archive was refused: by the library, or before it was even read.
+  public func refuseImport(_ fileName: String, _ error: ThemeImportError) {
+    let refused = Problem.couldNotImport(fileName: fileName, error)
+    lastSaved = nil
+    lastImported = nil
+    problem = refused
+    announce(refused.message)
+  }
+
+  /// What is said, and shown under the grid, once a theme is imported.
+  public static func importedSentence(_ name: String, _ mode: SavedMode) -> LocalizedStringResource
+  {
+    switch mode {
+    case .light:
+      LocalizedStringResource("\(name) is imported and used in light mode.", bundle: .module)
+    case .dark:
+      LocalizedStringResource("\(name) is imported and used in dark mode.", bundle: .module)
+    case .always:
+      LocalizedStringResource("\(name) is imported and applied.", bundle: .module)
+    }
+  }
+
+  /// Said of a family an imported theme asks for that this Mac could not get.
+  public static func missingFontSentence(_ family: String) -> LocalizedStringResource {
+    LocalizedStringResource(
+      "The font “\(family)” is not on this Mac: the default font takes its place.",
+      bundle: .module)
   }
 
   /// The `.zip` of a theme of the user's, with `preview` as its picture.
@@ -578,6 +679,7 @@ public final class ConversationThemesModel {
   /// Forgets the confirmation of the last save: another card was chosen.
   public func dismissConfirmation() {
     lastSaved = nil
+    lastImported = nil
     if !isOpen { problem = nil }
   }
 }
