@@ -172,8 +172,11 @@ public struct SpeechPace: Sendable {
   /// of it, and a margin.
   public func buffer(for text: String) -> Double {
     let duration = Double(text.count) * secondsPerCharacter
-    let behind = duration * max(0, 1 - speed)
-    return min(max(behind + 0.4, 0.4), 6)
+    // Half as much again, and a margin: the Mac does other things while it speaks — the
+    // microphone of a discussion, the conversation drawn — and a voice that stops and starts is
+    // worse than one that starts a little later.
+    let behind = duration * max(0, 1 - speed) * 1.5
+    return min(max(behind + 0.6, 0.6), 6)
   }
 
   /// Learns from a reading: averaged with what was known, so that one slow reading — the Mac

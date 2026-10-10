@@ -50,10 +50,11 @@ struct SpeechPaceTests {
   @Test("A short answer starts at once; a long one buffers what the voice would fall behind")
   func buffer() {
     let pace = SpeechPace()
-    #expect(pace.buffer(for: "Oui.") < 0.45)
-    // 210 characters, about 14 s of speech, generated at 0.9× real time: 1.4 s behind.
+    #expect(pace.buffer(for: "Oui.") < 0.7)
+    // 210 characters, about 14 s of speech, generated at 0.9× real time: 1.4 s behind, half as
+    // much again, and the margin.
     let answer = String(repeating: "a", count: 210)
-    #expect(abs(pace.buffer(for: answer) - 1.765) < 0.01)
+    #expect(abs(pace.buffer(for: answer) - 2.6475) < 0.01)
     // Never more than six seconds, however long the answer.
     #expect(pace.buffer(for: String(repeating: "a", count: 100_000)) == 6)
   }

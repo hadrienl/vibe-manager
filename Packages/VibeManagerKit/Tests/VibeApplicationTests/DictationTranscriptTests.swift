@@ -106,15 +106,18 @@ struct UtteranceDetectorTests {
     #expect(events.isEmpty)
   }
 
-  @Test("While the Mac speaks, only a voice well above its echo cuts in")
+  @Test("While the Mac speaks, its echo is learnt, and a voice well above it cuts in")
   func overTheVoice() {
     var detector = UtteranceDetector()
     var events: [UtteranceDetector.Event] = []
-    // The voice's echo, even in bursts, is not a sentence.
-    for _ in 0..<5 { events += detector.feed(Self.voice(0.05), whileSpeaking: true) }
-    for _ in 0..<4 { events += detector.feed(Self.voice(0.3), whileSpeaking: true) }
+    for _ in 0..<5 { events += detector.feed(Self.silence) }
+    // The voice's echo, louder than a quiet room, for two seconds: not a sentence.
+    for _ in 0..<20 { events += detector.feed(Self.voice(0.06), whileSpeaking: true) }
     #expect(events.isEmpty)
-    // Half a second of a loud voice is.
+    #expect(detector.echo > 0.03)
+    // The user, louder than the echo, for 0.4 s: a sentence begins.
+    for _ in 0..<3 { events += detector.feed(Self.voice(0.3), whileSpeaking: true) }
+    #expect(events.isEmpty)
     events += detector.feed(Self.voice(0.3), whileSpeaking: true)
     #expect(events == [.speechStarted])
   }
