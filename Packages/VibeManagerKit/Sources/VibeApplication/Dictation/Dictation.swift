@@ -79,6 +79,8 @@ public protocol AudioRecording: AnyObject {
   func start(cancellingEcho: Bool) throws
   /// What was heard since the last call, the microphone left open.
   func takeSamples() -> [Float]
+  /// How loud the last tenth of a second was, between 0 and 1: the wave of a dictation.
+  var level: Float { get }
   /// Stops and gives back everything heard since `start`, or since the last `takeSamples`.
   func stop() -> [Float]
 }
