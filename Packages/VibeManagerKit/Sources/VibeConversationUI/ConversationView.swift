@@ -213,7 +213,7 @@ public struct ConversationView: View {
         model.scrollGeometryChanged(contentFrame: contentFrame, viewportHeight: height)
       }
       .defaultScrollAnchor(.bottom)
-      .modifier(ToolbarVeil())
+      .modifier(ToolbarVeil(hasMessagesUnderComposer: contentFrame.maxY - viewportHeight > 1))
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
       }
@@ -391,7 +391,7 @@ public struct ConversationView: View {
         .containerRelativeFrame([.horizontal, .vertical])
     }
     .scrollDisabled(true)
-    .modifier(ToolbarVeil())
+    .modifier(ToolbarVeil(hasMessagesUnderComposer: false))
   }
 
   private static func rotorLabel(_ block: ConversationBlock) -> String {
@@ -485,13 +485,19 @@ private struct PlainFooterBackground: ViewModifier {
 /// The soft edge effect of macOS 26 blurs the top of the toolbar only and fades out towards its
 /// foot: a message level with the title or the pickers stayed legible under them. The hard one
 /// blurs it all, under a veil of the window's background. Before macOS 26 there is no edge effect.
+///
+/// Under the composer, the messages fade as they go (#359): only while some pass under it. With
+/// nothing there, macOS 26 still lays the edge effect, a lighter band across the composer's bar,
+/// while the agent writes its first answer.
 private struct ToolbarVeil: ViewModifier {
+  let hasMessagesUnderComposer: Bool
+
   func body(content: Content) -> some View {
     if #available(macOS 26, *) {
       content
         .scrollEdgeEffectStyle(.hard, for: .top)
-        // Under the composer, the messages fade as they go (#359).
         .scrollEdgeEffectStyle(.soft, for: .bottom)
+        .scrollEdgeEffectHidden(!hasMessagesUnderComposer, for: .bottom)
     } else {
       content
     }
