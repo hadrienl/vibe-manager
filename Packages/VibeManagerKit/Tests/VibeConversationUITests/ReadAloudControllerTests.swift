@@ -5,7 +5,7 @@ import VibeApplication
 @testable import VibeConversationUI
 
 /// A voice that says nothing: it records what it was asked to read, and reads until cancelled.
-private final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
+final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
   private let lock = NSLock()
   private var installed: Bool
   private var _spoken: [(text: String, voice: SpeechVoice, language: SpeechLanguage)] = []

@@ -36,7 +36,6 @@ struct DictationButton: View {
     }
   }
 
-
   var body: some View {
     Button {
       if isWaitingBehindButton {
@@ -68,11 +67,13 @@ struct DictationButton: View {
     .onDisappear { dictation.release(owner) }
     .accessibilityLabel(
       isRecording
-        ? Text("Stop Dictation", bundle: .module) : Text("Dictate", bundle: .module))
+        ? Text("Stop Dictation", bundle: .module) : Text("Dictate", bundle: .module)
+    )
     .help(
       isRecording
         ? Text("Stop and insert what you said", bundle: .module)
-        : Text("Dictate a message, transcribed on this Mac", bundle: .module))
+        : Text("Dictate a message, transcribed on this Mac", bundle: .module)
+    )
     .popover(isPresented: popoverBinding, arrowEdge: .top) {
       DictationPopover(dictation: dictation, dictate: toggle)
     }
@@ -281,14 +282,15 @@ extension ConversationModel {
     // time the text is heard must not receive it.
     let field = WeakTextView(PromptComposer.composerTextView(showing: draft))
     var request = DictationController.Request(
-      owner: ObjectIdentifier(self), vocabulary: { [weak self] in
+      owner: ObjectIdentifier(self),
+      vocabulary: { [weak self] in
         await self?.dictationVocabulary() ?? ""
       },
       insert: { [weak self] text in
         guard let self else { return }
         PromptComposer.insertDictation(text, into: self, field: field.view)
       })
-    request.send = { [weak self] text in _ = await self?.sendSpoken(text) }
+    request.send = { [weak self] text in await self?.sendSpoken(text) ?? false }
     request.interrupt = { [weak self] in await self?.interrupt() }
     request.isAgentWorking = { [weak self] in self?.isAgentWorking ?? false }
     return request
@@ -324,14 +326,17 @@ struct DiscussionButton: View {
     .disabled(
       !isDiscussing
         && (!isEnabled || dictation.isBusy(for: ObjectIdentifier(model))
-          || dictation.phase != .idle && !dictation.concerns(ObjectIdentifier(model))))
+          || dictation.phase != .idle && !dictation.concerns(ObjectIdentifier(model)))
+    )
     .accessibilityLabel(
       isDiscussing
         ? Text("End the Discussion", bundle: .module)
-        : Text("Start a Discussion", bundle: .module))
+        : Text("Start a Discussion", bundle: .module)
+    )
     .help(
       isDiscussing
         ? Text("Click to end the discussion", bundle: .module)
-        : Text("Discuss aloud: each pause sends what you said, the answers are read", bundle: .module))
+        : Text(
+          "Discuss aloud: each pause sends what you said, the answers are read", bundle: .module))
   }
 }

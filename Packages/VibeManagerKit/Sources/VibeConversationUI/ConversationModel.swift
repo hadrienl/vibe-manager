@@ -1266,12 +1266,11 @@ public final class ConversationModel {
     attachments = []
     draft = text
     let sent = await send()
-    attachments = keptAttachments
-    if sent {
-      draft = kept
-    } else {
-      draft = kept.isEmpty ? text : kept + " " + text
-    }
+    // What is in the field now — typed or attached while the sentence was on its way, the field
+    // keeping the keyboard under the wave, and the sentence itself if it was not sent — follows
+    // the draft it interrupted.
+    draft = [kept, draft].filter { !$0.isEmpty }.joined(separator: " ")
+    attachments = keptAttachments + attachments
     return sent
   }
 

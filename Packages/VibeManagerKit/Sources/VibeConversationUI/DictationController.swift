@@ -55,8 +55,9 @@ public final class DictationController {
     /// The words the speaker is likely to say: read while the user speaks.
     public let vocabulary: @MainActor () async -> String
     public let insert: @MainActor (String) -> Void
-    /// Sends a sentence of the discussion to the agent; `nil` where there is no agent to send to.
-    public var send: (@MainActor (String) async -> Void)?
+    /// Sends a sentence of the discussion to the agent, and says whether it was; `nil` where there
+    /// is no agent to send to.
+    public var send: (@MainActor (String) async -> Bool)?
     /// Interrupts the agent's turn: « stop » said in a discussion.
     public var interrupt: (@MainActor () async -> Void)?
     /// Whether the agent is at work, for the discussion to say so.
@@ -136,6 +137,8 @@ public final class DictationController {
   /// Shorter, a press is a click: it starts or ends the discussion; longer, it dictates.
   /// Changed by the tests only, whose clock runs as the machine allows.
   @ObservationIgnored var holdThreshold: TimeInterval = 0.3
+  /// How often a discussion reads the microphone. Shortened by the tests only.
+  @ObservationIgnored var listenInterval = Duration.milliseconds(100)
 
   public init(
     transcriber: any SpeechTranscribing, recorder: any AudioRecording,
@@ -173,6 +176,7 @@ public final class DictationController {
     }
     guard phase == .idle else { return }
     attempt += 1
+    earlyRelease = nil
     self.request = request
     owner = request.owner
     problem = nil
@@ -191,8 +195,14 @@ public final class DictationController {
     isWarming = true
     let variant = settings.variant
     Task {
-      try? await transcriber.prepare(variant)
-      isModelReady = true
+      do {
+        try await transcriber.prepare(variant)
+      } catch {
+        isWarming = false
+        return
+      }
+      // Another model chosen meanwhile is not the one loaded.
+      if settings.variant == variant { isModelReady = true }
     }
   }
 
@@ -201,6 +211,7 @@ public final class DictationController {
     if phase == .discussing, owner == request.owner { return endDiscussion() }
     guard phase == .idle else { return }
     attempt += 1
+    earlyRelease = nil
     self.request = request
     owner = request.owner
     problem = nil
@@ -277,12 +288,13 @@ public final class DictationController {
     discussion = .listening
     detector = UtteranceDetector()
     readAloud?.readsConversation = request.owner
+    readAloud?.readsNextAnswerOnly = false
     let variant = settings.variant
     Task { try? await transcriber.prepare(variant) }
     vocabulary = Task { await request.vocabulary() }
     listening = Task {
       while !Task.isCancelled {
-        try? await Task.sleep(for: .milliseconds(100))
+        try? await Task.sleep(for: listenInterval)
         guard !Task.isCancelled, phase == .discussing else { return }
         listen()
       }
@@ -330,27 +342,36 @@ public final class DictationController {
     pendingSentences += 1
     sentences = Task {
       await previous?.value
-      await say(samples, for: request, prompt: await prompt?.value ?? "")
+      let isSent = await say(samples, for: request, prompt: await prompt?.value ?? "")
       pendingSentences -= 1
+      // The discussion ended on this sentence, and nothing was sent: no answer will come to be
+      // read, and the next ones — typed — are not.
+      if !isSent, pendingSentences == 0, readAloud?.readsNextAnswerOnly == true,
+        readAloud?.readsConversation == request.owner
+      {
+        readAloud?.readsConversation = nil
+        readAloud?.readsNextAnswerOnly = false
+      }
     }
   }
 
   /// A sentence of the discussion, transcribed and sent — or « stop », which interrupts the agent.
   /// Sent even once the discussion is over: the last sentence is what ended it.
-  private func say(_ samples: [Float], for request: Request, prompt: String) async {
-    guard DictationTranscript.containsSpeech(samples) else { return }
+  /// - Returns: whether a sentence was sent, an answer to come.
+  private func say(_ samples: [Float], for request: Request, prompt: String) async -> Bool {
+    guard DictationTranscript.containsSpeech(samples) else { return false }
     guard
       let text = try? await transcriber.transcribe(
         samples, with: settings.variant, language: settings.language, prompt: prompt)
-    else { return }
+    else { return false }
     let sentence = DictationTranscript.cleaned(text)
-    guard !sentence.isEmpty else { return }
+    guard !sentence.isEmpty else { return false }
     if UtteranceDetector.isStop(sentence) {
       readAloud?.stop()
       await request.interrupt?()
-    } else {
-      await request.send?(sentence)
+      return false
     }
+    return await request.send?(sentence) ?? false
   }
 
   /// The discussion over: the microphone closed, the voice silent. A sentence under way is still
@@ -364,7 +385,7 @@ public final class DictationController {
     let last = detector.flush()
     if let last { queue(last) }
     readAloud?.stop()
-    if last != nil {
+    if last != nil || pendingSentences > 0 {
       // The discussion ended on a sentence: its answer is still read.
       readAloud?.readsNextAnswerOnly = true
     } else {
@@ -478,6 +499,7 @@ public final class DictationController {
     case .idle:
       // A recording about to start — the system asking about the microphone — never will.
       attempt += 1
+      earlyRelease = nil
       dismissProblem()
     case .transcribing:
       break
@@ -578,12 +600,14 @@ public final class DictationController {
   private func fail(_ problem: Problem) {
     phase = .idle
     request = nil
+    earlyRelease = nil
     self.problem = problem
   }
 
   private func end() {
     phase = .idle
     request = nil
+    earlyRelease = nil
     owner = nil
   }
 
