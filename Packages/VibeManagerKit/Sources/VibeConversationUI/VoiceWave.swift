@@ -13,7 +13,10 @@ struct VoiceWave: View {
   private static let bars = 56
 
   var body: some View {
-    TimelineView(.animation(minimumInterval: 1 / 30, paused: reduceMotion)) { context in
+    // Slower when the wave moves by itself: the voice is generated meanwhile, and every frame
+    // drawn is taken from it.
+    TimelineView(.animation(minimumInterval: isAmbient ? 1 / 15 : 1 / 30, paused: reduceMotion)) {
+      context in
       let time = context.date.timeIntervalSinceReferenceDate
       Canvas { canvas, size in
         let spacing = size.width / CGFloat(Self.bars)

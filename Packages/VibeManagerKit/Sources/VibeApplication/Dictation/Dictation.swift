@@ -236,6 +236,8 @@ public struct UtteranceDetector: Sendable {
   public private(set) var level: Float = 0
   /// The room's noise: the quietest of the last five seconds, rising slowly.
   public private(set) var floor: Float = 0.005
+  /// How loud the Mac's own voice comes back through the microphone, learnt while it speaks.
+  public private(set) var echo: Float = 0
   private var recent: [Float] = []
   private var carry: [Float] = []
   private var lead: [[Float]] = []
@@ -251,13 +253,13 @@ public struct UtteranceDetector: Sendable {
   /// What a voice must stand above: the room, three times over — and much more while the Mac
   /// speaks, so that only the user cutting in is heard over the echo the filter lets through.
   public func threshold(whileSpeaking: Bool) -> Float {
-    whileSpeaking ? max(0.06, floor * 10) : max(0.01, floor * 3)
+    whileSpeaking ? max(0.03, floor * 3, echo * 2.5) : max(0.01, floor * 3)
   }
 
   /// So long above the threshold to begin a sentence — longer over the Mac's own voice, whose
   /// echo comes in bursts.
   static func framesToStart(whileSpeaking: Bool) -> Int {
-    whileSpeaking ? 5 : speechFrames
+    whileSpeaking ? 4 : speechFrames
   }
 
   /// Feeds what was heard; `whileSpeaking` when the voice reads an answer.
@@ -271,13 +273,21 @@ public struct UtteranceDetector: Sendable {
       for sample in frame { sum += sample * sample }
       let rms = (sum / Float(frame.count)).squareRoot()
       level = rms
-      recent.append(rms)
-      if recent.count > Self.roomFrames { recent.removeFirst(recent.count - Self.roomFrames) }
-      // Down at once, up slowly: a voice that begins with the discussion is not taken for the
-      // room, while a louder room is learnt within seconds.
-      let quietest = max(0.002, recent.min() ?? rms)
-      floor = quietest < floor ? quietest : min(quietest, floor * 1.05)
       let isLoud = rms >= threshold(whileSpeaking: whileSpeaking)
+      if whileSpeaking {
+        // The voice's echo is learnt apart from the room, from its first tenth of a second —
+        // and hardly at all from what stands out of it: the user cutting in.
+        let weight: Float = isLoud ? 0.01 : 0.1
+        echo = echo == 0 ? rms : echo * (1 - weight) + rms * weight
+      } else {
+        echo *= 0.8
+        recent.append(rms)
+        if recent.count > Self.roomFrames { recent.removeFirst(recent.count - Self.roomFrames) }
+        // Down at once, up slowly: a voice that begins with the discussion is not taken for the
+        // room, while a louder room is learnt within seconds.
+        let quietest = max(0.002, recent.min() ?? rms)
+        floor = quietest < floor ? quietest : min(quietest, floor * 1.05)
+      }
       if var current = sentence {
         current.append(contentsOf: frame)
         sentenceFrames += 1
