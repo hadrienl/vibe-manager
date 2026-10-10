@@ -29840,7 +29840,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La police « %@ » n’est pas sur ce Mac : la police par défaut la remplace."
+            "value" : "La police « %@ » n’est pas sur ce Mac : la police par défaut la remplace."
           }
         },
         "hi" : {
@@ -37671,7 +37671,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "« %1$@ » n’a pas été importé : %2$@."
+            "value" : "« %1$@ » n’a pas été importé : %2$@."
           }
         },
         "hi" : {
