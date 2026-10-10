@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
@@ -27,6 +28,9 @@ public struct ConversationView: View {
         _ onScreen: @escaping (String) -> Void
       ) -> AnyView
     )?
+  /// Space as the microphone (#357), for the window this conversation is in.
+  @State private var voiceKeys = VoiceKeyMonitor()
+  @State private var window: NSWindow?
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
   @State private var pager = ConversationPager()
@@ -106,6 +110,11 @@ public struct ConversationView: View {
     .environment(\.readAloud, model.readAloud)
     // The voice loaded while the conversation is read, not when its first answer is (#357).
     .task { model.readAloud?.warmUp() }
+    // Space as the microphone, in the conversation on screen (#357).
+    .background(WindowReader { window = $0 })
+    .onChange(of: isActive, initial: true) { updateVoiceKeys() }
+    .onChange(of: window) { updateVoiceKeys() }
+    .onDisappear { voiceKeys.stop() }
     // The audio mode (#357): the answers that arrive are read, in the conversation on screen.
     .onChange(of: model.agentAnswers.map(\.id), initial: true) { followAnswers() }
     .onChange(of: isActive) { followAnswers() }
@@ -463,5 +472,33 @@ extension ConversationView {
   fileprivate func followAnswers() {
     model.readAloud?.follow(
       model.agentAnswers, in: ObjectIdentifier(model), isOnScreen: isActive)
+  }
+}
+
+extension ConversationView {
+  /// Installs Space as the microphone while this conversation is on screen, and takes it away
+  /// when it is not.
+  fileprivate func updateVoiceKeys() {
+    guard isActive, let dictation = model.dictation, window != nil else {
+      voiceKeys.stop()
+      return
+    }
+    let model = model
+    voiceKeys.start(
+      in: window,
+      VoiceKeyMonitor.Actions(
+        press: {
+          guard model.acceptsInput || dictation.phase == .discussing else { return }
+          model.readAloud?.stop()
+          dictation.pressBegan(model.dictationRequest())
+        },
+        release: { dictation.pressEnded(model.dictationRequest()) },
+        escape: {
+          guard dictation.concerns(ObjectIdentifier(model)),
+            dictation.phase == .discussing || dictation.phase == .recording
+          else { return false }
+          dictation.cancel()
+          return true
+        }))
   }
 }

@@ -117,9 +117,9 @@ struct PromptComposer: View {
             return .handled
           }
           .onKeyPress(.escape) {
-            // A dictation under way is thrown away first (#340).
+            // A dictation or a discussion under way is ended first (#340, #357).
             if let dictation = model.dictation, dictation.concerns(ObjectIdentifier(model)),
-              dictation.phase == .recording
+              dictation.phase == .recording || dictation.phase == .discussing
             {
               dictation.cancel()
               return .handled
@@ -136,6 +136,15 @@ struct PromptComposer: View {
             Task { await model.interrupt() }
             return .handled
           }
+      }
+      // While the microphone listens, a wave takes the field's place (#357); the draft stays
+      // under it, untouched.
+      .overlay {
+        if let dictation = model.dictation, let wave = waveStyle(dictation) {
+          VoiceWave(level: dictation.level, color: wave.color, isAmbient: wave.isAmbient)
+            .padding(.horizontal, 4)
+            .background(theme.raised.color)
+        }
       }
       HStack(spacing: 8) {
         if isShell {
@@ -157,10 +166,6 @@ struct PromptComposer: View {
           DictationButton(
             model: model, dictation: dictation, isEnabled: state == .ready && !isShell,
             isActive: isActive)
-        }
-        // The audio mode (#357): the answers read as they arrive.
-        if let readAloud = model.readAloud, !isShell {
-          AudioModeButton(readAloud: readAloud)
         }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line
@@ -394,10 +399,41 @@ struct PromptComposer: View {
     guard dictation.concerns(ObjectIdentifier(model)) else { return nil }
     switch dictation.phase {
     case .recording:
-      return Text("Listening… click ■ to insert what you said · Esc to cancel", bundle: .module)
+      return Text("Dictating… let go to insert what you said · Esc to cancel", bundle: .module)
     case .transcribing:
       return Text("Transcribing…", bundle: .module)
+    case .discussing:
+      switch dictation.discussion {
+      case .listening:
+        return Text("Discussion · your turn · click the microphone or Esc to end", bundle: .module)
+      case .hearing:
+        return Text("Discussion · listening…", bundle: .module)
+      case .transcribing:
+        return Text("Discussion · transcribing…", bundle: .module)
+      case .agentWorking:
+        return Text("Discussion · \(model.agentName) is working", bundle: .module)
+      case .agentSpeaking:
+        return Text("Discussion · \(model.agentName) is speaking · speak to cut in", bundle: .module)
+      }
     case .idle, .offeringDownload, .downloading, .preparing:
+      return nil
+    }
+  }
+
+  /// The wave in the field's place, and its colour: red while dictating, green when it is the
+  /// user's turn, grey while the agent works, violet while it speaks. `nil` when nothing listens.
+  private func waveStyle(_ dictation: DictationController) -> (color: Color, isAmbient: Bool)? {
+    guard dictation.concerns(ObjectIdentifier(model)) else { return nil }
+    switch dictation.phase {
+    case .recording:
+      return (.red, false)
+    case .discussing:
+      switch dictation.discussion {
+      case .listening, .hearing: return (.green, false)
+      case .transcribing, .agentWorking: return (theme.secondaryText.color, true)
+      case .agentSpeaking: return (.purple, true)
+      }
+    case .idle, .offeringDownload, .downloading, .preparing, .transcribing:
       return nil
     }
   }

@@ -19,9 +19,18 @@ private final class FakeRecorder: AudioRecording {
     return grants
   }
 
-  func start() throws {
+  /// What the microphone hears next in a discussion, a tenth of a second at a time.
+  var stream: [[Float]] = []
+  private(set) var cancelsEcho = false
+
+  func start(cancellingEcho: Bool) throws {
     if failsToStart { throw CocoaError(.featureUnsupported) }
     isRecording = true
+    cancelsEcho = cancellingEcho
+  }
+
+  func takeSamples() -> [Float] {
+    stream.isEmpty ? [] : stream.removeFirst()
   }
 
   func stop() -> [Float] {
@@ -386,5 +395,133 @@ struct DictationControllerTests {
 
     await dictation.removeModel(.largeTurbo)
     #expect(dictation.installedSizes.keys.map(\.self) == [.small])
+  }
+}
+
+
+/// A tenth of a second of silence, and of a voice.
+private let silentTenth = [Float](repeating: 0, count: 1_600)
+private let voicedTenth = (0..<1_600).map { 0.2 * sin(Float($0) * 2 * .pi * 220 / 16_000) }
+
+@Suite("The discussion (#357)")
+@MainActor
+struct DiscussionTests {
+  private final class Composer {
+    var sent: [String] = []
+    var interrupted = 0
+    var inserted: [String] = []
+  }
+
+  private func request(_ composer: Composer) -> DictationController.Request {
+    var request = DictationController.Request(
+      owner: ObjectIdentifier(composer), vocabulary: { "" },
+      insert: { composer.inserted.append($0) })
+    request.send = { composer.sent.append($0) }
+    request.interrupt = { composer.interrupted += 1 }
+    return request
+  }
+
+  /// A press is a click however long the machine takes, unless `holds`.
+  private func controller(
+    _ recorder: FakeRecorder, _ transcriber: FakeTranscriber, holds: Bool = false
+  ) -> DictationController {
+    let dictation = DictationController(
+      transcriber: transcriber, recorder: recorder, store: InMemoryDictationSettingsStore())
+    dictation.holdThreshold = holds ? 0 : 3_600
+    return dictation
+  }
+
+  @Test("A click starts the discussion: the microphone stays open, echo cancelled")
+  func clickStarts() async {
+    let recorder = FakeRecorder()
+    let dictation = controller(recorder, FakeTranscriber(installed: [.largeTurbo]))
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    #expect(dictation.phase == .discussing)
+    #expect(recorder.isRecording)
+    #expect(recorder.cancelsEcho)
+
+    // A second click ends it.
+    dictation.pressBegan(request(composer))
+    dictation.pressEnded(request(composer))
+    #expect(dictation.phase == .idle)
+    #expect(!recorder.isRecording)
+  }
+
+  @Test("A sentence ended by a pause is transcribed and sent")
+  func sendsSentences() async {
+    let recorder = FakeRecorder()
+    recorder.stream =
+      Array(repeating: silentTenth, count: 5) + Array(repeating: voicedTenth, count: 8)
+      + Array(repeating: silentTenth, count: 14)
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Ouvre la PR en brouillon."
+    let dictation = controller(recorder, transcriber)
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    for _ in 0..<60 where composer.sent.isEmpty {
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(composer.sent == ["Ouvre la PR en brouillon."])
+    #expect(dictation.phase == .discussing)
+    dictation.endDiscussion()
+  }
+
+  @Test("« Stop » said in a discussion interrupts the agent instead of being sent")
+  func stopInterrupts() async {
+    let recorder = FakeRecorder()
+    recorder.stream =
+      Array(repeating: voicedTenth, count: 5) + Array(repeating: silentTenth, count: 14)
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Stop !"
+    let dictation = controller(recorder, transcriber)
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    for _ in 0..<60 where composer.interrupted == 0 {
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(composer.interrupted == 1)
+    #expect(composer.sent.isEmpty)
+    dictation.endDiscussion()
+  }
+
+  @Test("A held press dictates into the draft, as before")
+  func holdDictates() async {
+    let recorder = FakeRecorder()
+    recorder.heard = speech
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Fix the build."
+    let dictation = controller(recorder, transcriber, holds: true)
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    await until { dictation.phase == .idle }
+    #expect(composer.inserted == ["Fix the build."])
+    #expect(composer.sent.isEmpty)
+  }
+
+  @Test("Escape, or the composer put away, ends the discussion")
+  func ends() async {
+    let recorder = FakeRecorder()
+    let dictation = controller(recorder, FakeTranscriber(installed: [.largeTurbo]))
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    dictation.release(ObjectIdentifier(composer))
+    #expect(dictation.phase == .idle)
+    #expect(!recorder.isRecording)
   }
 }

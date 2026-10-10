@@ -74,9 +74,17 @@ public protocol AudioRecording: AnyObject {
   var access: MicrophoneAccess { get }
   /// Asks the system, which asks the user once; `true` when granted.
   func requestAccess() async -> Bool
-  func start() throws
-  /// Stops and gives back everything heard since `start`.
+  /// Opens the microphone. `cancellingEcho` filters out what the Mac itself plays — the voice
+  /// reading an answer — so that a discussion does not hear it as the user (#357).
+  func start(cancellingEcho: Bool) throws
+  /// What was heard since the last call, the microphone left open.
+  func takeSamples() -> [Float]
+  /// Stops and gives back everything heard since `start`, or since the last `takeSamples`.
   func stop() -> [Float]
+}
+
+extension AudioRecording {
+  public func start() throws { try start(cancellingEcho: false) }
 }
 
 /// A speech model on this Mac: downloaded, loaded, and asked what was said.
@@ -192,4 +200,103 @@ public enum DictationTranscript {
   static let commonTerms = [
     "Claude Code", "Codex", "commit", "pull request", "CI", "GitHub", "worktree", "build",
   ]
+}
+
+/// Where a sentence begins and ends in what the microphone hears, for the discussion (#357): a
+/// voice louder than the room for a moment begins one, a pause ends it. Pure, so it is tested.
+public struct UtteranceDetector: Sendable {
+  public enum Event: Equatable, Sendable {
+    /// The user began to speak.
+    case speechStarted
+    /// A sentence ended with a pause: its samples, from a little before its first word.
+    case utterance([Float])
+  }
+
+  /// A tenth of a second: what each loudness is measured on.
+  static let frame = DictationTranscript.sampleRate / 10
+  /// So long above the room to begin a sentence: a cough or a click does not.
+  static let speechFrames = 3
+  /// So long a pause to end it.
+  public static let pauseFrames = 12
+  /// What is kept from before the first loud frame: the start of the first word.
+  static let leadFrames = 3
+  /// A sentence never lasts longer: past it, it is ended where it is.
+  static let longestFrames = 600
+
+  /// The loudness of the room, learnt while nobody speaks.
+  private var noise: Float = 0.005
+  public private(set) var level: Float = 0
+  private var carry: [Float] = []
+  private var lead: [[Float]] = []
+  private var loud = 0
+  private var quiet = 0
+  private var sentence: [Float]?
+  private var sentenceFrames = 0
+
+  public init() {}
+
+  public var isHearingSpeech: Bool { sentence != nil }
+
+  /// What a voice must stand above: the room's noise, three times over — and much more while the
+  /// Mac speaks, so that only the user cutting in is heard over the echo the filter lets through.
+  func threshold(whileSpeaking: Bool) -> Float {
+    whileSpeaking ? max(0.04, noise * 8) : max(0.015, noise * 3)
+  }
+
+  /// Feeds what was heard; `whileSpeaking` when the voice reads an answer.
+  public mutating func feed(_ samples: [Float], whileSpeaking: Bool = false) -> [Event] {
+    var events: [Event] = []
+    carry.append(contentsOf: samples)
+    while carry.count >= Self.frame {
+      let frame = Array(carry.prefix(Self.frame))
+      carry.removeFirst(Self.frame)
+      var sum: Float = 0
+      for sample in frame { sum += sample * sample }
+      let rms = (sum / Float(frame.count)).squareRoot()
+      level = rms
+      let isLoud = rms >= threshold(whileSpeaking: whileSpeaking)
+      if var current = sentence {
+        current.append(contentsOf: frame)
+        sentenceFrames += 1
+        quiet = isLoud ? 0 : quiet + 1
+        if quiet >= Self.pauseFrames || sentenceFrames >= Self.longestFrames {
+          // The pause itself is not part of it, but for its first tenth.
+          let trailing = max(0, quiet - 1) * Self.frame
+          events.append(.utterance(Array(current.dropLast(trailing))))
+          sentence = nil
+          quiet = 0
+          loud = 0
+          lead = []
+        } else {
+          sentence = current
+        }
+        continue
+      }
+      if isLoud {
+        loud += 1
+        lead.append(frame)
+        if loud >= Self.speechFrames {
+          sentence = lead.suffix(Self.leadFrames + Self.speechFrames).flatMap { $0 }
+          sentenceFrames = loud
+          quiet = 0
+          events.append(.speechStarted)
+        }
+      } else {
+        loud = 0
+        lead.append(frame)
+        if lead.count > Self.leadFrames { lead.removeFirst(lead.count - Self.leadFrames) }
+        // The room is learnt from its quiet frames only, slowly.
+        noise = noise * 0.95 + rms * 0.05
+      }
+    }
+    return events
+  }
+
+  /// Whether a sentence asks the agent to stop rather than says something to it.
+  public static func isStop(_ text: String) -> Bool {
+    let words = text.lowercased()
+      .folding(options: .diacriticInsensitive, locale: nil)
+      .trimmingCharacters(in: .punctuationCharacters.union(.whitespacesAndNewlines))
+    return ["stop", "arrete", "arrete-toi", "stoppe", "halt"].contains(words)
+  }
 }

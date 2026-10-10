@@ -23,7 +23,7 @@ struct DictationButton: View {
     guard isMine else { return false }
     switch dictation.phase {
     case .downloading, .preparing, .transcribing: return true
-    case .idle, .offeringDownload, .recording: return false
+    case .idle, .offeringDownload, .recording, .discussing: return false
     }
   }
 
@@ -32,64 +32,93 @@ struct DictationButton: View {
     guard isMine, hidesProgress else { return false }
     switch dictation.phase {
     case .downloading, .preparing: return true
-    case .idle, .offeringDownload, .recording, .transcribing: return false
+    case .idle, .offeringDownload, .recording, .transcribing, .discussing: return false
     }
   }
 
+  /// Recording a dictation, held: the button is red.
+  private var isDiscussing: Bool { isMine && dictation.phase == .discussing }
+  @State private var isPressed = false
+
   var body: some View {
-    Button {
-      if isWaitingBehindButton {
-        hidesProgress = false
-        return
+    Group {
+      if isWorking {
+        ProgressView().controlSize(.small)
+      } else {
+        Image(systemName: isRecording || isDiscussing ? "mic.fill" : "mic")
+          .font(.system(size: 13, weight: .semibold))
+          .foregroundStyle(isRecording || isDiscussing ? Color.white : theme.text.color)
       }
-      toggle()
-    } label: {
-      Group {
-        if isWorking {
-          ProgressView().controlSize(.small)
-        } else {
-          Image(systemName: isRecording ? "stop.fill" : "mic")
-            .font(.system(size: isRecording ? 11 : 13, weight: .semibold))
-            .foregroundStyle(isRecording ? Color.white : theme.text.color)
-        }
-      }
-      .frame(width: 28, height: 28)
-      .background(isRecording ? Color.red : theme.surface.color, in: Circle())
-      .overlay(Circle().stroke(isRecording ? Color.clear : theme.border.color))
-      .contentShape(Circle())
     }
-    .buttonStyle(.plain)
-    // A recording can always be stopped: the agent may have asked something meanwhile.
-    .disabled(
-      !isRecording && !isWaitingBehindButton
-        && (!isEnabled || dictation.isBusy(for: owner) || isWorking))
+    .frame(width: 28, height: 28)
+    .background(
+      isRecording ? Color.red : isDiscussing ? Color.green : theme.surface.color, in: Circle()
+    )
+    .overlay(Circle().stroke(isRecording || isDiscussing ? Color.clear : theme.border.color))
+    .contentShape(Circle())
+    .opacity(isUsable ? 1 : 0.4)
+    // Pressed, it listens at once; let go of, a click starts or ends the discussion, a hold
+    // inserts what was dictated (#357).
+    .gesture(
+      DragGesture(minimumDistance: 0)
+        .onChanged { _ in
+          guard !isPressed, isUsable else { return }
+          isPressed = true
+          if isWaitingBehindButton {
+            hidesProgress = false
+            return
+          }
+          hidesProgress = false
+          model.readAloud?.stop()
+          dictation.pressBegan(model.dictationRequest())
+        }
+        .onEnded { _ in
+          guard isPressed else { return }
+          isPressed = false
+          dictation.pressEnded(model.dictationRequest())
+        }
+    )
     .onChange(of: isActive) { _, isActive in
       if !isActive { dictation.release(owner) }
     }
     .onDisappear { dictation.release(owner) }
+    .accessibilityElement()
+    .accessibilityAddTraits(.isButton)
     .accessibilityLabel(
-      isRecording
-        ? Text("Stop Dictation", bundle: .module) : Text("Dictate", bundle: .module))
+      isDiscussing
+        ? Text("End the Discussion", bundle: .module)
+        : Text("Start a Discussion", bundle: .module))
+    .accessibilityAction { click() }
+    .accessibilityAction(named: Text("Dictate", bundle: .module)) { toggle() }
     .help(
-      isRecording
-        ? Text("Stop and insert what you said", bundle: .module)
-        : Text("Dictate a message, transcribed on this Mac", bundle: .module))
+      isDiscussing
+        ? Text("Click to end the discussion", bundle: .module)
+        : Text("Click to discuss aloud · hold to dictate · or Space", bundle: .module))
     .popover(isPresented: popoverBinding, arrowEdge: .top) {
       DictationPopover(dictation: dictation, dictate: toggle)
     }
   }
 
+  /// Whether the button can be pressed: a recording or a discussion can always be stopped.
+  private var isUsable: Bool {
+    isRecording || isDiscussing || isWaitingBehindButton
+      || (isEnabled && !dictation.isBusy(for: owner) && !isWorking)
+  }
+
+  /// A click, as VoiceOver gives it: the discussion starts, or ends.
+  private func click() {
+    let request = model.dictationRequest()
+    dictation.pressBegan(request)
+    dictation.pressEnded(request)
+  }
+
+  /// The dictation of old: a click starts it, a second inserts what was said. VoiceOver's
+  /// « Dictate », and the popover's button once the model is ready.
   private func toggle() {
     hidesProgress = false
     // The microphone would hear the voice.
     model.readAloud?.stop()
-    // The field the text goes to, if it has the keyboard now: another field that has it by the
-    // time the text is heard must not receive it.
-    let field = WeakTextView(PromptComposer.composerTextView(showing: model.draft))
-    dictation.toggle(
-      DictationController.Request(
-        owner: owner, vocabulary: { await model.dictationVocabulary() },
-        insert: { text in PromptComposer.insertDictation(text, into: model, field: field.view) }))
+    dictation.toggle(model.dictationRequest())
   }
 
   /// Shown while the dictation that this composer asked for waits on something, or stopped.
@@ -101,7 +130,7 @@ struct DictationButton: View {
         switch dictation.phase {
         case .offeringDownload: return true
         case .downloading, .preparing: return !hidesProgress
-        case .idle, .recording, .transcribing: return false
+        case .idle, .recording, .transcribing, .discussing: return false
         }
       },
       set: { isPresented in
@@ -111,7 +140,7 @@ struct DictationButton: View {
         switch dictation.phase {
         case .offeringDownload: dictation.cancel()
         case .downloading, .preparing: hidesProgress = true
-        case .idle, .recording, .transcribing: break
+        case .idle, .recording, .transcribing, .discussing: break
         }
         dictation.dismissProblem()
       })
@@ -200,7 +229,7 @@ struct DictationPopover: View {
         ProgressView().progressViewStyle(.linear)
         Text("The first time, this can take a minute.", bundle: .module)
           .foregroundStyle(.secondary)
-      case .idle, .recording, .transcribing:
+      case .idle, .recording, .transcribing, .discussing:
         EmptyView()
       }
     }
@@ -267,5 +296,28 @@ final class WeakTextView {
 
   init(_ view: NSTextView?) {
     self.view = view
+  }
+}
+
+extension ConversationModel {
+  /// What the dictation and the discussion of this conversation's composer need (#340, #357):
+  /// the words to expect, where a dictation goes, how a sentence is sent, how the agent stops.
+  @MainActor
+  func dictationRequest() -> DictationController.Request {
+    // The field the text goes to, if it has the keyboard now: another field that has it by the
+    // time the text is heard must not receive it.
+    let field = WeakTextView(PromptComposer.composerTextView(showing: draft))
+    var request = DictationController.Request(
+      owner: ObjectIdentifier(self), vocabulary: { [weak self] in
+        await self?.dictationVocabulary() ?? ""
+      },
+      insert: { [weak self] text in
+        guard let self else { return }
+        PromptComposer.insertDictation(text, into: self, field: field.view)
+      })
+    request.send = { [weak self] text in _ = await self?.sendSpoken(text) }
+    request.interrupt = { [weak self] in await self?.interrupt() }
+    request.isAgentWorking = { [weak self] in self?.isAgentWorking ?? false }
+    return request
   }
 }

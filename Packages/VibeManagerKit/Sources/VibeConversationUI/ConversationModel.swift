@@ -1256,6 +1256,25 @@ public final class ConversationModel {
     attachments.removeAll { $0 == file }
   }
 
+  /// Sends a sentence said in a discussion (#357), as if it were typed and sent, without
+  /// touching the draft being written: it is put back once the sentence is sent. A sentence that
+  /// could not be sent — a request awaits an answer — is added to the draft rather than lost.
+  @discardableResult
+  public func sendSpoken(_ text: String) async -> Bool {
+    let kept = draft
+    let keptAttachments = attachments
+    attachments = []
+    draft = text
+    let sent = await send()
+    attachments = keptAttachments
+    if sent {
+      draft = kept
+    } else {
+      draft = kept.isEmpty ? text : kept + " " + text
+    }
+    return sent
+  }
+
   /// Sends the draft through the terminal. Returns whether it was sent.
   @discardableResult
   public func send() async -> Bool {

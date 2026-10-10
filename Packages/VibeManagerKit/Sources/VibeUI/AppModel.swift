@@ -154,7 +154,11 @@ public final class AppModel {
   /// The agent's answers read aloud (#357). Set by the composition from macOS 15, which the voice
   /// model needs; `nil` before, and no answer offers to be read.
   public var readAloud: ReadAloudController? {
-    didSet { readAloud?.showSettings = { [weak self] in self?.settingsPage = .dictation } }
+    didSet {
+      readAloud?.showSettings = { [weak self] in self?.settingsPage = .dictation }
+      // The discussion reads the answers, and stops the voice when the user speaks over it.
+      dictation?.readAloud = readAloud
+    }
   }
   /// The application's name, as its bundle gives it, at the head of the window's title (#159).
   /// A workspace assembled without a bundle — the tests' — goes by the product's name.
