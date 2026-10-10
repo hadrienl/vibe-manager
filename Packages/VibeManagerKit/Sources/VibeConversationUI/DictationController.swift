@@ -1,4 +1,5 @@
 import Foundation
+import OSLog
 import Observation
 import VibeApplication
 
@@ -126,6 +127,8 @@ public final class DictationController {
   /// The level of a dictation, read for its wave.
   @ObservationIgnored private var metering: Task<Void, Never>?
   @ObservationIgnored private var isWarming = false
+  @ObservationIgnored private var ticks = 0
+  private static let log = Logger(subsystem: "eu.hadrien.VibeManager", category: "voice")
   /// The sentences of the discussion, transcribed and sent one after the other.
   @ObservationIgnored private var sentences: Task<Void, Never>?
   @ObservationIgnored private var pendingSentences = 0
@@ -258,16 +261,17 @@ public final class DictationController {
       case .speechStarted:
         if isSpeaking { readAloud?.stop() }
       case .utterance(let samples):
-        let previous = sentences
-        pendingSentences += 1
-        sentences = Task {
-          await previous?.value
-          await say(samples)
-          pendingSentences -= 1
-        }
+        queue(samples)
       }
     }
     level = detector.level
+    // What the detector makes of the room, once a second: to tune it where it hears wrong.
+    ticks += 1
+    if ticks % 10 == 0 {
+      Self.log.debug(
+        "Discussion: level \(self.detector.level, format: .fixed(precision: 3)) room \(self.detector.floor, format: .fixed(precision: 3)) threshold \(self.detector.threshold(whileSpeaking: isSpeaking), format: .fixed(precision: 3)) hearing \(self.detector.isHearingSpeech)"
+      )
+    }
     discussion =
       if detector.isHearingSpeech { .hearing }
       else if pendingSentences > 0 { .transcribing }
@@ -276,16 +280,29 @@ public final class DictationController {
       else { .listening }
   }
 
+  /// A sentence to transcribe and send, after those before it.
+  private func queue(_ samples: [Float]) {
+    guard let request else { return }
+    let previous = sentences
+    let prompt = vocabulary
+    pendingSentences += 1
+    sentences = Task {
+      await previous?.value
+      await say(samples, for: request, prompt: await prompt?.value ?? "")
+      pendingSentences -= 1
+    }
+  }
+
   /// A sentence of the discussion, transcribed and sent — or « stop », which interrupts the agent.
-  private func say(_ samples: [Float]) async {
-    guard phase == .discussing, DictationTranscript.containsSpeech(samples) else { return }
-    let prompt = await vocabulary?.value ?? ""
+  /// Sent even once the discussion is over: the last sentence is what ended it.
+  private func say(_ samples: [Float], for request: Request, prompt: String) async {
+    guard DictationTranscript.containsSpeech(samples) else { return }
     guard
       let text = try? await transcriber.transcribe(
         samples, with: settings.variant, language: settings.language, prompt: prompt)
     else { return }
     let sentence = DictationTranscript.cleaned(text)
-    guard !sentence.isEmpty, phase == .discussing, let request else { return }
+    guard !sentence.isEmpty else { return }
     if UtteranceDetector.isStop(sentence) {
       readAloud?.stop()
       await request.interrupt?()
@@ -294,17 +311,22 @@ public final class DictationController {
     }
   }
 
-  /// The discussion over: the microphone closed, the voice silent.
+  /// The discussion over: the microphone closed, the voice silent. A sentence under way is still
+  /// transcribed and sent — the user ended the discussion on it.
   public func endDiscussion() {
     guard phase == .discussing else { return }
     listening?.cancel()
     listening = nil
-    sentences?.cancel()
-    sentences = nil
-    pendingSentences = 0
-    _ = recorder.stop()
-    readAloud?.readsConversation = nil
+    _ = detector.feed(recorder.stop())
+    let last = detector.flush()
+    if let last { queue(last) }
     readAloud?.stop()
+    if last != nil {
+      // The discussion ended on a sentence: its answer is still read.
+      readAloud?.readsNextAnswerOnly = true
+    } else {
+      readAloud?.readsConversation = nil
+    }
     level = 0
     end()
   }

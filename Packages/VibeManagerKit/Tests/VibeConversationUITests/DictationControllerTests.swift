@@ -512,6 +512,29 @@ struct DiscussionTests {
     #expect(composer.sent.isEmpty)
   }
 
+  @Test("Ending the discussion in the middle of a sentence still sends it")
+  func endSendsTheLastSentence() async {
+    let recorder = FakeRecorder()
+    recorder.stream = Array(repeating: voicedTenth, count: 6)
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Mets le label v1.1.0."
+    let dictation = controller(recorder, transcriber)
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    for _ in 0..<40 where dictation.discussion != .hearing {
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    dictation.cancel()
+    #expect(dictation.phase == .idle)
+    for _ in 0..<60 where composer.sent.isEmpty {
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    #expect(composer.sent == ["Mets le label v1.1.0."])
+  }
+
   @Test("Escape, or the composer put away, ends the discussion")
   func ends() async {
     let recorder = FakeRecorder()

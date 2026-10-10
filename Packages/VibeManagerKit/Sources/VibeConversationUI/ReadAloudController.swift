@@ -53,6 +53,8 @@ public final class ReadAloudController {
   /// The conversation in a discussion (#357): its answers are read as they arrive, whatever the
   /// audio mode.
   public var readsConversation: ObjectIdentifier?
+  /// The discussion ended on a sentence sent: the answer to it is read, then nothing more.
+  public var readsNextAnswerOnly = false
 
   /// Opens Settings on the page where the model is downloaded: asked to read without it.
   @ObservationIgnored public var showSettings: (() -> Void)?
@@ -120,6 +122,13 @@ public final class ReadAloudController {
     guard let known, isOnScreen, isModelInstalled,
       settings.readsAnswers || readsConversation == conversation
     else { return }
+    let isLast = readsNextAnswerOnly && readsConversation == conversation
+    defer {
+      if isLast, answers.contains(where: { !known.contains($0.id) }) {
+        readsConversation = nil
+        readsNextAnswerOnly = false
+      }
+    }
     for answer in answers where !known.contains(answer.id) {
       if isReading || !queue.isEmpty {
         queue.append(answer)

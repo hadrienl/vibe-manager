@@ -18,8 +18,9 @@ struct VoiceWave: View {
       Canvas { canvas, size in
         let spacing = size.width / CGFloat(Self.bars)
         let width = max(2, spacing * 0.45)
-        // Loud enough to see a whisper, never past the field.
-        let loudness = isAmbient ? 0.35 : min(1, Double(level) * 9)
+        // On a square-root scale: a voice at a normal distance fills most of the field, a whisper
+        // still moves it, and nothing goes past it.
+        let loudness = isAmbient ? 0.35 : min(1, Double(level).squareRoot() * 3.5)
         for index in 0..<Self.bars {
           let phase = Double(index) * 0.55
           let wobble = (sin(time * 6 + phase) + sin(time * 3.7 + phase * 1.7)) / 4 + 0.5

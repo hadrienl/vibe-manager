@@ -195,6 +195,23 @@ struct AudioModeTests {
     #expect(synthesizer.spoken.map(\.text) == ["Shown."])
   }
 
+  @Test("A discussion ended on a sentence reads the answer to it, then nothing more")
+  func readsTheLastAnswer() async {
+    let synthesizer = FakeSynthesizer(installed: true, readsUntilCancelled: false)
+    let readAloud = controller(synthesizer, on: false)
+    let conversation = ObjectIdentifier(Conversation())
+
+    readAloud.follow([], in: conversation, isOnScreen: true)
+    readAloud.readsConversation = conversation
+    readAloud.readsNextAnswerOnly = true
+    readAloud.follow([("a", "The answer.")], in: conversation, isOnScreen: true)
+    await until { synthesizer.spoken.count == 1 && readAloud.phase == .idle }
+    readAloud.follow([("a", "The answer."), ("b", "Another.")], in: conversation, isOnScreen: true)
+    for _ in 0..<100 { await Task.yield() }
+    #expect(synthesizer.spoken.map(\.text) == ["The answer."])
+    #expect(readAloud.readsConversation == nil)
+  }
+
   @Test("Stop, an answer read by hand, or the mode turned off clears what was to be read")
   func stopClearsTheQueue() async {
     let synthesizer = FakeSynthesizer(installed: true)
