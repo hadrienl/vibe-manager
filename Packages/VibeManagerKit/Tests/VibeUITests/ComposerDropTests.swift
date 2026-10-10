@@ -154,12 +154,15 @@ struct ComposerDropTests {
   private static func dropDestination(
     in view: NSView, at location: NSPoint, for types: [NSPasteboard.PasteboardType]
   ) -> NSView? {
-    guard !view.isHidden, view.bounds.contains(view.convert(location, from: nil)) else {
-      return nil
-    }
+    guard !view.isHidden else { return nil }
+    // A view of no size is no destination, but what it holds may be: the composer's glass, on
+    // macOS 26, lays it inside such a view, which AppKit looks through (#359).
+    let isEmpty = view.bounds.isEmpty
+    guard isEmpty || view.bounds.contains(view.convert(location, from: nil)) else { return nil }
     for subview in view.subviews.reversed() {
       if let found = dropDestination(in: subview, at: location, for: types) { return found }
     }
+    guard !isEmpty else { return nil }
     let registered = Set(view.registeredDraggedTypes)
     let general = registered.compactMap { UTType($0.rawValue) }
     let takes = types.contains { type in
