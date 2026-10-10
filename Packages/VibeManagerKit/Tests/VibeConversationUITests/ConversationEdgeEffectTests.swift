@@ -73,9 +73,11 @@ struct ConversationEdgeEffectTests {
     let (window, _) = host(messages: 1)
     defer { window.close() }
     let toolbar = window.contentView!.safeAreaInsets.top
-    // Before the fix, the document stays as short as its one message.
+    // Before the fix, the document stays as short as its one message. Awaited as checked below:
+    // the composer's inset comes after the first layout, the document's height a turn later.
     let scroll = try await settled(window) { scroll, document in
-      document.frame.height >= visible(scroll) - 1
+      abs(document.frame.height - visible(scroll)) < 1
+        && abs(visibleEnd(scroll) - document.frame.maxY) < 1
     }
     #expect(toolbar > 0)
     #expect(scroll.contentInsets.top == toolbar)
@@ -96,5 +98,9 @@ struct ConversationEdgeEffectTests {
     let document = try #require(scroll.documentView)
     #expect(scroll.contentInsets.top == window.contentView!.safeAreaInsets.top)
     #expect(abs(visibleEnd(scroll) - document.frame.maxY) < 1)
+    // The messages go on under the composer, rather than stopping short above it (#359).
+    if #available(macOS 26, *) {
+      #expect(scroll.contentInsets.bottom > 0)
+    }
   }
 }

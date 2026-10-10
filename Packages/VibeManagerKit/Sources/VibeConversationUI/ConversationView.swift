@@ -281,7 +281,7 @@ public struct ConversationView: View {
         SubagentTray(model: model)
       }
       if model.isAgentWorking {
-        ActivityLine(model: model)
+        ActivityLine(model: model).modifier(StatusGlass())
       }
       if model.composerState == .stopped, let failure = model.shownLaunchFailure {
         HStack(alignment: .firstTextBaseline) {
@@ -299,6 +299,7 @@ public struct ConversationView: View {
           Spacer()
           stoppedActions
         }
+        .modifier(StatusGlass())
       } else if model.composerState == .stopped, model.hasStoppedOnError {
         HStack {
           Label {
@@ -313,6 +314,7 @@ public struct ConversationView: View {
           Spacer()
           stoppedActions
         }
+        .modifier(StatusGlass())
       } else if model.composerState == .stopped, model.canRestart(), let restart = model.restart {
         HStack {
           Label {
@@ -327,6 +329,7 @@ public struct ConversationView: View {
             Text("Restart", bundle: .module)
           }
         }
+        .modifier(StatusGlass())
       }
       PromptComposer(model: model, isActive: isActive)
     }
@@ -433,25 +436,38 @@ struct BlockView: View {
 /// The terminal panel and the footer, laid over the end of the messages on macOS 26: they scroll
 /// under the composer's glass instead of stopping short above it (#359). Before, below them.
 ///
-/// The theme's picture, when it has one, stays where it is while the messages scroll (#118). Under
-/// the toolbar too, where the messages scroll: a view, unlike the colour it replaced, stops at the
-/// safe area, and the window's grey showed there instead of the theme. Behind the messages only,
-/// it stops at the bar, over the plain background.
+/// The theme's picture, when it has one, stays where it is while the messages scroll (#118), and
+/// as the bar grows: laid over the whole view, never over the messages' part of it, which shrinks
+/// for a long draft or the agent's activity, and the picture filling it would be cropped anew.
+/// Behind the messages only, the plain background covers it under the bar, behind the messages
+/// that scroll there.
 private struct ComposerBar<Bar: View>: ViewModifier {
   let theme: ConversationTheme
   @ViewBuilder let bar: Bar
+  @State private var barHeight = 0.0
 
   func body(content: Content) -> some View {
     if #available(macOS 26, *) {
       content
-        .background {
-          ThemeBackdropView(theme: theme)
-            .ignoresSafeArea(edges: theme.backdrop.area == .messages ? .top : .all)
-        }
         // An inset, not a bar: under a bar, macOS 26 blurs its whole height as soon as it grows
         // for the agent's activity, cut sharp at the top — the very break the glass removes.
-        .safeAreaInset(edge: .bottom, spacing: 0) { bar }
-        .background { theme.background.color.ignoresSafeArea() }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+          VStack(spacing: 0) { bar }
+            .onGeometryChange(for: Double.self) {
+              $0.size.height
+            } action: {
+              barHeight = $0
+            }
+        }
+        .background {
+          ThemeBackdropView(theme: theme)
+            .overlay(alignment: .bottom) {
+              if theme.backdrop.area == .messages {
+                theme.background.color.frame(height: barHeight)
+              }
+            }
+            .ignoresSafeArea()
+        }
     } else {
       VStack(spacing: 0) {
         content

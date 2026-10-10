@@ -122,7 +122,8 @@ struct ComposerDropTests {
     pasteboard.writeObjects(objects)
     let types = pasteboard.types ?? []
     let destination = try #require(Self.dropDestination(in: host, at: location, for: types))
-    // AppKit's own choice, where it can be asked: the same view.
+    // AppKit's own choice, where it can be asked: the same view. Asked, it must answer — or a
+    // file dropped from the Finder could miss the catcher while the walk above still finds it.
     if let chosen = Self.appKitDestination(in: window, at: location, for: types) {
       #expect(chosen === destination)
     }
@@ -172,11 +173,12 @@ struct ComposerDropTests {
     return takes ? view : nil
   }
 
-  /// AppKit's own lookup, `-[NSView _hitTest:dragTypes:]`, when it answers: a private method,
-  /// asked here only, to check the test's reading of it.
+  /// AppKit's own lookup, `-[NSView _hitTest:dragTypes:]`, when it can be asked — a private
+  /// method, asked here only, to check the test's reading of it: `nil` when it cannot, `.some(nil)`
+  /// when it finds no destination.
   private static func appKitDestination(
     in window: NSWindow, at location: NSPoint, for types: [NSPasteboard.PasteboardType]
-  ) -> NSView? {
+  ) -> NSView?? {
     typealias Lookup =
       @convention(c) (NSObject, Selector, UnsafeMutablePointer<NSPoint>, NSSet) -> NSView?
     let selector = NSSelectorFromString("_hitTest:dragTypes:")
@@ -185,7 +187,7 @@ struct ComposerDropTests {
     else { return nil }
     var point = frame.convert(location, from: nil)
     let lookup = unsafeBitCast(implementation, to: Lookup.self)
-    return lookup(frame, selector, &point, NSSet(array: types.map(\.rawValue)))
+    return .some(lookup(frame, selector, &point, NSSet(array: types.map(\.rawValue))))
   }
 
   private func file(named name: String, in fixture: Fixture) throws -> URL {
