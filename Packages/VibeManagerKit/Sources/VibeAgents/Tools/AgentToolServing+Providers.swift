@@ -75,3 +75,20 @@ public enum CodexToolOptions {
     return result + "\""
   }
 }
+
+/// Claude Code adds `--append-system-prompt` to its own system prompt, which it keeps (#352).
+extension ClaudeCodeAgentProvider: AgentInstructing {
+  public func instructing(_ instructions: String, to plan: AgentLaunchPlan) -> AgentLaunchPlan {
+    plan.adding(options: ["--append-system-prompt", instructions])
+  }
+}
+
+/// Codex reads `developer_instructions` from its configuration, given for this launch with `-c`
+/// (#352). It replaces any the user's configuration holds, for this launch only.
+extension CodexAgentProvider: AgentInstructing {
+  public func instructing(_ instructions: String, to plan: AgentLaunchPlan) -> AgentLaunchPlan {
+    plan.adding(options: [
+      "-c", "developer_instructions=\(CodexToolOptions.tomlString(instructions))",
+    ])
+  }
+}

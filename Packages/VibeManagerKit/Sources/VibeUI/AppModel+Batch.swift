@@ -370,7 +370,8 @@ extension AppModel {
     guard let target, let session = sessions.first(where: { $0.id == target }),
       session.taskStatus != .archived
     else { return }
-    if session.taskStatus != filter.column { update { $0.column = session.taskStatus } }
+    let column = listedColumn(of: session)
+    if column != filter.column { update { $0.column = column } }
     if selectedSessionID != target { select(target) }
   }
 

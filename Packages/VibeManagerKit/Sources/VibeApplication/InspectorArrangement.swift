@@ -34,6 +34,9 @@ public struct InspectorSectionID: RawRepresentable, Hashable, Codable, Sendable,
   public static let agent = Self("agent")
   public static let usage = Self("usage")
   public static let prompt = Self("prompt")
+  /// A coordinator's children, or the coordinator of a child and what it did there (#352). Not in
+  /// the default arrangement: it comes first, unfolded, the first time a coordination is shown.
+  public static let coordination = Self("coordination")
 }
 
 /// How the user arranged the context column: the order of its sections, which are folded, and

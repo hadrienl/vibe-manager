@@ -376,6 +376,14 @@ public final class TerminalPaneModel {
     return true
   }
 
+  /// When the user last typed in the terminal itself, as opposed to what the application writes
+  /// to it: a message the application types waits until they stop (#352).
+  @ObservationIgnored public private(set) var lastKeyboardInputAt: ContinuousClock.Instant?
+
+  public func noteKeyboardInput() {
+    lastKeyboardInputAt = .now
+  }
+
   /// Input travels through here so that keystrokes and resizes keep the order they were made in.
   public func write(_ bytes: [UInt8]) async {
     guard !bytes.isEmpty else { return }

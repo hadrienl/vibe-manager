@@ -12,6 +12,9 @@ import VibeTerminal
 /// after a relaunch, the agent having run on in the terminal host (ADR 0017).
 public enum BrowserBridge {
   public static let bridgeFlag = "--browser-bridge"
+  /// After the socket: which of the application's tool servers the bridge stands for (#352).
+  /// Absent, the web view's.
+  public static let serverFlag = "--server"
   public static let commandLineFlag = "--browser-cli"
   /// Named in a session's terminal, for the `vibe` command.
   public static let socketEnvironmentKey = "VIBE_BROWSER_SOCKET"
@@ -28,9 +31,12 @@ public enum BrowserBridge {
     guard arguments.count >= 2 else { return }
     switch arguments[1] {
     case bridgeFlag:
-      guard arguments.count >= 3 else { exit(64) }
+      guard arguments.count >= 3, let server = server(in: Array(arguments.dropFirst(3))) else {
+        exit(64)
+      }
       signal(SIGPIPE, SIG_IGN)
-      BridgeProcess(socketPath: arguments[2], verifier: CodeSigningPeerVerifier()).run()
+      BridgeProcess(socketPath: arguments[2], server: server, verifier: CodeSigningPeerVerifier())
+        .run()
       exit(0)
     case commandLineFlag:
       signal(SIGPIPE, SIG_IGN)
@@ -43,14 +49,34 @@ public enum BrowserBridge {
     }
   }
 
+  /// The server the arguments after the socket name, the web view's when they name none; `nil` for
+  /// a server this build does not know.
+  public static func server(in arguments: [String]) -> AgentToolServerDefinition? {
+    guard let index = arguments.firstIndex(of: serverFlag) else { return .browser }
+    guard index + 1 < arguments.count else { return nil }
+    return AgentToolServerDefinition.named(arguments[index + 1])
+  }
+
+  /// The arguments an agent starts the bridge of `server` with.
+  public static func arguments(socketPath: String, server: AgentToolServerDefinition) -> [String] {
+    server.name == AgentToolServerDefinition.browser.name
+      ? [bridgeFlag, socketPath] : [bridgeFlag, socketPath, serverFlag, server.name]
+  }
+
   /// The bridge, with a verifier of the caller's choosing: the tests' fixture accepts any process
   /// of the same user, as the application's binary and the test binary are signed differently.
-  public static func runBridge(socketPath: String, verifier: any TerminalHostPeerVerifier) {
-    BridgeProcess(socketPath: socketPath, verifier: verifier).run()
+  public static func runBridge(
+    socketPath: String, server: AgentToolServerDefinition = .browser,
+    verifier: any TerminalHostPeerVerifier
+  ) {
+    BridgeProcess(socketPath: socketPath, server: server, verifier: verifier).run()
   }
 
   /// Connects to the application and says hello. `nil` when it is not there, or not itself.
-  static func connect(to socketPath: String, verifier: any TerminalHostPeerVerifier) -> (
+  static func connect(
+    to socketPath: String, server: AgentToolServerDefinition = .browser,
+    verifier: any TerminalHostPeerVerifier
+  ) -> (
     descriptor: Int32, reader: LineReader
   )? {
     guard let descriptor = UnixSocket.connect(to: socketPath) else { return nil }
@@ -58,7 +84,7 @@ public enum BrowserBridge {
     setsockopt(
       descriptor, SOL_SOCKET, SO_NOSIGPIPE, &noSignal, socklen_t(MemoryLayout<Int32>.size))
     guard verifier.accepts(peerOf: descriptor),
-      writeAll(BrowserChannelHandshake.hello(), to: descriptor)
+      writeAll(BrowserChannelHandshake.hello(server: server.name), to: descriptor)
     else {
       close(descriptor)
       return nil
@@ -84,14 +110,18 @@ public enum BrowserBridge {
 /// The bridge itself: standard input to the socket, the socket to standard output.
 final class BridgeProcess: @unchecked Sendable {
   private let socketPath: String
+  private let server: AgentToolServerDefinition
   private let verifier: any TerminalHostPeerVerifier
   private let lock = NSLock()
   private var descriptor: Int32 = -1
   /// Requests sent to the application and not answered yet: answered here if it goes away.
   private var pending: [JSONValue] = []
 
-  init(socketPath: String, verifier: any TerminalHostPeerVerifier) {
+  init(
+    socketPath: String, server: AgentToolServerDefinition, verifier: any TerminalHostPeerVerifier
+  ) {
     self.socketPath = socketPath
+    self.server = server
     self.verifier = verifier
   }
 
@@ -122,7 +152,10 @@ final class BridgeProcess: @unchecked Sendable {
   /// The descriptor, connecting first if there is none.
   private func connection() -> Int32 {
     if let current = lock.withLock({ descriptor >= 0 ? descriptor : nil }) { return current }
-    guard let (connected, reader) = BrowserBridge.connect(to: socketPath, verifier: verifier) else {
+    guard
+      let (connected, reader) = BrowserBridge.connect(
+        to: socketPath, server: server, verifier: verifier)
+    else {
       return -1
     }
     lock.withLock { descriptor = connected }
@@ -149,7 +182,7 @@ final class BridgeProcess: @unchecked Sendable {
       return pending
     }
     for id in unanswered {
-      emit(Self.closedResult(id: id))
+      emit(closedResult(id: id))
     }
   }
 
@@ -162,22 +195,21 @@ final class BridgeProcess: @unchecked Sendable {
         requested.flatMap { BrowserMCPServer.supportedProtocolVersions.contains($0) ? $0 : nil }
         ?? BrowserMCPServer.supportedProtocolVersions[0]
       emit(
-        BrowserMCPServer.encode(result: BrowserMCPServer.initializeResult(version: version), id: id)
-      )
+        BrowserMCPServer.encode(
+          result: BrowserMCPServer.initializeResult(version: version, server: server), id: id))
     case "ping":
       emit(BrowserMCPServer.encode(result: [:], id: id))
     case "tools/list":
-      emit(BrowserMCPServer.encode(result: BrowserToolCatalog.listResult, id: id))
+      emit(BrowserMCPServer.encode(result: server.listResult, id: id))
     case "tools/call":
-      emit(Self.closedResult(id: id))
+      emit(closedResult(id: id))
     default:
       emit(BrowserMCPServer.encode(error: -32601, message: "Method not found: \(method)", id: id))
     }
   }
 
-  static func closedResult(id: JSONValue) -> Data {
-    BrowserMCPServer.encode(
-      result: BrowserToolResult.error(BrowserBridge.closedMessage).json, id: id)
+  func closedResult(id: JSONValue) -> Data {
+    BrowserMCPServer.encode(result: BrowserToolResult.error(server.closedMessage).json, id: id)
   }
 
   private func emit(_ line: Data) {

@@ -58,8 +58,10 @@ extension AppModel {
   /// The session in front of the user, if any: selected, in a window on screen, in the active
   /// application. A sheet over the window does not hide it.
   func updateVisibleSession() {
-    guard let activityTracker else { return }
     let visible = isApplicationActive && isMainWindowVisible ? selectedSessionID : nil
+    // A coordinator that called the user is answered once it is in front of them (#352).
+    coordinationSessionShown(visible)
+    guard let activityTracker else { return }
     let previous = visibleSessionUpdate
     visibleSessionUpdate = Task {
       await previous?.value

@@ -610,6 +610,47 @@ public struct RootView: View {
     } message: { session in
       Text(closeConfirmationMessage(for: session))
     }
+    // A coordinator stopped while children of its still run: they stop too, or go on (#352).
+    .confirmationDialog(
+      model.pendingCoordinatorStop.map {
+        $0.action == .close
+          ? Text("Close “\($0.session.name)”?", bundle: .module, comment: "A session's name.")
+          : Text("Archive “\($0.session.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Close this session?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingCoordinatorStop != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelCoordinatorStop()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingCoordinatorStop
+    ) { stop in
+      Button(
+        LocalizedStringResource(
+          "Stop All", bundle: .module,
+          comment: "Stops a coordinator session and its child sessions.")
+      ) {
+        Task { await model.confirmCoordinatorStop(stop, includingChildren: true) }
+      }
+      Button(
+        LocalizedStringResource(
+          "Stop the Coordinator Only", bundle: .module,
+          comment: "Stops a coordinator session; its child sessions go on.")
+      ) {
+        Task { await model.confirmCoordinatorStop(stop, includingChildren: false) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelCoordinatorStop()
+      }
+    } message: { stop in
+      Text(
+        "\(stop.runningChildren) child sessions are still running. Children left running go on, and find their coordinator when it starts again.",
+        bundle: .module,
+        comment:
+          "Asked when a coordinator session is stopped while some of its child sessions still run.")
+    }
     // Closing several sessions asks #51's question once, with its "Don't ask again" (#77).
     .confirmationDialog(
       Text(verbatim: model.pendingBatch?.title ?? ""),
@@ -767,7 +808,8 @@ public struct RootView: View {
       ticketTitles: model.ticketTitles,
       leaveNotes: { model.focusSession() },
       usage: model.usage,
-      journal: model.journal
+      journal: model.journal,
+      coordination: model
     )
   }
 
@@ -2168,6 +2210,10 @@ struct SessionRow: View {
   var body: some View {
     let _ = BodyCounter.tick(.sessionRow)
     HStack(spacing: 10) {
+      // A coordinator folds its children; a child is set in under it (#352).
+      if isCoordinator {
+        CoordinatorDisclosure(model: commands.model, sessionID: session.id)
+      }
       SessionBadge(appearance: appearance, icon: icon)
         .background {
           GeometryReader { proxy in
@@ -2187,10 +2233,18 @@ struct SessionRow: View {
             .lineLimit(1)
         }
         if let agent = session.agent {
-          Text(AgentNaming.name(of: agent.providerID, names: commands.model.agentNames))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .help(Text(verbatim: agent.providerID))
+          HStack(spacing: 4) {
+            Text(AgentNaming.name(of: agent.providerID, names: commands.model.agentNames))
+              .help(Text(verbatim: agent.providerID))
+            // A child is listed in its coordinator's column: its own is said here (#352).
+            if let parent, parent.taskStatus != session.taskStatus {
+              Text(verbatim: "·")
+              Text(session.taskStatus.label)
+            }
+          }
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
         }
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
@@ -2214,6 +2268,9 @@ struct SessionRow: View {
         // The exit code or the signal, for whoever wants it, behind words that say what happened.
         .help(status.detail ?? "")
         .lineLimit(1)
+        if isCoordinator {
+          CoordinatorRowSummary(model: commands.model, sessionID: session.id)
+        }
       }
       .sessionThemePopover(model: commands.model, sessionID: session.id, place: .sidebar)
       Spacer(minLength: 4)
@@ -2238,6 +2295,7 @@ struct SessionRow: View {
       }
     }
     .padding(.vertical, 4)
+    .padding(.leading, parent == nil ? 0 : Self.childIndent)
     // The menu is the list's (#77): it knows whether the click landed in a selection of several.
     // Its name field, while it is renamed, is reached on its own.
     .accessibilityElement(children: commands.isRenaming ? .contain : .combine)
@@ -2255,6 +2313,22 @@ struct SessionRow: View {
           commands.perform(action)
         } label: {
           commands.name(of: action)
+        }
+      }
+    }
+    // The chevron of a coordinator, reachable without a pointer (#352).
+    .accessibilityActions {
+      if isCoordinator, !commands.model.children(of: session.id).isEmpty {
+        let isExpanded = commands.model.isExpanded(coordinator: session.id)
+        Button {
+          commands.model.setExpanded(!isExpanded, coordinator: session.id)
+        } label: {
+          isExpanded
+            ? Text(
+              "Hide Children", bundle: .module, comment: "Folds a coordinator session's children.")
+            : Text(
+              "Show Children", bundle: .module, comment: "Unfolds a coordinator session's children."
+            )
         }
       }
     }
@@ -2286,6 +2360,18 @@ struct SessionRow: View {
         }
       }
     }
+  }
+
+  /// How far a child's row is set in under its coordinator's: the width of the disclosure.
+  static let childIndent: CGFloat = 22
+
+  private var isCoordinator: Bool {
+    session.coordination?.isCoordinator == true
+  }
+
+  /// The coordinator this row is listed under (#352).
+  private var parent: WorkSession? {
+    commands.model.coordinator(of: session)
   }
 
   // Read by the row itself rather than handed to it by the list (#254): what an agent does wakes
