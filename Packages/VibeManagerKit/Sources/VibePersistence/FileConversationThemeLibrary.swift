@@ -98,10 +98,11 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
     {
       files.append(DiagnosticFile(name: "backdrop.jpg", contents: picture))
     }
-    // The families fetched for it: whoever imports the theme has them without Google.
+    // Its families from Google Fonts — fetched for it, or installed here and fetched now: whoever
+    // imports the theme has them without Google (#361).
     if let fonts, let theme {
-      for family in Set([theme.fonts.message, theme.fonts.code].compactMap { $0 }).sorted() {
-        for file in await fonts.files(of: family) {
+      for family in Self.families(of: theme) {
+        for file in await fonts.exportedFiles(of: family) {
           guard let contents = try? Data(contentsOf: file) else { continue }
           files.append(
             DiagnosticFile(name: "fonts/\(family)/\(file.lastPathComponent)", contents: contents))
@@ -109,6 +110,70 @@ public struct FileConversationThemeLibrary: ConversationThemeLibrary {
       }
     }
     return ZipArchiveWriter.archive(files)
+  }
+
+  /// The files an archive of a theme may hold, and the folders below which they are.
+  static let archiveLimits: ZipArchiveReader.Limits = {
+    var limits = ZipArchiveReader.Limits()
+    // `fonts/<family>/<file>`.
+    limits.folderDepth = 2
+    return limits
+  }()
+
+  public func importArchive(_ data: Data) async throws -> ThemeImport {
+    let entries: [ZipArchiveReader.Entry]
+    do {
+      entries = try ZipArchiveReader.entries(of: data, limits: Self.archiveLimits)
+    } catch .tooLarge {
+      throw ThemeImportError.tooLarge
+    } catch {
+      throw ThemeImportError.notATheme
+    }
+    guard let file = entries.first(where: { $0.name == "theme.json" }) else {
+      diagnostics.record(.store, .notice, "theme.importRefused")
+      throw ThemeImportError.notATheme
+    }
+    var theme: ConversationTheme
+    do {
+      theme = try ConversationThemeFile.theme(
+        from: file.contents, id: ConversationThemeLibraryRules.importedID)
+    } catch {
+      diagnostics.record(.store, .notice, "theme.importRefused")
+      throw ThemeImportError.file(error)
+    }
+    // Its fonts: the archive's, or else found as a generation finds them.
+    var missing: [String] = []
+    for family in Self.families(of: theme) {
+      let prefix = "fonts/\(family)/"
+      let faces = entries.filter { $0.name.hasPrefix(prefix) }.map(\.contents)
+      if let fonts, !faces.isEmpty, await fonts.install(family, faces: faces) { continue }
+      if await fonts?.prepare(family) == .available { continue }
+      missing.append(family)
+    }
+    // Its picture, decoded and encoded again under a name of this Mac's; without it, none.
+    theme.backdrop.image = nil
+    if let images, let picture = entries.first(where: { $0.name == "backdrop.jpg" }) {
+      theme.backdrop.image = try? await images.keep(picture.contents)
+    }
+    let kept: ConversationTheme
+    do {
+      kept = try await save(theme, name: theme.personalName ?? "")
+    } catch {
+      throw ThemeImportError.couldNotWrite
+    }
+    diagnostics.record(
+      .store, .info, "theme.imported",
+      [
+        "fonts": .count(Self.families(of: theme).count - missing.count),
+        "missingFonts": .count(missing.count),
+        "picture": .count(theme.backdrop.image == nil ? 0 : 1),
+      ])
+    return ThemeImport(theme: kept, missingFonts: missing)
+  }
+
+  /// The families a theme asks for, each once.
+  static func families(of theme: ConversationTheme) -> [String] {
+    Set([theme.fonts.message, theme.fonts.code].compactMap { $0 }).sorted()
   }
 
   public func location(ofFile fileName: String) -> URL? {

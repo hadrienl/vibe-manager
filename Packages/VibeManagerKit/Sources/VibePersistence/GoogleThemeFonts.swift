@@ -73,9 +73,64 @@ public actor GoogleThemeFonts: ThemeFontResolving {
     return fontFiles(in: folder(of: family))
   }
 
+  /// The files an export carries for `family` (#361): the ones kept, or — for a family installed
+  /// on this Mac, never fetched — Google's, fetched now and kept, so that the Mac that imports the
+  /// theme has it too. None for a family Google does not serve: a font bought or made for a
+  /// company is the user's to give, not the application's; nor for one every Mac has.
+  public func exportedFiles(of family: String) async -> [URL] {
+    let kept = files(of: family)
+    guard kept.isEmpty, ConversationThemeFile.isFontFamily(family),
+      !Self.systemFamilies.contains(family)
+    else { return kept }
+    // Installed already: what Google serves is kept, not activated over it.
+    guard await download(family, activate: false) == .available else { return [] }
+    return files(of: family)
+  }
+
+  /// Keeps and activates the faces of `family` an imported archive carried (#361), unless the
+  /// family is installed or kept already. Only what CoreText reads as a font is kept, within the
+  /// bounds of a family fetched from Google. Whether the family can now be drawn.
+  public func install(_ family: String, faces: [Data]) -> Bool {
+    guard ConversationThemeFile.isFontFamily(family) else { return false }
+    if Self.isInstalled(family) || activateKept(family) { return true }
+    let fonts = faces.filter { $0.count <= Self.maximumFileSize && Self.isFont($0) }
+      .prefix(Self.maximumFiles)
+    guard !fonts.isEmpty else { return false }
+    do {
+      try keep(Array(fonts), as: family)
+    } catch {
+      diagnostics.record(.store, .error, "theme.fontInstallFailed")
+      return false
+    }
+    diagnostics.record(.store, .info, "theme.fontInstalled", ["files": .count(fonts.count)])
+    return activateKept(family)
+  }
+
+  /// Writes `faces` as the files of `family`, whole or not at all: into a folder of their own,
+  /// renamed into place once every file is written.
+  private func keep(_ faces: [Data], as family: String) throws {
+    let staging = directory.appendingPathComponent(
+      ".staging-\(UUID().uuidString)", isDirectory: true)
+    defer { try? FileManager.default.removeItem(at: staging) }
+    try FileManager.default.createDirectory(
+      at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    for (index, data) in faces.enumerated() {
+      let file = staging.appendingPathComponent("\(index).ttf")
+      guard
+        FileManager.default.createFile(
+          atPath: file.path, contents: data, attributes: [.posixPermissions: 0o600])
+      else { throw CocoaError(.fileWriteUnknown) }
+    }
+    let target = folder(of: family)
+    try? FileManager.default.removeItem(at: target)
+    try FileManager.default.moveItem(at: staging, to: target)
+  }
+
   // MARK: - Fetching
 
-  private func download(_ family: String) async -> FontAvailability {
+  /// Fetches the faces of `family` and keeps them; `activate` false for a family installed, which
+  /// only an export fetches.
+  private func download(_ family: String, activate: Bool = true) async -> FontAvailability {
     let css: Data
     do {
       guard let found = try await styleSheet(of: family) else {
@@ -89,34 +144,24 @@ public actor GoogleThemeFonts: ThemeFontResolving {
     }
     let urls = Self.fileURLs(in: String(decoding: css, as: UTF8.self))
     guard !urls.isEmpty else { return .unknown }
-    let staging = directory.appendingPathComponent(
-      ".staging-\(UUID().uuidString)", isDirectory: true)
-    defer { try? FileManager.default.removeItem(at: staging) }
-    var bytes = 0
+    var faces: [Data] = []
     do {
-      try FileManager.default.createDirectory(
-        at: staging, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-      for (index, url) in urls.enumerated() {
+      for url in urls {
         let (data, status) = try await fetch(url)
         guard status == 200, data.count <= Self.maximumFileSize, Self.isFont(data) else {
           throw CocoaError(.fileReadCorruptFile)
         }
-        bytes += data.count
-        let file = staging.appendingPathComponent("\(index).ttf")
-        guard
-          FileManager.default.createFile(
-            atPath: file.path, contents: data, attributes: [.posixPermissions: 0o600])
-        else { throw CocoaError(.fileWriteUnknown) }
+        faces.append(data)
       }
-      let target = folder(of: family)
-      try? FileManager.default.removeItem(at: target)
-      try FileManager.default.moveItem(at: staging, to: target)
+      try keep(faces, as: family)
     } catch {
       diagnostics.record(.store, .error, "theme.fontDownloadFailed")
       return .unreachable
     }
     diagnostics.record(
-      .store, .info, "theme.fontDownloaded", ["files": .count(urls.count), "size": .bytes(bytes)])
+      .store, .info, "theme.fontDownloaded",
+      ["files": .count(urls.count), "size": .bytes(faces.reduce(0) { $0 + $1.count })])
+    guard activate else { return .available }
     return activateKept(family) ? .available : .unreachable
   }
 
