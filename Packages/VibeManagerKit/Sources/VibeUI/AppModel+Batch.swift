@@ -11,11 +11,18 @@ public struct SessionBatchConfirmation: Equatable, Identifiable {
   /// A second way to answer yes, for a move In Progress that would restart many agents at once
   /// (#192): the sessions are moved and nothing is restarted. Offered first, as the default.
   public let withoutRestartTitle: String?
+  /// A second way to answer yes, for a move to To Do or Waiting of sessions whose agents run
+  /// (#353): the sessions are moved and their agents keep running. The first answer closes them.
+  public var keepOpenTitle: String? = nil
 
   public var id: SessionBatchAction { plan.action }
 
   /// Closing asks the question of #51, and offers its "Don't ask again".
   public var isClose: Bool { plan.action == .close }
+
+  /// Whether the question offers "Don't ask again": #51's for a close, the one of the question a
+  /// move to To Do or Waiting asks otherwise (#353).
+  public var offersDontAskAgain: Bool { isClose || keepOpenTitle != nil }
 }
 
 /// What a command on several sessions could not do, in one place (#77). Like the restoration's,
@@ -151,6 +158,15 @@ extension AppModel {
   public func requestBatch(_ plan: SessionBatchPlan) async {
     guard !plan.isEmpty else { return }
     batchReport = nil
+    // One session moved where its agent is closed or asked about (#353): its own question, as a
+    // move of one asks it — the question of a batch is only asked for several.
+    if case .move(let status) = plan.action, plan.eligible.count == 1,
+      let session = sessions.first(where: { $0.id == plan.eligible[0] }),
+      closeOnMove(of: session, to: status) != .keepOpen
+    {
+      await setTaskStatus(status, for: session.id)
+      return
+    }
     if let confirmation = confirmation(for: plan) {
       pendingBatch = confirmation
       return
@@ -161,15 +177,23 @@ extension AppModel {
   /// Takes the confirmation rather than reading `pendingBatch`, for the reason `archive(_:)`
   /// gives: SwiftUI dismisses the dialog, and clears it, before the button runs.
   ///
-  /// `restarting: false` is the answer "Move Without Restarting" gives (#192).
+  /// `restarting: false` is the answer "Move Without Restarting" gives (#192), `closing: false`
+  /// the answer "Move and Keep Open" gives (#353).
   public func confirmBatch(
-    _ confirmation: SessionBatchConfirmation, askAgain: Bool = true, restarting: Bool = true
+    _ confirmation: SessionBatchConfirmation, askAgain: Bool = true, restarting: Bool = true,
+    closing: Bool = true
   ) async {
     pendingBatch = nil
-    if confirmation.isClose, !askAgain {
-      confirmsStoppingRunningAgent = false
+    if !askAgain {
+      if confirmation.isClose {
+        confirmsStoppingRunningAgent = false
+      } else if confirmation.keepOpenTitle != nil {
+        setAsideClose = closing ? .close : .keepOpen
+      }
     }
-    await performBatch(confirmation.plan, skipsAnnounced: true, restarting: restarting)
+    await performBatch(
+      confirmation.plan, skipsAnnounced: true, restarting: restarting,
+      closing: confirmation.keepOpenTitle != nil ? closing : nil)
   }
 
   public func cancelBatch() {
@@ -187,6 +211,7 @@ extension AppModel {
     let title: String
     var confirmTitle: String
     var withoutRestartTitle: String?
+    var keepOpenTitle: String?
     switch plan.action {
     case .archive:
       title = String(localized: "Archive \(count) Sessions?", bundle: .module)
@@ -242,6 +267,38 @@ extension AppModel {
         comment: "How many sessions, then a task status.")
       confirmTitle = String(
         localized: "Move Sessions", bundle: .module, comment: "Moves several sessions.")
+      // Done closes the sessions, To Do and Waiting ask or do what the user chose (#353).
+      let closing = eligible.filter { closeOnMove(of: $0, to: status) != .keepOpen }
+      let running = closing.filter { launcher?.isRunning($0.id) == true }.count
+      if status == .done || setAsideClose == .close, running > 0 {
+        sentences.append(
+          String(
+            localized:
+              "\(running) running agents will be stopped. The sessions can be restarted later.",
+            bundle: .module))
+      } else if status != .done, setAsideClose == .ask, !closing.isEmpty {
+        sentences.append(
+          String(
+            localized: """
+              Agents run in some of these sessions: they can be stopped now and the sessions \
+              restarted later, or keep running.
+              """,
+            bundle: .module, comment: "Moving several sessions to To Do or Waiting."))
+        confirmTitle = String(
+          localized: "Move and Close", bundle: .module,
+          comment: "Moves sessions to a status and closes them, stopping their agents.")
+        keepOpenTitle = String(
+          localized: "Move and Keep Open", bundle: .module,
+          comment: "Moves several sessions and leaves their agents running.")
+      }
+      // What closing stops besides the agents, as the close of several says it (#115).
+      if status == .done || setAsideClose != .keepOpen,
+        closing.contains(where: { !runningDrawerCommands(of: $0.id).isEmpty })
+      {
+        sentences.append(
+          String(
+            localized: "What runs in their side terminals will be stopped.", bundle: .module))
+      }
       let starting = eligible.filter { Self.restartsWhenMoved($0, to: status) && canRestart($0) }
         .count
       if starting > 0 {
@@ -271,13 +328,17 @@ extension AppModel {
     sentences += skipSentences(plan.skippedCounts, action: plan.action)
     return SessionBatchConfirmation(
       plan: plan, title: title, message: sentences.joined(separator: " "),
-      confirmTitle: confirmTitle, withoutRestartTitle: withoutRestartTitle)
+      confirmTitle: confirmTitle, withoutRestartTitle: withoutRestartTitle,
+      keepOpenTitle: keepOpenTitle)
   }
 
   // MARK: - Running
 
+  /// `closing` is the answer to the question a move to To Do or Waiting asks (#353); `nil` when
+  /// it was not asked, and the setting decides.
   func performBatch(
-    _ plan: SessionBatchPlan, skipsAnnounced: Bool, restarting: Bool = true
+    _ plan: SessionBatchPlan, skipsAnnounced: Bool, restarting: Bool = true,
+    closing: Bool? = nil
   ) async {
     // Asked again: a session may have been closed, restarted or archived since the question.
     let current = batchPlan(plan.action, for: plan.eligible)
@@ -310,8 +371,9 @@ extension AppModel {
       // disk is an application that stops answering.
       for id in current.eligible { results[id] = await restartInBatch(id) }
     case .move(let status):
+      let closes = closing ?? (status == .done || setAsideClose == .close)
       for id in current.eligible {
-        results[id] = await moveInBatch(id, to: status, restarting: restarting)
+        results[id] = await moveInBatch(id, to: status, restarting: restarting, closing: closes)
       }
     }
 

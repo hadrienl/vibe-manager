@@ -201,6 +201,99 @@ struct SessionBatchTests {
     }
   }
 
+  // MARK: - A status that closes the sessions (#353)
+
+  @Test("Moving several sessions to Done closes those whose agents run, in one question")
+  func movingSeveralToDoneCloses() async throws {
+    let running = (1...2).map {
+      session("Running\($0)", status: .active, updatedAt: TimeInterval(400 - $0))
+    }
+    let stopped = session("Stopped", updatedAt: 100)
+    let (model, launcher, repository) = makeWorkspace(running + [stopped])
+    await model.load()
+    for session in running { await launcher.launch(session: session, plan: plan(for: session)) }
+    await model.reload()
+    selectAll(running + [stopped], in: model)
+
+    await model.requestBatch(model.batchPlan(.move(to: .done), for: model.commandTargets))
+
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.message.hasPrefix("2 running agents will be stopped.") == true)
+    #expect(confirmation.keepOpenTitle == nil)
+    for session in running { #expect(launcher.isRunning(session.id)) }
+
+    await model.confirmBatch(confirmation)
+
+    for session in running + [stopped] {
+      #expect(await repository.session(id: session.id)?.taskStatus == .done)
+      #expect(await repository.session(id: session.id)?.status == .closed)
+      #expect(!launcher.isRunning(session.id))
+    }
+  }
+
+  @Test("Moving several running sessions to Waiting asks once: close them or keep them open")
+  func movingSeveralToWaitingAsksOnce() async throws {
+    let running = (1...2).map {
+      session("Running\($0)", status: .active, updatedAt: TimeInterval(400 - $0))
+    }
+    let (model, launcher, repository) = makeWorkspace(running)
+    await model.load()
+    for session in running { await launcher.launch(session: session, plan: plan(for: session)) }
+    await model.reload()
+    selectAll(running, in: model)
+
+    await model.requestBatch(model.batchPlan(.move(to: .waiting), for: model.commandTargets))
+
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.confirmTitle == "Move and Close")
+    #expect(confirmation.keepOpenTitle == "Move and Keep Open")
+    #expect(confirmation.offersDontAskAgain)
+
+    await model.confirmBatch(confirmation, askAgain: false, closing: false)
+
+    #expect(model.setAsideClose == .keepOpen)
+    for session in running {
+      #expect(await repository.session(id: session.id)?.taskStatus == .waiting)
+      #expect(launcher.isRunning(session.id))
+    }
+  }
+
+  @Test("Move and Close stops the agents of the sessions moved to To Do")
+  func movingSeveralToToDoCloses() async throws {
+    let running = (1...2).map {
+      session("Running\($0)", status: .active, updatedAt: TimeInterval(400 - $0))
+    }
+    let (model, launcher, repository) = makeWorkspace(running)
+    await model.load()
+    for session in running { await launcher.launch(session: session, plan: plan(for: session)) }
+    await model.reload()
+    selectAll(running, in: model)
+
+    await model.requestBatch(model.batchPlan(.move(to: .todo), for: model.commandTargets))
+    await model.confirmBatch(try #require(model.pendingBatch))
+
+    #expect(model.setAsideClose == .ask)
+    for session in running {
+      #expect(await repository.session(id: session.id)?.taskStatus == .todo)
+      #expect(await repository.session(id: session.id)?.status == .closed)
+      #expect(!launcher.isRunning(session.id))
+    }
+  }
+
+  @Test("A batch of one running session asks the question of a session on its own")
+  func movingOneRunningSessionAsksItsOwnQuestion() async {
+    let running = session("Running", status: .active)
+    let (model, launcher, _) = makeWorkspace([running])
+    await model.load()
+    await launcher.launch(session: running, plan: plan(for: running))
+    await model.reload()
+
+    await model.requestBatch(model.batchPlan(.move(to: .waiting), for: [running.id]))
+
+    #expect(model.pendingBatch == nil)
+    #expect(model.pendingSetAside?.session.id == running.id)
+  }
+
   // MARK: - Restart
 
   @Test("Restarting a selection asks once; a session whose summary must be read is left out")
