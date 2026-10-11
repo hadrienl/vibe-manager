@@ -57,10 +57,12 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
   /// typed 256 bytes every 20 ms, a prompt arrives as written.
   /// A command sent with `!` during a turn is queued as well, and run as a command once the turn
   /// ends (2.1.285).
+  /// Its prompt is drawn between two rules, which the screen shows (#370).
   public var promptFormat: AgentPromptFormat {
     AgentPromptFormat(
       textEntry: .typed(chunkSize: 256, chunkDelay: .milliseconds(20)),
-      shellEntry: ShellEntry(queuesWhileWorking: true))
+      shellEntry: ShellEntry(queuesWhileWorking: true),
+      readsInputOnScreen: true)
   }
 }
 
