@@ -183,6 +183,10 @@ struct PromptComposer: View {
               font: theme.interfaceFont(size: appearance.textSize.scaled(11.5)), action: restart)
           }
         }
+        // The audio mode (#357): the answers read as they arrive.
+        if let readAloud = model.readAloud, !isShell {
+          AudioModeButton(readAloud: readAloud)
+        }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line
             .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
@@ -436,7 +440,8 @@ struct PromptComposer: View {
       case .agentWorking:
         return Text("Discussion · \(model.agentName) is working", bundle: .module)
       case .agentSpeaking:
-        return Text("Discussion · \(model.agentName) is speaking · speak to cut in", bundle: .module)
+        return Text(
+          "Discussion · \(model.agentName) is speaking · speak to cut in", bundle: .module)
       }
     case .idle, .offeringDownload, .downloading, .preparing:
       return nil

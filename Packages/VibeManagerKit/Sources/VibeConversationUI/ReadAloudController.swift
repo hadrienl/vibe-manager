@@ -275,3 +275,36 @@ struct ReadingAloudPill: View {
   }
 }
 
+/// The audio mode (#357): each answer that arrives in the conversation on screen is read aloud.
+struct AudioModeButton: View {
+  @Bindable var readAloud: ReadAloudController
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    let isOn = readAloud.settings.readsAnswers
+    Button {
+      readAloud.settings.readsAnswers.toggle()
+      // Without its model, Settings shows where it is downloaded.
+      if readAloud.settings.readsAnswers, !readAloud.isModelInstalled {
+        readAloud.showSettings?()
+        openSettings()
+      }
+    } label: {
+      Image(systemName: isOn ? "speaker.wave.2.fill" : "speaker.slash")
+        .font(.system(size: 12, weight: .semibold))
+        .foregroundStyle(isOn ? theme.onAccent.color : theme.text.color)
+        .frame(width: 28, height: 28)
+        .background(isOn ? theme.accent.color : theme.surface.color, in: Circle())
+        .overlay(Circle().stroke(isOn ? Color.clear : theme.border.color))
+        .contentShape(Circle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityLabel(Text("Audio Mode", bundle: .module))
+    .accessibilityValue(isOn ? Text("On", bundle: .module) : Text("Off", bundle: .module))
+    .help(
+      isOn
+        ? Text("Audio mode on: answers are read as they arrive", bundle: .module)
+        : Text("Audio mode: read the answers as they arrive", bundle: .module))
+  }
+}
