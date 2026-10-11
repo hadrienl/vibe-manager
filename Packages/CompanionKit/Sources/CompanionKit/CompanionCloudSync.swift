@@ -49,7 +49,13 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
   private var engine: CKSyncEngine?
   private var journal = CompanionJournal()
   private var status = CompanionSyncStatus()
-  private var onUpdate: (@Sendable (CompanionSyncUpdate) -> Void)?
+  /// The updates, handed over by a task of their own rather than from where they happen: a task
+  /// started inside a delegate callback carries the callback's context, and CloudKit stops the
+  /// process when such a task awaits `sendChanges` ("Cannot await a call into CKSyncEngine from
+  /// within a delegate callback").
+  private let updates: AsyncStream<CompanionSyncUpdate>.Continuation
+  private let updateStream: AsyncStream<CompanionSyncUpdate>
+  private var delivery: Task<Void, Never>?
 
   public init(
     containerIdentifier: String = CompanionCloud.containerIdentifier, storeURL: URL
@@ -57,13 +63,17 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
     container = CKContainer(identifier: containerIdentifier)
     self.storeURL = storeURL
     store = CompanionSyncStore.load(from: storeURL)
+    (updateStream, updates) = AsyncStream.makeStream()
   }
 
   // MARK: - CompanionSyncing
 
   public func start(onUpdate: @escaping @Sendable (CompanionSyncUpdate) -> Void) async {
-    self.onUpdate = onUpdate
     guard engine == nil else { return }
+    // Detached: none of the caller's context, whoever starts the synchronisation.
+    delivery = Task.detached { [updateStream] in
+      for await update in updateStream { onUpdate(update) }
+    }
     makeEngine()
     await refreshAccountStatus()
   }
@@ -460,7 +470,7 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
 
   private func publish(fetched: [CompanionRecord] = [], sent: [String] = []) {
     status.pendingChanges = engine?.state.pendingRecordZoneChanges.count ?? 0
-    onUpdate?(
+    updates.yield(
       CompanionSyncUpdate(
         records: store.entries.values.map(\.record), status: status, journal: journal.entries,
         fetched: fetched, sent: sent))
