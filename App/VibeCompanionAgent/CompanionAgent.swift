@@ -17,11 +17,10 @@ final class CompanionAgent {
     subsystem: "eu.hadrien.VibeManager.companion", category: "agent")
   /// The application is the only peer: the same team, its identifier.
   private static let applicationIdentifier = "eu.hadrien.VibeManager"
-  /// How often the agent asks iCloud itself, on top of the pushes: without them — entitlement
-  /// missing, push lost — nothing would ever be fetched.
-  private static let fetchInterval: TimeInterval = 5 * 60
-  /// How often polling is considered; see `poll`.
-  private static let pollInterval: TimeInterval = 30
+  /// How often the zone is asked directly, pushes or not: CloudKit's are silent ones, which the
+  /// system delays and drops past a few an hour, and a test must not wait for them. A fetch with
+  /// nothing new is one request, and pushes nothing to anyone.
+  private static let pollInterval: TimeInterval = 5
   /// How long a departing agent waits for its last write to leave.
   private static let departureLimit: TimeInterval = 10
 
@@ -61,11 +60,10 @@ final class CompanionAgent {
   private var handled: Set<String> = []
   private var timers: [Timer] = []
   private var isDeparting = false
+  private var isPolling = false
   /// Keeps App Nap away: a process without a window is its first candidate, and a napping agent's
   /// heartbeat could come later than the phone's tolerance. The Mac may still sleep.
   private var activity: (any NSObjectProtocol)?
-  private var lastPush: Date?
-  private var lastFetch: Date?
 
   init(arguments: Arguments) {
     self.arguments = arguments
@@ -204,7 +202,10 @@ final class CompanionAgent {
       )
     }
     for ping in triage.toAnswer {
-      Self.logger.notice("link: test \(ping.nonce, privacy: .public) handed to the application")
+      let age = Date().timeIntervalSince(ping.sentAt)
+      Self.logger.notice(
+        "link: test \(ping.nonce, privacy: .public) handed to the application, sent \(age, format: .fixed(precision: 1), privacy: .public) s ago"
+      )
       handled.insert(ping.nonce)
       connection.send(.testReceived(ping))
     }
@@ -273,21 +274,16 @@ final class CompanionAgent {
     }
   }
 
-  /// Every 30 s while no push came in the last half hour, every 5 min otherwise: without pushes, a
-  /// test would wait for the next fetch — which is all this is, then.
+  /// Every `pollInterval`, whether pushes arrive or not; one fetch at a time.
   private func poll() async {
-    let now = Date()
-    let pushesArrive = lastPush.map { now.timeIntervalSince($0) < 30 * 60 } ?? false
-    if pushesArrive, let lastFetch, now.timeIntervalSince(lastFetch) < Self.fetchInterval {
-      return
-    }
-    lastFetch = now
+    guard !isPolling else { return }
+    isPolling = true
+    defer { isPolling = false }
     await sync.fetchChanges()
   }
 
-  /// A push reached the agent: noted, so that polling slows down, and fetched.
+  /// A push reached the agent: noted for the journal, and fetched at once.
   func pushReceived() {
-    lastPush = Date()
     Task {
       await sync.notePush()
       await sync.fetchChanges()
