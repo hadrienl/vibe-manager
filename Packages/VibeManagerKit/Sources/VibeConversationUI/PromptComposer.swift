@@ -173,7 +173,7 @@ struct PromptComposer: View {
         }
         // The audio mode (#357): the answers read as they arrive.
         if let readAloud = model.readAloud, !isShell {
-          AudioModeButton(readAloud: readAloud)
+          AudioModeButton(readAloud: readAloud, conversation: ObjectIdentifier(model))
         }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line

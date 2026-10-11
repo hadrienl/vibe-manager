@@ -276,14 +276,20 @@ struct ReadingAloudPill: View {
 }
 
 /// The audio mode (#357): each answer that arrives in the conversation on screen is read aloud.
+/// A discussion reads them too: it shows on, and stays so until the discussion ends.
 struct AudioModeButton: View {
   @Bindable var readAloud: ReadAloudController
+  let conversation: ObjectIdentifier
   @Environment(\.conversationTheme) private var theme
   @Environment(\.openSettings) private var openSettings
 
   var body: some View {
-    let isOn = readAloud.settings.readsAnswers
+    let isDiscussing =
+      readAloud.readsConversation == conversation && !readAloud.readsNextAnswerOnly
+    let isOn = readAloud.settings.readsAnswers || isDiscussing
     Button {
+      // A discussion reads its answers whatever the mode: nothing to turn off before it ends.
+      guard !isDiscussing else { return }
       readAloud.settings.readsAnswers.toggle()
       // Without its model, Settings shows where it is downloaded.
       if readAloud.settings.readsAnswers, !readAloud.isModelInstalled {
