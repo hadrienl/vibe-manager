@@ -24,12 +24,17 @@ public enum PromptInputRecognition {
     return input
   }
 
-  /// Whether the prompt shows the end of `text`. Lines are wrapped where the prompt is narrow, and
-  /// spaces may fall at a wrap: both are compared without their blanks.
+  /// Whether the prompt ends on `text`, the images joined after it aside. Lines are wrapped where
+  /// the prompt is narrow, blanks may fall at a wrap, and an emoji may be drawn otherwise: only
+  /// letters, digits and punctuation are compared. A text shorter than `tailLength` is the whole
+  /// prompt, never a word of a hint — `Try "fix lint errors"` holds no "fix".
   public static func holds(_ text: String, in input: [String]) -> Bool {
-    let expected = String(text.filter { !$0.isWhitespace }.suffix(tailLength))
+    let expected = comparable(text)
     guard !expected.isEmpty else { return false }
-    return input.joined().filter { !$0.isWhitespace }.contains(expected)
+    // Claude Code shows `[Image #1]` in place of an image whose path was typed after the text.
+    let shown = comparable(input.joined(separator: " ").replacing(/\[Image #\d+\]/, with: ""))
+    guard expected.count > tailLength else { return shown == expected }
+    return shown.hasSuffix(expected.suffix(tailLength))
   }
 
   /// Claude Code shows a long text arriving at once as a placeholder rather than the text.
@@ -43,15 +48,36 @@ public enum PromptInputRecognition {
     input.count > 1 && input.last?.allSatisfy(\.isWhitespace) == true
   }
 
-  /// How much of the end of a text is looked for: enough to tell it from a hint.
+  /// A rule of Claude Code's screen, across a prompt or between a question's options.
+  static func isRule(_ line: String) -> Bool {
+    let rest = line.trimmingCharacters(in: .whitespaces)
+    return !rest.isEmpty && rest.allSatisfy { "─━".contains($0) }
+  }
+
+  /// How much of the end of a long text is looked for: enough to tell it from a hint.
   static let tailLength = 32
 
-  private static func isRule(_ line: String) -> Bool {
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
-    return trimmed.count >= 4 && trimmed.allSatisfy { $0 == "─" }
+  private static func comparable(_ text: String) -> String {
+    String(
+      String.UnicodeScalarView(
+        text.unicodeScalars.filter { scalar in
+          scalar.properties.isAlphabetic || scalar.properties.numericType != nil
+            || (scalar.isASCII && scalar.properties.generalCategory.isPunctuation)
+        }))
   }
 
   private static func isBlank(_ character: Character) -> Bool {
     character == " " || character == "\u{A0}"
+  }
+}
+
+extension Unicode.GeneralCategory {
+  fileprivate var isPunctuation: Bool {
+    switch self {
+    case .connectorPunctuation, .dashPunctuation, .openPunctuation, .closePunctuation,
+      .initialPunctuation, .finalPunctuation, .otherPunctuation, .mathSymbol, .currencySymbol:
+      true
+    default: false
+    }
   }
 }

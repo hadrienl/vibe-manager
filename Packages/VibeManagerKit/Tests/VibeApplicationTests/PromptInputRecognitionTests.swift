@@ -76,4 +76,17 @@ struct PromptInputRecognitionTests {
         == nil)
     #expect(PromptInputRecognition.input(screen: "") == nil)
   }
+
+  @Test("A short text is the whole prompt, never a word of a hint")
+  func shortText() {
+    #expect(!PromptInputRecognition.holds("fix", in: ["Try \"fix lint errors\""]))
+    #expect(PromptInputRecognition.holds("fix", in: ["fix"]))
+    #expect(PromptInputRecognition.holds("fix", in: ["fix[Image #1]"]))
+  }
+
+  @Test("An emoji drawn otherwise does not keep the text from being found")
+  func emoji() {
+    #expect(PromptInputRecognition.holds("merci 🙏🏽", in: ["merci 🙏"]))
+    #expect(PromptInputRecognition.holds("merci\u{200B} !", in: ["merci !"]))
+  }
 }
