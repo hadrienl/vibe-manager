@@ -12606,6 +12606,16 @@
         }
       }
     },
+    "Detect Again" : {
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer la détection"
+          }
+        }
+      }
+    },
     "Density" : {
       "localizations" : {
         "ar" : {

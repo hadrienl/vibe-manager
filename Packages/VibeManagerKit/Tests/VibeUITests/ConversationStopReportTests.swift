@@ -41,6 +41,7 @@ struct ConversationStopReportTests {
     #expect(conversation.shownLaunchFailure?.message == failure?.message)
     #expect(conversation.shownLaunchFailure?.message.contains("/bin/nope") == true)
     #expect(conversation.shownLaunchFailure?.suggestion == failure?.suggestion)
+    #expect(conversation.shownLaunchFailure?.canDetectAgain == true)
     #expect(ConversationStopReport.launchFailure(of: nil) == nil)
   }
 }
