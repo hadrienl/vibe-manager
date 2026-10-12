@@ -30,6 +30,8 @@ public enum SessionBatchItemResult: Equatable, Sendable {
   case doneWithWarning(message: String, suggestion: String?)
   /// Moved In Progress, but the agent the move starts for a session that never ran did not start.
   case movedWithoutStart(message: String, suggestion: String?)
+  /// Moved to a status that closes the session (#353), but the close failed.
+  case movedWithoutClose(message: String, suggestion: String?)
   case skipped(SessionBatchSkip)
   case failed(message: String, suggestion: String?)
 }

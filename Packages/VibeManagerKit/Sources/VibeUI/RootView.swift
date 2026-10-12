@@ -585,32 +585,52 @@ public struct RootView: View {
       Text(verbatim: model.identityFailure ?? "")
     }
     // Only asked when an agent is running: the one thing closing loses is the work it is doing.
-    // `presenting:` for the same reason as the archive dialog below.
+    // A move to Done asks it too, and makes the move once answered (#353).
+    .closeConfirmation(
+      model: model, isOffered: closeOffersDontAskAgain == true,
+      suppressesConfirmation: $suppressesCloseConfirmation,
+      message: closeConfirmationMessage(for:)
+    )
+    // A session whose agent runs, moved to To Do or Waiting (#353). Its "Don't ask again" keeps
+    // the answer given, which the settings can change back.
     .confirmationDialog(
-      model.pendingClose.map {
-        Text("Close “\($0.name)”?", bundle: .module, comment: "A session's name.")
+      model.pendingSetAside.map {
+        Text("Close “\($0.session.name)”?", bundle: .module, comment: "A session's name.")
       } ?? Text("Close this session?", bundle: .module),
       isPresented: Binding(
-        get: { model.pendingClose != nil },
+        get: { model.pendingSetAside != nil },
         set: { isPresented in
           guard !isPresented else { return }
-          model.cancelClose()
+          model.cancelSetAside()
         }
       ),
       titleVisibility: .visible,
-      presenting: model.pendingClose
-    ) { session in
-      Button(LocalizedStringResource("Close Session", bundle: .module)) {
+      presenting: model.pendingSetAside
+    ) { request in
+      Button(
+        LocalizedStringResource(
+          "Move and Close", bundle: .module,
+          comment: "Moves sessions to a status and closes them, stopping their agents.")
+      ) {
         let askAgain = !suppressesCloseConfirmation
-        Task { await model.confirmClose(session.id, askAgain: askAgain) }
+        Task { await model.confirmSetAside(request, closing: true, askAgain: askAgain) }
+      }
+      Button(
+        LocalizedStringResource(
+          "Keep Open", bundle: .module,
+          comment: "Moves a session to To Do or Waiting and leaves its agent running.")
+      ) {
+        let askAgain = !suppressesCloseConfirmation
+        Task { await model.confirmSetAside(request, closing: false, askAgain: askAgain) }
       }
       Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
-        model.cancelClose()
+        model.cancelSetAside()
       }
-    } message: { session in
-      Text(closeConfirmationMessage(for: session))
+    } message: { request in
+      Text(verbatim: setAsideMessage(for: request))
     }
-    // Closing several sessions asks #51's question once, with its "Don't ask again" (#77).
+    // Closing several sessions asks #51's question once, with its "Don't ask again" (#77). So
+    // does moving several to To Do or Waiting while their agents run, with its own (#353).
     .confirmationDialog(
       Text(verbatim: model.pendingBatch?.title ?? ""),
       isPresented: batchBinding(close: true),
@@ -620,6 +640,12 @@ public struct RootView: View {
       Button(confirmation.confirmTitle) {
         let askAgain = !suppressesCloseConfirmation
         Task { await model.confirmBatch(confirmation, askAgain: askAgain) }
+      }
+      if let keepOpenTitle = confirmation.keepOpenTitle {
+        Button(keepOpenTitle) {
+          let askAgain = !suppressesCloseConfirmation
+          Task { await model.confirmBatch(confirmation, askAgain: askAgain, closing: false) }
+        }
       }
       Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
         model.cancelBatch()
@@ -636,11 +662,15 @@ public struct RootView: View {
       message: archiveConfirmationMessage(for:)
     )
     // Before the side terminal's dialog and the other batch one in the chain: the toggle reaches
-    // every dialog it wraps, and a question has a "Don't ask again" only when it is #51's.
+    // every dialog it wraps, and a question has a "Don't ask again" only when the answer can be
+    // kept — #51's, or the one a move to To Do or Waiting asks (#353).
     .dialogSuppressionToggle(
       Text("Don’t ask again", bundle: .module), isSuppressed: $suppressesCloseConfirmation
     )
     .onChange(of: model.pendingClose?.id) { _, id in
+      if id != nil { suppressesCloseConfirmation = false }
+    }
+    .onChange(of: model.pendingSetAside?.session.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
     }
     .onChange(of: model.pendingBatch?.id) { _, id in
@@ -649,6 +679,12 @@ public struct RootView: View {
     .onChange(of: model.pendingArchive?.id) { _, id in
       if id != nil { suppressesCloseConfirmation = false }
     }
+    // A move to Done that only an agent in the middle of a turn asks about (#353), after the
+    // toggle for the same reason as the archive question below.
+    .closeConfirmation(
+      model: model, isOffered: closeOffersDontAskAgain == false,
+      suppressesConfirmation: .constant(false), message: closeConfirmationMessage(for:)
+    )
     // The same question when only an agent in the middle of a turn asks it (#242): after the
     // suppression toggle, since "Don't ask again" would change nothing — it is always asked.
     .archiveConfirmation(
@@ -735,7 +771,7 @@ public struct RootView: View {
   /// One binding per dialog: the close question carries a toggle the others must not show.
   private func batchBinding(close: Bool) -> Binding<Bool> {
     Binding(
-      get: { model.pendingBatch.map { $0.isClose == close } ?? false },
+      get: { model.pendingBatch.map { $0.offersDontAskAgain == close } ?? false },
       set: { isPresented in
         guard !isPresented else { return }
         model.cancelBatch()
@@ -769,6 +805,33 @@ public struct RootView: View {
       usage: model.usage,
       journal: model.journal
     )
+  }
+
+  /// Whether the close question on screen offers "Don't ask again", `nil` when there is none.
+  /// Asked by a move because the agent is in the middle of a turn, it does not (#353).
+  private var closeOffersDontAskAgain: Bool? {
+    model.pendingCloseRequest.map { request in
+      request.status.map { model.moveCloseOffersDontAskAgain(request.session, to: $0) } ?? true
+    }
+  }
+
+  /// The question a move to To Do or Waiting asks (#353): what Close stops, side terminals
+  /// included, as #51's question says it. Keep Open stops nothing.
+  private func setAsideMessage(for request: StatusClose) -> String {
+    let consequence = String(
+      localized: """
+        It moves to \(String(localized: request.status.label)). Its agent can be stopped now and \
+        the session restarted later, or keep running.
+        """,
+      bundle: .module, comment: "A task status.")
+    let commands = model.runningDrawerCommands(of: request.session.id)
+    guard !commands.isEmpty else { return consequence }
+    let list = commands.map { "“\($0)”" }.formatted(.list(type: .and))
+    return consequence + " "
+      + String(
+        localized: "Closing it also stops what runs in its side terminals: \(list).",
+        bundle: .module,
+        comment: "The argument lists the commands running in the session's side terminals.")
   }
 
   private func closeConfirmationMessage(for session: WorkSession) -> String {
@@ -2610,6 +2673,47 @@ private final class ShownWidth {
 }
 
 extension View {
+  /// The question before closing a session (#51), or before the close a move to Done makes
+  /// (#353). `presenting:` for the same reason as `archiveConfirmation`.
+  fileprivate func closeConfirmation(
+    model: AppModel, isOffered: Bool, suppressesConfirmation: Binding<Bool>,
+    message: @escaping (WorkSession) -> String
+  ) -> some View {
+    confirmationDialog(
+      model.pendingClose.map {
+        Text("Close “\($0.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Close this session?", bundle: .module),
+      isPresented: Binding(
+        get: { isOffered },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelClose()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingCloseRequest
+    ) { question in
+      Button(
+        question.status == nil
+          ? LocalizedStringResource("Close Session", bundle: .module)
+          : LocalizedStringResource(
+            "Move and Close", bundle: .module,
+            comment: "Moves sessions to a status and closes them, stopping their agents.")
+      ) {
+        let askAgain = !suppressesConfirmation.wrappedValue
+        Task {
+          await model.confirmClose(
+            question.session.id, movingTo: question.status, askAgain: askAgain)
+        }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelClose()
+      }
+    } message: { question in
+      Text(message(question.session))
+    }
+  }
+
   /// The question before archiving a session (#115). `presenting:` hands the session to the
   /// buttons, rather than having them read it back from the model: SwiftUI dismisses the dialog
   /// before running a button's action, and the dismissal clears the pending session — read there,
