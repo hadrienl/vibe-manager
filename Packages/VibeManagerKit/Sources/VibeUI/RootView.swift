@@ -607,7 +607,11 @@ public struct RootView: View {
       titleVisibility: .visible,
       presenting: model.pendingSetAside
     ) { request in
-      Button(LocalizedStringResource("Close Session", bundle: .module)) {
+      Button(
+        LocalizedStringResource(
+          "Move and Close", bundle: .module,
+          comment: "Moves sessions to a status and closes them, stopping their agents.")
+      ) {
         let askAgain = !suppressesCloseConfirmation
         Task { await model.confirmSetAside(request, closing: true, askAgain: askAgain) }
       }
@@ -658,7 +662,8 @@ public struct RootView: View {
       message: archiveConfirmationMessage(for:)
     )
     // Before the side terminal's dialog and the other batch one in the chain: the toggle reaches
-    // every dialog it wraps, and a question has a "Don't ask again" only when it is #51's.
+    // every dialog it wraps, and a question has a "Don't ask again" only when the answer can be
+    // kept — #51's, or the one a move to To Do or Waiting asks (#353).
     .dialogSuppressionToggle(
       Text("Don’t ask again", bundle: .module), isSuppressed: $suppressesCloseConfirmation
     )
@@ -805,13 +810,13 @@ public struct RootView: View {
   /// Whether the close question on screen offers "Don't ask again", `nil` when there is none.
   /// Asked by a move because the agent is in the middle of a turn, it does not (#353).
   private var closeOffersDontAskAgain: Bool? {
-    model.pendingClose.map {
-      model.pendingCloseStatus == nil || model.moveCloseOffersDontAskAgain($0)
+    model.pendingCloseRequest.map { request in
+      request.status.map { model.moveCloseOffersDontAskAgain(request.session, to: $0) } ?? true
     }
   }
 
   /// The question a move to To Do or Waiting asks (#353): what Close stops, side terminals
-  /// included, as #51's question says it.
+  /// included, as #51's question says it. Keep Open stops nothing.
   private func setAsideMessage(for request: StatusClose) -> String {
     let consequence = String(
       localized: """
@@ -819,8 +824,14 @@ public struct RootView: View {
         the session restarted later, or keep running.
         """,
       bundle: .module, comment: "A task status.")
-    guard let drawer = drawerCommandsSentence(for: request.session) else { return consequence }
-    return consequence + " " + drawer
+    let commands = model.runningDrawerCommands(of: request.session.id)
+    guard !commands.isEmpty else { return consequence }
+    let list = commands.map { "“\($0)”" }.formatted(.list(type: .and))
+    return consequence + " "
+      + String(
+        localized: "Closing it also stops what runs in its side terminals: \(list).",
+        bundle: .module,
+        comment: "The argument lists the commands running in the session's side terminals.")
   }
 
   private func closeConfirmationMessage(for session: WorkSession) -> String {
@@ -2661,12 +2672,6 @@ private final class ShownWidth {
   var value: CGFloat?
 }
 
-/// The session a close question is about, and the status the move that asked it goes to (#353).
-private struct CloseQuestion {
-  let session: WorkSession
-  let status: SessionTaskStatus?
-}
-
 extension View {
   /// The question before closing a session (#51), or before the close a move to Done makes
   /// (#353). `presenting:` for the same reason as `archiveConfirmation`.
@@ -2686,9 +2691,7 @@ extension View {
         }
       ),
       titleVisibility: .visible,
-      presenting: model.pendingClose.map {
-        CloseQuestion(session: $0, status: model.pendingCloseStatus)
-      }
+      presenting: model.pendingCloseRequest
     ) { question in
       Button(
         question.status == nil

@@ -219,6 +219,7 @@ struct SessionBatchTests {
 
     let confirmation = try #require(model.pendingBatch)
     #expect(confirmation.message.hasPrefix("2 running agents will be stopped.") == true)
+    #expect(confirmation.confirmTitle == "Move and Close")
     #expect(confirmation.keepOpenTitle == nil)
     for session in running { #expect(launcher.isRunning(session.id)) }
 
@@ -278,6 +279,63 @@ struct SessionBatchTests {
       #expect(await repository.session(id: session.id)?.status == .closed)
       #expect(!launcher.isRunning(session.id))
     }
+  }
+
+  @Test(
+    "A remembered answer is what a batch to Waiting does, with no Keep Open to choose",
+    arguments: [SetAsideClose.close, .keepOpen])
+  func movingSeveralToWaitingRemembers(answer: SetAsideClose) async throws {
+    let running = (1...2).map {
+      session("Running\($0)", status: .active, updatedAt: TimeInterval(400 - $0))
+    }
+    let (model, launcher, repository) = makeWorkspace(running)
+    await model.load()
+    for session in running { await launcher.launch(session: session, plan: plan(for: session)) }
+    await model.reload()
+    model.setAsideClose = answer
+    selectAll(running, in: model)
+
+    await model.requestBatch(model.batchPlan(.move(to: .waiting), for: model.commandTargets))
+    let confirmation = try #require(model.pendingBatch)
+    #expect(confirmation.keepOpenTitle == nil)
+    #expect(confirmation.confirmTitle == (answer == .close ? "Move and Close" : "Move Sessions"))
+    await model.confirmBatch(confirmation)
+
+    for session in running {
+      #expect(await repository.session(id: session.id)?.taskStatus == .waiting)
+      #expect(launcher.isRunning(session.id) == (answer == .keepOpen))
+    }
+  }
+
+  @Test("A batch of one running session moved to Done asks #51's question, as on its own")
+  func movingOneRunningSessionToDone() async {
+    let running = session("Running", status: .active)
+    let (model, launcher, _) = makeWorkspace([running])
+    await model.load()
+    await launcher.launch(session: running, plan: plan(for: running))
+    await model.reload()
+
+    await model.requestBatch(model.batchPlan(.move(to: .done), for: [running.id]))
+
+    #expect(model.pendingBatch == nil)
+    #expect(model.pendingClose?.id == running.id)
+    #expect(model.pendingCloseStatus == .done)
+  }
+
+  @Test("A move whose close fails is told as moved, not as left where it was")
+  func movedWithoutClose() async {
+    let moved = session("Moved", status: .active)
+    let (model, _, _) = makeWorkspace([moved])
+    await model.load()
+
+    let report = model.report(
+      .move(to: .done),
+      results: [moved.id: .movedWithoutClose(message: "No answer.", suggestion: nil)],
+      order: [moved.id])
+
+    #expect(report?.message == "1 session was moved, but could not be closed.")
+    #expect(report?.lines.map(\.id) == [moved.id])
+    #expect(SessionBatchItemResult.movedWithoutClose(message: "", suggestion: nil).isDone)
   }
 
   @Test("A batch of one running session asks the question of a session on its own")

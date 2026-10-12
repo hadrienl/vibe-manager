@@ -13,7 +13,7 @@ public struct SessionBatchConfirmation: Equatable, Identifiable {
   public let withoutRestartTitle: String?
   /// A second way to answer yes, for a move to To Do or Waiting of sessions whose agents run
   /// (#353): the sessions are moved and their agents keep running. The first answer closes them.
-  public var keepOpenTitle: String? = nil
+  public let keepOpenTitle: String?
 
   public var id: SessionBatchAction { plan.action }
 
@@ -270,13 +270,21 @@ extension AppModel {
       // Done closes the sessions, To Do and Waiting ask or do what the user chose (#353).
       let closing = eligible.filter { closeOnMove(of: $0, to: status) != .keepOpen }
       let running = closing.filter { launcher?.isRunning($0.id) == true }.count
-      if status == .done || setAsideClose == .close, running > 0 {
+      let closes = status == .done || setAsideClose == .close
+      let asks = status != .done && setAsideClose == .ask && !closing.isEmpty
+      let drawers = closing.contains { !runningDrawerCommands(of: $0.id).isEmpty }
+      if closes, !closing.isEmpty {
+        confirmTitle = String(
+          localized: "Move and Close", bundle: .module,
+          comment: "Moves sessions to a status and closes them, stopping their agents.")
+      }
+      if closes, running > 0 {
         sentences.append(
           String(
             localized:
               "\(running) running agents will be stopped. The sessions can be restarted later.",
             bundle: .module))
-      } else if status != .done, setAsideClose == .ask, !closing.isEmpty {
+      } else if asks {
         sentences.append(
           String(
             localized: """
@@ -291,13 +299,17 @@ extension AppModel {
           localized: "Move and Keep Open", bundle: .module,
           comment: "Moves several sessions and leaves their agents running.")
       }
-      // What closing stops besides the agents, as the close of several says it (#115).
-      if status == .done || setAsideClose != .keepOpen,
-        closing.contains(where: { !runningDrawerCommands(of: $0.id).isEmpty })
-      {
+      // What closing stops besides the agents, as the close of several says it (#115). Asked,
+      // only Move and Close stops it.
+      if closes, drawers {
         sentences.append(
           String(
             localized: "What runs in their side terminals will be stopped.", bundle: .module))
+      } else if asks, drawers {
+        sentences.append(
+          String(
+            localized: "Closing them also stops what runs in their side terminals.",
+            bundle: .module))
       }
       let starting = eligible.filter { Self.restartsWhenMoved($0, to: status) && canRestart($0) }
         .count
@@ -371,9 +383,22 @@ extension AppModel {
       // disk is an application that stops answering.
       for id in current.eligible { results[id] = await restartInBatch(id) }
     case .move(let status):
+      // Read before the statuses are written: what the move closes depends on where it starts.
       let closes = closing ?? (status == .done || setAsideClose == .close)
+      let toClose =
+        closes
+        ? current.eligible.filter { id in
+          sessions.first { $0.id == id }.map { closeOnMove(of: $0, to: status) != .keepOpen }
+            ?? false
+        } : []
       for id in current.eligible {
-        results[id] = await moveInBatch(id, to: status, restarting: restarting, closing: closes)
+        results[id] = await moveInBatch(id, to: status, restarting: restarting)
+      }
+      // Every row in its column first, then the agents stopped side by side, as a close of
+      // several does.
+      let moved = toClose.filter { results[$0]?.isDone == true }
+      for (id, closed) in await concurrently(moved, { await $0.closeInBatch($1) }) {
+        results[id] = Self.moveResult(closing: closed)
       }
     }
 
@@ -436,6 +461,22 @@ extension AppModel {
     if selectedSessionID != target { select(target) }
   }
 
+  /// A session moved, then closed (#353): the move happened whatever the close does, and a close
+  /// that failed is told as such rather than as a move that did not.
+  private static func moveResult(
+    closing closed: SessionBatchItemResult
+  ) -> SessionBatchItemResult {
+    switch closed {
+    case .failed(let message, let suggestion):
+      return .movedWithoutClose(message: message, suggestion: suggestion)
+    case .doneWithWarning:
+      return closed
+    case .done, .movedWithoutStart, .movedWithoutClose, .skipped:
+      // Skipped: another close of the same session was already under way.
+      return .done
+    }
+  }
+
   private func concurrently(
     _ ids: [SessionID],
     _ body: @escaping @MainActor @Sendable (AppModel, SessionID) async -> SessionBatchItemResult
@@ -456,6 +497,7 @@ extension AppModel {
     var notDone: [SessionBatchReport.Line] = []
     var warnings: [SessionBatchReport.Line] = []
     var notStarted: [SessionBatchReport.Line] = []
+    var notClosed: [SessionBatchReport.Line] = []
     var skipped: [SessionBatchSkip: Int] = [:]
     for id in order {
       guard let result = results[id] else { continue }
@@ -468,6 +510,8 @@ extension AppModel {
         warnings.append(.init(id: id, text: message, suggestion: suggestion))
       case .movedWithoutStart(let message, let suggestion):
         notStarted.append(.init(id: id, text: Self.line(name, message), suggestion: suggestion))
+      case .movedWithoutClose(let message, let suggestion):
+        notClosed.append(.init(id: id, text: Self.line(name, message), suggestion: suggestion))
       case .failed(let message, let suggestion):
         notDone.append(.init(id: id, text: Self.line(name, message), suggestion: suggestion))
       case .skipped(.needsSummary):
@@ -496,6 +540,12 @@ extension AppModel {
           localized: "\(notStarted.count) sessions were moved, but their agent did not start.",
           bundle: .module))
     }
+    if !notClosed.isEmpty {
+      sentences.append(
+        String(
+          localized: "\(notClosed.count) sessions were moved, but could not be closed.",
+          bundle: .module))
+    }
     if !warnings.isEmpty {
       sentences.append(
         String(
@@ -505,7 +555,8 @@ extension AppModel {
     }
     guard !sentences.isEmpty else { return nil }
     return SessionBatchReport(
-      message: sentences.joined(separator: " "), lines: notDone + notStarted + warnings)
+      message: sentences.joined(separator: " "),
+      lines: notDone + notStarted + notClosed + warnings)
   }
 
   private static func line(_ name: String, _ sentence: String) -> String {
@@ -582,7 +633,7 @@ extension AppModel {
 extension SessionBatchItemResult {
   var isDone: Bool {
     switch self {
-    case .done, .doneWithWarning, .movedWithoutStart: return true
+    case .done, .doneWithWarning, .movedWithoutStart, .movedWithoutClose: return true
     case .skipped, .failed: return false
     }
   }

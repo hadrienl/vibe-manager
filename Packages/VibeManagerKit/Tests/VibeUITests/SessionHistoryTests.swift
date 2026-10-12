@@ -1044,7 +1044,7 @@ extension SessionHistoryTests {
 
     #expect(model.pendingClose?.id == stored.id)
     #expect(model.pendingCloseStatus == .done)
-    #expect(model.moveCloseOffersDontAskAgain(stored))
+    #expect(model.moveCloseOffersDontAskAgain(stored, to: .done))
     #expect(await repository.session(id: stored.id)?.taskStatus == .doing)
     #expect(launcher.isRunning(stored.id))
 
@@ -1074,7 +1074,7 @@ extension SessionHistoryTests {
     await model.setTaskStatus(.done, for: stored.id)
 
     #expect(model.pendingClose?.id == stored.id)
-    #expect(!model.moveCloseOffersDontAskAgain(stored))
+    #expect(!model.moveCloseOffersDontAskAgain(stored, to: .done))
     #expect(launcher.isRunning(stored.id))
   }
 
@@ -1096,7 +1096,7 @@ extension SessionHistoryTests {
   @Test(
     "Moving a running session to To Do or Waiting asks whether to close it",
     arguments: [SessionTaskStatus.todo, .waiting])
-  func settingAsideAsks(status: SessionTaskStatus) async {
+  func settingAsideAsks(status: SessionTaskStatus) async throws {
     let stored = session(name: "Paused", status: .active)
     let (model, launcher, _, repository) = await running([stored])
 
@@ -1112,7 +1112,7 @@ extension SessionHistoryTests {
     #expect(launcher.isRunning(stored.id))
 
     await model.setTaskStatus(status, for: stored.id)
-    await model.confirmSetAside(try! #require(model.pendingSetAside), closing: true)
+    await model.confirmSetAside(try #require(model.pendingSetAside), closing: true)
 
     #expect(await repository.session(id: stored.id)?.taskStatus == status)
     #expect(await repository.session(id: stored.id)?.status == .closed)
@@ -1174,8 +1174,85 @@ extension SessionHistoryTests {
 
     #expect(model.pendingClose?.id == stored.id)
     #expect(model.pendingCloseStatus == .waiting)
+    // Asked only because of the turn: "Don't ask again" would change nothing.
+    #expect(!model.moveCloseOffersDontAskAgain(stored, to: .waiting))
     #expect(await repository.session(id: stored.id)?.taskStatus == .doing)
     #expect(launcher.isRunning(stored.id))
+  }
+
+  @Test("A remembered Close does not ask #51's question again about an idle agent")
+  func rememberedCloseSkipsTheCloseQuestion() async {
+    let stored = session(name: "Idle", status: .active)
+    let (model, launcher, _, repository) = await running(
+      [stored], preferences: InMemorySessionClosePreferences(setAsideClose: .close))
+    #expect(model.confirmsStoppingRunningAgent)
+
+    await model.setTaskStatus(.todo, for: stored.id)
+
+    #expect(model.pendingClose == nil)
+    #expect(await repository.session(id: stored.id)?.taskStatus == .todo)
+    #expect(!launcher.isRunning(stored.id))
+  }
+
+  @Test("Between To Do and Waiting, an agent kept open is not asked about again")
+  func betweenToDoAndWaitingAsksNothing() async throws {
+    let stored = session(name: "Parked", status: .active)
+    let (model, launcher, _, repository) = await running([stored])
+    await model.setTaskStatus(.waiting, for: stored.id)
+    await model.confirmSetAside(try #require(model.pendingSetAside), closing: false)
+
+    await model.setTaskStatus(.todo, for: stored.id)
+
+    #expect(model.pendingSetAside == nil)
+    #expect(await repository.session(id: stored.id)?.taskStatus == .todo)
+    #expect(launcher.isRunning(stored.id))
+  }
+
+  @Test("Close answered for a session already moved there some other way still closes it")
+  func settingAsideAnsweredLateCloses() async throws {
+    let stored = session(name: "Moved", status: .active)
+    let (model, launcher, _, repository) = await running([stored])
+    await model.setTaskStatus(.waiting, for: stored.id)
+    let request = try #require(model.pendingSetAside)
+    // Moved there by ⌘Z's path in the meantime, which writes the status and nothing else.
+    await model.setTaskStatus(.waiting, for: stored.id, restarting: false)
+
+    await model.confirmSetAside(request, closing: true)
+
+    #expect(await repository.session(id: stored.id)?.taskStatus == .waiting)
+    #expect(await repository.session(id: stored.id)?.status == .closed)
+    #expect(!launcher.isRunning(stored.id))
+  }
+
+  @Test("“Don't ask again” on the question a move to Done asks turns #51's question off")
+  func movingToDoneDontAskAgain() async {
+    let stored = session(name: "Finished", status: .active)
+    let (model, _, _, repository) = await running([stored])
+
+    await model.setTaskStatus(.done, for: stored.id)
+    await model.confirmClose(stored.id, movingTo: .done, askAgain: false)
+
+    #expect(!model.confirmsStoppingRunningAgent)
+    #expect(await repository.session(id: stored.id)?.taskStatus == .done)
+    #expect(await repository.session(id: stored.id)?.status == .closed)
+  }
+
+  @Test("⌃⌘→ to Done that asked #51's question is taken back by ⌘Z, without restarting")
+  func keyboardMoveToDoneIsUndone() async throws {
+    let stored = session(name: "Almost", status: .active)
+    let (model, launcher, _, repository) = await running([stored])
+    await model.setTaskStatus(.waiting, for: stored.id, restarting: false)
+    model.select(stored.id)
+
+    await model.moveTaskStatus(of: stored.id, forward: true)
+    #expect(model.pendingCloseStatus == .done)
+    await model.confirmClose(stored.id, movingTo: .done)
+    #expect(await repository.session(id: stored.id)?.taskStatus == .done)
+    #expect(!launcher.isRunning(stored.id))
+
+    await model.undoSidebarChange()
+    #expect(await repository.session(id: stored.id)?.taskStatus == .waiting)
+    #expect(!launcher.isRunning(stored.id))
   }
 
   @Test("A move from the keyboard that asked first is taken back by ⌘Z once answered")

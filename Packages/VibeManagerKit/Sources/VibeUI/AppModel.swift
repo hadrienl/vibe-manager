@@ -232,11 +232,11 @@ public final class AppModel {
   /// confirmed (#240).
   public private(set) var pendingStatusRestart: StatusRestart?
   /// The session the user asked to close while its agent was still working, held until they
-  /// confirm. Closing can be undone with Restart, but the agent's work in progress cannot.
-  public private(set) var pendingClose: WorkSession?
-  /// The status the session in `pendingClose` moves to once the question is answered, when a
-  /// move asked it (#353). Cancelling the question cancels the move.
-  public private(set) var pendingCloseStatus: SessionTaskStatus?
+  /// confirm, and the status a move that asked it goes to (#353). Closing can be undone with
+  /// Restart, but the agent's work in progress cannot. Cancelling the question cancels the move.
+  public private(set) var pendingCloseRequest: CloseRequest?
+  public var pendingClose: WorkSession? { pendingCloseRequest?.session }
+  public var pendingCloseStatus: SessionTaskStatus? { pendingCloseRequest?.status }
   /// A session whose agent runs, moved to To Do or Waiting, until the user says whether it is
   /// closed or kept open (#353).
   public private(set) var pendingSetAside: StatusClose?
@@ -1192,16 +1192,14 @@ public final class AppModel {
   public func requestClose(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canClose(session) else { return }
     guard !interruptsWork(session) else {
-      pendingClose = session
-      pendingCloseStatus = nil
+      pendingCloseRequest = CloseRequest(session: session, status: nil)
       return
     }
     await close(id)
   }
 
   public func cancelClose() {
-    pendingClose = nil
-    pendingCloseStatus = nil
+    pendingCloseRequest = nil
     pendingMoveUndo = nil
   }
 
@@ -1211,8 +1209,7 @@ public final class AppModel {
   public func confirmClose(
     _ id: SessionID, movingTo status: SessionTaskStatus? = nil, askAgain: Bool = true
   ) async {
-    pendingClose = nil
-    pendingCloseStatus = nil
+    pendingCloseRequest = nil
     if !askAgain {
       confirmsStoppingRunningAgent = false
     }
@@ -1235,27 +1232,36 @@ public final class AppModel {
     sidebarHistory.record(undo)
   }
 
-  /// Whether the close a move makes asks first (#353): as ⇧⌘W does, and always for an agent in
-  /// the middle of a turn, "Don't ask again" or not — as archiving does (#242).
-  public func moveCloseAsks(_ session: WorkSession) -> Bool {
-    interruptsWork(session) || interruptsTurn(session)
+  /// Whether the close a move makes asks first (#353). Done asks as ⇧⌘W does. To Do and Waiting
+  /// close because the user said so, in the setting or its "Don't ask again": asking again would
+  /// take that back. Both always ask for an agent in the middle of a turn, "Don't ask again" or
+  /// not — as archiving does (#242).
+  public func moveCloseAsks(_ session: WorkSession, to status: SessionTaskStatus) -> Bool {
+    interruptsTurn(session) || (status == .done && interruptsWork(session))
   }
 
   /// Whether the question before a move's close offers "Don't ask again": only when the setting
-  /// is what asks it. Asked because the agent is in the middle of a turn, it always will be.
-  public func moveCloseOffersDontAskAgain(_ session: WorkSession) -> Bool {
-    interruptsWork(session)
+  /// of #51 is what asks it. Asked because the agent is in the middle of a turn, it always will
+  /// be.
+  public func moveCloseOffersDontAskAgain(
+    _ session: WorkSession, to status: SessionTaskStatus
+  ) -> Bool {
+    status == .done && interruptsWork(session)
   }
 
-  /// What moving a session to a status does to its agent (#353). Done closes the session; To Do
-  /// and Waiting ask, or do what the user asked to keep, when its agent runs. In Progress keeps
-  /// it, and starts it when it is closed (#192).
+  /// What moving a session to a status does to its agent (#353). Done closes the session. Leaving
+  /// In Progress or Done for To Do or Waiting asks, or does what the user asked to keep, when its
+  /// agent runs; between To Do and Waiting, the agent was already kept open once. In Progress
+  /// keeps it, and starts it when it is closed (#192).
   func closeOnMove(of session: WorkSession, to status: SessionTaskStatus) -> SetAsideClose {
     switch status {
     case .done:
       return canClose(session) ? .close : .keepOpen
     case .todo, .waiting:
-      return launcher?.isRunning(session.id) == true ? setAsideClose : .keepOpen
+      guard session.taskStatus != .todo, session.taskStatus != .waiting, canClose(session),
+        launcher?.isRunning(session.id) == true
+      else { return .keepOpen }
+      return setAsideClose
     case .doing, .archived:
       return .keepOpen
     }
@@ -1273,7 +1279,9 @@ public final class AppModel {
     guard let session = sessions.first(where: { $0.id == request.session.id }),
       session.taskStatus != request.status
     else {
+      // Moved there some other way since: Close still closes, as #51's question does.
       pendingMoveUndo = nil
+      if closing { await close(request.session.id) }
       return
     }
     await writeTaskStatus(request.status, of: session, closing: closing)
@@ -1360,10 +1368,10 @@ public final class AppModel {
 
   /// One session of a batch move (#77): the status is written, and a closed session that goes In
   /// Progress is restarted, as it is on its own (#192) — unless the user chose to move the batch
-  /// without restarting it. A session the move closes (#353) is closed after the status is
-  /// written, unless the user chose to keep the batch open.
+  /// without restarting it. The sessions the move closes (#353) are closed by the batch, all
+  /// together once every status is written.
   func moveInBatch(
-    _ id: SessionID, to status: SessionTaskStatus, restarting: Bool = true, closing: Bool = true
+    _ id: SessionID, to status: SessionTaskStatus, restarting: Bool = true
   ) async -> SessionBatchItemResult {
     guard let session = sessions.first(where: { $0.id == id }) else {
       return .failed(
@@ -1378,9 +1386,6 @@ public final class AppModel {
       onboarding.send(.taskStatusChanged(id, status))
     } catch {
       return .failed(message: Self.message(for: error), suggestion: nil)
-    }
-    if closing, closeOnMove(of: session, to: status) != .keepOpen {
-      return await closeInBatch(id)
     }
     guard restarting, Self.restartsWhenMoved(session, to: status), canRestart(session) else {
       return .done
@@ -1617,9 +1622,8 @@ public final class AppModel {
         pendingMoveUndo = nil
         return
       case .close:
-        guard !moveCloseAsks(session) else {
-          pendingClose = session
-          pendingCloseStatus = status
+        guard !moveCloseAsks(session, to: status) else {
+          pendingCloseRequest = CloseRequest(session: session, status: status)
           pendingMoveUndo = nil
           return
         }
@@ -3595,4 +3599,11 @@ public struct StatusRestart: Sendable {
 public struct StatusClose: Sendable {
   public let session: WorkSession
   public let status: SessionTaskStatus
+}
+
+/// A session to close once the user confirms (#51), and the status the move that asked it goes
+/// to, if one did (#353).
+public struct CloseRequest: Sendable {
+  public let session: WorkSession
+  public let status: SessionTaskStatus?
 }
