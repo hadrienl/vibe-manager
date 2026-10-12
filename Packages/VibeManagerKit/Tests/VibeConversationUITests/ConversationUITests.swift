@@ -770,6 +770,39 @@ struct ConversationModelTests {
     #expect(model.request(for: last) == nil)
   }
 
+  @Test("A server's confirmation goes under its running call, its group unfolded")
+  func elicitationUnderItsServersCall() throws {
+    let (model, _) = model()
+    let calls = (1...3).map {
+      ToolCall(
+        callID: "t\($0)", kind: .mcp(server: "claude_ai_Supabase", tool: "execute_sql"),
+        state: $0 < 3 ? .succeeded : .running)
+    }
+    model.apply(
+      ConversationSnapshot(
+        entries: calls.map { ConversationEntry(id: "e\($0.callID)", content: .tool($0)) },
+        availability: .available))
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: model.sessionID, key: "f"), receivedAt: Date(),
+      kind: .question,
+      content: .elicitation(
+        AgentElicitation(server: "claude.ai Supabase", message: "Run it?", fieldCount: 0)),
+      reference: AgentToolReference(tool: nil), isShown: true)
+    model.pendingRequest = {
+      ConversationRequest(request: request, answers: [.allowOnce, .deny], isSending: false)
+    }
+    model.answerRequest = { _, _ in true }
+    model.activity = .awaitingUser(.question)
+    #expect(model.request(for: calls[2]) != nil)
+    #expect(model.request(for: calls[0]) == nil)
+    let group = try #require(model.blocks.first)
+    guard case .toolGroup = group else {
+      Issue.record("The calls are not grouped")
+      return
+    }
+    #expect(model.isExpanded(group))
+  }
+
   @Test("A question only its terminal can answer leaves the options and the composer closed")
   func terminalOnly() async {
     let (model, _, answers, _) = asking([Self.colour], answers: [])

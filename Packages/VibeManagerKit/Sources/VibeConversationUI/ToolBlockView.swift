@@ -820,8 +820,9 @@ struct RequestActions: View {
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(theme.codeBackground.color, in: RoundedRectangle(cornerRadius: 6))
       }
-      // A dialog the agent only announced (#273): its own words are all there is to show.
-      if case .inTerminal(let prompt) = request.request.content, let message = prompt.message {
+      // A dialog the agent only announced (#273), or a server's form: their words are all there
+      // is to show.
+      if let message = Self.message(of: request.request.content) {
         Text(verbatim: DisplaySafeText.visible(message))
           .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.text.color)
@@ -855,6 +856,24 @@ struct RequestActions: View {
         if answers.contains(.deny) { denyButton }
       case .unreadable:
         if answers.contains(.deny) { denyButton }
+      case .elicitation:
+        // A server's confirmation: Escape cancels it, and the agent's turn goes on.
+        if answers.contains(.allowOnce) {
+          Button {
+            model.answer(.allowOnce)
+          } label: {
+            Text("Allow", bundle: .module, comment: "Allows what an agent asks, this once.")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent.color)
+        }
+        if answers.contains(.deny) {
+          Button {
+            model.answer(.deny)
+          } label: {
+            Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
+          }
+        }
       case .plan:
         if answers.contains(.approvePlan) {
           Menu {
@@ -887,7 +906,7 @@ struct RequestActions: View {
           }
           .help(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation, .inTerminal:
+      case .questions, .inTerminal:
         EmptyView()
       }
       if request.isSending {
@@ -906,6 +925,14 @@ struct RequestActions: View {
   static let stopsTheTurn = LocalizedStringResource(
     "Also interrupts the agent's turn: it waits for your next message.", bundle: .module,
     comment: "What refusing a request does besides refusing.")
+
+  static func message(of content: AgentRequestContent) -> String? {
+    switch content {
+    case .inTerminal(let prompt): return prompt.message
+    case .elicitation(let elicitation): return elicitation.message
+    default: return nil
+    }
+  }
 
   private var denyButton: some View {
     Button {

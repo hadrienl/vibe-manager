@@ -374,6 +374,10 @@ struct AnswerKeymapTests {
       claude.keystrokes(for: .approvePlan(.reviewEdits), to: plan, screen: screen) == [[0x32]])
     #expect(claude.keystrokes(for: .rejectPlan, to: plan) == [[0x1B]])
     #expect(claude.answers(for: .elicitation(AgentElicitation())).isEmpty)
+    #expect(
+      claude.answers(for: .elicitation(AgentElicitation(server: "db", fieldCount: 0)))
+        == [.allowOnce, .deny])
+    #expect(claude.answers(for: .elicitation(AgentElicitation(server: "db", fieldCount: 2))).isEmpty)
   }
 
   @Test("Codex: y, p for a command, a for a patch, Escape; its questions stay in the terminal")

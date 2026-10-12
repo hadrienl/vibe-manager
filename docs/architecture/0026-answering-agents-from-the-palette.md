@@ -42,6 +42,8 @@ Code, drops the other requests its sub-agents were waiting on — which the Refu
 | Claude Code 2.1.282 | `1` | `2`, only with `permission_suggestions` | Escape | a digit per question; the one after the options, pasted text and Return; `1` submits several | `1` / `2`; Escape rejects |
 | Codex 0.157.1 | `y` | `p` (a command prefix), `a` (a patch's files) | Escape | in the terminal | — |
 
+A server's confirmation, for Claude Code, is Return on `Accept` or Escape, both read on screen.
+
 Questions with several choices toggle, and are sent from a tab of their own: left to the terminal.
 
 ### A queue per session
@@ -70,9 +72,12 @@ can share. Its dialog, though, shows all of what it asks — the command whole h
 refusal included, is typed only once the screen names its request and no other of the queue. A
 command is read line for line; between two lines, only blanks may differ — a wrapped line may break
 inside a word. Two reports of dialogs not drawn yet are two requests, never one: Codex reports each
-call once. An MCP tool's form is not read: it shows the tool's arguments shortened and cut, and two
-calls of the same tool look alike. A request taken away on a guess may be the dialog drawn: a patch
-of the same files is then not told from it, and is answered in the terminal.
+call once. An MCP tool's form shows its arguments shortened and cut, but names its server and its
+tool (`Allow the <server> MCP server to run tool "<tool>"?`): it names a request only when no other
+request of the queue is a call of the same tool — two such calls look alike, and are answered in
+the terminal. Its `Allow` is the digit `1`; Escape cancels it. A request taken away on a guess may
+be the dialog drawn: a patch of the same files is then not told from it, and is answered in the
+terminal.
 
 The queue must hold every request whose dialog may be drawn. Codex waits for its
 `PermissionRequest` hook before drawing, and the hook has written its line by then: an answer reads
@@ -81,6 +86,16 @@ typed — and only then compares the two. Two requests for the same command both
 cannot tell them apart; the folder a command runs in is neither shown nor reported. They are
 answered in the terminal. When Codex leaves out the top of a dialog too tall for its terminal,
 nothing is read either.
+
+### A server's confirmation, read off Claude Code's screen
+
+An MCP server's form with no field to fill in — `requested_schema` without properties, which the
+`Elicitation` hook now keeps whole — is only accepted or declined: Claude Code draws its server's
+words, then `❯ Accept    Decline`, no option numbered. The hook comes before the dialog is drawn,
+and no digit picks an option: Return accepts only once the screen shows this server's words — and
+nothing else — above the two choices, `Accept` pointed at. Escape cancels it, read on screen as
+well: before the dialog, it would stop the turn. A form with fields is filled in the terminal. In
+the conversation, the card goes under the server's call that runs.
 
 ### What would be allowed is what is shown
 

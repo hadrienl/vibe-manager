@@ -932,6 +932,10 @@ public final class ConversationModel {
     case .subagentGroup:
       return true
     case .toolGroup(_, let calls):
+      // A request to answer under one of its calls: a running one's, which stays in the group.
+      if calls.contains(where: { $0.toolCall.map { request(for: $0) != nil } ?? false }) {
+        return true
+      }
       return appearance.expandsFailures
         && calls.contains {
           if case .failed = $0.toolCall?.state { return true }
@@ -940,6 +944,7 @@ public final class ConversationModel {
     case .entry(let entry):
       guard let call = entry.toolCall else { return false }
       if call.kind.isShownOpen || call.state == .awaitingPermission { return true }
+      if request(for: call) != nil { return true }
       if case .failed = call.state, appearance.expandsFailures { return true }
       if call.kind == .edit || call.kind == .create { return appearance.expandsEdits }
       return false
@@ -1141,12 +1146,29 @@ public final class ConversationModel {
   }
 
   private func requestCall(of request: ConversationRequest) -> ToolCall? {
-    guard case .permission(let permission) = request.request.content,
-      let subject = permission.subject
-    else { return pendingCall }
-    let unfinished = ConversationEntry.allCalls(in: shownEntries)
-      .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
-    return unfinished.last { Self.isAbout($0, subject) } ?? pendingCall
+    let unfinished = { [shownEntries] in
+      ConversationEntry.allCalls(in: shownEntries)
+        .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
+    }
+    switch request.request.content {
+    case .permission(let permission):
+      guard let subject = permission.subject else { return pendingCall }
+      return unfinished().last { Self.isAbout($0, subject) } ?? pendingCall
+    case .elicitation(let elicitation):
+      // A server asks while one of its tools runs, which waits on nothing else.
+      guard let server = elicitation.server else { return pendingCall }
+      return unfinished().last { Self.isCall($0, of: server) } ?? pendingCall
+    default:
+      return pendingCall
+    }
+  }
+
+  /// Whether `call` is to a tool of `server`, named in the call as `claude_ai_Supabase` and by
+  /// the server itself as `claude.ai Supabase`.
+  static func isCall(_ call: ToolCall, of server: String) -> Bool {
+    guard case .mcp(let name, _) = call.kind else { return false }
+    let key = { (name: String) in name.lowercased().filter { $0.isLetter || $0.isNumber } }
+    return key(name) == key(server)
   }
 
   /// Whether a permission's subject is what `call` shows.

@@ -13,12 +13,15 @@ import VibeApplication
 ///   boxes, as drawn by 2.1.283: a digit ticks its option and stays, the right arrow moves on.
 ///   Several questions, or one of several choices, end on a review, whose `1` submits. Beside
 ///   previews, as drawn by 2.1.285, a digit only moves the highlight: Return, sent apart, takes it.
+/// - An MCP server's form with nothing to fill in: `❯ Accept    Decline`, no digit. Return takes
+///   `Accept` once the screen shows it pointed at, under this server's words; Escape cancels it.
 /// - A plan: `Yes, auto-accept edits` — or `Yes, and use auto mode` where that mode is available,
 ///   in its place — then `Yes, manually approve edits`; a setting may put `clear context`
 ///   options before them. The option is read off the screen; Escape rejects.
 ///
 /// Return is never pressed alone to pick an option: it takes the highlighted one, whatever that
-/// is. It follows a digit only beside previews, once the digit has moved the highlight.
+/// is. It follows a digit only beside previews, once the digit has moved the highlight, and
+/// accepts a confirmation only once the screen shows `Accept` highlighted.
 public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
   public init() {}
 
@@ -37,6 +40,8 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       return [.approvePlan, .rejectPlan]
     case .unreadable:
       return [.deny]
+    case .elicitation(let elicitation) where elicitation.isConfirmation:
+      return [.allowOnce, .deny]
     case .elicitation, .inTerminal:
       return []
     }
@@ -56,6 +61,16 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
             && !$0.localizedCaseInsensitiveContains("bypass")
         })
     case (.deny, .permission), (.deny, .unreadable), (.rejectPlan, .plan):
+      return [TerminalKeys.escape]
+    // Reported before it is drawn: a key typed before would land in the prompt, and Escape there
+    // would stop the turn.
+    case (.allowOnce, .elicitation(let elicitation)):
+      guard let form = screen?.confirmation, form.asks(elicitation), form.isAcceptPointed else {
+        return nil
+      }
+      return [TerminalKeys.enter]
+    case (.deny, .elicitation(let elicitation)):
+      guard let form = screen?.confirmation, form.asks(elicitation) else { return nil }
       return [TerminalKeys.escape]
     case (.approvePlan(let approval), .plan):
       let words: String
@@ -188,8 +203,8 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
   }
 
   /// Codex's dialog shows the command whole, every path a patch writes to, the host (#283):
-  /// before any key, the screen tells which request it is. An MCP tool's form is not read: its
-  /// requests are answered in the session.
+  /// before any key, the screen tells which request it is. An MCP tool's form names only its
+  /// server and its tool: two calls of the same tool waiting are answered in the session.
   public var readsRequestOnScreen: Bool {
     true
   }

@@ -543,6 +543,23 @@ struct RequestCard: View {
         if answers.contains(.deny) { denyButton }
       case .unreadable:
         if answers.contains(.deny) { denyButton }
+      case .elicitation:
+        // A server's confirmation: Escape cancels it, and the agent's turn goes on.
+        if answers.contains(.allowOnce) {
+          Button {
+            send(.allowOnce)
+          } label: {
+            Text("Allow", bundle: .module, comment: "Allows what an agent asks, this once.")
+          }
+          .buttonStyle(.borderedProminent)
+        }
+        if answers.contains(.deny) {
+          Button {
+            send(.deny)
+          } label: {
+            Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
+          }
+        }
       case .plan:
         if answers.contains(.approvePlan) {
           Menu {
@@ -576,7 +593,7 @@ struct RequestCard: View {
           .help(Text(Self.stopsTheTurn))
           .accessibilityHint(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation, .inTerminal:
+      case .questions, .inTerminal:
         EmptyView()
       }
       Spacer(minLength: 0)

@@ -22,6 +22,9 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     case patch(Set<String>)
     /// An access to this host.
     case host(String)
+    /// This tool of this MCP server, as its form names them: not its arguments, which it shows
+    /// cut short.
+    case mcpTool(server: String, tool: String)
   }
 
   public let subject: Subject
@@ -35,7 +38,7 @@ public struct AgentDrawnDialog: Hashable, Sendable {
   /// the dialog shows on screen is all of it (#283).
   public var quotesWhole: Bool {
     switch subject {
-    case .commandStart, .file, .files, .server: return false
+    case .commandStart, .file, .files, .server, .mcpTool: return false
     case .command, .shownCommand, .patch, .host: return true
     }
   }
@@ -75,17 +78,22 @@ public struct AgentDrawnDialog: Hashable, Sendable {
       let target = Self.host(of: String(purpose.dropFirst(Self.networkPurpose.count)))
       let shown = Self.host(of: host)
       return !shown.isEmpty && target == shown
+    case (.mcpTool(let name, let shown), .mcp(let server, let tool)):
+      return Self.serverKey(name) == Self.serverKey(server)
+        && Self.serverKey(shown) == Self.serverKey(tool)
     default:
       return false
     }
   }
 
   /// Whether a dialog read off the screen can name `request`: a command, a patch, a network
-  /// access. An MCP tool's form shows its arguments cut short, and is never read (#283).
+  /// access (#283). An MCP tool's form names its server and its tool, not its arguments: it names
+  /// the request only while no other call of the same tool waits, which the screen's reading
+  /// checks against the whole queue.
   public static func showsWhole(_ request: AgentRequest) -> Bool {
     guard case .permission(let permission) = request.content else { return false }
     switch permission.tool {
-    case .shell, .patch: return true
+    case .shell, .patch, .mcp: return true
     default: return false
     }
   }

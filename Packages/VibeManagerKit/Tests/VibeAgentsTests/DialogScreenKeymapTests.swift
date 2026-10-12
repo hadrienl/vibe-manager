@@ -96,6 +96,30 @@ enum DialogScreens {
     ────────
     """
 
+  /// An MCP server's form with nothing to fill in, as Claude Code 2.1.288 draws it, wrapped in a
+  /// narrow pane.
+  static let claudeConfirmation = """
+     Calling Supabase 4 times… (ctrl+o to expand)
+     ⎿  Fulfilling input required by 'tools/call' (round 1)
+
+    ──────────────────────────────────────────────────────────
+     MCP server “claude.ai Supabase” requests your input
+
+     This SQL includes destructive operations (DROP, DELETE,
+     TRUNCATE or UPDATE without WHERE).
+     It may permanently remove data, tables, schemas or other objects.
+     Run it on project msrauwqwfahxpgwrhmlb?
+
+     ❯ Accept    Decline
+
+     Esc to cancel · ↑/↓ to navigate
+    """
+  static let confirmationMessage = """
+    This SQL includes destructive operations (DROP, DELETE, TRUNCATE or UPDATE without WHERE).
+    It may permanently remove data, tables, schemas or other objects.
+    Run it on project msrauwqwfahxpgwrhmlb?
+    """
+
   static func dialog(_ text: String) -> AgentDialogScreen? { AgentDialogScreen(screen: text) }
 }
 
@@ -126,6 +150,29 @@ struct AgentDialogScreenTests {
     #expect(narrow.options[1].label.hasSuffix("project from this project"))
   }
 
+  @Test("A confirmation: its server, its words, and whether Accept is pointed at")
+  func confirmation() throws {
+    let screen = try #require(DialogScreens.dialog(DialogScreens.claudeConfirmation))
+    #expect(screen.options.isEmpty)
+    let form = try #require(screen.confirmation)
+    #expect(form.server == "claude.ai Supabase")
+    #expect(form.isAcceptPointed)
+    let elicitation = AgentElicitation(
+      server: "claude.ai Supabase", message: DialogScreens.confirmationMessage, fieldCount: 0)
+    #expect(form.asks(elicitation))
+    #expect(
+      !form.asks(
+        AgentElicitation(
+          server: "claude.ai Supabase", message: "Run it on another project?", fieldCount: 0)))
+    #expect(
+      !form.asks(
+        AgentElicitation(server: "other", message: DialogScreens.confirmationMessage, fieldCount: 0)
+      ))
+    let declining = DialogScreens.claudeConfirmation.replacingOccurrences(
+      of: "❯ Accept    Decline", with: "  Accept  ❯ Decline")
+    #expect(DialogScreens.dialog(declining)?.confirmation?.isAcceptPointed == false)
+  }
+
   @Test("An agent's numbered list, or nothing numbered, is no dialog")
   func none() {
     #expect(DialogScreens.dialog(DialogScreens.agentList) == nil)
@@ -146,6 +193,38 @@ struct DialogScreenKeymapTests {
     .permission(
       AgentToolPermission(
         tool: tool, toolName: "Bash", subject: "ls", purpose: purpose, alwaysAllow: always))
+  }
+
+  @Test("Claude Code's confirmation: Return once Accept is pointed at under its words, Escape")
+  func claudeConfirmation() {
+    let elicitation = AgentRequestContent.elicitation(
+      AgentElicitation(
+        server: "claude.ai Supabase", message: DialogScreens.confirmationMessage, fieldCount: 0))
+    let screen = DialogScreens.dialog(DialogScreens.claudeConfirmation)
+    #expect(claude.keystrokes(for: .allowOnce, to: elicitation, screen: screen) == [[0x0D]])
+    #expect(claude.keystrokes(for: .deny, to: elicitation, screen: screen) == [[0x1B]])
+    // Not drawn yet: a key would land in the prompt, and Escape stop the turn.
+    #expect(claude.keystrokes(for: .allowOnce, to: elicitation, screen: nil) == nil)
+    #expect(claude.keystrokes(for: .deny, to: elicitation, screen: nil) == nil)
+    // Decline pointed at: Return would decline.
+    let declining = DialogScreens.dialog(
+      DialogScreens.claudeConfirmation.replacingOccurrences(
+        of: "❯ Accept    Decline", with: "  Accept  ❯ Decline"))
+    #expect(claude.keystrokes(for: .allowOnce, to: elicitation, screen: declining) == nil)
+    // A form with fields to fill in, drawn or not, is left to the terminal.
+    let form = AgentRequestContent.elicitation(
+      AgentElicitation(
+        server: "claude.ai Supabase", message: DialogScreens.confirmationMessage, fieldCount: 1))
+    #expect(claude.keystrokes(for: .allowOnce, to: form, screen: screen) == nil)
+  }
+
+  @Test("Codex: an MCP tool's form takes the digit of Allow, Escape cancels it")
+  func codexMCPTool() {
+    let tool = permission(.mcp(server: "echo_box", tool: "write_note"), always: nil)
+    let screen = DialogScreens.dialog(CodexApprovalScreens.codexTool)
+    #expect(codex.answers(for: tool) == [.allowOnce, .deny])
+    #expect(codex.keystrokes(for: .allowOnce, to: tool, screen: screen) == [[0x31]])
+    #expect(codex.keystrokes(for: .deny, to: tool, screen: screen) == [[0x1B]])
   }
 
   @Test("Claude Code's plan: each approval takes its own option, wherever it stands")

@@ -96,7 +96,7 @@ public enum AgentRequestContent: Hashable, Codable, Sendable {
   /// A plan to accept before the agent starts. `excerpt` is its beginning.
   case plan(excerpt: String, isComplete: Bool)
   /// A form an MCP server asks the user to fill in, or a page to open: only the terminal can
-  /// answer it.
+  /// answer it, unless the form is a mere confirmation.
   case elicitation(AgentElicitation)
   /// The agent asked something its report does not let us read: cut short, or not JSON.
   case unreadable(tool: String?)
@@ -123,11 +123,22 @@ public struct AgentElicitation: Hashable, Codable, Sendable {
   public let message: String?
   /// The page the server asks to open, in URL mode: `http` or `https` only.
   public let url: URL?
+  /// How many fields its form has, when its report says: none makes it a mere confirmation,
+  /// accepted or declined.
+  public let fieldCount: Int?
 
-  public init(server: String? = nil, message: String? = nil, url: URL? = nil) {
+  public init(
+    server: String? = nil, message: String? = nil, url: URL? = nil, fieldCount: Int? = nil
+  ) {
     self.server = server
     self.message = message
     self.url = url.flatMap { ["http", "https"].contains($0.scheme?.lowercased()) ? $0 : nil }
+    self.fieldCount = fieldCount
+  }
+
+  /// A form with nothing to fill in, only to accept or decline.
+  public var isConfirmation: Bool {
+    url == nil && fieldCount == 0
   }
 }
 
