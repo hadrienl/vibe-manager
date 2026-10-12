@@ -61,10 +61,7 @@ public struct AgentDialogScreen: Hashable, Sendable {
     }
     // A rule drawn between two options: Claude Code sets "Chat about this" apart from a
     // question's options (2.1.288).
-    func isRule(_ line: String) -> Bool {
-      let rest = line.trimmingCharacters(in: .whitespaces)
-      return !rest.isEmpty && rest.allSatisfy { "─━".contains($0) }
-    }
+    let isRule = PromptInputRecognition.isRule
     // The last run of options numbered 1, 2, 3… one right under the other's words, or a rule.
     var run: [Parsed] = []
     for option in parsed {
