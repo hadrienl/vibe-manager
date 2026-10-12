@@ -13,6 +13,7 @@ struct VibeCompanionApp: App {
     WindowGroup {
       CompanionScreen()
         .environment(delegate.model)
+        .environment(delegate.channel)
     }
   }
 }
@@ -22,6 +23,8 @@ struct VibeCompanionApp: App {
 @MainActor
 final class CompanionAppDelegate: NSObject, UIApplicationDelegate {
   let model: CompanionModel
+  /// The active channel (#368), opened and closed by the screen with the foreground.
+  let channel = CompanionChannel()
 
   override init() {
     let support =

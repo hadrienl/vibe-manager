@@ -4,7 +4,10 @@
 #include "CompanionBase.xcconfig"
 
 SDKROOT = macosx
-MACOSX_DEPLOYMENT_TARGET = 14.0
+// iroh's bindings (#368) ask for macOS 14.5, and ship a library for Apple silicon only: an Intel
+// Mac would not run the agent.
+MACOSX_DEPLOYMENT_TARGET = 14.5
+ARCHS = arm64
 PRODUCT_BUNDLE_IDENTIFIER = eu.hadrien.VibeManager.CompanionAgent
 PRODUCT_NAME = Vibe Manager Companion
 INFOPLIST_KEY_CFBundleDisplayName = Vibe Manager Companion

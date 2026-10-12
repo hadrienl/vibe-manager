@@ -51,6 +51,9 @@ final class CompanionAgent {
   }
 
   let sync: CompanionCloudSync
+  /// The active channel's end (#368), and the address it is reached at, once bound.
+  private let echo: CompanionEchoServer
+  private var irohAddress: CompanionEchoServer.Address?
   private let arguments: Arguments
   private var connection: CompanionLinkConnection?
   private var installation: Installation?
@@ -69,6 +72,7 @@ final class CompanionAgent {
     self.arguments = arguments
     sync = CompanionCloudSync(
       storeURL: arguments.stateDirectory.appendingPathComponent("sync.json", isDirectory: false))
+    echo = CompanionEchoServer(stateDirectory: arguments.stateDirectory)
   }
 
   func start() async {
@@ -84,7 +88,25 @@ final class CompanionAgent {
       return
     }
     schedule()
+    let echo = self.echo
+    Task { [weak self] in
+      await echo.start { [weak self] address in
+        Task { @MainActor in await self?.irohAddressChanged(address) }
+      }
+    }
     await sync.fetchChanges()
+  }
+
+  /// Written in the `Mac` record at once: the phone dials what it reads there. The relay changes
+  /// rarely, the identifier never, so this is no frequent write.
+  private func irohAddressChanged(_ address: CompanionEchoServer.Address) async {
+    guard address != irohAddress, !isDeparting else { return }
+    irohAddress = address
+    CompanionIroh.logger.notice(
+      "echo: publishing \(address.endpointID, privacy: .public) via \(address.relayURL ?? "no relay", privacy: .public)"
+    )
+    await writeMac(online: true)
+    sendSoon()
   }
 
   // MARK: - Link
@@ -239,7 +261,9 @@ final class CompanionAgent {
       .mac(
         CompanionMac(
           installationID: installation.id, name: Self.macName(), version: installation.version,
-          buildLabel: installation.buildLabel, online: online, lastSeen: Date()))
+          buildLabel: installation.buildLabel, online: online, lastSeen: Date(),
+          irohEndpointID: online ? irohAddress?.endpointID : nil,
+          irohRelayURL: online ? irohAddress?.relayURL : nil))
     ])
   }
 
@@ -305,6 +329,7 @@ final class CompanionAgent {
         await self.sync.sendChanges()
         resumed.resume()
       }
+      Task { await self.echo.stop() }
       Task { @MainActor in
         try? await Task.sleep(for: .seconds(Self.departureLimit))
         resumed.resume()

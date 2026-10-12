@@ -7,6 +7,7 @@ import UIKit
 /// iCloud, the synchronisation, the active sessions, the test, the journal.
 struct CompanionScreen: View {
   @Environment(CompanionModel.self) private var model
+  @Environment(CompanionChannel.self) private var channel
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
@@ -14,6 +15,7 @@ struct CompanionScreen: View {
       List {
         if model.macs.count > 1 { macPicker }
         StatusSection()
+        ChannelSection()
         cloudSection
         syncSection
         sessionsSection
@@ -32,7 +34,23 @@ struct CompanionScreen: View {
         }
       }
       .onChange(of: scenePhase) { _, phase in
-        if phase == .active { Task { await model.refresh() } }
+        switch phase {
+        case .active:
+          Task { await model.refresh() }
+          // Back from the background, where it was closed; already up at launch.
+          if channel.phase != .connecting && channel.phase != .connected {
+            channel.open(to: model.selectedMac)
+          }
+        case .background:
+          // iOS suspends the application and breaks its socket: the endpoint goes with it.
+          channel.close()
+        default:
+          break
+        }
+      }
+      // A Mac picked, or its endpoint published: dialed at once, in the foreground.
+      .onChange(of: model.selectedMac?.irohEndpointID, initial: true) { _, _ in
+        if scenePhase == .active { channel.open(to: model.selectedMac) }
       }
     }
   }
@@ -242,6 +260,7 @@ private struct TestSection: View {
 #Preview {
   CompanionScreen()
     .environment(CompanionModel(sync: PreviewCompanionSync(), deviceName: "iPhone"))
+    .environment(CompanionChannel())
 }
 
 /// A synchronisation that only answers with fixed records, for the preview.

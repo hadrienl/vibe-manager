@@ -38,10 +38,16 @@ public struct CompanionMac: Hashable, Codable, Sendable {
   /// Written `true` at start, `false` on a clean stop. A crash writes nothing: `lastSeen` says it.
   public var online: Bool
   public var lastSeen: Date
+  /// The companion agent's iroh endpoint (#368): its public key, stable from one launch to the
+  /// next, which the phone dials for the active channel. `nil` until the endpoint is up.
+  public var irohEndpointID: String?
+  /// The iroh relay the endpoint calls home: where the phone first finds it, before any hole is
+  /// punched.
+  public var irohRelayURL: String?
 
   public init(
     installationID: String, name: String, version: String, buildLabel: String, online: Bool,
-    lastSeen: Date
+    lastSeen: Date, irohEndpointID: String? = nil, irohRelayURL: String? = nil
   ) {
     self.installationID = installationID
     self.name = name
@@ -49,6 +55,8 @@ public struct CompanionMac: Hashable, Codable, Sendable {
     self.buildLabel = buildLabel
     self.online = online
     self.lastSeen = lastSeen
+    self.irohEndpointID = irohEndpointID
+    self.irohRelayURL = irohRelayURL
   }
 }
 

@@ -44,6 +44,8 @@ public enum CompanionRecordCodec {
     static let sentAt = "sentAt"
     static let nonce = "nonce"
     static let receivedAt = "receivedAt"
+    static let irohEndpointID = "irohEndpointID"
+    static let irohRelayURL = "irohRelayURL"
   }
 
   public static func recordType(of record: CompanionRecord) -> String {
@@ -77,6 +79,9 @@ public enum CompanionRecordCodec {
       secret[Field.buildLabel] = mac.buildLabel
       secret[Field.online] = mac.online
       ckRecord[Field.lastSeen] = mac.lastSeen
+      // Encrypted like the rest, though a public key: nothing reads them but the phone.
+      secret[Field.irohEndpointID] = mac.irohEndpointID
+      secret[Field.irohRelayURL] = mac.irohRelayURL
     case .session(let session):
       ckRecord[Field.macID] = session.macID
       secret[Field.title] = session.title
@@ -110,7 +115,9 @@ public enum CompanionRecordCodec {
         CompanionMac(
           installationID: id, name: macName, version: secret[Field.version] as? String ?? "",
           buildLabel: secret[Field.buildLabel] as? String ?? "",
-          online: secret[Field.online] as? Bool ?? false, lastSeen: lastSeen))
+          online: secret[Field.online] as? Bool ?? false, lastSeen: lastSeen,
+          irohEndpointID: secret[Field.irohEndpointID] as? String,
+          irohRelayURL: secret[Field.irohRelayURL] as? String))
     case RecordType.session:
       guard let id = name.dropPrefix("session-"),
         let macID = ckRecord[Field.macID] as? String,
