@@ -107,8 +107,8 @@ struct ExecutableLocatorTests {
     #expect(location == .found(path: "/usr/bin/stub-agent", source: .processPath))
   }
 
-  @Test("Symbolic links are resolved to the real executable")
-  func resolvesSymlinks() async {
+  @Test("A symbolic link stays stable when its versioned target is replaced")
+  func keepsSymlinkPath() async {
     let fileSystem = StubFileSystem(
       executables: ["/opt/homebrew/Cellar/stub/bin/stub-agent"],
       symlinks: ["/opt/homebrew/bin/stub-agent": "/opt/homebrew/Cellar/stub/bin/stub-agent"]
@@ -122,7 +122,7 @@ struct ExecutableLocatorTests {
     #expect(
       location
         == .found(
-          path: "/opt/homebrew/Cellar/stub/bin/stub-agent",
+          path: "/opt/homebrew/bin/stub-agent",
           source: .candidateDirectory
         )
     )

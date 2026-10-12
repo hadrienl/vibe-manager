@@ -297,6 +297,13 @@ public struct ConversationView: View {
           }
           .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           Spacer()
+          if failure.canDetectAgain, let detectAgain = model.detectAgentsAgain {
+            Button {
+              Task { await detectAgain() }
+            } label: {
+              Text("Detect Again", bundle: .module)
+            }
+          }
           stoppedActions
         }
         .modifier(StatusGlass())

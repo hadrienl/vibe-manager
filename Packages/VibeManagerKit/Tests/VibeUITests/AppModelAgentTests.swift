@@ -16,14 +16,20 @@ private struct StubAgentProvider: AgentProvider {
   let state: AgentAvailabilityState
   /// Holds the detection until the test opens it.
   let gate: ProbeGate?
+  let recorder: DetectionRecorder?
 
-  init(id: String, state: AgentAvailabilityState, gate: ProbeGate? = nil) {
+  init(
+    id: String, state: AgentAvailabilityState, gate: ProbeGate? = nil,
+    recorder: DetectionRecorder? = nil
+  ) {
     descriptor = AgentDescriptor(id: AgentProviderID(id), displayName: id.capitalized)
     self.state = state
     self.gate = gate
+    self.recorder = recorder
   }
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
+    await recorder?.record(forceRefresh)
     await gate?.wait()
     return AgentAvailability(
       state: state,
@@ -43,6 +49,14 @@ private struct StubAgentProvider: AgentProvider {
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
     throw AgentLaunchError.unavailable(state)
+  }
+}
+
+private actor DetectionRecorder {
+  private(set) var requests: [Bool] = []
+
+  func record(_ forceRefresh: Bool) {
+    requests.append(forceRefresh)
   }
 }
 
@@ -79,6 +93,28 @@ func appModelExposesAgentDiagnostics() async {
 
   #expect(model.agentDiagnostics.map(\.providerID.rawValue) == ["claude", "codex"])
   #expect(model.agentDiagnostics.last?.state == .notFound)
+}
+
+@MainActor
+@Test("A launch failure can run the forced detection used by Settings")
+func launchFailureCanDetectAgain() async throws {
+  let recorder = DetectionRecorder()
+  let conversations = ConversationWorkspace()
+  let model = AppModel(
+    repository: EmptyRepository(),
+    agents: StubAgentRegistry(providers: [
+      StubAgentProvider(id: "claude", state: .available, recorder: recorder)
+    ]),
+    conversations: conversations
+  )
+  await model.load()
+
+  let conversation = conversations.show(
+    WorkSession(name: "Session", agent: SessionAgentConfiguration(providerID: "claude")))
+  let detectAgain = try #require(conversation.detectAgentsAgain)
+  await detectAgain()
+
+  #expect(await recorder.requests.last == true)
 }
 
 @MainActor

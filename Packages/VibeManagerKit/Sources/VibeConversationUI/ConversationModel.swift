@@ -311,6 +311,8 @@ public final class ConversationModel {
   @ObservationIgnored private var knownImages: Set<String>?
   /// Restarts the session, from the composer of a session whose agent stopped.
   @ObservationIgnored public var restart: (() -> Void)?
+  /// Detects the installed agents again after a launch plan pointed at a file that disappeared.
+  @ObservationIgnored public var detectAgentsAgain: (() async -> Void)?
   /// Whether the session can be restarted now: an archived one cannot.
   @ObservationIgnored public var canRestart: () -> Bool = { true }
   /// The first request of the session and how it may be answered, read from the application's
@@ -1637,9 +1639,12 @@ public final class ConversationModel {
 public struct ConversationLaunchFailure: Equatable, Sendable {
   public let message: String
   public let suggestion: String?
+  /// A fresh detection can repair this failure without leaving the conversation for Settings.
+  public let canDetectAgain: Bool
 
-  public init(message: String, suggestion: String?) {
+  public init(message: String, suggestion: String?, canDetectAgain: Bool = false) {
     self.message = message
     self.suggestion = suggestion
+    self.canDetectAgain = canDetectAgain
   }
 }
