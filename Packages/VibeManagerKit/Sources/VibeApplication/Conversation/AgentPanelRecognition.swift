@@ -37,4 +37,14 @@ public enum AgentPanelRecognition {
   private static func isPrompt(_ line: String) -> Bool {
     line.hasPrefix("❯") || line.hasPrefix("›")
   }
+
+  /// Whether the screen offers to send the prompts queued now: Claude Code 2.1.288 shows "Press up
+  /// to edit queued messages · ctrl+x ctrl+s to send now" under its prompt while some are queued
+  /// (#341). Only the words are looked for: the keys may be bound otherwise in `keybindings.json`.
+  public static func showsSendNowHint(screen: String) -> Bool {
+    let lines = screen.split(separator: "\n").filter {
+      !$0.allSatisfy(\.isWhitespace)
+    }
+    return lines.suffix(lineCount).contains { $0.localizedCaseInsensitiveContains("to send now") }
+  }
 }

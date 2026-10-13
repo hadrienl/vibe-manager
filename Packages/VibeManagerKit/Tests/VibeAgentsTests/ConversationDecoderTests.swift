@@ -116,6 +116,26 @@ struct ClaudeCodeConversationDecoderTests {
     #expect(entries[1].content == .notice(.interrupted))
   }
 
+  @Test("Queued prompts sent now: the turn interrupted, then each prompt of its own (#341)")
+  func sentNow() {
+    // As Claude Code 2.1.288 writes it once ctrl+x ctrl+s sent two prompts queued during a command.
+    let entries = decode([
+      #"{"type":"user","uuid":"u1","message":{"role":"user","content":"Wait a while"}}"#,
+      #"{"type":"assistant","uuid":"a1","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"sleep 40"}}]}}"#,
+      #"{"type":"user","uuid":"r1","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"The user doesn't want to proceed with this tool use. The tool use was rejected.","is_error":true}]},"toolUseResult":"Error: The user doesn't want to proceed with this tool use. The tool use was rejected."}"#,
+      #"{"type":"user","uuid":"i1","interruptedBySendNow":true,"message":{"role":"user","content":[{"type":"text","text":"[Request interrupted by user for tool use]"}]}}"#,
+      #"{"type":"user","uuid":"u2","message":{"role":"user","content":"First queued"}}"#,
+      #"{"type":"user","uuid":"u3","message":{"role":"user","content":"Second queued"}}"#,
+    ])
+    let prompts = entries.compactMap { entry -> String? in
+      guard case .userPrompt(let text, _) = entry.content else { return nil }
+      return text
+    }
+    #expect(prompts == ["Wait a while", "First queued", "Second queued"])
+    #expect(entries.contains { $0.content == .notice(.interrupted) })
+    #expect(entries.first(where: { $0.toolCall != nil })?.toolCall?.state != .running)
+  }
+
   @Test("An edit keeps its patch, never the whole file it touched")
   func edit() {
     let original = String(repeating: "secret line\n", count: 1_000)

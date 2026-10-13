@@ -131,6 +131,9 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   /// queued behind ended: it is given ten minutes rather than ten seconds before it is said lost,
   /// and no longer holds back the echoes sent after it.
   let waitsForEnd: Bool
+  /// The turn a message was sent during, which the agent keeps for when that turn ends: it can be
+  /// sent now instead (#341). `nil` for one sent at rest, and for a command.
+  let queuedInTurn: Int?
   public var state: State
   /// When Return was last written for it: the wait for the transcript runs from there, not from
   /// the time spent typing it and waiting for the agent to show it (#370).
@@ -244,6 +247,8 @@ public final class ConversationModel {
       rebuild(changedFrom: nil)
       // A skill or a prompt the agent took up: nothing waits in a panel of its terminal, and the
       // composer gets the keyboard back from the block.
+      // A request answered goes back to the same turn; from rest, a new one starts.
+      if activity == .working, oldValue == .idle || oldValue == nil { turn += 1 }
       if activity == .working {
         initialCommand = nil
         if terminalPanel != nil {
@@ -1377,6 +1382,7 @@ public final class ConversationModel {
         // Queued, a command is written once the turn ended, then run.
         waitsForEnd: opensPanel
           || kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
+        queuedInTurn: kind == .message && isAgentWorking ? turn : nil,
         state: .sending))
     let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
@@ -1745,6 +1751,50 @@ public final class ConversationModel {
     await write?(promptFormat.interruptKey)
   }
 
+  // MARK: - Send now (#341)
+
+  /// Counts the turns, for a message queued during one to be told from one left over from an
+  /// earlier turn — put back in the agent's prompt by an Escape, and never sent.
+  private(set) var turn = 0
+  /// The messages Send Now was clicked for: the key is not written twice for them.
+  private var sentNow: Set<UUID> = []
+
+  /// The echo under which Send Now shows: the last message queued in this turn, since the key
+  /// sends them all — while the turn goes on, and no request or dialog would take the keys.
+  public var sendNowEchoID: UUID? {
+    guard promptFormat.sendNowKey != nil, isAgentWorking, composerState == .ready,
+      terminalPanel == nil, !isSubmitting
+    else { return nil }
+    return echoes.last(where: { $0.queuedInTurn == turn && !sentNow.contains($0.id) })?.id
+  }
+
+  public func canSendNow(_ echo: PendingEcho) -> Bool {
+    sendNowEchoID == echo.id
+  }
+
+  /// Sends the messages queued at once, the turn stopped, as the agent's own key does. Written
+  /// only once its screen offers it: otherwise the terminal is shown, for the user to see why.
+  /// The echoes are confirmed as any other, by the prompts the transcript writes.
+  public func sendNow() async {
+    guard let key = promptFormat.sendNowKey, sendNowEchoID != nil, let write else { return }
+    // Held from the first click: a second one, while the screen is read, writes nothing.
+    let sent = Set(echoes.filter { $0.queuedInTurn == turn }.map(\.id))
+    let sentTurn = turn
+    sentNow.formUnion(sent)
+    let screen = await readScreen?()
+    // Reading the screen takes a moment: the turn may have ended, a request come meanwhile.
+    guard isAgentWorking, composerState == .ready, terminalPanel == nil, turn == sentTurn else {
+      sentNow.subtract(sent)
+      return
+    }
+    guard let screen, AgentPanelRecognition.showsSendNowHint(screen: screen) else {
+      sentNow.subtract(sent)
+      showTerminal?()
+      return
+    }
+    await write(key)
+  }
+
   private func confirmEchoes() {
     guard !echoes.isEmpty else { return }
     let prompts = echoTallies.count(of: .message)
@@ -1762,6 +1812,7 @@ public final class ConversationModel {
       claimed.insert(index)
       return true
     }
+    sentNow.formIntersection(echoes.map(\.id))
     settleTerminalPanel()
   }
 

@@ -174,6 +174,9 @@ public struct AgentPromptFormat: Hashable, Sendable {
   public var queueKey: [UInt8]
   /// What stops the agent's turn: Escape for both CLIs.
   public var interruptKey: [UInt8]
+  /// What sends at once the prompts queued during a turn, the turn stopped; `nil` for an agent
+  /// that cannot (#341).
+  public var sendNowKey: [UInt8]?
   /// Between the paste and the key that sends it: a TUI that times keystrokes to tell a paste
   /// from typing must have seen the paste end.
   public var submitDelay: Duration
@@ -193,6 +196,7 @@ public struct AgentPromptFormat: Hashable, Sendable {
     submitKey: [UInt8] = [0x0D],
     queueKey: [UInt8] = [0x0D],
     interruptKey: [UInt8] = [0x1B],
+    sendNowKey: [UInt8]? = nil,
     submitDelay: Duration = .milliseconds(80),
     attachmentDelay: Duration = .milliseconds(500),
     shellEntry: ShellEntry? = nil,
@@ -204,6 +208,7 @@ public struct AgentPromptFormat: Hashable, Sendable {
     self.submitKey = submitKey
     self.queueKey = queueKey
     self.interruptKey = interruptKey
+    self.sendNowKey = sendNowKey
     self.submitDelay = submitDelay
     self.attachmentDelay = attachmentDelay
   }
