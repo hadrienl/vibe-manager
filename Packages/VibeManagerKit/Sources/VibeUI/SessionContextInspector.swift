@@ -84,7 +84,7 @@ struct SessionContextInspector: View {
   /// usage — is left out, and keeps its place in the arrangement for when it comes back.
   private var sections: [InspectorSectionDescriptor] {
     var sections: [InspectorSectionDescriptor] = []
-    if let coordination, session.coordination != nil {
+    if let coordination, session.coordination != nil || coordination.showsAsCoordinator(session) {
       sections.append(coordinationSection(coordination))
     }
     if let journal {
@@ -127,7 +127,7 @@ extension SessionContextInspector {
   }
 
   fileprivate func coordinationSection(_ model: AppModel) -> InspectorSectionDescriptor {
-    let isCoordinator = session.coordination?.isCoordinator == true
+    let isCoordinator = model.showsAsCoordinator(session)
     return InspectorSectionDescriptor(
       id: .coordination,
       title: isCoordinator

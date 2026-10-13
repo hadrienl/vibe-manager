@@ -11508,6 +11508,107 @@
         }
       }
     },
+    "Coordinate" : {
+      "comment" : "A composer's chip: the agent may create sessions.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تنسيق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koordinieren"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordinar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordonner"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "समन्वय करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordina"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コーディネート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "코디네이트"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coördineren"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koordynuj"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordenar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Координировать"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koordine et"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Координувати"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "协调"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "協調"
+          }
+        }
+      }
+    },
     "Copied" : {
       "localizations" : {
         "ar" : {
@@ -18526,6 +18627,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最近的動作：%@"
+          }
+        }
+      }
+    },
+    "Let the agent create and follow sessions of its own, one per task." : {
+      "comment" : "The help of the Coordinate chip, turned off.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "السماح للوكيل بإنشاء جلسات خاصة به ومتابعتها، جلسة لكل مهمة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Den Agenten eigene Sitzungen anlegen und verfolgen lassen, eine pro Aufgabe."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite que el agente cree y siga sus propias sesiones, una por tarea."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permettre à l’agent de créer et de suivre ses propres sessions, une par tâche."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "एजेंट को अपने सेशन बनाने और उन पर नज़र रखने दें, हर काम के लिए एक।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Consenti all’agente di creare e seguire sessioni proprie, una per attività."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エージェントが自分のセッションをタスクごとに作成して見守れるようにします。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에이전트가 작업마다 하나씩 자체 세션을 만들고 지켜보게 합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Laat de agent eigen sessies maken en volgen, één per taak."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pozwól agentowi tworzyć i śledzić własne sesje, po jednej na zadanie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permite que o agente crie e acompanhe sessões próprias, uma por tarefa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Разрешить агенту создавать собственные сессии и следить за ними, по одной на задачу."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajanın her görev için bir tane olmak üzere kendi oturumlarını oluşturup izlemesine izin verin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Дозволити агенту створювати власні сеанси й стежити за ними, по одному на завдання."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "让智能体创建并跟进自己的会话，每项任务一个。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "讓代理程式建立並追蹤自己的工作階段，每項任務一個。"
           }
         }
       }
@@ -30216,6 +30418,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "文字大小"
+          }
+        }
+      }
+    },
+    "The agent can create and follow sessions of its own, one per task. Click to turn it off." : {
+      "comment" : "The help of the Coordinate chip, turned on.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكن للوكيل إنشاء جلسات خاصة به ومتابعتها، جلسة لكل مهمة. انقر لإيقاف ذلك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Agent kann eigene Sitzungen anlegen und verfolgen, eine pro Aufgabe. Zum Ausschalten klicken."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El agente puede crear y seguir sus propias sesiones, una por tarea. Haz clic para desactivarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent peut créer et suivre ses propres sessions, une par tâche. Cliquez pour désactiver."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "एजेंट अपने सेशन बना सकता है और उन पर नज़र रख सकता है, हर काम के लिए एक। बंद करने के लिए क्लिक करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agente può creare e seguire sessioni proprie, una per attività. Fai clic per disattivare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エージェントは自分のセッションをタスクごとに作成して見守れます。クリックするとオフになります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에이전트가 작업마다 하나씩 자체 세션을 만들고 지켜볼 수 있습니다. 끄려면 클릭하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De agent kan eigen sessies maken en volgen, één per taak. Klik om dit uit te zetten."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent może tworzyć i śledzić własne sesje, po jednej na zadanie. Kliknij, aby wyłączyć."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O agente pode criar e acompanhar sessões próprias, uma por tarefa. Clique para desativar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Агент может создавать собственные сессии и следить за ними, по одной на задачу. Нажмите, чтобы выключить."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajan her görev için bir tane olmak üzere kendi oturumlarını oluşturup izleyebilir. Kapatmak için tıklayın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Агент може створювати власні сеанси й стежити за ними, по одному на завдання. Натисніть, щоб вимкнути."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "智能体可以创建并跟进自己的会话，每项任务一个。点按即可关闭。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理程式可以建立並追蹤自己的工作階段，每項任務一個。按一下即可關閉。"
           }
         }
       }

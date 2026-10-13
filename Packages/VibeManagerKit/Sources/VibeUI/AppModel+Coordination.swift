@@ -1,6 +1,7 @@
 import Foundation
 import VibeApplication
 import VibeBrowser
+import VibeConversationUI
 import VibeDomain
 
 /// A coordinator's children, summed up on its row and in its section (#352).
@@ -35,8 +36,15 @@ extension AppModel {
     return SessionHierarchy.column(of: session, in: SessionHierarchy.index(sessions))
   }
 
+  /// Whether the user turned coordination on for a session.
   public func isCoordinator(_ id: SessionID) -> Bool {
     sessions.first { $0.id == id }?.coordination?.isCoordinator == true
+  }
+
+  /// Whether a session is shown as a coordinator: coordination is on for it, or it has children —
+  /// turned off since, it still folds them and sums them up.
+  public func showsAsCoordinator(_ session: WorkSession) -> Bool {
+    session.coordination?.isCoordinator == true || !children(of: session.id).isEmpty
   }
 
   public func isExpanded(coordinator id: SessionID) -> Bool {
@@ -59,7 +67,7 @@ extension AppModel {
       if let parent = session.coordination?.coordinatorID, shownParents.contains(parent) {
         return !collapsed.contains(parent)
       }
-      if session.coordination?.isCoordinator == true { shownParents.insert(session.id) }
+      shownParents.insert(session.id)
       return true
     }
   }
@@ -109,8 +117,7 @@ extension AppModel {
   /// The children still running of a coordinator about to be stopped: the question offers to stop
   /// them too.
   public func runningChildren(ofCoordinator session: WorkSession) -> [WorkSession] {
-    guard session.coordination?.isCoordinator == true else { return [] }
-    return children(of: session.id).filter { launcher?.isRunning($0.id) == true }
+    children(of: session.id).filter { launcher?.isRunning($0.id) == true }
   }
 
   /// Closes a coordinator's running children, as a batch close would, saying nothing (#352).
@@ -155,8 +162,11 @@ extension AppModel {
     return false
   }
 
-  /// A child's agent stopped on its own.
+  /// A session's agent stopped on its own: what was owed to it is told at its next launch, by its
+  /// instructions; a child's coordinator is told.
   func coordinationProcessEnded(_ id: SessionID) {
+    coordination.notices[id] = nil
+    coordination.owedRules.remove(id)
     guard let child = sessions.first(where: { $0.id == id }),
       let coordinatorID = child.coordination?.coordinatorID
     else { return }
@@ -185,10 +195,24 @@ extension AppModel {
     startCoordinationTicker()
   }
 
-  /// Reads the wake-ups kept, and starts telling them.
+  /// Reads the wake-ups kept, and starts telling them; reads which agents can coordinate.
   func startCoordination() async {
     await coordination.load()
     if !coordination.wakes.isEmpty { startCoordinationTicker() }
+    await loadCoordinatingAgents()
+  }
+
+  /// The agents handed tools and instructions at launch: those a session can coordinate with.
+  func loadCoordinatingAgents() async {
+    guard let agents else { return }
+    var ids: Set<String> = []
+    for descriptor in await agents.descriptors() {
+      let provider = await agents.provider(id: descriptor.id)
+      if provider is any AgentToolServing, provider is any AgentInstructing {
+        ids.insert(descriptor.id.rawValue)
+      }
+    }
+    coordination.coordinatingAgents = ids
   }
 
   /// Ticks every second while something waits to be typed, and otherwise wakes for the next
@@ -297,12 +321,83 @@ extension AppModel {
   }
 }
 
+// MARK: - Turning coordination on
+
+extension AppModel {
+  /// Whether the user can turn coordination on for a session: any session but a child or an
+  /// archived one, whose agent is handed tools at launch (#352).
+  public func canCoordinate(_ session: WorkSession) -> Bool {
+    guard CoordinationPolicy.mayCoordinate(session), session.status != .archived,
+      let agent = session.agent?.providerID
+    else { return false }
+    return coordination.coordinatingAgents.contains(agent)
+  }
+
+  /// The composer's “Coordinate” chip (#352). Turned on while the agent runs, its tools serve at
+  /// once: the user's next message says so, and the first answer of a tool gives the rules. Turned
+  /// on while it does not, its next launch gives them.
+  public func setCoordinating(_ isOn: Bool, for id: SessionID) async {
+    guard let session = sessions.first(where: { $0.id == id }),
+      (session.coordination?.isCoordinator == true) != isOn,
+      !isOn || canCoordinate(session)
+    else { return }
+    do {
+      try await SetSessionCoordinating(repository: repository)(isOn, for: id)
+    } catch {
+      return
+    }
+    await reload()
+    if launcher?.isRunning(id) == true {
+      // Turned back before the next message, nothing is said.
+      if let pending = coordination.notices[id], pending != isOn {
+        coordination.notices[id] = nil
+      } else {
+        coordination.notices[id] = isOn
+      }
+      if isOn { coordination.owedRules.insert(id) } else { coordination.owedRules.remove(id) }
+    } else {
+      coordination.notices[id] = nil
+      coordination.owedRules.remove(id)
+    }
+    diagnostics.record(
+      .session, .info, isOn ? "coordination.turnedOn" : "coordination.turnedOff",
+      ["session": diagnostics.pseudonym(id)])
+  }
+
+  /// What the user's next message to a session says first, taken once (#352).
+  func takeCoordinationNotice(for id: SessionID) -> String? {
+    guard let isOn = coordination.notices.removeValue(forKey: id) else { return nil }
+    return isOn ? CoordinatorInstructions.turnedOn : CoordinatorInstructions.turnedOff
+  }
+
+  /// The composer's chip for a session, or `nil` where it cannot coordinate.
+  func composerCoordination(for id: SessionID) -> ComposerCoordination? {
+    guard let session = sessions.first(where: { $0.id == id }) else { return nil }
+    let isOn = session.coordination?.isCoordinator == true
+    guard isOn || canCoordinate(session) else { return nil }
+    return ComposerCoordination(isOn: isOn) { [weak self] value in
+      Task { await self?.setCoordinating(value, for: id) }
+    }
+  }
+}
+
 // MARK: - The tools
 
 extension AppModel {
-  /// Runs one of a coordinator's tools (#352). Every refusal is said to the agent, in English.
+  /// Runs one of a coordinator's tools (#352). Every refusal is said to the agent, in English. The
+  /// first answer after coordination was turned on while the agent ran gives the rules.
   func runCoordinationTool(_ tool: String, arguments: JSONValue, caller: SessionID) async
     -> BrowserToolResult
+  {
+    let result = await coordinationToolResult(tool, arguments: arguments, caller: caller)
+    guard !result.isError, result.content.count == 1, case .text(let text) = result.content[0],
+      coordination.owedRules.remove(caller) != nil
+    else { return result }
+    return .text(CoordinatorInstructions.withRules(text))
+  }
+
+  private func coordinationToolResult(_ tool: String, arguments: JSONValue, caller: SessionID)
+    async -> BrowserToolResult
   {
     do {
       let coordinator = try CoordinationPolicy.coordinator(caller, among: sessions)
@@ -678,8 +773,9 @@ public final class CoordinationToolRunner: BrowserToolRunning {
     return await model.runCoordinationTool(tool, arguments: arguments, caller: session)
   }
 
-  /// The coordinators whose agent runs: the only sessions the coordination server lets in.
-  public func coordinators() -> Set<SessionID> {
-    Set(model?.sessions.filter { $0.coordination?.isCoordinator == true }.map(\.id) ?? [])
+  /// The sessions the coordination server lets in: every one but a child. Its tools refuse until
+  /// the user turns coordination on.
+  public func admittedSessions() -> Set<SessionID> {
+    Set(model?.sessions.filter(CoordinationPolicy.mayCoordinate).map(\.id) ?? [])
   }
 }

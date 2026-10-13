@@ -141,6 +141,13 @@ extension AppModel {
         self?.setPresentation(.terminal, of: id)
       }
       model.dictation = self?.dictation
+      // The “Coordinate” chip, and what turning it on or off tells the agent (#352).
+      model.coordination = { [weak self] in
+        self?.composerCoordination(for: id)
+      }
+      model.takePreface = { [weak self] in
+        self?.takeCoordinationNotice(for: id)
+      }
       model.dictationVocabulary = { [weak self] in
         guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
           return ""

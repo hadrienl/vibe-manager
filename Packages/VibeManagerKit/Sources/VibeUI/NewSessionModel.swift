@@ -195,7 +195,8 @@ public final class NewSessionModel {
     set { draft.coordination = newValue ? .coordinator : nil }
   }
 
-  /// Whether the agent chosen can coordinate: only one handed the tools at launch can.
+  /// Whether the agent chosen can coordinate: only one handed the tools at launch can. The draft's
+  /// “Coordinate” chip shows for it alone.
   public var canCoordinate: Bool {
     selectedAgent.map { coordinatingAgentIDs.contains($0.id) } ?? false
   }
@@ -491,15 +492,17 @@ public final class NewSessionModel {
     isLoadingAgents = true
     defer { isLoadingAgents = false }
 
-    agents = await AgentOption.detect(in: registry, forceRefresh: forceRefresh)
+    let detected = await AgentOption.detect(in: registry, forceRefresh: forceRefresh)
+    // Read before the agents are shown, so that they come with their default selection at once.
     var coordinating: Set<AgentProviderID> = []
-    for option in agents {
+    for option in detected {
       let provider = await registry.provider(id: option.id)
       if provider is any AgentToolServing, provider is any AgentInstructing {
         coordinating.insert(option.id)
       }
     }
     coordinatingAgentIDs = coordinating
+    agents = detected
 
     // Every agent stays listed, including the ones that cannot run — disappearing teaches the
     // user nothing. Only the default selection skips them.

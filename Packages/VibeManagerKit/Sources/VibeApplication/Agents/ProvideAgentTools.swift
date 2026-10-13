@@ -25,7 +25,8 @@ public struct ProvideAgentTools {
   private let agents: any AgentProviderResolving
   /// `nil` when the agents are not given the web view: Settings › Web View.
   private let setup: @MainActor () -> Setup?
-  /// The coordinator's tool server (#352), given to coordinators alone; `nil` when there is none.
+  /// The coordination tool server (#352), given to every session but a child; `nil` when there is
+  /// none.
   private let coordination: @MainActor () -> AgentToolServer?
 
   public init(
@@ -37,18 +38,22 @@ public struct ProvideAgentTools {
     self.coordination = coordination
   }
 
-  /// - Parameter session: the session launched. A coordinator gets its tools and instructions on
-  ///   top of the web view's (#352), whether or not agents are given the web view.
+  /// - Parameter session: the session launched. Every session but a child gets the coordination
+  ///   tools on top of the web view's (#352), whether or not agents are given the web view: they
+  ///   serve once the user turns coordination on, without a restart. A session it is on for is
+  ///   given the coordinator's instructions as well.
   public func callAsFunction(_ plan: AgentLaunchPlan, for session: WorkSession? = nil) async
     -> AgentLaunchPlan
   {
     var plan = plan
-    if session?.coordination?.isCoordinator == true, let server = coordination() {
+    if let session, CoordinationPolicy.mayCoordinate(session), let server = coordination() {
       let provider = await agents.provider(id: plan.providerID)
       if let serving = provider as? any AgentToolServing {
         plan = serving.providingTools([server], to: plan)
       }
-      if let instructing = provider as? any AgentInstructing {
+      if session.coordination?.isCoordinator == true,
+        let instructing = provider as? any AgentInstructing
+      {
         plan = instructing.instructing(CoordinatorInstructions.text, to: plan)
       }
     }

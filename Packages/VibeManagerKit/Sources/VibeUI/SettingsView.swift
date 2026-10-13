@@ -248,8 +248,8 @@ struct SettingsSidebarContent {
     }
     var tools: [SettingsPage] = []
     if model.browser != nil { tools.append(.webView) }
-    tools.append(.coordination)
     tools.append(.templates)
+    tools.append(.coordination)
     if model.dictation != nil { tools.append(.dictation) }
     if model.ticketTitles.canReadPages { tools.append(.tickets) }
     groups.append(

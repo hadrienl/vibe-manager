@@ -5,15 +5,15 @@ import VibeDomain
 /// in the coordinator's column and group, whatever its own task status or folder.
 ///
 /// A child's own status is on its row; it is not listed a second time in its own column. A child
-/// whose coordinator is archived or gone is an ordinary session again, in its own column.
+/// whose coordinator is archived or gone is an ordinary session again, in its own column. One whose
+/// coordinator had coordination turned off stays under it: what it was started for goes on.
 public enum SessionHierarchy {
   /// The coordinator a session is listed under, when it is listed under one.
   public static func parent(
     of session: WorkSession, in sessions: [SessionID: WorkSession]
   ) -> WorkSession? {
     guard session.status != .archived, let id = session.coordination?.coordinatorID,
-      let parent = sessions[id], parent.status != .archived,
-      parent.coordination?.isCoordinator == true
+      let parent = sessions[id], parent.status != .archived
     else { return nil }
     return parent
   }

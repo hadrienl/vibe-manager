@@ -13,13 +13,34 @@ child sessions, chooses their agent, orders the work, and is the user's one poin
 
 ## Decisions
 
-### A coordinator is an ordinary session, plus a tool server
+### Any session can coordinate, once the user turns it on
 
-`WorkSession.coordination` (`SessionCoordination`) says whether a session coordinates others
-(`.coordinator`) or is one of a coordinator's children (`.child(of:)`). Everything else is the same
-session: the same terminal, conversation, sidebar row and commands. A child is a session the user
-can open, write to, rename, close. There is no third level: the tools are given to coordinators
-alone, and a child is never one.
+`WorkSession.coordination` (`SessionCoordination`) says whether the user turned coordination on for
+a session (`.coordinator`) or whether it is one of a coordinator's children (`.child(of:)`).
+Everything else is the same session: the same terminal, conversation, sidebar row and commands. A
+child is a session the user can open, write to, rename, close.
+
+Coordination is not a kind of session chosen once at creation. A first version had a switch in the
+new session's More Options, which a first test missed: asked to "start two sessions", an ordinary
+session had no way to, and its agent ran subagents of its own instead. Instead, a “Coordinate”
+chip sits in the composer — of the new session's draft and of every conversation — for the
+sessions of an agent that takes tools and instructions at launch (Claude Code, Codex, and the
+endpoints that run them). It turns coordination on or off at any time
+(`SetSessionCoordinating`):
+
+- Every session but a child is given the `vibe-sessions` server at launch, whether coordination is
+  on or not. Its tools refuse while it is off, telling the agent to ask the user to turn the chip
+  on. An agent asked to start sessions asks for it instead of improvising.
+- Turned on while the agent runs, nothing restarts: the tools serve at once, the user's next
+  message from the composer starts with a line saying so (`CoordinatorInstructions.turnedOn`), and
+  the first answer of a tool carries the instructions. Turned on while it does not, its next launch
+  gives them. Turned off, the next message says so, and the children already running go on.
+- The user decides: an agent never creates sessions in a session the user did not turn it on for.
+  The instructions cost context only there.
+- There is no third level: a child is never given the server, and the tools refuse a child.
+
+A session with children stays shown as their coordinator once turned off: it folds them and sums
+them up, and its children stay under it.
 
 `sessions.json` goes to schema 10, the v9 shape with one optional field, read field by field: a role
 written by a later build, or a child said to be its own, reads as an ordinary session rather than as
@@ -33,8 +54,8 @@ bridge and the ancestry check are shared: the bridge is the same binary given
 `--browser-bridge <socket> --server vibe-sessions`, and names its server in its hello
 (`AgentToolServerDefinition`). A bridge that names none is the web view's, as every bridge was
 before, so an agent left running in the terminal host keeps working. Each server lets in the
-sessions it serves: the coordination server, the processes of coordinator sessions alone, whatever
-the setting that gives agents the web view. With the application closed, the bridge still lists a
+sessions it serves: the coordination server, the processes of every session but a child, whatever
+the setting that gives agents the web view; its tools then check that coordination is on. With the application closed, the bridge still lists a
 server's tools and says why a call fails.
 
 | Tool | What it does |
@@ -89,12 +110,15 @@ created, messaged, moved, started, stopped — is kept in `Coordination/<child>.
 
 ### The instructions
 
-A coordinator is told what it is at every launch, on top of its agent's own system prompt:
+A session coordination is on for is told what it is at every launch, on top of its agent's own
+system prompt:
 `--append-system-prompt` for Claude Code, `-c developer_instructions=…` for Codex
 (`AgentInstructing`), which replaces any the user's configuration holds, for that launch only. The
 text (`CoordinatorInstructions`) asks for a plan the user approves once, a worktree per child, no
 polling, no merge, and relays rather than answers. It is shipped with the application and not
-editable: the user's wishes go in the session's prompt or a template.
+editable: the user's wishes go in the session's prompt or a template. Every other session only
+reads the server's short description, given at `initialize`: when to prefer these tools to
+subagents of its own, and that they wait for the chip.
 
 ### In the sidebar
 

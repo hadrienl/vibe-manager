@@ -1,6 +1,7 @@
 import Foundation
 
-/// The tools a coordinator session is given to create and drive sessions of its own (#352).
+/// The tools a session is given to create and drive sessions of its own (#352): every session but
+/// a child, the tools serving once the user turns coordination on.
 ///
 /// Here beside the web view's because both are served by the same channel and the same bridge,
 /// which lists them by itself while the application is closed. What they do is the application's:
@@ -131,13 +132,17 @@ public enum CoordinationToolCatalog {
 }
 
 extension AgentToolServerDefinition {
-  /// A coordinator's tools (#352).
+  /// The coordination tools (#352), given to every session but a child.
   public static let coordination = AgentToolServerDefinition(
     name: CoordinationToolCatalog.serverName,
     instructions: """
       These tools let this Vibe Manager session coordinate child sessions: create them, follow \
-      them, write to them, move and stop them. Vibe Manager writes to you when a child finishes \
-      a turn, waits for the user, or stops: you do not need to poll.
+      them, write to them, move and stop them. Each child is a session of its own the user sees \
+      in the sidebar, with its own agent, folder and conversation: when the user asks you to \
+      start sessions, or to hand several tasks to agents they can follow, use these tools rather \
+      than subagents of your own. They work once the user turns on “Coordinate” in this \
+      session's message field; a tool answers so when it is off. Vibe Manager writes to you when \
+      a child finishes a turn, waits for the user, or stops: you do not need to poll.
       """,
     tools: CoordinationToolCatalog.tools,
     closedMessage:
@@ -145,5 +150,5 @@ extension AgentToolServerDefinition {
       + "Ask the user to open Vibe Manager, then try again.",
     refusal:
       "This process cannot coordinate sessions: it does not run in the terminal of a Vibe "
-      + "Manager coordinator session.")
+      + "Manager session, or runs in a child session.")
 }

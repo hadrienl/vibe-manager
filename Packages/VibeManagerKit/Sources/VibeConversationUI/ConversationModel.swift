@@ -313,6 +313,12 @@ public final class ConversationModel {
   /// The application's dictation (#340); `nil` where there is none, and the composer shows no
   /// microphone.
   @ObservationIgnored public var dictation: DictationController?
+  /// Coordination, offered in the composer (#352): `nil` where the session cannot coordinate. Read
+  /// each time, so that the composer follows the application's state.
+  @ObservationIgnored public var coordination: () -> ComposerCoordination? = { nil }
+  /// What the application has to tell the agent in front of the user's next message, taken once:
+  /// `nil` when there is nothing (#352).
+  @ObservationIgnored public var takePreface: (() -> String?)?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.
   @ObservationIgnored public var dictationVocabulary: @MainActor () async -> String = { "" }
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
@@ -1350,8 +1356,15 @@ public final class ConversationModel {
       }
     }
     let shell = promptFormat.shellEntry
-    let submission = PromptSubmission(text: draft, attachments: attachments)
-    let kind = submission.kind(shell: shell)
+    let typed = PromptSubmission(text: draft, attachments: attachments)
+    let kind = typed.kind(shell: shell)
+    // What the application has to tell the agent goes first (#352), never in front of a command —
+    // the shell's or the CLI's.
+    let preface =
+      kind == .message && !draft.hasPrefix("/") ? takePreface?() : nil
+    let submission =
+      preface.map { PromptSubmission(text: $0 + "\n\n" + draft, attachments: attachments) }
+      ?? typed
     let keystrokes = PromptEncoding.keystrokes(
       for: submission, format: promptFormat, whileWorking: isAgentWorking)
     // Prompts still on their way reach the transcript first: this one is confirmed only once
@@ -1369,8 +1382,10 @@ public final class ConversationModel {
       recallText = PromptHistory.recalled(command: command)
     case .message:
       text = PromptEncoding.sanitized(submission.messageText(shell: shell))
+      // Recalled as the user wrote it, without what the application put in front.
+      let written = PromptEncoding.sanitized(typed.messageText(shell: shell))
       recallText =
-        shell == nil ? text : PromptHistory.recalled(message: PromptEncoding.sanitized(draft))
+        shell == nil ? written : PromptHistory.recalled(message: PromptEncoding.sanitized(draft))
     }
     let echoID = UUID()
     // A command of the CLI — `/mcp` — may open a panel of its terminal, and be written to the

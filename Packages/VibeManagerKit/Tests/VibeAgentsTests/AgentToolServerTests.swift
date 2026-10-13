@@ -108,13 +108,20 @@ struct CoordinatorLaunchTests {
       result.arguments.contains { $0.hasPrefix("developer_instructions=\"You are a coordinator") })
   }
 
-  @Test("An ordinary session, or a child, gets neither")
-  func others() async {
-    for session in [
-      WorkSession(name: "Alone"), WorkSession(name: "#351", coordination: .child(of: SessionID())),
-    ] {
-      let result = await provide(session, provider: ClaudeCodeAgentProvider.id)
-      #expect(result.arguments == plan(ClaudeCodeAgentProvider.id).arguments)
-    }
+  @Test(
+    "An ordinary session gets the server, for the user to turn coordination on, but no instructions"
+  )
+  func ordinary() async {
+    let result = await provide(WorkSession(name: "Alone"), provider: ClaudeCodeAgentProvider.id)
+    #expect(result.arguments.contains("mcp__vibe-sessions"))
+    #expect(!result.arguments.contains("--append-system-prompt"))
+  }
+
+  @Test("A child gets neither")
+  func child() async {
+    let result = await provide(
+      WorkSession(name: "#351", coordination: .child(of: SessionID())),
+      provider: ClaudeCodeAgentProvider.id)
+    #expect(result.arguments == plan(ClaudeCodeAgentProvider.id).arguments)
   }
 }
