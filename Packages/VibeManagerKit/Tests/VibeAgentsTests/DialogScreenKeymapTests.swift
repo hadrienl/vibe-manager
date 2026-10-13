@@ -131,6 +131,17 @@ enum DialogScreens {
 
       enter continue · esc skip
     """
+  /// Codex 0.159.2 resumed, at its prompt: no hook has spoken yet, and none will before a turn.
+  static let codexAtRest = """
+    • CI corrigée et verte sur la PR #373.
+
+      Worked for 32m 33s • Oct 12 at 14:47
+
+    › Ask Codex to do anything
+
+      GPT-5.6-Sol medium · ~/Documents/vibe-manager
+      ? for shortcuts                                        ⚠ 4 warnings · f2 to view
+    """
   /// Two questions, as Claude Code 2.1.296 draws the first: "Chat about this" past a rule.
   static let claudeChatAboutThis = """
     ←  ☐ Color  ☐ Pets  ✔ Submit  →
@@ -157,7 +168,8 @@ struct AgentDialogScreenTests {
   func options() throws {
     let bash = try #require(DialogScreens.dialog(DialogScreens.claudeBash))
     #expect(bash.options.map(\.number) == [1, 2, 3, 4])
-    #expect(bash.options[1].label == "Yes, and always allow access to /Users/a/proj from this project")
+    #expect(
+      bash.options[1].label == "Yes, and always allow access to /Users/a/proj from this project")
     let codex = try #require(DialogScreens.dialog(DialogScreens.codexCommand))
     #expect(codex.options.map(\.shortcut) == ["y", "p", "esc"])
     #expect(codex.options[0].label == "Yes, proceed")
@@ -265,6 +277,33 @@ struct DialogScreenKeymapTests {
     #expect(codex.startupDialog(onScreen: DialogScreens.codexCommand) == nil)
     #expect(
       codex.answers(for: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil))).isEmpty)
+  }
+
+  @Test("Codex's prompt at rest: no dialog of its start waits; a dialog's pointer is not it")
+  func codexPromptAtRest() {
+    #expect(codex.showsPromptAtRest(onScreen: DialogScreens.codexAtRest))
+    #expect(codex.startupDialog(onScreen: DialogScreens.codexAtRest) == nil)
+    #expect(!codex.showsPromptAtRest(onScreen: DialogScreens.codexUpdate))
+    #expect(!codex.showsPromptAtRest(onScreen: DialogScreens.codexCommand))
+    #expect(!claude.showsPromptAtRest(onScreen: DialogScreens.codexAtRest))
+    // The folder's trust, a panel: no prompt under them.
+    let trust = """
+      Do you trust the contents of this directory?
+
+      › 1. Yes, continue
+        2. No, quit
+
+        Press enter to continue
+      """
+    #expect(!codex.showsPromptAtRest(onScreen: trust))
+    let panel = """
+      Select Model and Effort
+      › gpt-5.6-sol (current)
+        gpt-5.5
+
+        enter select · esc back
+      """
+    #expect(!codex.showsPromptAtRest(onScreen: panel))
   }
 
   @Test("Claude Code's questions set aside: Chat about this's digit, read on screen, then the text")

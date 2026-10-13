@@ -103,6 +103,11 @@ private struct ScreenKeymap: AgentAnswerKeymap {
     }
     return paths.isEmpty ? nil : AgentDrawnDialog(.patch(Set(paths)))
   }
+
+  /// `› ` alone on the last line: the prompt, waiting for words.
+  func showsPromptAtRest(onScreen text: String) -> Bool {
+    text.split(separator: "\n").last == "› "
+  }
 }
 
 /// The screen a terminal shows, which a test changes.
@@ -130,11 +135,14 @@ private struct Fixture {
   let answer: AnswerAgentRequest
   let id = SessionID()
 
-  init(sleep: @escaping @Sendable (Duration) async throws -> Void = { _ in
-    try await Task.sleep(for: .seconds(3600))
-  }) {
+  init(
+    clock: TestClock? = nil,
+    sleep: @escaping @Sendable (Duration) async throws -> Void = { _ in
+      try await Task.sleep(for: .seconds(3600))
+    }
+  ) {
     tracker = TrackAgentActivity(
-      logs: logs, store: MemoryActivityStore(), now: { t1 }, sleep: sleep,
+      logs: logs, store: MemoryActivityStore(), now: { clock?.now ?? t1 }, sleep: sleep,
       persistenceDelay: .seconds(3600))
     let screen = screen
     let written = written
@@ -178,6 +186,27 @@ private struct Fixture {
 @Suite("Which request a dialog is, read off the screen (#283)", .timeLimit(.minutes(2)))
 struct DialogOnScreenTests {
   // MARK: - What a dialog shows
+
+  @Test("Hooks silent past a start, the prompt at rest on screen: nothing waits on the user")
+  func promptAtRest() async throws {
+    let clock = TestClock(t1)
+    let fixture = Fixture(clock: clock)
+    await fixture.tracker.processStarted(fixture.id, decoder: CodexLikeDecoder())
+    clock.advance(11)
+    await fixture.tracker.tick()
+    let guessed = try #require(await fixture.tracker.state(for: fixture.id)?.requests.first)
+    #expect(guessed.id.key == "startup")
+    // A dialog on screen, of no kind the keymap knows: the guess stands.
+    await fixture.screen.show("Do you trust this folder?\n› 1. Yes")
+    await fixture.answer.readStartupDialog(guessed.id)
+    #expect(await fixture.tracker.state(for: fixture.id)?.requests.count == 1)
+    // The prompt: no dialog held the hooks back.
+    await fixture.screen.show("Resumed.\n› ")
+    await fixture.answer.readStartupDialog(guessed.id)
+    let state = await fixture.tracker.state(for: fixture.id)
+    #expect(state?.requests.isEmpty == true)
+    #expect(state?.activity == .idle)
+  }
 
   @Test("A wrapped command is the command, however the terminal broke its lines")
   func wrappedCommand() {
@@ -230,7 +259,8 @@ struct DialogOnScreenTests {
 
   // MARK: - Answering
 
-  @Test("Two commands that start alike: the first is offered, and answered once the screen shows it")
+  @Test(
+    "Two commands that start alike: the first is offered, and answered once the screen shows it")
   func sameStartAnsweredOnScreen() async {
     let fixture = Fixture()
     await fixture.start()
@@ -262,9 +292,11 @@ struct DialogOnScreenTests {
     #expect(await fixture.written.bytes == [[0x79]])
   }
 
-  @Test("A screen that shows no dialog, or one cut short, gets nothing typed", arguments: [
-    nil, "› Ask Codex to do anything", "[… 9 lines] ctrl+a view all",
-  ])
+  @Test(
+    "A screen that shows no dialog, or one cut short, gets nothing typed",
+    arguments: [
+      nil, "› Ask Codex to do anything", "[… 9 lines] ctrl+a view all",
+    ])
   func unreadable(_ text: String?) async {
     let fixture = Fixture()
     await fixture.start()

@@ -72,6 +72,21 @@ enum CodexDrawnDialogReading {
     return String(versions)
   }
 
+  /// Whether the prompt is drawn at the foot of the screen, under no dialog: `› Ask Codex to do
+  /// anything`, then its model and its hints. A dialog's options start with the same pointer,
+  /// numbered, and the trust or update dialog of its start draws no prompt under them.
+  static func promptAtRest(onScreen text: String) -> Bool {
+    let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+      .filter { !$0.isEmpty }
+    guard !AgentPanelRecognition.showsPanel(screen: text),
+      let prompt = lines.suffix(promptFooterLines + 1).lastIndex(where: { $0.hasPrefix("›") })
+    else { return false }
+    return lines[prompt].firstMatch(of: #/\A›\s*\d+\./#) == nil
+  }
+
+  /// What Codex draws under its prompt at most: a line of its model and folder, one of hints.
+  static let promptFooterLines = 3
+
   /// `› 1. Yes, proceed (y)`, `1. Allow`: where the options start.
   static func isFirstOption(_ line: String) -> Bool {
     line.hasPrefix("› 1. ") || line.hasPrefix("1. ")

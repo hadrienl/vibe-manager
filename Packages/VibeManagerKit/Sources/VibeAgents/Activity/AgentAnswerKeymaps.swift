@@ -242,6 +242,10 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
     }
   }
 
+  public func showsPromptAtRest(onScreen text: String) -> Bool {
+    CodexDrawnDialogReading.promptAtRest(onScreen: text)
+  }
+
   public func keystrokes(
     for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
   ) -> [[UInt8]]? {
