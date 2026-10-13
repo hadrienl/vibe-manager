@@ -29,6 +29,7 @@ extension AppModel {
         if let state = update.state {
           self.activityDidChange(
             update.sessionID, from: previous, to: state, isReplayed: update.isReplayed)
+          self.readStartupDialog(of: state, previous: previous)
         }
         self.conversations.activityChanged(update.sessionID, to: update.state)
         self.requestAnswering = self.requestAnswering.filter {
@@ -46,6 +47,20 @@ extension AppModel {
     requestsDidChange()
     await loadHookTrustingAgents()
     updateVisibleSession()
+  }
+
+  /// A dialog of the start is guessed to wait: its screen says which, when it is one that can be
+  /// answered from here — Codex's update offered. Read once, as the guess is made: by then the
+  /// dialog is drawn.
+  private func readStartupDialog(of state: AgentActivityState, previous: AgentActivityState?) {
+    func startup(_ state: AgentActivityState?) -> AgentRequestID? {
+      guard let request = state?.requests.first, case .inTerminal(let prompt) = request.content,
+        prompt.kind == .startup
+      else { return nil }
+      return request.id
+    }
+    guard let id = startup(state), startup(previous) != id, let answerRequest else { return }
+    Task { await answerRequest.readStartupDialog(id) }
   }
 
   /// The main window was hidden, minimised or covered — or shown again.

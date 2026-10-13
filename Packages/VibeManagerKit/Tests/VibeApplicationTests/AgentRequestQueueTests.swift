@@ -239,6 +239,25 @@ struct AgentRequestQueueTests {
     #expect(right.requests.map(\.reference.subject) == ["touch b"])
   }
 
+  @Test("A form answered from outside: its result, come later, settles none of those behind it")
+  func elicitationAnsweredFromOutside() {
+    let form = AgentSignal.questionAsked(
+      .question,
+      notice: AgentRequestNotice(
+        content: .elicitation(AgentElicitation(server: "supabase", fieldCount: 0)),
+        reference: AgentToolReference(tool: nil), isShown: true))
+    let asked = feed(form, form)
+    #expect(asked.requests.count == 2)
+    let answered = AgentActivityMachine.reduce(
+      asked, .answerSent(asked.requests[0].id), context: context(at: 50))
+    #expect(answered.requests.count == 1)
+    let resulted = feed(.questionResolved, to: answered)
+    #expect(resulted.requests.count == 1)
+    #expect(resulted.activity == .awaitingUser(.question))
+    // The second answered in the terminal: its result takes it away.
+    #expect(feed(.questionResolved, to: resulted).requests.isEmpty)
+  }
+
   @Test("A key typed in the terminal answers the dialog on screen: the first request")
   func keyTyped() {
     let asked = feed(permission("touch a", agent: "A"), permission("touch b", agent: "B"))

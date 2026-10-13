@@ -90,6 +90,11 @@ public struct ConversationRequest: Equatable, Sendable {
       && answers.contains(.writeText)
   }
 
+  /// Questions the composer does not answer, set aside by writing to the agent instead.
+  var takesChatAboutThis: Bool {
+    questions != nil && !takesComposerText && answers.contains(.chatAboutThis)
+  }
+
   /// Answered at a click: one question of one choice. Otherwise the choices go together.
   public var answersAtOnce: Bool {
     guard let questions, questions.count == 1 else { return false }
@@ -937,6 +942,10 @@ public final class ConversationModel {
     case .subagentGroup:
       return true
     case .toolGroup(_, let calls):
+      // A request to answer under one of its calls: a running one's, which stays in the group.
+      if calls.contains(where: { $0.toolCall.map { request(for: $0) != nil } ?? false }) {
+        return true
+      }
       return appearance.expandsFailures
         && calls.contains {
           if case .failed = $0.toolCall?.state { return true }
@@ -945,6 +954,7 @@ public final class ConversationModel {
     case .entry(let entry):
       guard let call = entry.toolCall else { return false }
       if call.kind.isShownOpen || call.state == .awaitingPermission { return true }
+      if request(for: call) != nil { return true }
       if case .failed = call.state, appearance.expandsFailures { return true }
       if call.kind == .edit || call.kind == .create { return appearance.expandsEdits }
       return false
@@ -1029,6 +1039,9 @@ public final class ConversationModel {
     case ready
     /// The agent asks a question: what is written is its free answer, the "Other" of its options.
     case answeringQuestion
+    /// Questions wait that the composer does not answer: what it sends sets them aside, and
+    /// goes to the agent as a message.
+    case chattingAboutQuestion
     /// The agent waits for an answer in its terminal: a prompt typed now would be read as one.
     case awaitingAnswer
     /// The agent is starting and has not said it is ready.
@@ -1043,14 +1056,15 @@ public final class ConversationModel {
     guard isProcessRunning else { return .stopped }
     guard isAgentReady else { return .starting }
     if case .awaitingUser = activity {
-      return request?.takesComposerText == true ? .answeringQuestion : .awaitingAnswer
+      if request?.takesComposerText == true { return .answeringQuestion }
+      return request?.takesChatAboutThis == true ? .chattingAboutQuestion : .awaitingAnswer
     }
     return .ready
   }
 
   /// Whether the composer can be typed into: a closed one does not take the keyboard.
   public var acceptsInput: Bool {
-    composerState == .ready || composerState == .answeringQuestion
+    [.ready, .answeringQuestion, .chattingAboutQuestion].contains(composerState)
   }
 
   public var canSend: Bool {
@@ -1059,7 +1073,7 @@ public final class ConversationModel {
       // Keys typed now would go to the panel open in the conversation, not to the prompt.
       return !isSubmitting && !PromptSubmission(text: draft, attachments: attachments).isEmpty
         && shellHold == nil && terminalPanel == nil
-    case .answeringQuestion:
+    case .answeringQuestion, .chattingAboutQuestion:
       return request?.isSending == false && !freeAnswer.isEmpty
     default:
       return false
@@ -1145,18 +1159,63 @@ public final class ConversationModel {
     return request
   }
 
+  /// The request no call of the conversation holds — a dialog of the CLI's start, an update it
+  /// offers — shown above the composer.
+  public var standaloneRequest: ConversationRequest? {
+    guard let request, requestCall(of: request) == nil else { return nil }
+    // A permission or a question goes under its call, which the transcript brings in a moment.
+    switch request.request.content {
+    case .inTerminal, .elicitation: return request
+    default: return nil
+    }
+  }
+
   private func requestCall(of request: ConversationRequest) -> ToolCall? {
-    guard case .permission(let permission) = request.request.content,
-      let subject = permission.subject
-    else { return pendingCall }
-    let unfinished = ConversationEntry.allCalls(in: shownEntries)
-      .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
-    return unfinished.last { Self.isAbout($0, subject) } ?? pendingCall
+    let unfinished = { [shownEntries] in
+      ConversationEntry.allCalls(in: shownEntries)
+        .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
+    }
+    switch request.request.content {
+    case .permission(let permission):
+      guard let subject = permission.subject else { return pendingCall }
+      return unfinished().last { Self.isAbout($0, subject) } ?? pendingCall
+    case .elicitation(let elicitation):
+      // A server asks while one of its tools runs, which waits on nothing else.
+      guard let server = elicitation.server else { return pendingCall }
+      return unfinished().last { Self.isCall($0, of: server) } ?? pendingCall
+    default:
+      return pendingCall
+    }
+  }
+
+  /// Whether `call` is to a tool of `server`, named in the call as `claude_ai_Supabase` and by
+  /// the server itself as `claude.ai Supabase`.
+  static func isCall(_ call: ToolCall, of server: String) -> Bool {
+    guard case .mcp(let name, _) = call.kind else { return false }
+    let key = { (name: String) in name.lowercased().filter { $0.isLetter || $0.isNumber } }
+    return key(name) == key(server)
   }
 
   /// Whether a permission's subject is what `call` shows.
   static func isAbout(_ call: ToolCall, _ subject: String) -> Bool {
     call.parameter(.command) == subject || call.parameter(.path) == subject
+  }
+
+  /// Whether the composer is ready again within a moment of the questions being set aside: the
+  /// tracker says so as soon as their digit is typed, and the screen once the CLI has drawn its
+  /// prompt again — before, it still shows the questions, whose hint reads as a panel's.
+  private func promptIsBack() async -> Bool {
+    for _ in 0..<40 {
+      if composerState == .ready {
+        guard let readScreen else { return true }
+        let screen = await readScreen()
+        if screen.map(AgentPanelRecognition.showsPanel(screen:)) != true {
+          return composerState == .ready
+        }
+      }
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    return false
   }
 
   /// Chooses an option of a question: one question of one choice is answered at once; otherwise
@@ -1259,6 +1318,13 @@ public final class ConversationModel {
       guard await answerRequest(.answers([.text(text)]), request.request.id) else { return false }
       if freeAnswer == text { draft = "" }
       return true
+    }
+    if composerState == .chattingAboutQuestion {
+      // The questions set aside first, their digit read off the screen; the message then goes as
+      // any other, once the prompt is back — never while another dialog is drawn.
+      guard canSend, let request, let answerRequest,
+        await answerRequest(.chatAboutThis, request.request.id), await promptIsBack()
+      else { return false }
     }
     guard canSend, let write else { return false }
     isSubmitting = true

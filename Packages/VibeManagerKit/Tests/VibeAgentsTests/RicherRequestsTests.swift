@@ -64,6 +64,27 @@ struct ElicitationReadingTests {
     #expect(read.url == nil)
   }
 
+  @Test("A form says how many fields it has: none is a confirmation, a page never is one")
+  func fields() throws {
+    let form = try #require(elicitation(try reported(mode: "form", url: "")))
+    #expect(form.fieldCount == 1)
+    #expect(!form.isConfirmation)
+    let page = try #require(elicitation(try reported(mode: "url", url: "https://example.org")))
+    #expect(page.fieldCount == nil)
+    #expect(!page.isConfirmation)
+    let confirmation = try #require(
+      elicitation(
+        event(
+          "Elicitation",
+          #"{"mcp_server_name":"db","message":"Run it?","mode":"form","requested_schema":{"type":"object","properties":{}}}"#
+        )))
+    #expect(confirmation.isConfirmation)
+    // Its fields unknown, a form is never taken for a confirmation.
+    let unknown = try #require(
+      elicitation(event("Elicitation", #"{"mcp_server_name":"db","mode":"form"}"#)))
+    #expect(!unknown.isConfirmation)
+  }
+
   @Test("Only a web page is ever opened")
   func schemes() {
     #expect(AgentElicitation(url: URL(string: "file:///etc/passwd")).url == nil)

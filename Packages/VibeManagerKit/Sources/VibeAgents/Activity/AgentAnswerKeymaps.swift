@@ -13,12 +13,18 @@ import VibeApplication
 ///   boxes, as drawn by 2.1.283: a digit ticks its option and stays, the right arrow moves on.
 ///   Several questions, or one of several choices, end on a review, whose `1` submits. Beside
 ///   previews, as drawn by 2.1.285, a digit only moves the highlight: Return, sent apart, takes it.
+/// - An MCP server's form with nothing to fill in: `❯ Accept    Decline`, no digit. Return takes
+///   `Accept` once the screen shows it pointed at, under this server's words; Escape cancels it.
 /// - A plan: `Yes, auto-accept edits` — or `Yes, and use auto mode` where that mode is available,
 ///   in its place — then `Yes, manually approve edits`; a setting may put `clear context`
 ///   options before them. The option is read off the screen; Escape rejects.
 ///
+/// - "Chat about this", after a rule under a question's options: its digit declines them all and
+///   gives the prompt back, the agent's turn going on (2.1.296).
+///
 /// Return is never pressed alone to pick an option: it takes the highlighted one, whatever that
-/// is. It follows a digit only beside previews, once the digit has moved the highlight.
+/// is. It follows a digit only beside previews, once the digit has moved the highlight, and
+/// accepts a confirmation only once the screen shows `Accept` highlighted.
 public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
   public init() {}
 
@@ -28,15 +34,26 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       return permission.alwaysAllow == nil
         ? [.allowOnce, .deny] : [.allowOnce, .allowAlways, .deny]
     case .questions(let questions):
-      // Past nine options, the free answer has no digit.
+      // Past nine options, the free answer has no digit — and "Chat about this", after it, none.
       guard questions.allSatisfy({ TerminalKeys.digit(forOption: $0.options.count) != nil })
       else { return [] }
-      return questions.contains(where: \.allowsMultipleChoices)
+      var kinds: Set<AgentAnswerKind> =
+        questions.contains(where: \.allowsMultipleChoices)
         ? [.chooseOption, .chooseOptions, .writeText] : [.chooseOption, .writeText]
+      // "Chat about this" sets them all aside: after the first question's options and its free
+      // answer.
+      if let first = questions.first,
+        TerminalKeys.digit(forOption: first.options.count + 1) != nil
+      {
+        kinds.insert(.chatAboutThis)
+      }
+      return kinds
     case .plan:
       return [.approvePlan, .rejectPlan]
     case .unreadable:
       return [.deny]
+    case .elicitation(let elicitation) where elicitation.isConfirmation:
+      return [.allowOnce, .deny]
     case .elicitation, .inTerminal:
       return []
     }
@@ -57,6 +74,16 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
         })
     case (.deny, .permission), (.deny, .unreadable), (.rejectPlan, .plan):
       return [TerminalKeys.escape]
+    // Reported before it is drawn: a key typed before would land in the prompt, and Escape there
+    // would stop the turn.
+    case (.allowOnce, .elicitation(let elicitation)):
+      guard let form = screen?.confirmation, form.asks(elicitation), form.isAcceptPointed else {
+        return nil
+      }
+      return [TerminalKeys.enter]
+    case (.deny, .elicitation(let elicitation)):
+      guard let form = screen?.confirmation, form.asks(elicitation) else { return nil }
+      return [TerminalKeys.escape]
     case (.approvePlan(let approval), .plan):
       let words: String
       switch approval {
@@ -70,6 +97,11 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
           $0.hasPrefix("Yes") && $0.localizedCaseInsensitiveContains(words)
             && !$0.localizedCaseInsensitiveContains("clear context")
         })
+    case (.chatAboutThis, .questions(let questions)):
+      // The questions are declined at once, and the agent's turn goes on, its prompt back
+      // (2.1.296): the message is typed there as any other, once nothing else is asked.
+      guard let first = questions.first, Self.isDrawn(first, on: screen) else { return nil }
+      return Self.digit(of: screen?.option { $0 == "Chat about this" })
     case (.answers(let answers), .questions(let questions)):
       // The question on screen must be this one, its options where its report puts them: past
       // them come "Type something", then "Chat about this", which a digit one off would take.
@@ -166,6 +198,10 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
 /// then `Cancel`. It ignores `y`, which left the agent waiting on a request the card said was
 /// answered: a digit picks its option and submits the form, and `1` is always `Allow`.
 ///
+/// The update Codex offers as it starts, before its hooks speak, is read off the screen: `2`
+/// skips it, `3` skips it until the next version — both checked against 0.159.2. Updating is left
+/// to the terminal, where what it runs is seen.
+///
 /// `request_permissions` and `write_stdin` are answered in the terminal (#273): Codex says
 /// nothing when it draws the first, and quotes the second cut too short to tell one from another,
 /// so neither is ever known on screen. Escape would not refuse the first anyway: `d` does.
@@ -180,6 +216,8 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
       // A host's access says nothing of commands: no "always" there, whatever the tool.
       return Self.alwaysKey(for: permission) == nil || permission.alwaysAllow == nil
         ? [.allowOnce, .deny] : [.allowOnce, .allowAlways, .deny]
+    case .inTerminal(let prompt) where prompt.kind == .update:
+      return [.skipUpdate]
     // Every answer waits for the screen to name its request (#283): a report that cannot be read
     // never matches what it shows — even a refusal, whose Escape would refuse another dialog.
     case .unreadable, .questions, .plan, .elicitation, .inTerminal:
@@ -188,14 +226,20 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
   }
 
   /// Codex's dialog shows the command whole, every path a patch writes to, the host (#283):
-  /// before any key, the screen tells which request it is. An MCP tool's form is not read: its
-  /// requests are answered in the session.
+  /// before any key, the screen tells which request it is. An MCP tool's form names only its
+  /// server and its tool: two calls of the same tool waiting are answered in the session.
   public var readsRequestOnScreen: Bool {
     true
   }
 
   public func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
     CodexDrawnDialogReading.dialog(onScreen: text)
+  }
+
+  public func startupDialog(onScreen text: String) -> AgentTerminalPrompt? {
+    CodexDrawnDialogReading.update(onScreen: text).map {
+      AgentTerminalPrompt(kind: .update, message: $0.isEmpty ? nil : $0)
+    }
   }
 
   public func keystrokes(
@@ -219,6 +263,9 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
       return [key]
     case (.deny, .permission), (.deny, .unreadable):
       return [TerminalKeys.escape]
+    case (.skipUpdate(let untilNextVersion), .inTerminal(let prompt)) where prompt.kind == .update:
+      let label = untilNextVersion ? "Skip until next version" : "Skip"
+      return ClaudeCodeAnswerKeymap.digit(of: screen?.option { $0 == label })
     default:
       return nil
     }
