@@ -508,8 +508,12 @@ struct SubagentTray: View {
     }
     .padding(.horizontal, 10)
     .padding(.vertical, 6)
-    .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 12))
-    .overlay(RoundedRectangle(cornerRadius: 12).stroke(theme.border.color))
+    // Glass on macOS 26, as the composer under it (#359).
+    .modifier(
+      ConversationGlass(
+        shape: RoundedRectangle(cornerRadius: 12), fill: theme.raised.color,
+        border: theme.border.color)
+    )
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Sub-agents running", bundle: .module))
     .onChange(of: items.filter(\.hasEnded).map(\.id)) { before, after in

@@ -543,6 +543,23 @@ struct RequestCard: View {
         if answers.contains(.deny) { denyButton }
       case .unreadable:
         if answers.contains(.deny) { denyButton }
+      case .elicitation:
+        // A server's confirmation: Escape cancels it, and the agent's turn goes on.
+        if answers.contains(.allowOnce) {
+          Button {
+            send(.allowOnce)
+          } label: {
+            Text("Allow", bundle: .module, comment: "Allows what an agent asks, this once.")
+          }
+          .buttonStyle(.borderedProminent)
+        }
+        if answers.contains(.deny) {
+          Button {
+            send(.deny)
+          } label: {
+            Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
+          }
+        }
       case .plan:
         if answers.contains(.approvePlan) {
           Menu {
@@ -576,7 +593,24 @@ struct RequestCard: View {
           .help(Text(Self.stopsTheTurn))
           .accessibilityHint(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation, .inTerminal:
+      case .inTerminal:
+        // An update the CLI offers as it starts: passed over from here, updated in the terminal.
+        if answers.contains(.skipUpdate) {
+          Button {
+            send(.skipUpdate(untilNextVersion: false))
+          } label: {
+            Text("Skip", bundle: .module, comment: "Passes over the update an agent's CLI offers.")
+          }
+          .buttonStyle(.borderedProminent)
+          Button {
+            send(.skipUpdate(untilNextVersion: true))
+          } label: {
+            Text(
+              "Skip This Version", bundle: .module,
+              comment: "Passes over the update an agent's CLI offers, until a newer one.")
+          }
+        }
+      case .questions:
         EmptyView()
       }
       Spacer(minLength: 0)

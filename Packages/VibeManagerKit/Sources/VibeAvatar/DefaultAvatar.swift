@@ -1,5 +1,6 @@
 import Foundation
 import VibeApplication
+import VibePersistence
 
 /// The avatar shipped with the application: an archive in this module's resources, read by the
 /// same code as any archive a user imports (#41).

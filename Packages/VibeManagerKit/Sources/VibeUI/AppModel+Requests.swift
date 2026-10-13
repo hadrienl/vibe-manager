@@ -167,7 +167,7 @@ extension AppModel {
       return LocalizedStringResource(
         "Refused · \(sessionName)", bundle: .module,
         comment: "Said once an agent's request was refused from the palette.")
-    case .answers:
+    case .answers, .skipUpdate, .chatAboutThis:
       return LocalizedStringResource(
         "Answered · \(sessionName)", bundle: .module,
         comment: "Said once an agent's question was answered from the palette.")

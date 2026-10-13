@@ -87,12 +87,18 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
   }
 
   private func inspect(path: String, source: AgentDetectionSource) -> ExecutableLocation {
-    let resolved = fileSystem.resolvedPath(for: path)
-    guard fileSystem.fileExists(atPath: resolved) else { return .notFound }
-    guard fileSystem.isExecutableFile(atPath: resolved) else {
-      return .notExecutable(path: resolved, source: source)
+    // Keep the stable path we discovered instead of replacing it with a symlink's current
+    // target. Self-updating CLIs such as Claude Code repoint `~/.local/bin/claude` and remove the
+    // old version while Vibe Manager is still running. Caching the versioned target would then
+    // make the next restart try to launch a file that no longer exists.
+    //
+    // FileManager and FileHandle follow symlinks for all three checks, so the target is still
+    // what gets inspected while the path stored in the launch plan remains update-safe.
+    guard fileSystem.fileExists(atPath: path) else { return .notFound }
+    guard fileSystem.isExecutableFile(atPath: path) else {
+      return .notExecutable(path: path, source: source)
     }
-    return .found(path: resolved, source: source)
+    return .found(path: path, source: source)
   }
 
   /// Asks the user's login shell where the binary lives, without running the binary itself.
@@ -157,7 +163,6 @@ public struct FileSystemExecutableLocator: ExecutableLocator {
 public protocol ExecutableFileSystem: Sendable {
   func fileExists(atPath path: String) -> Bool
   func isExecutableFile(atPath path: String) -> Bool
-  func resolvedPath(for path: String) -> String
   /// Whether this Mac can only run the file through Rosetta. `false` whenever that is not
   /// established — a script, an unreadable file, a format this does not recognise.
   func needsTranslation(atPath path: String) -> Bool
@@ -174,10 +179,6 @@ public struct DefaultExecutableFileSystem: ExecutableFileSystem {
 
   public func isExecutableFile(atPath path: String) -> Bool {
     FileManager.default.isExecutableFile(atPath: path)
-  }
-
-  public func resolvedPath(for path: String) -> String {
-    URL(fileURLWithPath: path).resolvingSymlinksInPath().path
   }
 
   public func needsTranslation(atPath path: String) -> Bool {

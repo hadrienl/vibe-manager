@@ -255,24 +255,58 @@ struct ThemeWorkshopPanel: View {
   }
 }
 
-/// The card at the end of the grid that unfolds the panel.
-struct CreateThemeCard: View {
+/// The card at the end of the grid (#118, #361): its picture split in two buttons — make a theme
+/// with an agent, or import one. Without an agent, importing is all it offers.
+struct NewThemeCard: View {
+  let canCreate: Bool
   let isOpen: Bool
+  /// False while a theme is being kept: one import at a time.
+  let canImport: Bool
+  let create: () -> Void
+  let importArchive: () -> Void
 
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
-      Image(systemName: "plus")
-        .font(.system(size: 16, weight: .medium))
-        .foregroundStyle(.secondary)
-        .frame(maxWidth: .infinity, minHeight: 56)
-        .background(
-          RoundedRectangle(cornerRadius: 6)
-            .strokeBorder(
-              Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-        )
-      Text("Create My Theme", bundle: .module)
+      VStack(spacing: 0) {
+        if canCreate {
+          half(
+            Text("Create My Theme", bundle: .module), symbol: "plus", isOn: isOpen, action: create
+          )
+          .accessibilityValue(
+            isOpen ? Text("Unfolded", bundle: .module) : Text("Folded", bundle: .module)
+          )
+          .help(
+            Text("Describe a theme to an agent, and see each version applied", bundle: .module))
+          Line()
+            .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+            .frame(height: 1)
+          half(
+            Text("Import…", bundle: .module, comment: "On the new theme card: imports a theme."),
+            symbol: "square.and.arrow.down", isOn: false, action: importArchive
+          )
+          .accessibilityLabel(Text("Import a Theme…", bundle: .module))
+          .help(Text("Import a theme exported as a .zip archive", bundle: .module))
+          .disabled(!canImport)
+        } else {
+          half(
+            Text("Import a Theme…", bundle: .module), symbol: "square.and.arrow.down", isOn: false,
+            action: importArchive
+          )
+          .help(Text("Import a theme exported as a .zip archive", bundle: .module))
+          .disabled(!canImport)
+        }
+      }
+      .frame(maxWidth: .infinity, minHeight: 56)
+      .clipShape(RoundedRectangle(cornerRadius: 6))
+      .overlay(
+        RoundedRectangle(cornerRadius: 6)
+          .strokeBorder(
+            Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+      )
+      Text("New Theme", bundle: .module, comment: "Under the card that makes or imports a theme.")
         .font(.caption.weight(.semibold))
         .lineLimit(1)
+        .accessibilityHidden(true)
     }
     .padding(6)
     .background(
@@ -280,7 +314,55 @@ struct CreateThemeCard: View {
         .stroke(
           isOpen ? Color.accentColor : Color.secondary.opacity(0.25), lineWidth: isOpen ? 2 : 1)
     )
-    .contentShape(Rectangle())
+  }
+
+  private func half(_ title: Text, symbol: String, isOn: Bool, action: @escaping () -> Void)
+    -> some View
+  {
+    Button(action: action) {
+      HalfLabel(title: title, symbol: symbol, isOn: isOn)
+    }
+    .buttonStyle(.plain)
+  }
+
+  /// One button of the card: its whole half clickable, lit when hovered.
+  private struct HalfLabel: View {
+    let title: Text
+    let symbol: String
+    let isOn: Bool
+    @State private var isHovered = false
+
+    var body: some View {
+      Label {
+        title
+          .lineLimit(1)
+          .minimumScaleFactor(0.8)
+      } icon: {
+        Image(systemName: symbol)
+          .foregroundStyle(isOn ? Color.accentColor : .secondary)
+      }
+      .font(.caption.weight(.semibold))
+      .foregroundStyle(isOn ? Color.accentColor : .primary)
+      .padding(.horizontal, 8)
+      .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+      .background(
+        isOn
+          ? Color.accentColor.opacity(0.16)
+          : isHovered ? Color.primary.opacity(0.07) : Color.clear
+      )
+      .contentShape(Rectangle())
+      .onHover { isHovered = $0 }
+    }
+  }
+
+  /// The dashed line between the two buttons.
+  private struct Line: Shape {
+    func path(in rect: CGRect) -> Path {
+      Path { path in
+        path.move(to: CGPoint(x: rect.minX, y: rect.midY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+      }
+    }
   }
 }
 
@@ -348,7 +430,7 @@ struct ThemeLoadProblemsView: View {
     .font(.caption)
   }
 
-  static func reason(_ problem: ThemeFileProblem) -> LocalizedStringResource {
+  nonisolated static func reason(_ problem: ThemeFileProblem) -> LocalizedStringResource {
     switch problem {
     case .tooLarge:
       LocalizedStringResource("too large to be a theme", bundle: .module)

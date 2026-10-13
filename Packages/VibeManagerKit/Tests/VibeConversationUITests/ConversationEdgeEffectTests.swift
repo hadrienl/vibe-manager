@@ -57,9 +57,15 @@ struct ConversationEdgeEffectTests {
     throw CancellationError()
   }
 
-  /// The height of the scroll view below the toolbar.
+  /// The height of the scroll view below the toolbar, and above the composer laid over the end of
+  /// the messages on macOS 26 (#359).
   private func visible(_ scroll: NSScrollView) -> Double {
-    scroll.contentView.bounds.height - scroll.contentInsets.top
+    scroll.contentView.bounds.height - scroll.contentInsets.top - scroll.contentInsets.bottom
+  }
+
+  /// Where the messages end in view: above the composer.
+  private func visibleEnd(_ scroll: NSScrollView) -> Double {
+    scroll.contentView.bounds.maxY - scroll.contentInsets.bottom
   }
 
   @Test("A short conversation leaves the scroll view no top inset beyond the toolbar's")
@@ -67,16 +73,18 @@ struct ConversationEdgeEffectTests {
     let (window, _) = host(messages: 1)
     defer { window.close() }
     let toolbar = window.contentView!.safeAreaInsets.top
-    // Before the fix, the document stays as short as its one message.
+    // Before the fix, the document stays as short as its one message. Awaited as checked below:
+    // the composer's inset comes after the first layout, the document's height a turn later.
     let scroll = try await settled(window) { scroll, document in
-      document.frame.height >= scroll.contentView.bounds.height - toolbar - 1
+      abs(document.frame.height - visible(scroll)) < 1
+        && abs(visibleEnd(scroll) - document.frame.maxY) < 1
     }
     #expect(toolbar > 0)
     #expect(scroll.contentInsets.top == toolbar)
     let document = try #require(scroll.documentView)
     // The emptiness is the conversation's own, from the bottom: nothing to scroll.
     #expect(abs(document.frame.height - visible(scroll)) < 1)
-    #expect(abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1)
+    #expect(abs(visibleEnd(scroll) - document.frame.maxY) < 1)
   }
 
   @Test("A conversation taller than the view keeps that inset, and its end in view")
@@ -85,10 +93,14 @@ struct ConversationEdgeEffectTests {
     defer { window.close() }
     let scroll = try await settled(window) { scroll, document in
       document.frame.height > Self.height
-        && abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1
+        && abs(visibleEnd(scroll) - document.frame.maxY) < 1
     }
     let document = try #require(scroll.documentView)
     #expect(scroll.contentInsets.top == window.contentView!.safeAreaInsets.top)
-    #expect(abs(scroll.contentView.bounds.maxY - document.frame.maxY) < 1)
+    #expect(abs(visibleEnd(scroll) - document.frame.maxY) < 1)
+    // The messages go on under the composer, rather than stopping short above it (#359).
+    if #available(macOS 26, *) {
+      #expect(scroll.contentInsets.bottom > 0)
+    }
   }
 }

@@ -25721,6 +25721,376 @@
         }
       }
     },
+    "%lld sessions were moved, but could not be closed." : {
+      "localizations" : {
+        "ar" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "تم نقل %lld جلسات، لكن تعذّر إغلاقها."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "تم نقل %lld جلسة، لكن تعذّر إغلاقها."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "تم نقل %lld جلسة، لكن تعذّر إغلاقها."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "تم نقل %lld جلسة، لكن تعذّر إغلاقها."
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "تم نقل %lld جلستين، لكن تعذّر إغلاقهما."
+                }
+              },
+              "zero" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "تم نقل %lld جلسة، لكن تعذّر إغلاقها."
+                }
+              }
+            }
+          }
+        },
+        "de" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Sitzung wurde verschoben, konnte aber nicht geschlossen werden."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld Sitzungen wurden verschoben, konnten aber nicht geschlossen werden."
+                }
+              }
+            }
+          }
+        },
+        "en" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session was moved, but could not be closed."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions were moved, but could not be closed."
+                }
+              }
+            }
+          }
+        },
+        "es" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Se han movido %lld sesiones, pero no se han podido cerrar."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Se ha movido %lld sesión, pero no se ha podido cerrar."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Se han movido %lld sesiones, pero no se han podido cerrar."
+                }
+              }
+            }
+          }
+        },
+        "fr" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions ont été déplacées, mais n’ont pas pu être fermées."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld session a été déplacée, mais n’a pas pu être fermée."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessions ont été déplacées, mais n’ont pas pu être fermées."
+                }
+              }
+            }
+          }
+        },
+        "hi" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld सेशन ले जाया गया, लेकिन बंद नहीं किया जा सका।"
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld सेशन ले जाए गए, लेकिन बंद नहीं किए जा सके।"
+                }
+              }
+            }
+          }
+        },
+        "it" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessioni sono state spostate, ma non è stato possibile chiuderle."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessione è stata spostata, ma non è stato possibile chiuderla."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessioni sono state spostate, ma non è stato possibile chiuderle."
+                }
+              }
+            }
+          }
+        },
+        "ja" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld個のセッションを移動しましたが、閉じることができませんでした。"
+                }
+              }
+            }
+          }
+        },
+        "ko" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "세션 %lld개가 이동되었지만 닫을 수 없었습니다."
+                }
+              }
+            }
+          }
+        },
+        "nl" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessie is verplaatst, maar kon niet worden gesloten."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessies zijn verplaatst, maar konden niet worden gesloten."
+                }
+              }
+            }
+          }
+        },
+        "pl" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Przeniesiono %lld sesje, ale nie udało się ich zamknąć."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Przeniesiono %lld sesji, ale nie udało się ich zamknąć."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Przeniesiono %lld sesję, ale nie udało się jej zamknąć."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Przeniesiono %lld sesji, ale nie udało się ich zamknąć."
+                }
+              }
+            }
+          }
+        },
+        "pt-BR" : {
+          "variations" : {
+            "plural" : {
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessões foram movidas, mas não puderam ser fechadas."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessão foi movida, mas não pôde ser fechada."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sessões foram movidas, mas não puderam ser fechadas."
+                }
+              }
+            }
+          }
+        },
+        "ru" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сессии перемещены, но их не удалось закрыть."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сессий перемещено, но их не удалось закрыть."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сессия перемещена, но её не удалось закрыть."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сессии перемещено, но их не удалось закрыть."
+                }
+              }
+            }
+          }
+        },
+        "tr" : {
+          "variations" : {
+            "plural" : {
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld oturum taşındı, ancak kapatılamadı."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld oturum taşındı, ancak kapatılamadı."
+                }
+              }
+            }
+          }
+        },
+        "uk" : {
+          "variations" : {
+            "plural" : {
+              "few" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сеанси переміщено, але їх не вдалося закрити."
+                }
+              },
+              "many" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сеансів переміщено, але їх не вдалося закрити."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сеанс переміщено, але його не вдалося закрити."
+                }
+              },
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld сеансу переміщено, але їх не вдалося закрити."
+                }
+              }
+            }
+          }
+        },
+        "zh-Hans" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "已移动 %lld 个会话，但无法关闭。"
+                }
+              }
+            }
+          }
+        },
+        "zh-Hant" : {
+          "variations" : {
+            "plural" : {
+              "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld 個工作階段已移動，但無法關閉。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "%lld sessions were moved, but their agent did not start." : {
       "localizations" : {
         "ar" : {
@@ -33405,7 +33775,7 @@
       }
     },
     "Activity" : {
-      "comment" : "A section of the inspector.\nA tab of the Settings window.",
+      "comment" : "A section of an agent's page of the Settings.\nA section of the inspector.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -35009,7 +35379,7 @@
       }
     },
     "Agent" : {
-      "comment" : "The coding agent the session runs.\nThe heading of the session's agent.\nWhat the Usage window groups its figures by.",
+      "comment" : "A page of the Settings window: an agent.\nThe coding agent the session runs.\nThe heading of the session's agent.\nWhat the Usage window groups its figures by.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -35608,6 +35978,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保持執行的代理程式會在背景繼續工作，下次打開 Vibe Manager 時會原樣回到畫面上。重新啟動 Mac 會讓它們停止。"
+          }
+        }
+      }
+    },
+    "Agents run in some of these sessions: they can be stopped now and the sessions restarted later, or keep running." : {
+      "comment" : "Moving several sessions to To Do or Waiting.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعمل وكلاء في بعض هذه الجلسات: يمكن إيقافها الآن وإعادة تشغيل الجلسات لاحقًا، أو إبقاؤها قيد التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In einigen dieser Sitzungen laufen Agents: Sie können jetzt gestoppt und die Sitzungen später neu gestartet werden, oder weiterlaufen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En algunas de estas sesiones hay agentes en ejecución: pueden detenerse ahora y reiniciar las sesiones más tarde, o seguir en ejecución."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Des agents tournent dans certaines de ces sessions : ils peuvent être arrêtés maintenant et les sessions relancées plus tard, ou continuer à tourner."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इनमें से कुछ सेशन में एजेंट चल रहे हैं: उन्हें अभी रोका जा सकता है और सेशन बाद में फिर से शुरू किए जा सकते हैं, या वे चलते रह सकते हैं।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In alcune di queste sessioni sono in esecuzione degli agenti: possono essere arrestati ora e le sessioni riavviate in seguito, oppure restare in esecuzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これらのセッションの一部でエージェントが実行中です。今すぐ停止してセッションをあとで再起動するか、実行を続けることができます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 세션 중 일부에서 에이전트가 실행 중입니다. 지금 중단하고 세션을 나중에 재시작하거나, 계속 실행할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In sommige van deze sessies draaien agents: ze kunnen nu worden gestopt en de sessies later worden herstart, of blijven draaien."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "W niektórych z tych sesji działają agenci: można ich teraz zatrzymać i później ponownie uruchomić sesje albo pozostawić ich uruchomionych."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Há agentes em execução em algumas dessas sessões: eles podem ser parados agora e as sessões reiniciadas depois, ou continuar em execução."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В некоторых из этих сессий работают агенты: их можно остановить сейчас и перезапустить сессии позже или оставить работать."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu oturumların bazılarında ajanlar çalışıyor: şimdi durdurulup oturumlar daha sonra yeniden başlatılabilir ya da çalışmaya devam edebilirler."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У деяких із цих сеансів працюють агенти: їх можна зупинити зараз і перезапустити сеанси пізніше або залишити працювати."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其中一些会话的智能体正在运行：可以现在停止，稍后重新启动会话，也可以保持运行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "其中部分工作階段的代理程式正在執行：可以現在停止，稍後再重新啟動工作階段，也可以保持執行。"
           }
         }
       }
@@ -40678,7 +41149,7 @@
       }
     },
     "Ask" : {
-      "comment" : "What to do when quitting with agents running.",
+      "comment" : "A setting's answer: the question is asked each time.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -42691,7 +43162,7 @@
       }
     },
     "Badges" : {
-      "comment" : "A tab of the Settings window: the symbols and colours sessions may be given.",
+      "comment" : "A page of the Settings window: the symbols and colours sessions may be given.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -49158,6 +49629,107 @@
         }
       }
     },
+    "Close it" : {
+      "comment" : "What to do when a running session moves to To Do or Waiting.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إغلاقها"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrarla"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La fermer"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इसे बंद करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiudila"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sluiten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zamknij ją"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fechá-la"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрыть"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapat"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрити"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉"
+          }
+        }
+      }
+    },
     "Close this session?" : {
       "localizations" : {
         "ar" : {
@@ -49656,6 +50228,207 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "最接近的可讀取位置：%@"
+          }
+        }
+      }
+    },
+    "Closing it also stops what runs in its side terminals: %@." : {
+      "comment" : "The argument lists the commands running in the session's side terminals.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إغلاقها يوقف أيضًا ما يعمل في طرفياتها الجانبية: %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beim Schließen wird auch gestoppt, was in ihren Nebenterminals läuft: %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrarla también detiene lo que se ejecuta en sus terminales laterales: %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La fermer arrête aussi ce qui tourne dans ses terminaux annexes : %@."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इसे बंद करने से इसके साइड टर्मिनल में जो चल रहा है वह भी रुक जाएगा: %@।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiuderla arresta anche ciò che è in esecuzione nei suoi terminali laterali: %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、サイドターミナルで実行中の処理も停止されます：%@。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫으면 보조 터미널에서 실행 중인 항목도 중단됩니다: %@."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sluiten stopt ook wat in de zijterminals draait: %@."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zamknięcie zatrzyma też to, co działa w jej terminalach bocznych: %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fechá-la também para o que está em execução nos terminais laterais dela: %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрытие также остановит всё, что работает в её боковых терминалах: %@."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapatmak, yan terminallerinde çalışanları da durdurur: %@."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закриття також зупинить те, що працює в його бічних терміналах: %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭它也会停止其侧边终端中运行的内容：%@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉它也會停止其側邊終端機中執行的內容：%@。"
+          }
+        }
+      }
+    },
+    "Closing them also stops what runs in their side terminals." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إغلاقها يوقف أيضًا ما يعمل في طرفياتها الجانبية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beim Schließen wird auch gestoppt, was in ihren Nebenterminals läuft."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cerrarlas también detiene lo que se ejecuta en sus terminales laterales."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les fermer arrête aussi ce qui tourne dans leurs terminaux annexes."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "उन्हें बंद करने से उनके साइड टर्मिनल में जो चल रहा है वह भी रुक जाएगा।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chiuderle arresta anche ciò che è in esecuzione nei loro terminali laterali."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "閉じると、サイドターミナルで実行中の処理も停止されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "닫으면 보조 터미널에서 실행 중인 항목도 중단됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sluiten stopt ook wat in hun zijterminals draait."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zamknięcie zatrzyma też to, co działa w ich terminalach bocznych."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fechá-las também para o que está em execução nos terminais laterais delas."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закрытие также остановит всё, что работает в их боковых терминалах."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kapatmak, yan terminallerinde çalışanları da durdurur."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Закриття також зупинить те, що працює в їхніх бічних терміналах."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "关闭它们也会停止其侧边终端中运行的内容。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "關閉它們也會停止其側邊終端機中執行的內容。"
           }
         }
       }
@@ -51471,7 +52244,7 @@
       }
     },
     "Conversation" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -59112,7 +59885,7 @@
       }
     },
     "Done" : {
-      "comment" : "A task status: the session's work is finished.",
+      "comment" : "A task status: the session's work is finished.\nCloses the tutorial's last bubble.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -62129,7 +62902,7 @@
       }
     },
     "Endpoints" : {
-      "comment" : "A tab of the Settings window: model servers.",
+      "comment" : "A group of the Settings window's sidebar.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -63937,7 +64710,7 @@
       }
     },
     "Failed" : {
-      "comment" : "An avatar, or an agent action in the web view, that failed.",
+      "comment" : "An agent action in the web view that failed.\nAn avatar that could not be drawn.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -67964,7 +68737,7 @@
       }
     },
     "General" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -74690,6 +75463,107 @@
         }
       }
     },
+    "It moves to %@. Its agent can be stopped now and the session restarted later, or keep running." : {
+      "comment" : "A task status.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تنتقل إلى «%@». يمكن إيقاف وكيلها الآن وإعادة تشغيل الجلسة لاحقًا، أو إبقاؤه قيد التشغيل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie wird nach „%@“ verschoben. Ihr Agent kann jetzt gestoppt und die Sitzung später neu gestartet werden, oder weiterlaufen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pasa a “%@”. Su agente puede detenerse ahora y reiniciar la sesión más tarde, o seguir en ejecución."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elle passe à « %@ ». Son agent peut être arrêté maintenant et la session relancée plus tard, ou continuer à tourner."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह “%@” में जाता है। इसका एजेंट अभी रोका जा सकता है और सेशन बाद में फिर से शुरू किया जा सकता है, या वह चलता रह सकता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passa a “%@”. Il suo agente può essere arrestato ora e la sessione riavviata in seguito, oppure restare in esecuzione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」に移動します。エージェントを今すぐ停止してセッションをあとで再起動するか、実行を続けることができます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "‘%@’(으)로 이동합니다. 에이전트를 지금 중단하고 세션을 나중에 재시작하거나, 계속 실행할 수 있습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ze gaat naar ‘%@’. Haar agent kan nu worden gestopt en de sessie later worden herstart, of blijven draaien."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trafia do „%@”. Jej agenta można teraz zatrzymać i później ponownie uruchomić sesję albo pozostawić go uruchomionego."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ela passa para “%@”. O agente pode ser parado agora e a sessão reiniciada depois, ou continuar em execução."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Она перемещается в «%@». Её агента можно остановить сейчас и перезапустить сессию позже или оставить работать."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” durumuna taşınıyor. Ajanı şimdi durdurulup oturum daha sonra yeniden başlatılabilir ya da çalışmaya devam edebilir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Його буде переміщено до «%@». Його агента можна зупинити зараз і перезапустити сеанс пізніше або залишити працювати."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它将移到“%@”。可以现在停止其智能体，稍后重新启动会话，也可以保持运行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它會移到「%@」。可以現在停止其代理程式，稍後再重新啟動工作階段，也可以保持執行。"
+          }
+        }
+      }
+    },
     "Its look only: the agent draws the same character in ten expressions." : {
       "localizations" : {
         "ar" : {
@@ -75287,6 +76161,208 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "兩者都保留"
+          }
+        }
+      }
+    },
+    "Keep Open" : {
+      "comment" : "Moves a session to To Do or Waiting and leaves its agent running.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إبقاؤها مفتوحة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geöffnet lassen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dejar abierta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garder ouverte"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "खुला रखें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lascia aperta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開いたままにする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열어 두기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open laten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pozostaw otwartą"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manter Aberta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оставить открытой"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açık Bırak"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Залишити відкритим"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持開啟"
+          }
+        }
+      }
+    },
+    "Keep it open" : {
+      "comment" : "What to do when a running session moves to To Do or Waiting.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إبقاؤها مفتوحة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geöffnet lassen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dejarla abierta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La garder ouverte"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इसे खुला रखें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lasciala aperta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "開いたままにする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "열어 두기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open laten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pozostaw otwartą"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantê-la aberta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оставить открытой"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Açık bırak"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Залишити відкритим"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保持開啟"
           }
         }
       }
@@ -81255,6 +82331,208 @@
         }
       }
     },
+    "Move and Close" : {
+      "comment" : "Moves sessions to a status and closes them, stopping their agents.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النقل والإغلاق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verschieben und schließen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover y cerrar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer et fermer"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ले जाएँ और बंद करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta e chiudi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移動して閉じる"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이동 및 닫기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verplaats en sluit"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przenieś i zamknij"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover e Fechar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить и закрыть"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taşı ve Kapat"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перемістити й закрити"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动并关闭"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移動並關閉"
+          }
+        }
+      }
+    },
+    "Move and Keep Open" : {
+      "comment" : "Moves several sessions and leaves their agents running.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "النقل مع إبقائها مفتوحة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verschieben und geöffnet lassen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover y dejar abiertas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Déplacer et garder ouvertes"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ले जाएँ और खुला रखें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sposta e lascia aperte"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移動して開いたままにする"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이동 후 열어 두기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verplaats en laat open"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przenieś i pozostaw otwarte"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover e Manter Abertas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переместить и оставить открытыми"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Taşı ve Açık Bırak"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перемістити й залишити відкритими"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移动并保持打开"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移動並保持開啟"
+          }
+        }
+      }
+    },
     "Move and Restart" : {
       "comment" : "Moves several sessions In Progress and restarts their agents.",
       "localizations" : {
@@ -81861,6 +83139,106 @@
         }
       }
     },
+    "Moving a session to Done always closes it." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "نقل جلسة إلى «مكتملة» يغلقها دائمًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine Sitzung nach „Erledigt“ zu verschieben, schließt sie immer."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pasar una sesión a “Terminada” siempre la cierra."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer une session à « Terminé » la ferme toujours."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "किसी सेशन को “पूरा” में ले जाने से वह हमेशा बंद हो जाता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Spostare una sessione in “Completato” la chiude sempre."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セッションを「完了」に移動すると、常に閉じられます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세션을 ‘완료’로 옮기면 항상 닫힙니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Een sessie naar ‘Klaar’ verplaatsen sluit haar altijd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przeniesienie sesji do „Gotowe” zawsze ją zamyka."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mover uma sessão para “Concluída” sempre a fecha."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перемещение сессии в «Готово» всегда закрывает её."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir oturumu “Tamamlandı” durumuna taşımak onu her zaman kapatır."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Переміщення сеансу до «Виконано» завжди його закриває."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将会话移到“已完成”总会关闭它。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將工作階段移到「已完成」一律會關閉它。"
+          }
+        }
+      }
+    },
     "Moving it to %@ starts its agent again." : {
       "comment" : "A task status.",
       "localizations" : {
@@ -82063,7 +83441,7 @@
       }
     },
     "Name" : {
-      "comment" : "The name of a prompt template.\nThe name of the new session.",
+      "comment" : "The name of a prompt template.\nThe name of the header or parameter of the key.\nThe name of the new session.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -88194,7 +89572,7 @@
       }
     },
     "None" : {
-      "comment" : "No site is always allowed.",
+      "comment" : "A template that gives no conversation theme.\nNo authentication.\nNo site is always allowed.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -92888,7 +94266,7 @@
       }
     },
     "Notifications" : {
-      "comment" : "A section of the Settings window.",
+      "comment" : "A page of the Settings window: how the requests of the agents are signalled.\nA section of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -93991,7 +95369,7 @@
       }
     },
     "Open %@" : {
-      "comment" : "Opens a link of the summary; the URL or its short name.\nOpens a link of the summary; the URL.",
+      "comment" : "Opens a link of the summary; the URL or its short name.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -98212,7 +99590,7 @@
       }
     },
     "Privacy" : {
-      "comment" : "A section of the Settings window.\nA tab of the Settings window.",
+      "comment" : "A page of the Settings window.\nA section of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -104950,7 +106328,7 @@
       }
     },
     "Requests" : {
-      "comment" : "A VoiceOver rotor.\nA tab of the Settings window.",
+      "comment" : "A VoiceOver rotor.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -112832,7 +114210,7 @@
       }
     },
     "Session" : {
-      "comment" : "What the Usage window groups its figures by.\nOf the two views taking turns in a narrow window: the session's own.",
+      "comment" : "Of the two views taking turns in a narrow window: the session's own.\nWhat the Usage window groups its figures by.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -119452,6 +120830,208 @@
         }
       }
     },
+    "Skip" : {
+      "comment" : "Passes over the update an agent's CLI offers.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تخطٍّ"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überspringen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "छोड़ें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スキップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "건너뛰기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overslaan"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pomiń"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустить"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atla"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустити"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "略過"
+          }
+        }
+      }
+    },
+    "Skip This Version" : {
+      "comment" : "Passes over the update an agent's CLI offers, until a newer one.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تخطَّ هذا الإصدار"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Version überspringen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir esta versión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorer cette version"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह संस्करण छोड़ें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salta questa versione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このバージョンをスキップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 버전 건너뛰기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze versie overslaan"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pomiń tę wersję"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorar esta versão"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустить эту версию"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu sürümü atla"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустити цю версію"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过此版本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "略過此版本"
+          }
+        }
+      }
+    },
     "Skip Tutorial" : {
       "comment" : "Ends the tutorial for good.",
       "localizations" : {
@@ -124304,7 +125884,7 @@
       }
     },
     "Templates" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -146338,7 +147918,7 @@
       }
     },
     "Tickets" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -148551,7 +150131,7 @@
       }
     },
     "Tools" : {
-      "comment" : "A session's symbol.",
+      "comment" : "A group of the Settings window's sidebar.\nA session's symbol.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -152138,8 +153718,109 @@
         }
       }
     },
+    "Update available" : {
+      "comment" : "The title of a request of an agent: its CLI offers to update itself as it starts.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتوفر تحديث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update verfügbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualización disponible"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise à jour disponible"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट उपलब्ध है"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamento disponibile"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートがあります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트 가능"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update beschikbaar"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dostępna aktualizacja"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualização disponível"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступно обновление"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncelleme var"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступне оновлення"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用的更新"
+          }
+        }
+      }
+    },
     "Updates" : {
-      "comment" : "A section of the Settings window.\nA tab of the Settings window.",
+      "comment" : "A page of the Settings window.\nA section of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -152440,7 +154121,7 @@
       }
     },
     "Usage" : {
-      "comment" : "A section of the Settings window.\nA session's usage, heading.",
+      "comment" : "A session's usage, heading.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -155519,7 +157200,7 @@
       }
     },
     "Web View" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -157219,6 +158900,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "當新的工作階段提到工單位址時，其頁面會在工作階段的網頁視圖中打開（你已在其中登入），其標題也會加到筆記的最上方。只會打開解析器能辨識的位址。"
+          }
+        }
+      }
+    },
+    "When a running session moves to To Do or Waiting" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عند نقل جلسة قيد التشغيل إلى «للتنفيذ» أو «في الانتظار»"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn eine laufende Sitzung nach „Zu erledigen“ oder „Wartend“ verschoben wird"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando una sesión en ejecución pasa a “Pendiente” o “En espera”"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand une session dont l’agent tourne passe à « À faire » ou « En attente »"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "जब कोई चलता हुआ सेशन “करना है” या “प्रतीक्षा में” में जाता है"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando una sessione in esecuzione passa a “Da fare” o “In attesa”"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "実行中のセッションを「未着手」または「待機中」に移動したとき"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실행 중인 세션을 ‘할 일’ 또는 ‘대기 중’으로 옮길 때"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als een actieve sessie naar ‘Te doen’ of ‘Wachtend’ gaat"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gdy działająca sesja trafia do „Do zrobienia” lub „Oczekujące”"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando uma sessão em execução passa para “A Fazer” ou “Aguardando”"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Когда работающая сессия перемещается в «К выполнению» или «Ожидание»"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çalışan bir oturum “Yapılacak” veya “Bekliyor” durumuna taşındığında"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Коли запущений сеанс переміщується до «До виконання» або «Очікує»"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将正在运行的会话移到“待办”或“等待中”时"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將執行中的工作階段移到「待辦」或「等待中」時"
           }
         }
       }

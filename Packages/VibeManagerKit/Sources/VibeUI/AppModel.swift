@@ -241,8 +241,17 @@ public final class AppModel {
   /// confirmed (#240).
   public private(set) var pendingStatusRestart: StatusRestart?
   /// The session the user asked to close while its agent was still working, held until they
-  /// confirm. Closing can be undone with Restart, but the agent's work in progress cannot.
-  public private(set) var pendingClose: WorkSession?
+  /// confirm, and the status a move that asked it goes to (#353). Closing can be undone with
+  /// Restart, but the agent's work in progress cannot. Cancelling the question cancels the move.
+  public private(set) var pendingCloseRequest: CloseRequest?
+  public var pendingClose: WorkSession? { pendingCloseRequest?.session }
+  public var pendingCloseStatus: SessionTaskStatus? { pendingCloseRequest?.status }
+  /// A session whose agent runs, moved to To Do or Waiting, until the user says whether it is
+  /// closed or kept open (#353).
+  public private(set) var pendingSetAside: StatusClose?
+  /// The ⌘Z of a move from the keyboard that asked a question first (#353), recorded once the
+  /// question is answered by a move.
+  private var pendingMoveUndo: SessionStatusUndo?
   /// Closes under way, from the command to the reload that shows the session closed. Until then
   /// the session still reads as running, and a second ⇧⌘W would stop it a second time.
   public private(set) var closingSessionIDs: Set<SessionID> = []
@@ -257,6 +266,11 @@ public final class AppModel {
   /// the same answer.
   public var confirmsStoppingRunningAgent: Bool {
     didSet { closePreferences.confirmsStoppingRunningAgent = confirmsStoppingRunningAgent }
+  }
+  /// What moving a session whose agent runs to To Do or Waiting does to it (#353). Mirrored here
+  /// so that the settings window and the question's "Don't ask again" change the same answer.
+  public var setAsideClose: SetAsideClose {
+    didSet { closePreferences.setAsideClose = setAsideClose }
   }
   /// What quitting does to running agents, when the user asked not to be asked again. Mirrored
   /// here so that the settings window and the question's "Don't ask again" change the same answer.
@@ -821,6 +835,7 @@ public final class AppModel {
       editor: fileOpeningPreferences.editor
     )
     confirmsStoppingRunningAgent = closePreferences.confirmsStoppingRunningAgent
+    setAsideClose = closePreferences.setAsideClose
     self.clock = clock
     readBranchReport = branchReader
     self.repositoryStatus = repositoryStatus
@@ -1186,24 +1201,106 @@ public final class AppModel {
   public func requestClose(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canClose(session) else { return }
     guard !interruptsWork(session) else {
-      pendingClose = session
+      pendingCloseRequest = CloseRequest(session: session, status: nil)
       return
     }
     await close(id)
   }
 
   public func cancelClose() {
-    pendingClose = nil
+    pendingCloseRequest = nil
+    pendingMoveUndo = nil
   }
 
-  /// Closes the session the confirmation was opened for. Takes the identifier for the same reason
-  /// `archive(_:)` does: the dialog is dismissed, and `pendingClose` cleared, before this runs.
-  public func confirmClose(_ id: SessionID, askAgain: Bool = true) async {
-    pendingClose = nil
+  /// Closes the session the confirmation was opened for, and makes the move that asked it, if
+  /// one did (#353). Takes both for the same reason `archive(_:)` takes the identifier: the
+  /// dialog is dismissed, and `pendingClose` cleared, before this runs.
+  public func confirmClose(
+    _ id: SessionID, movingTo status: SessionTaskStatus? = nil, askAgain: Bool = true
+  ) async {
+    pendingCloseRequest = nil
     if !askAgain {
       confirmsStoppingRunningAgent = false
     }
-    await close(id)
+    guard let status, let session = sessions.first(where: { $0.id == id }),
+      session.taskStatus != status
+    else {
+      pendingMoveUndo = nil
+      return await close(id)
+    }
+    await writeTaskStatus(status, of: session, closing: true)
+    recordPendingMoveUndo(of: id, to: status)
+  }
+
+  /// A move from the keyboard is taken back with ⌘Z (#240), asked about first or not.
+  private func recordPendingMoveUndo(of id: SessionID, to status: SessionTaskStatus) {
+    defer { pendingMoveUndo = nil }
+    guard let undo = pendingMoveUndo, undo.id == id, undo.to == status,
+      sessions.first(where: { $0.id == id })?.taskStatus == status
+    else { return }
+    sidebarHistory.record(undo)
+  }
+
+  /// Whether the close a move makes asks first (#353). Done asks as ⇧⌘W does. To Do and Waiting
+  /// close because the user said so, in the setting or its "Don't ask again": asking again would
+  /// take that back. Both always ask for an agent in the middle of a turn, "Don't ask again" or
+  /// not — as archiving does (#242).
+  public func moveCloseAsks(_ session: WorkSession, to status: SessionTaskStatus) -> Bool {
+    interruptsTurn(session) || (status == .done && interruptsWork(session))
+  }
+
+  /// Whether the question before a move's close offers "Don't ask again": only when the setting
+  /// of #51 is what asks it. Asked because the agent is in the middle of a turn, it always will
+  /// be.
+  public func moveCloseOffersDontAskAgain(
+    _ session: WorkSession, to status: SessionTaskStatus
+  ) -> Bool {
+    status == .done && interruptsWork(session)
+  }
+
+  /// What moving a session to a status does to its agent (#353). Done closes the session. Leaving
+  /// In Progress or Done for To Do or Waiting asks, or does what the user asked to keep, when its
+  /// agent runs; between To Do and Waiting, the agent was already kept open once. In Progress
+  /// keeps it, and starts it when it is closed (#192).
+  func closeOnMove(of session: WorkSession, to status: SessionTaskStatus) -> SetAsideClose {
+    switch status {
+    case .done:
+      return canClose(session) ? .close : .keepOpen
+    case .todo, .waiting:
+      guard session.taskStatus != .todo, session.taskStatus != .waiting, canClose(session),
+        launcher?.isRunning(session.id) == true
+      else { return .keepOpen }
+      return setAsideClose
+    case .doing, .archived:
+      return .keepOpen
+    }
+  }
+
+  /// The answer to the question a move to To Do or Waiting asks (#353). "Don't ask again" keeps
+  /// the answer given.
+  public func confirmSetAside(
+    _ request: StatusClose, closing: Bool, askAgain: Bool = true
+  ) async {
+    pendingSetAside = nil
+    if !askAgain {
+      setAsideClose = closing ? .close : .keepOpen
+    }
+    guard let session = sessions.first(where: { $0.id == request.session.id }),
+      session.taskStatus != request.status
+    else {
+      // Moved there some other way since: Close still closes, as #51's question does.
+      pendingMoveUndo = nil
+      if closing { await close(request.session.id) }
+      return
+    }
+    await writeTaskStatus(request.status, of: session, closing: closing)
+    recordPendingMoveUndo(of: session.id, to: request.status)
+  }
+
+  /// Cancelling the question cancels the move: the session stays where it was, its agent too.
+  public func cancelSetAside() {
+    pendingSetAside = nil
+    pendingMoveUndo = nil
   }
 
   public func canArchive(_ session: WorkSession) -> Bool {
@@ -1280,7 +1377,8 @@ public final class AppModel {
 
   /// One session of a batch move (#77): the status is written, and a closed session that goes In
   /// Progress is restarted, as it is on its own (#192) — unless the user chose to move the batch
-  /// without restarting it.
+  /// without restarting it. The sessions the move closes (#353) are closed by the batch, all
+  /// together once every status is written.
   func moveInBatch(
     _ id: SessionID, to status: SessionTaskStatus, restarting: Bool = true
   ) async -> SessionBatchItemResult {
@@ -1501,9 +1599,12 @@ public final class AppModel {
   /// selected, and a closed one is restarted — started with its prompt when it never ran. The
   /// status is written whatever the restart does.
   ///
-  /// Every other move writes the status and nothing else, and the column on screen stays where
-  /// it is: the user sorting a column keeps their place in it. A session that leaves the column
-  /// hands the selection to the row that takes its place, as closing one does.
+  /// Every other move leaves the column on screen where it is: the user sorting a column keeps
+  /// their place in it. A session that leaves the column hands the selection to the row that
+  /// takes its place, as closing one does. Done closes the session, asking first as ⇧⌘W does;
+  /// To Do and Waiting ask whether to close a session whose agent runs (#353).
+  ///
+  /// `restarting: false` writes the status and nothing else: the move ⌘Z takes back.
   public func setTaskStatus(
     _ status: SessionTaskStatus, for id: SessionID, restarting: Bool = true
   ) async {
@@ -1518,6 +1619,37 @@ public final class AppModel {
       return
     }
 
+    // Done closes the session, To Do and Waiting may (#353). Asked before anything is written:
+    // cancelling leaves the session where it was. A move taken back does neither.
+    var closing = false
+    if restarting {
+      switch closeOnMove(of: session, to: status) {
+      case .keepOpen:
+        break
+      case .ask:
+        pendingSetAside = StatusClose(session: session, status: status)
+        pendingMoveUndo = nil
+        return
+      case .close:
+        guard !moveCloseAsks(session, to: status) else {
+          pendingCloseRequest = CloseRequest(session: session, status: status)
+          pendingMoveUndo = nil
+          return
+        }
+        closing = true
+      }
+    }
+    await writeTaskStatus(status, of: session, restarting: restarting, closing: closing)
+  }
+
+  /// The move, once nothing is left to ask: the status, then the close or the restart it makes.
+  /// The status is written first: the row leaves its column at once, while an agent can take
+  /// its grace period to stop.
+  private func writeTaskStatus(
+    _ status: SessionTaskStatus, of session: WorkSession, restarting: Bool = true,
+    closing: Bool
+  ) async {
+    let id = session.id
     let visible = orderedSessions
     let wasSelected = selectedSessionID == id
     do {
@@ -1532,7 +1664,7 @@ public final class AppModel {
       onboarding.send(.taskStatusChanged(id, status))
     } catch {
       reportAction(error, .moveStatus, on: id) { [weak self] in
-        await self?.setTaskStatus(status, for: id)
+        await self?.setTaskStatus(status, for: id, restarting: restarting)
       }
       return
     }
@@ -1540,6 +1672,7 @@ public final class AppModel {
       prepareHandOff(from: id, listedBefore: visible)
       await reload()
       handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
+      if closing { await close(id) }
       return
     }
 
@@ -1619,10 +1752,15 @@ public final class AppModel {
       return
     }
     await setTaskStatus(target, for: id)
+    let undo = SessionStatusUndo(
+      id: id, from: session.taskStatus, to: target, wasSelected: wasSelected)
     if sessions.first(where: { $0.id == id })?.taskStatus == target {
-      sidebarHistory.record(
-        SessionStatusUndo(
-          id: id, from: session.taskStatus, to: target, wasSelected: wasSelected))
+      sidebarHistory.record(undo)
+    } else if pendingSetAside?.session.id == id
+      || (pendingClose?.id == id && pendingCloseStatus == target)
+    {
+      // Asked first (#353): recorded once the question is answered by the move.
+      pendingMoveUndo = undo
     }
   }
 
@@ -3464,4 +3602,17 @@ extension AppModel {
 public struct StatusRestart: Sendable {
   public let session: WorkSession
   public let status: SessionTaskStatus
+}
+
+/// A session whose agent runs, to move to To Do or Waiting, and the status (#353).
+public struct StatusClose: Sendable {
+  public let session: WorkSession
+  public let status: SessionTaskStatus
+}
+
+/// A session to close once the user confirms (#51), and the status the move that asked it goes
+/// to, if one did (#353).
+public struct CloseRequest: Sendable {
+  public let session: WorkSession
+  public let status: SessionTaskStatus?
 }

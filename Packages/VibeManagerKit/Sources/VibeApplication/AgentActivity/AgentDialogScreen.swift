@@ -21,10 +21,40 @@ public struct AgentDialogScreen: Hashable, Sendable {
     }
   }
 
-  public let options: [Option]
+  /// A form of an MCP server with nothing to fill in, as Claude Code draws it: the server's words,
+  /// then `❯ Accept    Decline`, no option numbered.
+  public struct Confirmation: Hashable, Sendable {
+    public let server: String
+    /// The server's words, one line of the screen per line: wrapped to the terminal's width.
+    public let message: String
+    /// Whether `Accept` is pointed at: Return takes the option pointed at.
+    public let isAcceptPointed: Bool
 
-  public init(options: [Option]) {
+    public init(server: String, message: String, isAcceptPointed: Bool) {
+      self.server = server
+      self.message = message
+      self.isAcceptPointed = isAcceptPointed
+    }
+
+    /// Whether this is the dialog of `elicitation`: its server, and its words, however the
+    /// terminal wrapped them — nothing more between them and the choices, no field to fill in.
+    public func asks(_ elicitation: AgentElicitation) -> Bool {
+      guard elicitation.isConfirmation, let server = elicitation.server,
+        let words = elicitation.message
+      else { return false }
+      let unwrapped = { (text: String) in text.filter { !$0.isWhitespace } }
+      return server == self.server && !unwrapped(words).isEmpty
+        && unwrapped(words) == unwrapped(message)
+    }
+  }
+
+  public let options: [Option]
+  /// The confirmation the screen ends on, when it ends on one rather than on numbered options.
+  public let confirmation: Confirmation?
+
+  public init(options: [Option], confirmation: Confirmation? = nil) {
     self.options = options
+    self.confirmation = confirmation
   }
 
   /// How far from the bottom of what is drawn the dialog must end: Codex draws a form's footer
@@ -61,10 +91,7 @@ public struct AgentDialogScreen: Hashable, Sendable {
     }
     // A rule drawn between two options: Claude Code sets "Chat about this" apart from a
     // question's options (2.1.288).
-    func isRule(_ line: String) -> Bool {
-      let rest = line.trimmingCharacters(in: .whitespaces)
-      return !rest.isEmpty && rest.allSatisfy { "─━".contains($0) }
-    }
+    let isRule = PromptInputRecognition.isRule
     // The last run of options numbered 1, 2, 3… one right under the other's words, or a rule.
     var run: [Parsed] = []
     for option in parsed {
@@ -81,7 +108,14 @@ public struct AgentDialogScreen: Hashable, Sendable {
     }
     guard let last = run.last, lastContent - last.line <= Self.bottomDistance,
       run.filter(\.isPointed).count == 1
-    else { return nil }
+    else {
+      guard let confirmation = Self.confirmation(in: lines, lastContent: lastContent) else {
+        return nil
+      }
+      self.options = []
+      self.confirmation = confirmation
+      return
+    }
     var options: [Option] = []
     for option in run {
       let words = ([option.text] + continuation(of: option)).joined(separator: " ")
@@ -89,6 +123,28 @@ public struct AgentDialogScreen: Hashable, Sendable {
       options.append(Option(number: option.number, label: label, shortcut: shortcut))
     }
     self.options = options
+    self.confirmation = nil
+  }
+
+  /// `MCP server “github” requests your input`, its words under it, then its two choices, one
+  /// pointed at — near the bottom, as Claude Code draws them.
+  static func confirmation(in lines: [String], lastContent: Int) -> Confirmation? {
+    let trimmed = lines.map { $0.trimmingCharacters(in: .whitespaces) }
+    func isChoices(_ line: String) -> Bool {
+      line.filter { $0 == "❯" }.count == 1
+        && line.split(whereSeparator: { $0 == " " || $0 == "❯" }) == ["Accept", "Decline"]
+    }
+    guard let choices = trimmed.lastIndex(where: isChoices),
+      lastContent - choices <= bottomDistance,
+      let title = trimmed[..<choices].lastIndex(where: {
+        $0.wholeMatch(of: #/MCP server [“"].+[”"] requests your input/#) != nil
+      }),
+      let server = trimmed[title].firstMatch(of: #/[“"](.+)[”"]/#)?.1
+    else { return nil }
+    let message = trimmed[(title + 1)..<choices].joined(separator: "\n")
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    return Confirmation(
+      server: String(server), message: message, isAcceptPointed: trimmed[choices].hasPrefix("❯"))
   }
 
   /// `❯ 1. Yes`, `  2. No`, `› 1. Yes, proceed (y)`.

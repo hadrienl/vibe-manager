@@ -190,8 +190,8 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private func consume(_ event: TerminalReadEvent) async {
     switch event {
     case .bytes(let bytes):
-      let dropped = historyBuffer.append(bytes)
-      subscribers.output(bytes, historyDropped: dropped)
+      historyBuffer.append(bytes)
+      subscribers.output(bytes)
       reader.didConsume(byteCount: bytes.count)
     case .endOfFile:
       isReaderFinished = true

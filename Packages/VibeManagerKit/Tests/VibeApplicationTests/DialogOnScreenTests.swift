@@ -73,7 +73,7 @@ private struct CodexLikeDecoder: AgentSignalDecoding {
 }
 
 /// Reads the command a dialog shows from its `$ ` line, a patch's paths from its `Destination: `
-/// lines, and allows with `y`.
+/// lines, an MCP tool from a `tool: <server> <tool>` line, and allows with `y`.
 private struct ScreenKeymap: AgentAnswerKeymap {
   func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
     [.allowOnce, .deny]
@@ -91,6 +91,10 @@ private struct ScreenKeymap: AgentAnswerKeymap {
 
   func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
     let lines = text.split(separator: "\n")
+    if let line = lines.last(where: { $0.hasPrefix("tool: ") }) {
+      let names = line.dropFirst(6).split(separator: " ")
+      return AgentDrawnDialog(.mcpTool(server: String(names[0]), tool: String(names[1])))
+    }
     if let line = lines.last(where: { $0.hasPrefix("$ ") }) {
       return AgentDrawnDialog(.shownCommand(String(line.dropFirst(2))))
     }
@@ -352,13 +356,35 @@ struct DialogOnScreenTests {
     #expect(await fixture.answer(.allowOnce, to: first) == .sent)
   }
 
-  @Test("An MCP tool's form is never read: its request stays answered in the session")
+  @Test("An MCP tool's form names its tool: alone in the queue, its request is answered")
   func mcpTool() async {
     let fixture = Fixture()
     await fixture.start()
     let tool = await fixture.ask("", event: "mcp")
     await fixture.tracker.terminalNotification(fixture.id, "server:echo-box")
-    #expect(await fixture.answering(tool) == .inTerminalOnly(.uncertain))
+    #expect(await fixture.answering(tool) == .fromPalette([.allowOnce, .deny]))
+
+    // Another tool of the same server is not it.
+    await fixture.screen.show("tool: echo-box read_note")
+    #expect(await fixture.answer(.allowOnce, to: tool) == .otherDialog)
+    #expect(await fixture.written.bytes.isEmpty)
+
+    await fixture.screen.show("tool: echo-box write_note")
+    #expect(await fixture.answer(.allowOnce, to: tool) == .sent)
+    #expect(await fixture.written.bytes == [[0x79]])
+  }
+
+  @Test("Two calls of the same MCP tool read the same: neither is answered from outside")
+  func sameMCPToolTwice() async {
+    let fixture = Fixture()
+    await fixture.start()
+    let first = await fixture.ask("", event: "mcp")
+    _ = await fixture.ask("", event: "mcp")
+    await fixture.tracker.terminalNotification(fixture.id, "server:echo-box")
+    await fixture.screen.show("tool: echo-box write_note")
+    #expect(await fixture.answer(.allowOnce, to: first) == .otherDialog)
+    #expect(await fixture.answer(.deny, to: first) == .otherDialog)
+    #expect(await fixture.written.bytes.isEmpty)
   }
 
   @Test("A dialog that changed while the log was read gets nothing typed")

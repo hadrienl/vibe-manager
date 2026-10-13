@@ -171,6 +171,9 @@ extension AppModel {
       model.restart = { [weak self] in
         Task { await self?.restart(id) }
       }
+      model.detectAgentsAgain = { [weak self] in
+        await self?.refreshAgents(forceRefresh: true)
+      }
       model.canRestart = { [weak self] in
         guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
           return false
@@ -240,6 +243,19 @@ enum ConversationStopReport {
   /// Why the agent could not be launched, as its terminal says it.
   @MainActor
   static func launchFailure(of pane: TerminalPaneModel?) -> ConversationLaunchFailure? {
-    pane?.failure.map { ConversationLaunchFailure(message: $0.message, suggestion: $0.suggestion) }
+    pane?.failure.map {
+      ConversationLaunchFailure(
+        message: $0.message,
+        suggestion: $0.suggestion,
+        canDetectAgain: pane?.launchError?.isMissingExecutable == true
+      )
+    }
+  }
+}
+
+private extension TerminalError {
+  var isMissingExecutable: Bool {
+    if case .executableNotFound = self { return true }
+    return false
   }
 }

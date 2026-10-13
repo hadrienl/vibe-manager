@@ -183,6 +183,10 @@ public struct AgentPromptFormat: Hashable, Sendable {
   public var attachmentDelay: Duration
   /// `nil` for an agent without a shell mode: a `!` typed first is then text (#188).
   public var shellEntry: ShellEntry?
+  /// Whether its prompt can be read on its screen (`PromptInputRecognition`): Return then waits
+  /// for the text to show in it, and the prompt still there once Return is written is sent again
+  /// (#370).
+  public var readsInputOnScreen: Bool
 
   public init(
     textEntry: PromptTextEntry = .bracketedPaste,
@@ -191,9 +195,11 @@ public struct AgentPromptFormat: Hashable, Sendable {
     interruptKey: [UInt8] = [0x1B],
     submitDelay: Duration = .milliseconds(80),
     attachmentDelay: Duration = .milliseconds(500),
-    shellEntry: ShellEntry? = nil
+    shellEntry: ShellEntry? = nil,
+    readsInputOnScreen: Bool = false
   ) {
     self.shellEntry = shellEntry
+    self.readsInputOnScreen = readsInputOnScreen
     self.textEntry = textEntry
     self.submitKey = submitKey
     self.queueKey = queueKey

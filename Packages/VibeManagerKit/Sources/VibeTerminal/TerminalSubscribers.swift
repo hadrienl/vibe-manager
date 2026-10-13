@@ -118,12 +118,15 @@ final class TerminalSubscribers: @unchecked Sendable {
     return TerminalAttachment(state: state, history: history, events: stream)
   }
 
-  /// Hands a block of output, and the bytes the history dropped for it, to whoever reads them.
-  /// Returns the pulses planned for later, which are already scheduled.
+  /// Hands a block of output to whoever reads it. Returns the pulses planned for later, which are
+  /// already scheduled.
+  ///
+  /// What the history trims to make room for it is not told: those bytes were delivered already,
+  /// and each reader trims its own copy by itself. Told, it took half of a lagging reader's
+  /// bounded stream, and made it lose real output sooner (#364).
   @discardableResult
   func output(
     _ bytes: [UInt8],
-    historyDropped dropped: Int,
     at now: ContinuousClock.Instant = .now
   ) -> [PlannedPulse] {
     var readers: [AsyncStream<TerminalEvent>.Continuation] = []
@@ -151,7 +154,6 @@ final class TerminalSubscribers: @unchecked Sendable {
     }
     for continuation in readers {
       Self.yield(.output(bytes), to: continuation)
-      if dropped > 0 { Self.yield(.historyTruncated(droppedByteCount: dropped), to: continuation) }
     }
     for continuation in pulsed { continuation.yield(.outputPulse) }
     for pulse in planned { schedule(pulse, self) }

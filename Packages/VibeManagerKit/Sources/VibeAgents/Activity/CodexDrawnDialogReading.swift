@@ -9,9 +9,9 @@ import VibeApplication
 /// When the terminal is too short for it, Codex leaves out the top of what it asks and says how
 /// many lines it left out: then nothing is read.
 ///
-/// Not an MCP tool's form: it names the tool, but shows its arguments shortened, cut, and not all
-/// of them (`mcp_server_elicitation.rs`). Two calls of the same tool look the same there; they are
-/// answered in the session.
+/// An MCP tool's form names its server and its tool, but shows its arguments shortened, cut, and
+/// not all of them (`mcp_server_elicitation.rs`): it is read as the tool alone, which names a
+/// request only while no other call of it waits.
 enum CodexDrawnDialogReading {
   static let commandTitle = "Would you like to run the following command?"
   static let editsTitle = "Would you like to make the following edits?"
@@ -21,12 +21,21 @@ enum CodexDrawnDialogReading {
   /// shows only part of what it asks.
   static func dialog(onScreen text: String) -> AgentDrawnDialog? {
     guard AgentDialogScreen(screen: text) != nil else { return nil }
+    if update(onScreen: text) != nil { return AgentDrawnDialog(.update) }
     let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map {
       $0.trimmingCharacters(in: .whitespaces)
     }
-    guard let options = lines.lastIndex(where: isFirstOption),
-      let start = lines[..<options].lastIndex(where: isTitle)
-    else { return nil }
+    guard let options = lines.lastIndex(where: isFirstOption) else { return nil }
+    // An MCP tool's form draws the tool's arguments under its title, and an argument may read as
+    // a title: the form is read only from the one such line on screen, and never inside another
+    // dialog, whose own lines — a command's — may read so as well.
+    let toolTitles = lines[..<options].indices.filter { toolTitle(lines[$0]) != nil }
+    let other = lines[..<options].lastIndex(where: isTitle)
+    if let first = toolTitles.first, other == nil {
+      guard toolTitles.count == 1, let tool = toolTitle(lines[first]) else { return nil }
+      return AgentDrawnDialog(.mcpTool(server: tool.server, tool: tool.tool))
+    }
+    guard let start = other else { return nil }
     // A command's or a patch's title fits a line; a host's runs on until a blank one.
     let titleEnd =
       [commandTitle, editsTitle].contains(lines[start])
@@ -48,6 +57,21 @@ enum CodexDrawnDialogReading {
     }
   }
 
+  /// The update Codex offers as it starts, `Update available · 0.159.2 → 0.162.1`, by its
+  /// versions — empty when they cannot be read — or `nil` when the screen does not end on it: its
+  /// options `Update now`, `Skip`, `Skip until next version` under its title.
+  static func update(onScreen text: String) -> String? {
+    guard let screen = AgentDialogScreen(screen: text),
+      screen.options.first?.label.hasPrefix("Update now") == true,
+      screen.option(where: { $0 == "Skip" }) != nil,
+      screen.option(where: { $0 == "Skip until next version" }) != nil
+    else { return nil }
+    let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+    guard let title = lines.last(where: { $0.hasPrefix("Update available") }) else { return nil }
+    let versions = title.dropFirst("Update available".count).drop { " ·".contains($0) }
+    return String(versions)
+  }
+
   /// `› 1. Yes, proceed (y)`, `1. Allow`: where the options start.
   static func isFirstOption(_ line: String) -> Bool {
     line.hasPrefix("› 1. ") || line.hasPrefix("1. ")
@@ -57,6 +81,13 @@ enum CodexDrawnDialogReading {
     line == commandTitle || line == editsTitle
       || line.hasPrefix("Do you want to approve network access to ")
       || line.hasPrefix("Do you want to allow network access to ")
+  }
+
+  /// `Allow the echo-box MCP server to run tool "write_note"?`: the server and the tool.
+  static func toolTitle(_ line: String) -> (server: String, tool: String)? {
+    line.wholeMatch(of: #/Allow the (.+) MCP server to run tool "(.+)"\?/#).map {
+      (String($0.1), String($0.2))
+    }
   }
 
   /// `[… 9 lines] ctrl+a view all`: the top of what the dialog asks is not drawn.

@@ -52,7 +52,7 @@ struct PromptComposer: View {
           // A file dropped on the field is a chip, as anywhere else on the conversation (#146).
           .overlay(ComposerFileDropCatcher())
           .focused($isFocused)
-          .disabled(state != .ready && state != .answeringQuestion)
+          .disabled(![.ready, .answeringQuestion, .chattingAboutQuestion].contains(state))
           .accessibilityLabel(
             state == .answeringQuestion
               ? Text("Other answer to \(model.agentName)", bundle: .module)
@@ -180,7 +180,7 @@ struct PromptComposer: View {
             .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
             .foregroundStyle(theme.secondaryText.color)
             .lineLimit(1)
-        } else if state == .awaitingAnswer || state == .answeringQuestion {
+        } else if [.awaitingAnswer, .answeringQuestion, .chattingAboutQuestion].contains(state) {
           RequestHint(model: model)
         } else {
           hint(state)
@@ -207,15 +207,14 @@ struct PromptComposer: View {
     }
     .padding(.horizontal, 12)
     .padding(.vertical, 10)
-    .background(
-      isShell ? theme.warningBackground.color : theme.raised.color,
-      in: RoundedRectangle(cornerRadius: 14)
+    .modifier(
+      ConversationGlass(
+        shape: RoundedRectangle(cornerRadius: 14),
+        fill: isShell ? theme.warningBackground.color : theme.raised.color,
+        border: isShell ? theme.warning.color : theme.border.color, lineWidth: isShell ? 1.5 : 1,
+        tint: isShell ? theme.warning.color.opacity(0.25) : nil,
+        shadowRadius: 2, shadowOpacity: theme.isDark ? 0.3 : 0.06)
     )
-    .overlay(
-      RoundedRectangle(cornerRadius: 14)
-        .stroke(isShell ? theme.warning.color : theme.border.color, lineWidth: isShell ? 1.5 : 1)
-    )
-    .shadow(color: .black.opacity(theme.isDark ? 0.3 : 0.06), radius: 2, y: 1)
     // Above the composer, as wide, over the end of the conversation (#219).
     // The guide is set outside the condition: set within it, SwiftUI drops it, and the list hangs
     // down from the composer's top instead.
@@ -391,6 +390,10 @@ struct PromptComposer: View {
     case .ready: Text("Write to \(model.agentName)…", bundle: .module)
     case .answeringQuestion:
       Text("Another answer…", bundle: .module, comment: "The composer, as a question's Other.")
+    case .chattingAboutQuestion:
+      Text(
+        "Or write to \(model.agentName) instead…", bundle: .module,
+        comment: "The composer while questions wait: what it sends sets them aside.")
     case .awaitingAnswer: Text("Answer the request first", bundle: .module)
     case .starting:
       Text(
@@ -622,8 +625,10 @@ struct ActivityLine: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 3)
-        .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 7))
-        .overlay(RoundedRectangle(cornerRadius: 7).stroke(theme.border.color))
+        .modifier(
+          ConversationGlass(
+            shape: RoundedRectangle(cornerRadius: 7), fill: theme.raised.color,
+            border: theme.border.color, isInteractive: true))
       }
       .buttonStyle(.plain)
       .accessibilityLabel(Text("Interrupt the agent", bundle: .module))
@@ -659,6 +664,10 @@ struct RequestHint: View {
       Group {
         if model.composerState == .answeringQuestion {
           Text("↩ sends this answer · ⇧↩ new line", bundle: .module)
+        } else if model.composerState == .chattingAboutQuestion {
+          Text(
+            "↩ sets the questions aside and sends this", bundle: .module,
+            comment: "Under the composer while questions wait that it does not answer.")
         } else if model.activity == .awaitingUser(.question) {
           Text("\(model.agentName) is asking you a question", bundle: .module)
         } else {
