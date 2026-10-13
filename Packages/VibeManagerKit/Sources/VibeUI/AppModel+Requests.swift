@@ -42,10 +42,14 @@ public protocol RequestNotifying: AnyObject {
 
 extension RequestNotifying {
   public func postOutcome(_ notification: SessionOutcomeNotification) {}
-  public func postDictationReady(notifies: Bool) {}
+  public func postDictationReady(notifies _: Bool) {
+    // Nothing: a notifier that does not say the dictation is ready stays silent.
+  }
+  public func postSpeechReady(notifies _: Bool) {
+    // Nothing: a notifier that does not say the voice is ready stays silent.
+  }
   public func postAlertSound(title: String, body: String) {}
   public func postArchiveRun(ruleName: String, count: Int) {}
-  public func postSpeechReady(notifies: Bool) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.

@@ -605,7 +605,10 @@ struct DictationWaveTests {
     final class Composer {}
     let composer = Composer()
     let request = DictationController.Request(
-      owner: ObjectIdentifier(composer), vocabulary: { "" }, insert: { _ in })
+      owner: ObjectIdentifier(composer), vocabulary: { "" },
+      insert: { _ in
+        // Nothing: only the level is under test, not the text.
+      })
 
     dictation.toggle(request)
     await until { dictation.phase == .recording }
