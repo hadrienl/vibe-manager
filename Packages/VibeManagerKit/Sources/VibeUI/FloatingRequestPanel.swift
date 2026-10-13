@@ -301,15 +301,38 @@ struct BubbleShape: InsettableShape {
   var tailBottom: Bool
   var inset: CGFloat = 0
 
+  /// One outline, the tail part of the side it stands on: drawn as a shape of its own, it left
+  /// the rectangle's border across its base.
   func path(in rect: CGRect) -> Path {
     let rect = rect.insetBy(dx: inset, dy: inset)
-    var path = Path(roundedRect: rect, cornerRadius: 14, style: .continuous)
-    let tailY = tailBottom ? rect.maxY - 30 : rect.minY + 30
-    let edge = tailLeading ? rect.minX : rect.maxX
-    let tip = tailLeading ? edge - 8 : edge + 8
-    path.move(to: CGPoint(x: edge, y: tailY - 8))
-    path.addLine(to: CGPoint(x: tip, y: tailY))
-    path.addLine(to: CGPoint(x: edge, y: tailY + 8))
+    let radius = min(14, rect.width / 2, rect.height / 2)
+    let half: CGFloat = 8
+    let wanted = tailBottom ? rect.maxY - 30 : rect.minY + 30
+    let tailY = min(max(wanted, rect.minY + radius + half), rect.maxY - radius - half)
+    var path = Path()
+    path.move(to: CGPoint(x: rect.minX + radius, y: rect.minY))
+    path.addArc(
+      tangent1End: CGPoint(x: rect.maxX, y: rect.minY),
+      tangent2End: CGPoint(x: rect.maxX, y: rect.maxY), radius: radius)
+    if !tailLeading {
+      path.addLine(to: CGPoint(x: rect.maxX, y: tailY - half))
+      path.addLine(to: CGPoint(x: rect.maxX + half, y: tailY))
+      path.addLine(to: CGPoint(x: rect.maxX, y: tailY + half))
+    }
+    path.addArc(
+      tangent1End: CGPoint(x: rect.maxX, y: rect.maxY),
+      tangent2End: CGPoint(x: rect.minX, y: rect.maxY), radius: radius)
+    path.addArc(
+      tangent1End: CGPoint(x: rect.minX, y: rect.maxY),
+      tangent2End: CGPoint(x: rect.minX, y: rect.minY), radius: radius)
+    if tailLeading {
+      path.addLine(to: CGPoint(x: rect.minX, y: tailY + half))
+      path.addLine(to: CGPoint(x: rect.minX - half, y: tailY))
+      path.addLine(to: CGPoint(x: rect.minX, y: tailY - half))
+    }
+    path.addArc(
+      tangent1End: CGPoint(x: rect.minX, y: rect.minY),
+      tangent2End: CGPoint(x: rect.maxX, y: rect.minY), radius: radius)
     path.closeSubpath()
     return path
   }
