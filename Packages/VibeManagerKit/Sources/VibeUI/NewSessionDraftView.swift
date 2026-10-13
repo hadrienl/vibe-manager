@@ -140,9 +140,7 @@ public struct NewSessionDraftView: View {
       if model.themeComesFromTemplate { showsMoreOptions = true }
     }
     .task {
-      showsMoreOptions =
-        !model.draft.ticketText.isEmpty || model.draft.conversationTheme != nil
-        || model.draft.coordination != nil
+      showsMoreOptions = !model.draft.ticketText.isEmpty || model.draft.conversationTheme != nil
       // At once, so that nothing typed meanwhile goes elsewhere; again once the agents and the
       // folders are there, for a draft that came back refused — only then: the folders can take
       // seconds, and the caret would leave the name being typed meanwhile.
@@ -313,7 +311,6 @@ public struct NewSessionDraftView: View {
         if let themes {
           themeField(themes)
         }
-        coordinatorField
       }
       .padding(.top, 10)
     } label: {
@@ -321,16 +318,13 @@ public struct NewSessionDraftView: View {
         Text("More Options", bundle: .module, comment: "Unfolds the ticket.")
         if themes != nil {
           Text(
-            "Ticket, Theme, Coordination", bundle: .module,
-            comment: "What More Options unfolds: the ticket, the conversation theme, coordination."
+            "Ticket, Theme", bundle: .module,
+            comment: "What More Options unfolds: the ticket and the conversation theme."
           )
           .foregroundStyle(.secondary)
         } else {
-          Text(
-            "Ticket, Coordination", bundle: .module,
-            comment: "What More Options unfolds: the ticket and coordination."
-          )
-          .foregroundStyle(.secondary)
+          Text("Ticket", bundle: .module, comment: "The ticket the new session works on.")
+            .foregroundStyle(.secondary)
         }
       }
       .font(.callout)
@@ -691,29 +685,6 @@ public struct NewSessionDraftView: View {
     }
   }
 
-  /// Whether the session coordinates child sessions of its own (#352).
-  private var coordinatorField: some View {
-    LabeledField(
-      Text("Coordination", bundle: .module, comment: "A field of the new session's options."),
-      help: model.canCoordinate || model.isCoordinator
-        ? Text(
-          "It creates and follows child sessions, one per task, and tells you when one needs you.",
-          bundle: .module, comment: "Under the Coordinator Session switch of a new session.")
-        : Text(
-          "Only Claude Code and Codex can coordinate sessions.", bundle: .module,
-          comment: "Under the Coordinator Session switch, for an agent that cannot."),
-      issues: []
-    ) {
-      Toggle(isOn: $model.isCoordinator) {
-        Text(
-          "Coordinator Session", bundle: .module, comment: "A switch of the new session's options.")
-      }
-      .toggleStyle(.switch)
-      .disabled(!model.canCoordinate && !model.isCoordinator)
-      .accessibilityIdentifier("new-session-coordinator")
-    }
-  }
-
   /// The theme of the session's conversation (#274): the settings', or one of its own.
   private func themeField(_ themes: ConversationThemesModel) -> some View {
     let theme = model.draft.conversationTheme
@@ -882,6 +853,12 @@ public struct NewSessionDraftView: View {
       .help(Text("Attach Files…", bundle: .module, comment: "Joins files to the prompt."))
       .accessibilityLabel(
         Text("Attach Files…", bundle: .module, comment: "Joins files to the prompt."))
+
+      // The session may create and follow sessions of its own (#352), as a conversation's
+      // composer offers it later.
+      if model.canCoordinate || model.isCoordinator {
+        CoordinateToggle(isOn: $model.isCoordinator)
+      }
 
       if let summary {
         Text(verbatim: summary)

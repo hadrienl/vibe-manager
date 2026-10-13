@@ -11,7 +11,7 @@ struct CoordinationPane: View {
 
   var body: some View {
     List {
-      if session.coordination?.isCoordinator == true {
+      if model.showsAsCoordinator(session) {
         let children = model.children(of: session.id)
         if children.isEmpty {
           Text(
@@ -162,7 +162,7 @@ struct CoordinationSummaryText: View {
   let session: WorkSession
 
   var body: some View {
-    if session.coordination?.isCoordinator == true {
+    if model.showsAsCoordinator(session) {
       let summary = model.summary(ofCoordinator: session.id)
       if summary.needingUser > 0 {
         Text(

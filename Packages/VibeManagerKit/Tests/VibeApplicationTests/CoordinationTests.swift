@@ -36,13 +36,19 @@ struct CoordinationPolicyTests {
     ]
   }
 
-  @Test("Only a coordinator has children")
+  @Test("Only a session coordination is on for has children; a child never coordinates")
   func onlyCoordinators() throws {
     let alone = try #require(sessions.first { $0.name == "Alone" })
-    #expect(throws: CoordinationRefusal.notCoordinator) {
+    let child = try #require(sessions.first { $0.name == "#351" })
+    #expect(throws: CoordinationRefusal.coordinationOff) {
       try CoordinationPolicy.coordinator(alone.id, among: sessions)
     }
+    #expect(throws: CoordinationRefusal.childCannotCoordinate) {
+      try CoordinationPolicy.coordinator(child.id, among: sessions)
+    }
     #expect(try CoordinationPolicy.coordinator(parentID, among: sessions).name == "V2")
+    #expect(CoordinationPolicy.mayCoordinate(alone))
+    #expect(!CoordinationPolicy.mayCoordinate(child))
   }
 
   @Test("Another coordinator's child, or an ordinary session, reads as an id that names nothing")
@@ -242,6 +248,15 @@ struct SessionHierarchyTests {
     #expect(
       SessionHierarchy.apply(SessionFilter(column: .done), to: [archived, child, lost]).map(\.name)
         .sorted() == ["#351", "#352"])
+  }
+
+  @Test("Children stay under a session coordination was turned off for")
+  func turnedOff() {
+    let parent = session("V2", id: parentID, task: .doing)
+    let child = session("#351", task: .done, coordination: .child(of: parentID))
+    #expect(
+      SessionHierarchy.apply(SessionFilter(column: .doing), to: [child, parent]).map(\.name)
+        == ["V2", "#351"])
   }
 }
 

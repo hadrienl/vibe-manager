@@ -158,6 +158,12 @@ struct PromptComposer: View {
             model: model, dictation: dictation, isEnabled: state == .ready && !isShell,
             isActive: isActive)
         }
+        // Whether the agent may create sessions of its own (#352): turned on at any time.
+        if !isShell, let coordination = model.coordination() {
+          CoordinateToggle(
+            isOn: Binding(get: { coordination.isOn }, set: { coordination.set($0) }),
+            font: theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
+        }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line
             .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))

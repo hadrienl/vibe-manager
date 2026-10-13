@@ -31,6 +31,16 @@ public final class CoordinationModel {
   public internal(set) var calls: [SessionID: String] = [:]
   /// What coordinators did to each child, as read or written in this run.
   public internal(set) var traces: [SessionID: [CoordinationTraceEntry]] = [:]
+  /// The agents that can coordinate: those handed tools and instructions at launch. Read once the
+  /// agents are known; until then, none.
+  public internal(set) var coordinatingAgents: Set<String> = []
+
+  /// What the user's next message to a session says first: coordination turned on (`true`) or off
+  /// while its agent runs. Turned back before it is sent, nothing is said.
+  @ObservationIgnored var notices: [SessionID: Bool] = [:]
+  /// The sessions coordination was turned on for while their agent ran, launched without the
+  /// coordinator's instructions: the first answer of a tool gives them.
+  @ObservationIgnored var owedRules: Set<SessionID> = []
 
   @ObservationIgnored var inbox = CoordinationInbox()
   /// Messages a coordinator sent to a child busy with a turn, typed once it is at rest, in order.

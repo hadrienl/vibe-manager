@@ -2429,7 +2429,7 @@ struct SessionRow: View {
   static let childIndent: CGFloat = 22
 
   private var isCoordinator: Bool {
-    session.coordination?.isCoordinator == true
+    commands.model.showsAsCoordinator(session)
   }
 
   /// The coordinator this row is listed under (#352).

@@ -118,12 +118,85 @@ struct CoordinationToolsTests {
     }.joined()
   }
 
-  @Test("A session that is not a coordinator is refused every tool")
-  func notCoordinator() async {
+  @Test("A session coordination is off for is refused every tool, and told to ask the user")
+  func coordinationOff() async {
     let model = await makeModel()
     let result = await call(model, "sessions_list", as: alone.id)
     #expect(result.isError)
-    #expect(text(result) == CoordinationRefusal.notCoordinator.message)
+    #expect(text(result) == CoordinationRefusal.coordinationOff.message)
+  }
+
+  @Test("A child is refused every tool: coordination is one level deep")
+  func childRefused() async {
+    let mine = child("#351", of: parent, rank: 1)
+    let model = await makeModel([mine])
+    let result = await call(model, "sessions_list", as: mine.id)
+    #expect(text(result) == CoordinationRefusal.childCannotCoordinate.message)
+  }
+
+  @Test("Any session of an agent that can coordinate turns it on and off; a child cannot")
+  func turnedOnAndOff() async throws {
+    let ordinary = WorkSession(
+      name: "Ordinary", agent: SessionAgentConfiguration(providerID: "claude-code"),
+      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 100),
+      taskStatus: .doing, rank: 5)
+    let mine = WorkSession(
+      name: "#351", agent: SessionAgentConfiguration(providerID: "claude-code"),
+      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 100),
+      taskStatus: .todo, rank: 1,
+      coordination: .child(of: parent.id))
+    let model = await makeModel([ordinary, mine])
+    #expect(model.composerCoordination(for: ordinary.id) == nil)
+    model.coordination.coordinatingAgents = ["claude-code"]
+
+    #expect(model.composerCoordination(for: ordinary.id)?.isOn == false)
+    #expect(model.composerCoordination(for: mine.id) == nil)
+    await model.setCoordinating(true, for: ordinary.id)
+    #expect(model.isCoordinator(ordinary.id))
+    #expect(!(await call(model, "sessions_list", as: ordinary.id)).isError)
+    // Its agent not running, its next launch gives the instructions: nothing is said.
+    #expect(model.takeCoordinationNotice(for: ordinary.id) == nil)
+
+    await model.setCoordinating(true, for: mine.id)
+    #expect(!model.isCoordinator(mine.id))
+
+    await model.setCoordinating(false, for: ordinary.id)
+    #expect(!model.isCoordinator(ordinary.id))
+  }
+
+  @Test("Children stay under a coordinator turned off, still folded and summed up")
+  func turnedOffKeepsChildren() async throws {
+    let mine = child("#351", of: parent, rank: 1)
+    let model = await makeModel([mine])
+    model.coordination.coordinatingAgents = ["claude-code"]
+    await model.setCoordinating(false, for: parent.id)
+    let stored = try #require(model.sessions.first { $0.id == parent.id })
+    #expect(!model.isCoordinator(parent.id))
+    #expect(model.showsAsCoordinator(stored))
+    #expect(model.coordinator(of: mine)?.id == parent.id)
+  }
+
+  @Test("Turned on while the agent ran, the first answer of a tool gives the rules, once")
+  func owedRules() async {
+    let model = await makeModel()
+    model.coordination.owedRules.insert(parent.id)
+    let refused = await call(model, "session_read", ["id": "nothing"], as: parent.id)
+    #expect(!text(refused).contains(CoordinatorInstructions.text))
+    let first = text(await call(model, "sessions_list", as: parent.id))
+    #expect(first.contains(CoordinatorInstructions.text))
+    #expect(first.hasSuffix("You have no child session yet."))
+    let second = text(await call(model, "sessions_list", as: parent.id))
+    #expect(second == "You have no child session yet.")
+  }
+
+  @Test("What turning coordination on or off tells the agent goes with the next message, once")
+  func notice() async {
+    let model = await makeModel()
+    model.coordination.notices[parent.id] = true
+    #expect(model.takeCoordinationNotice(for: parent.id) == CoordinatorInstructions.turnedOn)
+    #expect(model.takeCoordinationNotice(for: parent.id) == nil)
+    model.coordination.notices[parent.id] = false
+    #expect(model.takeCoordinationNotice(for: parent.id) == CoordinatorInstructions.turnedOff)
   }
 
   @Test("A coordinator lists its own children only, and reads another's as nothing")

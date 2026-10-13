@@ -4,8 +4,10 @@ import VibeDomain
 /// Why a coordinator's tool refused what it was asked (#352). Said to the agent, in English, so that
 /// it can act on it or tell the user.
 public enum CoordinationRefusal: Error, Equatable, Sendable {
-  /// The caller is not a coordinator.
-  case notCoordinator
+  /// The user has not turned coordination on for the caller.
+  case coordinationOff
+  /// The caller is itself a child: coordination is one level deep.
+  case childCannotCoordinate
   /// No child of the caller has this id — one that exists but is another's included.
   case unknownChild(String)
   case limitReached(running: Int, limit: Int)
@@ -23,8 +25,14 @@ public enum CoordinationRefusal: Error, Equatable, Sendable {
 
   public var message: String {
     switch self {
-    case .notCoordinator:
-      return "This session is not a coordinator: only a coordinator session has children."
+    case .coordinationOff:
+      return
+        "Coordination is off for this session. Ask the user to turn on “Coordinate” in this "
+        + "session's message field in Vibe Manager, then call the tool again."
+    case .childCannotCoordinate:
+      return
+        "This session is a child of a coordinator, and a child cannot create sessions of its "
+        + "own. Tell your coordinator what you need instead."
     case .unknownChild(let id):
       return "No child session has the id \(id). sessions_list gives your children's ids."
     case .limitReached(let running, let limit):
@@ -58,14 +66,27 @@ public enum CoordinationRefusal: Error, Equatable, Sendable {
 /// The rules every tool of a coordinator follows (#352): whose children it may touch, how many may
 /// run, where, and when a child may be written to. Pure: what runs and what the agents do is given.
 public enum CoordinationPolicy {
-  /// The caller, if it is a coordinator.
+  /// The caller, if the user turned coordination on for it. A child never coordinates: one level
+  /// of sessions, never a tree that grows by itself.
   public static func coordinator(_ id: SessionID, among sessions: [WorkSession]) throws
     -> WorkSession
   {
-    guard let session = sessions.first(where: { $0.id == id }),
-      session.coordination?.isCoordinator == true
-    else { throw CoordinationRefusal.notCoordinator }
+    guard let session = sessions.first(where: { $0.id == id }) else {
+      throw CoordinationRefusal.coordinationOff
+    }
+    if session.coordination?.coordinatorID != nil {
+      throw CoordinationRefusal.childCannotCoordinate
+    }
+    guard session.coordination?.isCoordinator == true else {
+      throw CoordinationRefusal.coordinationOff
+    }
     return session
+  }
+
+  /// Whether a session may be given the coordination tools: any but a child (#352). The tools
+  /// themselves wait for the user to turn coordination on.
+  public static func mayCoordinate(_ session: WorkSession) -> Bool {
+    session.coordination?.coordinatorID == nil
   }
 
   /// A coordinator's children, archived ones aside, in the order the store keeps them.

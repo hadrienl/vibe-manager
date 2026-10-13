@@ -271,7 +271,7 @@ public final class AppEnvironment {
             } ?? [:]
           ) { $1 })
       },
-      // A coordinator's tools (#352), through the same bridge and channel, whatever the web view.
+      // The coordination tools (#352), through the same bridge and channel, whatever the web view.
       coordination: {
         bridge.map {
           AgentToolServer(
@@ -479,17 +479,17 @@ public final class AppEnvironment {
         preferences: UserDefaultsCoordinationPreferences(suiteName: data.defaultsSuite)),
       beep: { NSSound.beep() }
     )
-    // The coordinators' tools are answered on the web view's channel (#352), for the processes of
-    // coordinator sessions alone.
+    // The coordination tools are answered on the web view's channel (#352), for the processes of
+    // every session but a child; they refuse until the user turns coordination on.
     let coordinationTools = CoordinationToolRunner(model: appModel)
     browserChannel.serve(
       BrowserChannelListener.Server(
         definition: .coordination, runner: coordinationTools,
         sessions: { [weak launcher] in
           guard let launcher else { return [] }
-          let coordinators = coordinationTools.coordinators()
+          let admitted = coordinationTools.admittedSessions()
           return await launcher.runningProcessIdentifiers().compactMap { id, pid in
-            coordinators.contains(id) ? agentProcesses.process(id, pid) : nil
+            admitted.contains(id) ? agentProcesses.process(id, pid) : nil
           }
         }))
     // The composer's dictation (#340): Whisper on this Mac, its models beside this copy's data —

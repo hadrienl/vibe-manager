@@ -33575,7 +33575,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Une session coordinatrice crée et suit des sessions enfants, une par tâche. Elle ne répond jamais à votre place à une autorisation ou à une question d’un enfant : elles vous attendent dans la palette."
+            "value" : "Une session coordinatrice crée et suit des sessions enfants, une par tâche. Elle ne répond jamais à votre place à une autorisation ou à une question d’un enfant : elles vous attendent dans la palette."
           }
         },
         "hi" : {
@@ -48186,7 +48186,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Enfants en même temps : %lld"
+            "value" : "Enfants en même temps : %lld"
           }
         },
         "hi" : {
@@ -54353,7 +54353,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Coordonnée par « %@ »"
+            "value" : "Coordonnée par « %@ »"
           }
         },
         "hi" : {
@@ -54616,107 +54616,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Координатор"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "协调会话"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "協調工作階段"
-          }
-        }
-      }
-    },
-    "Coordinator Session" : {
-      "comment" : "A switch of the new session's options.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "جلسة تنسيق"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Koordinationssitzung"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sesión coordinadora"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Session coordinatrice"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "कोऑर्डिनेटर सेशन"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessione coordinatrice"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "コーディネーターセッション"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "코디네이터 세션"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Coördinatorsessie"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sesja koordynująca"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sessão coordenadora"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Координирующая сессия"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Koordinatör oturum"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Координаційний сеанс"
           }
         },
         "zh-Hans" : {
@@ -57978,7 +57877,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Créée par « %@ »"
+            "value" : "Créée par « %@ »"
           }
         },
         "hi" : {
@@ -78056,107 +77955,6 @@
         }
       }
     },
-    "It creates and follows child sessions, one per task, and tells you when one needs you." : {
-      "comment" : "Under the Coordinator Session switch of a new session.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "تنشئ جلسات فرعية وتتابعها، جلسة لكل مهمة، وتنبّهك عندما تحتاج إليك إحداها."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Sie erstellt und verfolgt Untersitzungen, eine pro Aufgabe, und sagt dir, wenn eine dich braucht."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crea y sigue sesiones secundarias, una por tarea, y te avisa cuando una te necesita."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Elle crée et suit des sessions enfants, une par tâche, et vous prévient quand l’une a besoin de vous."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "यह हर काम के लिए एक चाइल्ड सेशन बनाता है, उसका ध्यान रखता है, और किसी को आपकी ज़रूरत होने पर बताता है।"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Crea e segue sessioni figlie, una per attività, e ti avvisa quando una ha bisogno di te."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "タスクごとに子セッションを作成して見守り、あなたが必要になったときに知らせます。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "작업마다 하위 세션을 만들고 지켜보며, 사용자가 필요할 때 알려 줍니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ze maakt en volgt subsessies, één per taak, en laat het je weten als er een je nodig heeft."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tworzy sesje podrzędne, po jednej na zadanie, śledzi je i daje znać, gdy któraś Cię potrzebuje."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ela cria e acompanha sessões filhas, uma por tarefa, e avisa quando uma precisa de você."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Она создаёт дочерние сессии, по одной на задачу, следит за ними и сообщает, когда одной из них нужны вы."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Her görev için bir alt oturum oluşturur, onları izler ve birinin size ihtiyacı olduğunda haber verir."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Він створює дочірні сеанси, по одному на завдання, стежить за ними й повідомляє, коли комусь із них потрібні ви."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它为每项任务创建一个子会话并跟进，在某个子会话需要你时通知你。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "它會為每項任務建立一個子工作階段並追蹤，在某個子工作階段需要你時通知你。"
-          }
-        }
-      }
-    },
     "It moves to %@. Its agent can be stopped now and the session restarted later, or keep running." : {
       "comment" : "A task status.",
       "localizations" : {
@@ -82197,7 +81995,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Message de « %@ »"
+            "value" : "Message de « %@ »"
           }
         },
         "hi" : {
@@ -85958,7 +85756,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Déplacée vers %1$@ par « %2$@ »"
+            "value" : "Déplacée vers %1$@ par « %2$@ »"
           }
         },
         "hi" : {
@@ -98261,107 +98059,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "已開啟：%lld"
-          }
-        }
-      }
-    },
-    "Only Claude Code and Codex can coordinate sessions." : {
-      "comment" : "Under the Coordinator Session switch, for an agent that cannot.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "يستطيع Claude Code وCodex فقط تنسيق الجلسات."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Nur Claude Code und Codex können Sitzungen koordinieren."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo Claude Code y Codex pueden coordinar sesiones."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seuls Claude Code et Codex peuvent coordonner des sessions."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "सिर्फ़ Claude Code और Codex ही सेशन का समन्वय कर सकते हैं।"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Solo Claude Code e Codex possono coordinare sessioni."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "セッションを調整できるのは Claude Code と Codex だけです。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Claude Code와 Codex만 세션을 조정할 수 있습니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Alleen Claude Code en Codex kunnen sessies coördineren."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Tylko Claude Code i Codex mogą koordynować sesje."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Somente o Claude Code e o Codex podem coordenar sessões."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Координировать сессии могут только Claude Code и Codex."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Yalnızca Claude Code ve Codex oturumları koordine edebilir."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Координувати сеанси можуть лише Claude Code і Codex."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "只有 Claude Code 和 Codex 可以协调会话。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "只有 Claude Code 和 Codex 可以協調工作階段。"
           }
         }
       }
@@ -125363,7 +125060,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Lancée par « %@ »"
+            "value" : "Lancée par « %@ »"
           }
         },
         "hi" : {
@@ -126879,7 +126576,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Arrêtée par « %@ »"
+            "value" : "Arrêtée par « %@ »"
           }
         },
         "hi" : {
@@ -151317,107 +151014,6 @@
         }
       }
     },
-    "Ticket, Coordination" : {
-      "comment" : "What More Options unfolds: the ticket and coordination.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "التذكرة، التنسيق"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, Koordination"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, coordinación"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, coordination"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "टिकट, समन्वय"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, coordinamento"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "チケット、コーディネーション"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "티켓, 조정"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, coördinatie"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zgłoszenie, koordynacja"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, coordenação"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тикет, координация"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Talep, koordinasyon"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тікет, координація"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "工单、协调"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "工單、協調"
-          }
-        }
-      }
-    },
     "Ticket, Theme" : {
       "comment" : "What More Options unfolds: the ticket and the conversation theme.",
       "localizations" : {
@@ -151515,107 +151111,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "工單、主題"
-          }
-        }
-      }
-    },
-    "Ticket, Theme, Coordination" : {
-      "comment" : "What More Options unfolds: the ticket, the conversation theme, coordination.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "التذكرة، السمة، التنسيق"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, Design, Koordination"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, tema, coordinación"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, thème, coordination"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "टिकट, थीम, समन्वय"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, tema, coordinamento"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "チケット、テーマ、コーディネーション"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "티켓, 테마, 조정"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, thema, coördinatie"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Zgłoszenie, motyw, koordynacja"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ticket, tema, coordenação"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тикет, тема, координация"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Talep, tema, koordinasyon"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Тікет, тема, координація"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "工单、主题、协调"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "工單、主題、協調"
           }
         }
       }
