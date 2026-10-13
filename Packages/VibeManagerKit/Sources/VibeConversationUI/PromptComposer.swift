@@ -163,6 +163,12 @@ struct PromptComposer: View {
           CoordinateToggle(
             isOn: Binding(get: { coordination.isOn }, set: { coordination.set($0) }),
             font: theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
+          if coordination.isOn, let restart = coordination.restart {
+            // Not while it works: restarting it would stop the turn under way.
+            CoordinateRestartButton(
+              isEnabled: !model.isAgentWorking,
+              font: theme.interfaceFont(size: appearance.textSize.scaled(11.5)), action: restart)
+          }
         }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line
