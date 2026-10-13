@@ -8,8 +8,8 @@ import VibeApplication
 final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
   private let lock = NSLock()
   private var installed: Bool
-  private var _spoken: [(text: String, voice: SpeechVoice, language: SpeechLanguage)] = []
-  private var _stopped = 0
+  private var spokenLog: [(text: String, voice: SpeechVoice, language: SpeechLanguage)] = []
+  private var stopCount = 0
   /// Whether a reading lasts until it is cancelled, rather than ending at once.
   let readsUntilCancelled: Bool
 
@@ -19,9 +19,9 @@ final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
   }
 
   var spoken: [(text: String, voice: SpeechVoice, language: SpeechLanguage)] {
-    lock.withLock { _spoken }
+    lock.withLock { spokenLog }
   }
-  var stopped: Int { lock.withLock { _stopped } }
+  var stopped: Int { lock.withLock { stopCount } }
 
   func installedSize() -> Int64? { lock.withLock { installed ? 900 : nil } }
   var downloadSize: Int64 { 1_000 }
@@ -32,22 +32,22 @@ final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
   }
 
   func speak(_ text: String, voice: SpeechVoice, language: SpeechLanguage) async throws {
-    lock.withLock { _spoken.append((text, voice, language)) }
+    lock.withLock { spokenLog.append((text, voice, language)) }
     guard readsUntilCancelled else { return }
     while !Task.isCancelled { await Task.yield() }
-    lock.withLock { _stopped += 1 }
+    lock.withLock { stopCount += 1 }
     throw CancellationError()
   }
 
   func prepare() async throws {
-    lock.withLock { _prepared += 1 }
+    lock.withLock { prepareCount += 1 }
   }
 
-  func prepare(voice: SpeechVoice, language: SpeechLanguage) async throws {
-    lock.withLock { _prepared += 1 }
+  func prepare(voice _: SpeechVoice, language _: SpeechLanguage) async throws {
+    lock.withLock { prepareCount += 1 }
   }
-  private var _prepared = 0
-  var prepared: Int { lock.withLock { _prepared } }
+  private var prepareCount = 0
+  var prepared: Int { lock.withLock { prepareCount } }
 
   func remove() async throws { lock.withLock { installed = false } }
 }
