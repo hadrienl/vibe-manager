@@ -603,6 +603,30 @@ struct SessionTaskBoardTests {
     }
   }
 
+  @Test("A click on any tab gives the list the keyboard; the column shortcuts do not (#346)")
+  func tabGivesTheListTheKeyboard() async {
+    let kept = session("Kept", in: .done)
+    let (model, _, _) = makeWorkspace([session("Any", in: .todo), kept])
+    await model.load()
+    model.setColumn(.done)
+    model.select(kept.id)
+
+    for column in SessionTaskStatus.columns + [.done] {
+      let requests = model.sidebarFocusRequest
+      model.chooseColumn(column)
+      #expect(model.filter.column == column)
+      #expect(model.sidebarFocusRequest == requests + 1, "\(column)")
+    }
+    // Still visible, the session on screen stays the one selected.
+    #expect(model.selectedSessionID == kept.id)
+
+    let requests = model.sidebarFocusRequest
+    model.setColumn(.todo)
+    model.showNextColumn()
+    model.showPreviousColumn()
+    #expect(model.sidebarFocusRequest == requests)
+  }
+
   @Test("A tab counts what clicking it will show, search included")
   func tabsCountWhatTheyShow() async {
     let (model, _, _) = makeWorkspace([

@@ -1041,6 +1041,13 @@ public final class AppModel {
     reconcileSelection()
   }
 
+  /// A click on a column's tab (#346): the list takes the keyboard, for ⌘A and the commands on
+  /// the whole column. The shortcuts that change column leave the keyboard where it is.
+  public func chooseColumn(_ column: SessionTaskStatus) {
+    setColumn(column)
+    focusSidebar()
+  }
+
   /// ⌥⌘→ and ⌥⌘← (#240). Stops at both ends, like the selection shortcuts.
   public func showNextColumn() {
     guard let next = filter.column.next.first, next != .archived else { return }
