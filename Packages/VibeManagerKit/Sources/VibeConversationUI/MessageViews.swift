@@ -141,11 +141,34 @@ struct AgentTextView: View {
           } label: {
             Text("Copy Message", bundle: .module)
           }
+          if let readAloud {
+            let isReading = readAloud.isReading(text)
+            Button {
+              toggleReading(text, with: readAloud) { openSettings() }
+            } label: {
+              isReading
+                ? Text("Stop Reading", bundle: .module) : Text("Read Aloud", bundle: .module)
+            }
+          }
         }
       if let readAloud {
         ReadAloudButton(text: text, readAloud: readAloud) { openSettings() }
       }
     }
+  }
+}
+
+/// Reads an answer aloud, or stops it while it is read. Without its model, Settings shows where
+/// it is downloaded.
+@MainActor
+private func toggleReading(
+  _ text: String, with readAloud: ReadAloudController, showSettings: () -> Void
+) {
+  if readAloud.isReading(text) {
+    readAloud.stop()
+  } else {
+    readAloud.read(text, id: text)
+    if !readAloud.isModelInstalled { showSettings() }
   }
 }
 
@@ -160,13 +183,7 @@ private struct ReadAloudButton: View {
   var body: some View {
     let isReading = readAloud.isReading(text)
     Button {
-      if isReading {
-        readAloud.stop()
-      } else {
-        readAloud.read(text, id: text)
-        // Without its model, Settings shows where it is downloaded.
-        if !readAloud.isModelInstalled { showSettings() }
-      }
+      toggleReading(text, with: readAloud, showSettings: showSettings)
     } label: {
       Group {
         if readAloud.isLoading(text) {
