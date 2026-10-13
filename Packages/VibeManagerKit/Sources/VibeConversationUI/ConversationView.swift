@@ -331,6 +331,10 @@ public struct ConversationView: View {
         }
         .modifier(StatusGlass())
       }
+      if let request = model.standaloneRequest {
+        StandaloneRequestCard(model: model, request: request)
+          .modifier(StatusGlass())
+      }
       PromptComposer(model: model, isActive: isActive)
     }
     .frame(maxWidth: layout.contentWidth)

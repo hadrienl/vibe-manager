@@ -33405,7 +33405,7 @@
       }
     },
     "Activity" : {
-      "comment" : "A section of the inspector.\nA tab of the Settings window.",
+      "comment" : "A section of an agent's page of the Settings.\nA section of the inspector.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -35009,7 +35009,7 @@
       }
     },
     "Agent" : {
-      "comment" : "The coding agent the session runs.\nThe heading of the session's agent.\nWhat the Usage window groups its figures by.",
+      "comment" : "A page of the Settings window: an agent.\nThe coding agent the session runs.\nThe heading of the session's agent.\nWhat the Usage window groups its figures by.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -42691,7 +42691,7 @@
       }
     },
     "Badges" : {
-      "comment" : "A tab of the Settings window: the symbols and colours sessions may be given.",
+      "comment" : "A page of the Settings window: the symbols and colours sessions may be given.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -51269,7 +51269,7 @@
       }
     },
     "Conversation" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -59011,7 +59011,7 @@
       }
     },
     "Done" : {
-      "comment" : "A task status: the session's work is finished.",
+      "comment" : "A task status: the session's work is finished.\nCloses the tutorial's last bubble.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -62028,7 +62028,7 @@
       }
     },
     "Endpoints" : {
-      "comment" : "A tab of the Settings window: model servers.",
+      "comment" : "A group of the Settings window's sidebar.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -63836,7 +63836,7 @@
       }
     },
     "Failed" : {
-      "comment" : "An avatar, or an agent action in the web view, that failed.",
+      "comment" : "An agent action in the web view that failed.\nAn avatar that could not be drawn.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -67863,7 +67863,7 @@
       }
     },
     "General" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -81962,7 +81962,7 @@
       }
     },
     "Name" : {
-      "comment" : "The name of a prompt template.\nThe name of the new session.",
+      "comment" : "The name of a prompt template.\nThe name of the header or parameter of the key.\nThe name of the new session.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -88093,7 +88093,7 @@
       }
     },
     "None" : {
-      "comment" : "No site is always allowed.",
+      "comment" : "A template that gives no conversation theme.\nNo authentication.\nNo site is always allowed.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -92787,7 +92787,7 @@
       }
     },
     "Notifications" : {
-      "comment" : "A section of the Settings window.",
+      "comment" : "A page of the Settings window: how the requests of the agents are signalled.\nA section of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -93890,7 +93890,7 @@
       }
     },
     "Open %@" : {
-      "comment" : "Opens a link of the summary; the URL or its short name.\nOpens a link of the summary; the URL.",
+      "comment" : "Opens a link of the summary; the URL or its short name.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -98111,7 +98111,7 @@
       }
     },
     "Privacy" : {
-      "comment" : "A section of the Settings window.\nA tab of the Settings window.",
+      "comment" : "A page of the Settings window.\nA section of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -104748,7 +104748,7 @@
       }
     },
     "Requests" : {
-      "comment" : "A VoiceOver rotor.\nA tab of the Settings window.",
+      "comment" : "A VoiceOver rotor.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -112630,7 +112630,7 @@
       }
     },
     "Session" : {
-      "comment" : "What the Usage window groups its figures by.\nOf the two views taking turns in a narrow window: the session's own.",
+      "comment" : "Of the two views taking turns in a narrow window: the session's own.\nWhat the Usage window groups its figures by.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -119250,6 +119250,208 @@
         }
       }
     },
+    "Skip" : {
+      "comment" : "Passes over the update an agent's CLI offers.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تخطٍّ"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Überspringen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Passer"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "छोड़ें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salta"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "スキップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "건너뛰기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Overslaan"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pomiń"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустить"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atla"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустити"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "略過"
+          }
+        }
+      }
+    },
+    "Skip This Version" : {
+      "comment" : "Passes over the update an agent's CLI offers, until a newer one.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تخطَّ هذا الإصدار"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Version überspringen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Omitir esta versión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorer cette version"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह संस्करण छोड़ें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salta questa versione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このバージョンをスキップ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 버전 건너뛰기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze versie overslaan"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pomiń tę wersję"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ignorar esta versão"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустить эту версию"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu sürümü atla"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Пропустити цю версію"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "跳过此版本"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "略過此版本"
+          }
+        }
+      }
+    },
     "Skip Tutorial" : {
       "comment" : "Ends the tutorial for good.",
       "localizations" : {
@@ -124102,7 +124304,7 @@
       }
     },
     "Templates" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -146035,7 +146237,7 @@
       }
     },
     "Tickets" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -148248,7 +148450,7 @@
       }
     },
     "Tools" : {
-      "comment" : "A session's symbol.",
+      "comment" : "A group of the Settings window's sidebar.\nA session's symbol.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -151835,8 +152037,109 @@
         }
       }
     },
+    "Update available" : {
+      "comment" : "The title of a request of an agent: its CLI offers to update itself as it starts.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتوفر تحديث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update verfügbar"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualización disponible"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise à jour disponible"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट उपलब्ध है"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamento disponibile"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデートがあります"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트 가능"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update beschikbaar"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dostępna aktualizacja"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualização disponível"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступно обновление"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncelleme var"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Доступне оновлення"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "有可用的更新"
+          }
+        }
+      }
+    },
     "Updates" : {
-      "comment" : "A section of the Settings window.\nA tab of the Settings window.",
+      "comment" : "A page of the Settings window.\nA section of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -152137,7 +152440,7 @@
       }
     },
     "Usage" : {
-      "comment" : "A section of the Settings window.\nA session's usage, heading.",
+      "comment" : "A session's usage, heading.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -155115,7 +155418,7 @@
       }
     },
     "Web View" : {
-      "comment" : "A tab of the Settings window.",
+      "comment" : "A page of the Settings window.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

@@ -483,6 +483,20 @@ public actor TrackAgentActivity {
     return named == id && tracked.state.requests.first?.id == id
   }
 
+  /// The dialog a session's start waits on, read off its screen: one the keymap answers —
+  /// an update offered — takes the place of the request that only guessed a dialog is there.
+  public func startupDialogOnScreen(_ text: String, isFor id: AgentRequestID) {
+    guard var tracked = sessions[id.sessionID], let keymap = tracked.decoder?.answerKeymap,
+      let index = tracked.state.requests.firstIndex(where: { $0.id == id }),
+      case .inTerminal(let guessed) = tracked.state.requests[index].content,
+      guessed.kind == .startup, let prompt = keymap.startupDialog(onScreen: text)
+    else { return }
+    let previous = tracked.state
+    tracked.state.requests[index].content = .inTerminal(prompt)
+    sessions[id.sessionID] = tracked
+    changed(id.sessionID, from: previous)
+  }
+
   private func received(
     _ event: AgentActivityEvent,
     at position: AgentActivityLogPosition,

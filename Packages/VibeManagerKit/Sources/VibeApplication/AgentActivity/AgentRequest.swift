@@ -160,6 +160,9 @@ public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
     /// The CLI started, and its hooks have not spoken: a dialog of its own start holds them back —
     /// trusting the folder, approving servers or hooks, signing in (#273).
     case startup
+    /// The CLI offers to update itself before it starts — Codex's `Update available` — read off
+    /// the screen of a start whose hooks have not spoken.
+    case update
     /// Anything else the agent stopped for.
     case other
   }
@@ -385,6 +388,11 @@ public enum AgentAnswer: Hashable, Sendable {
   case answers([AgentQuestionAnswer])
   case approvePlan(AgentPlanApproval)
   case rejectPlan
+  /// The CLI's update is passed over: this time, or until the next version.
+  case skipUpdate(untilNextVersion: Bool)
+  /// The questions are set aside — Claude Code's "Chat about this" — for a message the agent gets
+  /// instead, typed into its prompt as any other.
+  case chatAboutThis
 }
 
 extension AgentAnswer {
@@ -396,6 +404,8 @@ extension AgentAnswer {
     case .deny: return [.deny]
     case .approvePlan: return [.approvePlan]
     case .rejectPlan: return [.rejectPlan]
+    case .skipUpdate: return [.skipUpdate]
+    case .chatAboutThis: return [.chatAboutThis]
     case .answers(let answers):
       return Set(
         answers.map { answer -> AgentAnswerKind in
@@ -458,6 +468,8 @@ public enum AgentAnswerKind: Hashable, Sendable {
   case allowOnce, allowAlways, deny
   case chooseOption, chooseOptions, writeText
   case approvePlan, rejectPlan
+  case skipUpdate
+  case chatAboutThis
 }
 
 /// Types an answer into the terminal of one CLI, keystroke by keystroke, as the user would (#40).
@@ -479,6 +491,9 @@ public protocol AgentAnswerKeymap: Sendable {
   var readsRequestOnScreen: Bool { get }
   /// The dialog drawn last, as the screen shows it, or `nil` when it cannot be read whole.
   func drawnDialog(onScreen text: String) -> AgentDrawnDialog?
+  /// What a dialog of the CLI's start says, read off the screen, when it is one this keymap
+  /// answers: an update offered.
+  func startupDialog(onScreen text: String) -> AgentTerminalPrompt?
 }
 
 extension AgentAnswerKeymap {
@@ -493,6 +508,10 @@ extension AgentAnswerKeymap {
   }
 
   public func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
+    nil
+  }
+
+  public func startupDialog(onScreen text: String) -> AgentTerminalPrompt? {
     nil
   }
 }

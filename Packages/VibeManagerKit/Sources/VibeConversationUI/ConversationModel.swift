@@ -90,6 +90,11 @@ public struct ConversationRequest: Equatable, Sendable {
       && answers.contains(.writeText)
   }
 
+  /// Questions the composer does not answer, set aside by writing to the agent instead.
+  var takesChatAboutThis: Bool {
+    questions != nil && !takesComposerText && answers.contains(.chatAboutThis)
+  }
+
   /// Answered at a click: one question of one choice. Otherwise the choices go together.
   public var answersAtOnce: Bool {
     guard let questions, questions.count == 1 else { return false }
@@ -1029,6 +1034,9 @@ public final class ConversationModel {
     case ready
     /// The agent asks a question: what is written is its free answer, the "Other" of its options.
     case answeringQuestion
+    /// Questions wait that the composer does not answer: what it sends sets them aside, and
+    /// goes to the agent as a message.
+    case chattingAboutQuestion
     /// The agent waits for an answer in its terminal: a prompt typed now would be read as one.
     case awaitingAnswer
     /// The agent is starting and has not said it is ready.
@@ -1043,14 +1051,15 @@ public final class ConversationModel {
     guard isProcessRunning else { return .stopped }
     guard isAgentReady else { return .starting }
     if case .awaitingUser = activity {
-      return request?.takesComposerText == true ? .answeringQuestion : .awaitingAnswer
+      if request?.takesComposerText == true { return .answeringQuestion }
+      return request?.takesChatAboutThis == true ? .chattingAboutQuestion : .awaitingAnswer
     }
     return .ready
   }
 
   /// Whether the composer can be typed into: a closed one does not take the keyboard.
   public var acceptsInput: Bool {
-    composerState == .ready || composerState == .answeringQuestion
+    [.ready, .answeringQuestion, .chattingAboutQuestion].contains(composerState)
   }
 
   public var canSend: Bool {
@@ -1059,7 +1068,7 @@ public final class ConversationModel {
       // Keys typed now would go to the panel open in the conversation, not to the prompt.
       return !isSubmitting && !PromptSubmission(text: draft, attachments: attachments).isEmpty
         && shellHold == nil && terminalPanel == nil
-    case .answeringQuestion:
+    case .answeringQuestion, .chattingAboutQuestion:
       return request?.isSending == false && !freeAnswer.isEmpty
     default:
       return false
@@ -1145,6 +1154,17 @@ public final class ConversationModel {
     return request
   }
 
+  /// The request no call of the conversation holds — a dialog of the CLI's start, an update it
+  /// offers — shown above the composer.
+  public var standaloneRequest: ConversationRequest? {
+    guard let request, requestCall(of: request) == nil else { return nil }
+    // A permission or a question goes under its call, which the transcript brings in a moment.
+    switch request.request.content {
+    case .inTerminal, .elicitation: return request
+    default: return nil
+    }
+  }
+
   private func requestCall(of request: ConversationRequest) -> ToolCall? {
     let unfinished = { [shownEntries] in
       ConversationEntry.allCalls(in: shownEntries)
@@ -1174,6 +1194,16 @@ public final class ConversationModel {
   /// Whether a permission's subject is what `call` shows.
   static func isAbout(_ call: ToolCall, _ subject: String) -> Bool {
     call.parameter(.command) == subject || call.parameter(.path) == subject
+  }
+
+  /// Whether the composer is ready again within a moment of the questions being set aside: the
+  /// tracker says so as it settles them, through the session's activity.
+  private func promptIsBack() async -> Bool {
+    for _ in 0..<40 {
+      if composerState == .ready { return true }
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    return composerState == .ready
   }
 
   /// Chooses an option of a question: one question of one choice is answered at once; otherwise
@@ -1276,6 +1306,13 @@ public final class ConversationModel {
       guard await answerRequest(.answers([.text(text)]), request.request.id) else { return false }
       if freeAnswer == text { draft = "" }
       return true
+    }
+    if composerState == .chattingAboutQuestion {
+      // The questions set aside first, their digit read off the screen; the message then goes as
+      // any other, once the prompt is back — never while another dialog is drawn.
+      guard canSend, let request, let answerRequest,
+        await answerRequest(.chatAboutThis, request.request.id), await promptIsBack()
+      else { return false }
     }
     guard canSend, let write else { return false }
     isSubmitting = true

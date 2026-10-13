@@ -593,7 +593,24 @@ struct RequestCard: View {
           .help(Text(Self.stopsTheTurn))
           .accessibilityHint(Text(Self.stopsTheTurn))
         }
-      case .questions, .inTerminal:
+      case .inTerminal:
+        // An update the CLI offers as it starts: passed over from here, updated in the terminal.
+        if answers.contains(.skipUpdate) {
+          Button {
+            send(.skipUpdate(untilNextVersion: false))
+          } label: {
+            Text("Skip", bundle: .module, comment: "Passes over the update an agent's CLI offers.")
+          }
+          .buttonStyle(.borderedProminent)
+          Button {
+            send(.skipUpdate(untilNextVersion: true))
+          } label: {
+            Text(
+              "Skip This Version", bundle: .module,
+              comment: "Passes over the update an agent's CLI offers, until a newer one.")
+          }
+        }
+      case .questions:
         EmptyView()
       }
       Spacer(minLength: 0)

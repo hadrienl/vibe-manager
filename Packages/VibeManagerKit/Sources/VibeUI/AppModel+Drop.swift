@@ -37,7 +37,8 @@ public enum SessionDropRoute: Equatable, Sendable {
     case .conversation:
       switch composer {
       case .none: return isProcessRunning ? .conversation : .refused(.stopped)
-      case .ready, .answeringQuestion, .awaitingAnswer, .starting: return .conversation
+      case .ready, .answeringQuestion, .chattingAboutQuestion, .awaitingAnswer, .starting:
+        return .conversation
       case .stopped: return .refused(.stopped)
       case .unavailable: return isProcessRunning ? .terminal(fallback: true) : .refused(.stopped)
       }

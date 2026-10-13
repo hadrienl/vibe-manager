@@ -120,6 +120,34 @@ enum DialogScreens {
     Run it on project msrauwqwfahxpgwrhmlb?
     """
 
+  /// The update Codex 0.159.2 offers as it starts.
+  static let codexUpdate = """
+      Update available · 0.159.2 → 0.162.1
+      Release notes: https://github.com/openai/codex/releases/latest
+
+    › 1. Update now (runs `sh -c 'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh'`)
+      2. Skip
+      3. Skip until next version
+
+      enter continue · esc skip
+    """
+  /// Two questions, as Claude Code 2.1.296 draws the first: "Chat about this" past a rule.
+  static let claudeChatAboutThis = """
+    ←  ☐ Color  ☐ Pets  ✔ Submit  →
+
+    Pick a color?
+
+    ❯ 1. Red
+         Rouge
+      2. Blue
+         Bleu
+      3. Type something.
+    ──────────────────────────────────────────────────────────────
+      4. Chat about this
+
+    Enter to select · Tab/Arrow keys to navigate · Esc to cancel
+    """
+
   static func dialog(_ text: String) -> AgentDialogScreen? { AgentDialogScreen(screen: text) }
 }
 
@@ -216,6 +244,49 @@ struct DialogScreenKeymapTests {
       AgentElicitation(
         server: "claude.ai Supabase", message: DialogScreens.confirmationMessage, fieldCount: 1))
     #expect(claude.keystrokes(for: .allowOnce, to: form, screen: screen) == nil)
+  }
+
+  @Test("Codex's update, read off the screen: Skip takes 2, Skip This Version 3, never Update")
+  func codexUpdate() throws {
+    let prompt = try #require(codex.startupDialog(onScreen: DialogScreens.codexUpdate))
+    #expect(prompt == AgentTerminalPrompt(kind: .update, message: "0.159.2 → 0.162.1"))
+    #expect(codex.drawnDialog(onScreen: DialogScreens.codexUpdate) == AgentDrawnDialog(.update))
+    let update = AgentRequestContent.inTerminal(prompt)
+    #expect(codex.answers(for: update) == [.skipUpdate])
+    let screen = DialogScreens.dialog(DialogScreens.codexUpdate)
+    #expect(
+      codex.keystrokes(for: .skipUpdate(untilNextVersion: false), to: update, screen: screen)
+        == [[0x32]])
+    #expect(
+      codex.keystrokes(for: .skipUpdate(untilNextVersion: true), to: update, screen: screen)
+        == [[0x33]])
+    #expect(codex.keystrokes(for: .skipUpdate(untilNextVersion: false), to: update) == nil)
+    // Another dialog of the start is not taken for it.
+    #expect(codex.startupDialog(onScreen: DialogScreens.codexCommand) == nil)
+    #expect(
+      codex.answers(for: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil))).isEmpty)
+  }
+
+  @Test("Claude Code's questions set aside: Chat about this's digit, read on screen, then the text")
+  func claudeChatAboutThis() {
+    let questions = AgentRequestContent.questions([
+      AgentQuestion(
+        header: "Color", text: "Pick a color?",
+        options: [.init(label: "Red", description: "Rouge"), .init(label: "Blue")]),
+      AgentQuestion(
+        header: "Pets", text: "Pets?", options: [.init(label: "Cat"), .init(label: "Dog")],
+        allowsMultipleChoices: true),
+    ])
+    #expect(claude.answers(for: questions).contains(.chatAboutThis))
+    let screen = DialogScreens.dialog(DialogScreens.claudeChatAboutThis)
+    #expect(claude.keystrokes(for: .chatAboutThis, to: questions, screen: screen) == [[0x34]])
+    #expect(claude.keystrokes(for: .chatAboutThis, to: questions, screen: nil) == nil)
+    // Eight options: "Chat about this" would be the tenth, with no digit.
+    let many = AgentRequestContent.questions([
+      AgentQuestion(
+        header: nil, text: "Which?", options: (1...8).map { .init(label: "o\($0)") })
+    ])
+    #expect(!claude.answers(for: many).contains(.chatAboutThis))
   }
 
   @Test("Codex: an MCP tool's form takes the digit of Allow, Escape cancels it")

@@ -109,6 +109,8 @@ public enum AgentActivityMachine {
   /// The keystrokes that stop a turn in both terminal interfaces, on their own in one write. An
   /// arrow key also starts with Escape, but arrives as a whole sequence.
   public static let interruptKeys: Set<[UInt8]> = [[0x1B], [0x03]]
+  /// The digits of an update's options: update now, skip, skip this version.
+  static let updateOptionKeys: Set<[UInt8]> = [[0x31], [0x32], [0x33]]
 
   public static func reduce(
     _ state: AgentActivityState,
@@ -147,10 +149,12 @@ public enum AgentActivityMachine {
     case .userInput(let bytes):
       next.lastUserInputAt = context.now
       // The dialog of a start the hooks never spoke after (#273): only Return or Escape leaves it,
-      // and no hook will say so.
+      // and no hook will say so — or, for an update offered, the digit of one of its options.
       if !next.isStructured {
-        if case .inTerminal(let prompt) = next.requests.first?.content, prompt.kind == .startup,
+        if case .inTerminal(let prompt) = next.requests.first?.content,
+          [.startup, .update].contains(prompt.kind),
           bytes == [0x0D] || interruptKeys.contains(bytes)
+            || (prompt.kind == .update && Self.updateOptionKeys.contains(bytes))
         {
           next.settleFirstRequest(isKnownAnswered: true)
         }
@@ -167,7 +171,7 @@ public enum AgentActivityMachine {
       // whose letters answer nothing: only Return or Escape ends it.
       if case .inTerminal(let prompt) = next.requests.first?.content {
         let ends =
-          [.form, .question, .plan, .account, .startup].contains(prompt.kind)
+          [.form, .question, .plan, .account, .startup, .update].contains(prompt.kind)
           ? bytes == [0x0D] : context.approvalAnswerKeys.contains(bytes)
         if ends || interruptKeys.contains(bytes) {
           next.settleFirstRequest(isKnownAnswered: true)
@@ -229,7 +233,7 @@ public enum AgentActivityMachine {
     // Anything the hooks say proves they are wired, even when their `SessionStart` came late —
     // after the fallback already took over. Whatever start held them back is behind the agent.
     next.source = .structured
-    next.dropAnnouncedRequests { $0.kind == .startup }
+    next.dropAnnouncedRequests { [.startup, .update].contains($0.kind) }
     next.lastOutputAt = nil
     // A tool that ran, a new turn, its end: the dialog drawn before its report, if any, is gone.
     switch signal {

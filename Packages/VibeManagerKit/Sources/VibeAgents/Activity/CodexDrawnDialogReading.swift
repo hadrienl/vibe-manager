@@ -21,6 +21,7 @@ enum CodexDrawnDialogReading {
   /// shows only part of what it asks.
   static func dialog(onScreen text: String) -> AgentDrawnDialog? {
     guard AgentDialogScreen(screen: text) != nil else { return nil }
+    if update(onScreen: text) != nil { return AgentDrawnDialog(.update) }
     let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map {
       $0.trimmingCharacters(in: .whitespaces)
     }
@@ -54,6 +55,21 @@ enum CodexDrawnDialogReading {
     default:
       return quoted(in: title, after: "network access to ").map { AgentDrawnDialog(.host($0)) }
     }
+  }
+
+  /// The update Codex offers as it starts, `Update available · 0.159.2 → 0.162.1`, by its
+  /// versions — empty when they cannot be read — or `nil` when the screen does not end on it: its
+  /// options `Update now`, `Skip`, `Skip until next version` under its title.
+  static func update(onScreen text: String) -> String? {
+    guard let screen = AgentDialogScreen(screen: text),
+      screen.options.first?.label.hasPrefix("Update now") == true,
+      screen.option(where: { $0 == "Skip" }) != nil,
+      screen.option(where: { $0 == "Skip until next version" }) != nil
+    else { return nil }
+    let lines = text.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) }
+    guard let title = lines.last(where: { $0.hasPrefix("Update available") }) else { return nil }
+    let versions = title.dropFirst("Update available".count).drop { " ·".contains($0) }
+    return String(versions)
   }
 
   /// `› 1. Yes, proceed (y)`, `1. Allow`: where the options start.

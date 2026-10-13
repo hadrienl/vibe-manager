@@ -25,6 +25,8 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     /// This tool of this MCP server, as its form names them: not its arguments, which it shows
     /// cut short.
     case mcpTool(server: String, tool: String)
+    /// The CLI's own update, offered before it starts.
+    case update
   }
 
   public let subject: Subject
@@ -39,12 +41,17 @@ public struct AgentDrawnDialog: Hashable, Sendable {
   public var quotesWhole: Bool {
     switch subject {
     case .commandStart, .file, .files, .server, .mcpTool: return false
+    case .update: return true
     case .command, .shownCommand, .patch, .host: return true
     }
   }
 
   /// Whether `request` is the one whose dialog this is, or may be.
   public func matches(_ request: AgentRequest) -> Bool {
+    if case .update = subject {
+      guard case .inTerminal(let prompt) = request.content else { return false }
+      return prompt.kind == .update
+    }
     guard case .permission(let permission) = request.content else { return false }
     switch (subject, permission.tool) {
     case (.commandStart(let start), .shell):

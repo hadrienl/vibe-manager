@@ -110,6 +110,13 @@ public struct AnswerAgentRequest: Sendable {
     return .sent
   }
 
+  /// Reads which dialog of its start a session waits on, off its screen: one its keymap answers
+  /// — an update offered — takes the place of the request that only guessed one is there.
+  public func readStartupDialog(_ id: AgentRequestID) async {
+    guard let text = await screen(id.sessionID) else { return }
+    await tracker.startupDialogOnScreen(text, isFor: id)
+  }
+
   /// Returns once the terminal has been silent for `quietPeriod`, or after `settleLimit`.
   private func settle(_ id: SessionID) async {
     let start = ContinuousClock.now
@@ -136,6 +143,8 @@ extension AgentAnswer {
     case .answers: return "answers"
     case .approvePlan: return "approvePlan"
     case .rejectPlan: return "rejectPlan"
+    case .skipUpdate: return "skipUpdate"
+    case .chatAboutThis: return "chatAboutThis"
     }
   }
 }

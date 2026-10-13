@@ -711,6 +711,58 @@ struct ConversationModelTests {
     #expect(model.draft.isEmpty)
   }
 
+  @Test("Questions the composer does not answer: what it sends sets them aside, as a message")
+  func chatAboutThis() async {
+    let size = AgentQuestion(
+      header: "Size", text: "Which size?", options: [.init(label: "S"), .init(label: "L")])
+    let (model, terminal, answers, _) = asking(
+      [Self.colour, size], answers: [.chooseOption, .writeText, .chatAboutThis])
+    #expect(model.composerState == .chattingAboutQuestion)
+    #expect(model.acceptsInput)
+    model.draft = "Stop, a ticket instead"
+    #expect(model.canSend)
+    // Set aside, the questions give the prompt back: the message is typed there.
+    model.answerRequest = { answer, id in
+      answers.given.append((answer, id))
+      model.activity = .working
+      return true
+    }
+    #expect(await model.send())
+    #expect(answers.given.first?.0 == .chatAboutThis)
+    #expect(!terminal.written.isEmpty)
+    #expect(model.draft.isEmpty)
+    // Another dialog drawn as they are set aside: nothing typed, the draft kept.
+    let (held, heldTerminal, _, _) = asking(
+      [Self.colour, size], answers: [.chooseOption, .writeText, .chatAboutThis])
+    held.answerRequest = { _, _ in
+      held.activity = .awaitingUser(.approval)
+      return true
+    }
+    held.draft = "Stop"
+    #expect(await held.send() == false)
+    #expect(heldTerminal.written.isEmpty)
+    #expect(held.draft == "Stop")
+    // A CLI without "Chat about this" keeps the composer closed.
+    let (closed, _, _, _) = asking([Self.colour, size], answers: [.chooseOption])
+    #expect(closed.composerState == .awaitingAnswer)
+  }
+
+  @Test("A request no call holds is shown above the composer")
+  func standaloneRequest() {
+    let (model, _) = model()
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: model.sessionID, key: "startup"), receivedAt: Date(),
+      kind: .approval,
+      content: .inTerminal(AgentTerminalPrompt(kind: .update, message: "0.159.2 → 0.162.1")),
+      reference: AgentToolReference(tool: nil), isShown: true)
+    model.pendingRequest = {
+      ConversationRequest(request: request, answers: [.skipUpdate], isSending: false)
+    }
+    model.answerRequest = { _, _ in true }
+    model.activity = .awaitingUser(.approval)
+    #expect(model.standaloneRequest?.request.id == request.id)
+  }
+
   @Test("A free answer that could not be typed stays in the composer")
   func freeAnswerKept() async {
     let (model, _, answers, _) = asking([Self.colour], answers: [.chooseOption, .writeText])

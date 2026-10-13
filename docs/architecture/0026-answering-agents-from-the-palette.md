@@ -97,6 +97,21 @@ nothing else — above the two choices, `Accept` pointed at. Escape cancels it, 
 well: before the dialog, it would stop the turn. A form with fields is filled in the terminal. In
 the conversation, the card goes under the server's call that runs.
 
+### Questions set aside, an update passed over
+
+Claude Code draws "Chat about this" past a rule under a question's options. Its digit, read off
+the screen, declines every question at once and gives the prompt back while the agent's turn goes
+on (2.1.296): the conversation's composer, closed before when several questions waited, sends that
+digit alone. Its message then goes as any prompt — typed, not pasted, which Claude Code would show
+its model as text the user did not write — once the prompt is back; another dialog drawn meanwhile,
+and nothing is typed, the draft kept.
+
+Codex can offer to update itself as it starts, before any hook speaks: the request guessed for a
+silent start is read off the screen once it is made, and an `Update available` with `Update now`,
+`Skip` and `Skip until next version` becomes an update offered. `2` skips it, `3` until the next
+version (0.159.2); updating, which runs a script, is left to the terminal. A request no call of the
+conversation holds is shown above its composer.
+
 ### What would be allowed is what is shown
 
 A permission whose payload was cut at the hook's limit can only be refused from outside. Text an

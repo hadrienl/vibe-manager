@@ -800,7 +800,8 @@ private struct OptionButtonStyle: ButtonStyle {
 struct RequestActions: View {
   let model: ConversationModel
   let request: ConversationRequest
-  let call: ToolCall
+  /// The call it is shown under, if any: what the call shows is not repeated.
+  let call: ToolCall?
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
@@ -809,7 +810,7 @@ struct RequestActions: View {
       // What would be allowed, unless the block above shows exactly that.
       if case .permission(let permission) = request.request.content,
         let subject = permission.subject,
-        !ConversationModel.isAbout(call, subject)
+        !(call.map { ConversationModel.isAbout($0, subject) } ?? false)
       {
         Text(verbatim: DisplaySafeText.visible(subject))
           .font(theme.codeFont(size: appearance.textSize.scaled(12)))
@@ -906,7 +907,25 @@ struct RequestActions: View {
           }
           .help(Text(Self.stopsTheTurn))
         }
-      case .questions, .inTerminal:
+      case .inTerminal:
+        // An update the CLI offers as it starts: passed over from here, updated in the terminal.
+        if answers.contains(.skipUpdate) {
+          Button {
+            model.answer(.skipUpdate(untilNextVersion: false))
+          } label: {
+            Text("Skip", bundle: .module, comment: "Passes over the update an agent's CLI offers.")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent.color)
+          Button {
+            model.answer(.skipUpdate(untilNextVersion: true))
+          } label: {
+            Text(
+              "Skip This Version", bundle: .module,
+              comment: "Passes over the update an agent's CLI offers, until a newer one.")
+          }
+        }
+      case .questions:
         EmptyView()
       }
       if request.isSending {
@@ -942,6 +961,45 @@ struct RequestActions: View {
     }
     .help(Text(Self.stopsTheTurn))
     .accessibilityHint(Text(Self.stopsTheTurn))
+  }
+}
+
+/// A request no call holds — a dialog of the CLI's start, an update it offers — above the composer,
+/// with what it says and its answers.
+struct StandaloneRequestCard: View {
+  let model: ConversationModel
+  let request: ConversationRequest
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label {
+        title
+      } icon: {
+        Image(systemName: isUpdate ? "arrow.down.circle" : "terminal")
+      }
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5), weight: .semibold))
+      .foregroundStyle(theme.text.color)
+      RequestActions(model: model, request: request, call: nil)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+  }
+
+  private var isUpdate: Bool {
+    if case .inTerminal(let prompt) = request.request.content { return prompt.kind == .update }
+    return false
+  }
+
+  private var title: Text {
+    isUpdate
+      ? Text(
+        "\(model.agentName) offers an update", bundle: .module,
+        comment: "Above the composer: the agent's CLI offers to update itself before it starts.")
+      : Text(
+        "\(model.agentName) is waiting for your answer", bundle: .module,
+        comment: "Above the composer: a dialog of the agent that no call of the conversation shows.")
   }
 }
 
