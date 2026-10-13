@@ -37,7 +37,7 @@ public struct CoordinateRestartButton: View {
     .buttonStyle(.link)
     .font(font)
     .disabled(!isEnabled)
-    .help(
+    .instantTooltip(
       Text(
         "This agent was started without the coordination tools. Restarting it resumes its conversation with them.",
         bundle: .module, comment: "The help of the Restart to Coordinate button.")
@@ -68,7 +68,7 @@ public struct CoordinateToggle: View {
       }
     }
     .toggleStyle(CoordinateToggleStyle(font: font))
-    .help(
+    .instantTooltip(
       isOn
         ? Text(
           "The agent can create and follow sessions of its own, one per task. Click to turn it off.",
