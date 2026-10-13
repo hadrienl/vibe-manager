@@ -21,6 +21,8 @@ public actor HostedTerminalSession: HostedTerminal {
   /// Set on a session taken back after a relaunch: the first size the view reports is followed by
   /// a redraw, so a full-screen program draws itself for the window it is now in.
   private var needsRedraw: Bool
+  /// When output lost on its way from the host has the program draw itself again (#367).
+  private var lossRedraws = PulseGate(interval: .seconds(1))
 
   init(
     id: TerminalID,
@@ -99,14 +101,40 @@ public actor HostedTerminalSession: HostedTerminal {
     subscribers.output(bytes)
   }
 
-  func receive(truncated byteCount: Int) {
+  /// Output the host dropped because the application fell behind reading it.
+  ///
+  /// Those bytes are in no history on this side: a view drawn again from it would show the same
+  /// damage. The program, which still holds the whole screen, is asked to draw it again instead —
+  /// at once, then at most once a second while the losses go on, and once more after the last
+  /// one, so a client that lags is not handed a redraw per loss (#367).
+  func receive(truncated byteCount: Int) async {
     historyBuffer.noteDropped(byteCount)
     subscribers.truncated(byteCount)
+    guard !hasEnded else { return }
+    switch lossRedraws.output(at: .now) {
+    case .emit:
+      await supervisor.send(.redraw(session: id))
+    case .schedule(let deadline):
+      Task { [weak self] in
+        try? await Task.sleep(until: deadline, clock: .continuous)
+        await self?.redrawAfterLosses()
+      }
+    case .covered:
+      break
+    }
   }
 
-  /// The history the host already held has arrived, and this is the state it goes on from.
+  private func redrawAfterLosses() async {
+    lossRedraws.scheduledPulseFired(at: .now)
+    guard !hasEnded else { return }
+    await supervisor.send(.redraw(session: id))
+  }
+
+  /// The history the host already held has arrived, and this is the state it goes on from. What
+  /// the host had trimmed before was delivered all the same, if not to this copy: the stream here
+  /// goes on from where the host's history starts, as the host's does (#367).
   func receiveAttached(state: TerminalProcessState, droppedByteCount: Int) {
-    historyBuffer.noteDropped(droppedByteCount)
+    historyBuffer.noteSkipped(droppedByteCount)
     apply(state)
   }
 

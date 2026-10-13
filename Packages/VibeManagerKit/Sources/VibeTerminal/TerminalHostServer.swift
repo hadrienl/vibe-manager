@@ -70,6 +70,7 @@ public actor TerminalHostServer {
   private struct Hosted {
     let session: PTYTerminalSession
     let role: TerminalRole
+    let scrollback: TerminalScrollbackLimits
     var endedAt: Date?
   }
 
@@ -328,7 +329,7 @@ public actor TerminalHostServer {
       records.append(
         HostedSessionRecord(
           session: id, state: await hosted.session.state(), endedAt: hosted.endedAt,
-          role: hosted.role))
+          role: hosted.role, scrollback: hosted.scrollback))
     }
     return records
   }
@@ -358,7 +359,7 @@ public actor TerminalHostServer {
       configuration.diagnostics.record(
         .session, .info, "host.sessionStarted",
         ["session": configuration.diagnostics.pseudonym(id), "running": .count(running + 1)])
-      sessions[id] = Hosted(session: session, role: spec.role)
+      sessions[id] = Hosted(session: session, role: spec.role, scrollback: spec.scrollback)
       watch(session)
       updateIdleState()
       guard case .running(let processIdentifier) = await session.state() else {

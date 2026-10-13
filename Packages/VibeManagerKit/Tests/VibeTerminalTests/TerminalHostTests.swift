@@ -610,6 +610,91 @@ struct TerminalHostTests {
     await host.shutDown()
   }
 
+  @Test("Output lost on its way from the host has the program draw itself again (#367)")
+  func redrawsAfterALoss() async throws {
+    let host = try InProcessTerminalHost()
+    let supervisor = host.supervisor()
+    let session = try await supervisor.start(
+      TerminalTestSupport.spec(
+        script: "trap 'echo WINCH' WINCH; printf 'ready\\n'; while :; do sleep 0.05; done"),
+      for: TerminalID())
+    let mirror = try #require(session as? HostedTerminalSession)
+    let transcript = await Transcript.follow(session)
+    #expect(await transcript.waitFor("ready"))
+
+    // What the supervisor does with a `truncated` from the host: no history on this side holds
+    // those bytes, only the program can draw the screen again.
+    await mirror.receive(truncated: 4_096)
+
+    #expect(await transcript.waitFor("WINCH"))
+    #expect(await mirror.history().droppedByteCount == 4_096)
+    await supervisor.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("Taken back after a relaunch, a history goes on from where the host's starts (#367)")
+  func reattachedHistoryKeepsTheHostOffsets() async throws {
+    let host = try InProcessTerminalHost()
+    let first = host.supervisor()
+    let id = TerminalID()
+    let limits = TerminalScrollbackLimits(maximumLineCount: 5, maximumByteCount: 8_000_000)
+    let session = try await first.start(
+      TerminalTestSupport.spec(
+        // A line at a time, each read as a block of its own, so the host trims its history; then
+        // it waits, still running, for the next launch to take it back.
+        script: "i=0; while [ $i -lt 40 ]; do echo line-$i; sleep 0.02; i=$((i + 1)); done; "
+          + "echo done-now; read go",
+        scrollback: limits),
+      for: id)
+    #expect(await Transcript.follow(session).waitFor("done-now"))
+    await first.relinquish(keepRunning: true)
+
+    let second = host.supervisor()
+    _ = await second.reconnect()
+    let adopted = try #require(await second.session(for: id))
+    let history = await adopted.history()
+
+    #expect(String(decoding: history.bytes, as: UTF8.self).contains("done-now"))
+    // What the host had trimmed was passed, not lost: counted once, where the history starts.
+    #expect(history.startOffset > 0)
+    #expect(history.droppedByteCount == history.startOffset)
+    await second.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
+  @Test("Taken back after a relaunch, a session keeps its own history limits (#367)")
+  func reattachedSessionKeepsItsLimits() async throws {
+    let host = try InProcessTerminalHost()
+    let first = host.supervisor()
+    let id = TerminalID()
+    let limits = TerminalScrollbackLimits(maximumLineCount: 5, maximumByteCount: 8_000_000)
+    let session = try await first.start(
+      TerminalTestSupport.spec(
+        script: "printf 'ready\\n'; read go; i=0; "
+          + "while [ $i -lt 40 ]; do echo line-$i; sleep 0.02; i=$((i + 1)); done; "
+          + "echo done-now; read stop",
+        scrollback: limits),
+      for: id)
+    #expect(await Transcript.follow(session).waitFor("ready"))
+    await first.relinquish(keepRunning: true)
+
+    let second = host.supervisor()
+    _ = await second.reconnect()
+    let adopted = try #require(await second.session(for: id))
+    let transcript = await Transcript.follow(adopted)
+    await adopted.write("go\r")
+    #expect(await transcript.waitFor("done-now"))
+
+    // Trimmed by the session's limits, as the host's history is: by the default ones, it would
+    // still hold all forty lines.
+    let history = await adopted.history()
+    let lines = history.bytes.filter { $0 == UInt8(ascii: "\n") }.count
+    #expect(lines <= limits.maximumLineCount + 1)
+    #expect(history.startOffset > 0)
+    await second.relinquish(keepRunning: false)
+    await host.shutDown()
+  }
+
   @Test("With no session and no client, the host ends itself")
   func endsWhenIdle() async throws {
     let host = try InProcessTerminalHost(idleGracePeriod: .milliseconds(200))

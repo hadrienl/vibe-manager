@@ -109,6 +109,47 @@ struct TerminalSubscribersTests {
     #expect(subscribers.lastOutputAt == at(40))
   }
 
+  @Test("Output a loss notice evicts is told too, with the next notice (#367)")
+  func noticeEvictionIsCounted() async {
+    let subscribers = TerminalSubscribers(schedule: { _, _ in })
+    let view = subscribers.attach(
+      .everything, state: .starting, history: Self.empty, hasEnded: false
+    ).events
+    var reader = view.makeAsyncIterator()
+    var emitted = 0
+    var seen = 0
+    func emit(_ count: Int) {
+      subscribers.output([UInt8](repeating: 0x61, count: count))
+      emitted += count
+    }
+    func read(_ events: Int) async {
+      for _ in 0..<events {
+        switch await reader.next() {
+        case .output(let bytes): seen += bytes.count
+        case .outputDropped(let count): seen += count
+        default: break
+        }
+      }
+    }
+
+    // A reader that does not read: its stream fills, then each block evicts the oldest, and each
+    // notice of that eviction evicts the next one.
+    for index in 0..<520 { emit(index % 7 + 1) }
+    await read(512)
+    // Read up, it is handed the next block, and the loss its last notice caused.
+    emit(3)
+    subscribers.finishAll()
+    while let event = await reader.next() {
+      switch event {
+      case .output(let bytes): seen += bytes.count
+      case .outputDropped(let count): seen += count
+      default: break
+      }
+    }
+
+    #expect(seen == emitted)
+  }
+
   @Test("A stand-in's stream is relayed with only what the interest reads")
   func relayKeepsWhatTheInterestReads() {
     #expect(TerminalEventInterest.state.translating(.output([1])) == nil)
@@ -149,6 +190,17 @@ struct TerminalHistoryOffsetTests {
       #expect(snapshot.startOffset == total - snapshot.bytes.count)
     }
     #expect(history.snapshot.startOffset > 0)
+  }
+
+  @Test("Output delivered before the history followed the stream counts as passed (#367)")
+  func skippedOutputMovesTheOffsets() {
+    var history = TerminalHistory(limits: .default)
+    history.append([1, 2, 3])
+    history.noteSkipped(1_000)
+    let snapshot = history.snapshot
+    #expect(snapshot.startOffset == 1_000)
+    #expect(snapshot.endOffset == 1_003)
+    #expect(snapshot.droppedByteCount == snapshot.startOffset)
   }
 
   @Test("Bytes lost before they reached the history move no offset")

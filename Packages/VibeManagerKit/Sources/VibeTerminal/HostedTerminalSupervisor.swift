@@ -91,6 +91,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
   /// started: what is stopped, after checking it is still the same, if the host dies.
   private var groups: [TerminalID: (group: Int32, startedAt: Date?)] = [:]
   private var pending: [UInt64: CheckedContinuation<TerminalHostMessage.Body?, Never>] = [:]
+  private var truncationNotices = TruncationNotices()
   private var nextRequest: UInt64 = 1
 
   public init(configuration: Configuration, local: PTYTerminalSupervisor = PTYTerminalSupervisor())
@@ -233,7 +234,8 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
         id: record.session,
         supervisor: self,
         state: record.state,
-        scrollback: .default,
+        // A host that predates them does not say a session's limits (#367).
+        scrollback: record.scrollback ?? .default,
         needsRedraw: !record.state.isFinished
       )
       mirrors[record.session] = mirror
@@ -285,6 +287,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
   }
 
   public func discard(_ id: TerminalID) async {
+    noteTruncationsLeft(by: id)
     groups[id] = nil
     auxiliary.remove(id)
     guard let mirror = mirrors.removeValue(forKey: id) else { return }
@@ -294,6 +297,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
 
   public func stepAway() async {
     awaitsReattach = true
+    noteAllTruncationsLeft()
     // Only what `reconnect` took: nothing is started before the launch has decided.
     mirrors.removeAll()
     guard let connection else { return }
@@ -304,6 +308,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
 
   public func relinquish(keepRunning: Bool) async {
     isClosed = true
+    noteAllTruncationsLeft()
     guard let connection else { return }
     // Short: this is said on the way out, under the application's own deadline, and the host acts
     // on the frame, not on whether its acknowledgement made it back.
@@ -638,20 +643,22 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
     case .attached(let id, let state, let dropped):
       noteGroup(of: state, for: id)
       await mirrors[id]?.receiveAttached(state: state, droppedByteCount: dropped)
-      if state.isFinished { release(id) }
+      if state.isFinished {
+        noteTruncationsLeft(by: id)
+        release(id)
+      }
     case .state(let id, let state, _):
       noteGroup(of: state, for: id)
       await mirrors[id]?.receive(state: state)
       if state.isFinished {
+        noteTruncationsLeft(by: id)
         release(id)
         // Not awaited: this runs on the loop that reads the host's replies, and letting the host
         // go asks it something first.
         if restartArmed { Task { await self.restartIfIdle() } }
       }
     case .truncated(let id, let count):
-      diagnostics.record(
-        .host, .notice, "host.outputTruncated",
-        ["session": diagnostics.pseudonym(id), "bytes": .bytes(count)])
+      noteTruncation(of: count, in: id)
       await mirrors[id]?.receive(truncated: count)
     default:
       break
@@ -659,6 +666,35 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
     if let number = message.request, number != 0 {
       resolve(number, with: message.body)
     }
+  }
+
+  /// Each loss the host reports is noted, but a client that stays behind for hours would fill the
+  /// journal with them (#364): the first is written at once, then at most one a minute per
+  /// session, with what was lost since.
+  func noteTruncation(
+    of byteCount: Int, in id: TerminalID, at now: ContinuousClock.Instant = .now
+  ) {
+    guard let due = truncationNotices.note(byteCount, in: id, at: now) else { return }
+    recordTruncations(due, in: id)
+  }
+
+  /// What a session lost since its last notice, written when it ends.
+  private func noteTruncationsLeft(by id: TerminalID) {
+    guard let left = truncationNotices.flush(id) else { return }
+    recordTruncations(left, in: id)
+  }
+
+  private func noteAllTruncationsLeft() {
+    for id in truncationNotices.sessions { noteTruncationsLeft(by: id) }
+  }
+
+  private func recordTruncations(_ losses: TruncationNotices.Losses, in id: TerminalID) {
+    diagnostics.record(
+      .host, .notice, "host.outputTruncated",
+      [
+        "session": diagnostics.pseudonym(id), "bytes": .bytes(losses.bytes),
+        "losses": .count(losses.count),
+      ])
   }
 
   /// A session that has ended is read, and the host has no reason to keep it any longer. The
@@ -722,6 +758,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
       }
     }
     groups.removeAll()
+    noteAllTruncationsLeft()
     diagnostics.record(
       .host, .error, "host.connectionLost",
       ["sessions": .count(mirrors.count), "stopped": .count(stopped)])
@@ -771,5 +808,54 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
         "stopped": .flag(stopped), "errno": .code(stopped ? 0 : errno),
       ])
     return outcome
+  }
+}
+
+/// The losses of output the host reported, written to the journal at most once per interval and
+/// per session (#367).
+struct TruncationNotices {
+  struct Losses: Equatable {
+    var bytes = 0
+    var count = 0
+  }
+
+  private struct Pending {
+    var lastWritten: ContinuousClock.Instant
+    var losses = Losses()
+  }
+
+  let interval: Duration
+  private var pending: [TerminalID: Pending] = [:]
+
+  init(interval: Duration = .seconds(60)) {
+    self.interval = interval
+  }
+
+  /// The sessions with a notice on record, whether or not losses wait to be written.
+  var sessions: [TerminalID] { Array(pending.keys) }
+
+  /// Notes a loss; returns what is to be written now, if anything: the first loss of a session,
+  /// then everything lost since the last notice, once the interval has passed.
+  mutating func note(
+    _ byteCount: Int, in id: TerminalID, at now: ContinuousClock.Instant
+  ) -> Losses? {
+    guard var entry = pending[id] else {
+      pending[id] = Pending(lastWritten: now)
+      return Losses(bytes: byteCount, count: 1)
+    }
+    entry.losses.bytes += byteCount
+    entry.losses.count += 1
+    guard now - entry.lastWritten >= interval else {
+      pending[id] = entry
+      return nil
+    }
+    pending[id] = Pending(lastWritten: now)
+    return entry.losses
+  }
+
+  /// Forgets a session; returns the losses not written yet, if any.
+  mutating func flush(_ id: TerminalID) -> Losses? {
+    guard let entry = pending.removeValue(forKey: id), entry.losses.count > 0 else { return nil }
+    return entry.losses
   }
 }

@@ -50,6 +50,9 @@ final class TerminalSubscribers: @unchecked Sendable {
     let continuation: AsyncStream<TerminalEvent>.Continuation
     let interest: TerminalEventInterest
     var gate: PulseGate?
+    /// Output its stream lost to make room for the notice of an earlier loss, told with the next
+    /// notice (#367).
+    var unannouncedLoss = 0
   }
 
   /// A pulse a subscriber is owed at `deadline`.
@@ -129,7 +132,7 @@ final class TerminalSubscribers: @unchecked Sendable {
     _ bytes: [UInt8],
     at now: ContinuousClock.Instant = .now
   ) -> [PlannedPulse] {
-    var readers: [AsyncStream<TerminalEvent>.Continuation] = []
+    var readers: [Reader] = []
     var pulsed: [AsyncStream<TerminalEvent>.Continuation] = []
     var planned: [PlannedPulse] = []
     lock.withLock {
@@ -137,7 +140,7 @@ final class TerminalSubscribers: @unchecked Sendable {
       for (id, subscriber) in subscribers {
         switch subscriber.interest {
         case .everything:
-          readers.append(subscriber.continuation)
+          readers.append((id, subscriber.continuation))
         case .state:
           continue
         case .pulses:
@@ -152,8 +155,8 @@ final class TerminalSubscribers: @unchecked Sendable {
         }
       }
     }
-    for continuation in readers {
-      Self.yield(.output(bytes), to: continuation)
+    for reader in readers {
+      yield(.output(bytes), to: reader)
     }
     for continuation in pulsed { continuation.yield(.outputPulse) }
     for pulse in planned { schedule(pulse, self) }
@@ -171,14 +174,14 @@ final class TerminalSubscribers: @unchecked Sendable {
 
   /// Bytes lost before they reached the history — trimmed from another buffer on their way here.
   func truncated(_ byteCount: Int) {
-    for continuation in continuations(where: { $0 == .everything }) {
-      Self.yield(.historyTruncated(droppedByteCount: byteCount), to: continuation)
+    for reader in readers(where: { $0 == .everything }) {
+      yield(.historyTruncated(droppedByteCount: byteCount), to: reader)
     }
   }
 
   func stateChanged(_ state: TerminalProcessState) {
-    for continuation in continuations(where: { _ in true }) {
-      Self.yield(.stateChanged(state), to: continuation)
+    for reader in readers(where: { _ in true }) {
+      yield(.stateChanged(state), to: reader)
     }
   }
 
@@ -191,23 +194,45 @@ final class TerminalSubscribers: @unchecked Sendable {
     for continuation in all { continuation.finish() }
   }
 
-  private func continuations(
-    where reads: (TerminalEventInterest) -> Bool
-  ) -> [AsyncStream<TerminalEvent>.Continuation] {
-    lock.withLock { subscribers.values.filter { reads($0.interest) }.map(\.continuation) }
+  private typealias Reader = (id: UUID, continuation: AsyncStream<TerminalEvent>.Continuation)
+
+  private func readers(where reads: (TerminalEventInterest) -> Bool) -> [Reader] {
+    lock.withLock {
+      subscribers.filter { reads($0.value.interest) }.map { ($0.key, $0.value.continuation) }
+    }
   }
 
-  private static func yield(
-    _ event: TerminalEvent, to continuation: AsyncStream<TerminalEvent>.Continuation
-  ) {
-    guard case .dropped(let discarded) = continuation.yield(event) else { return }
+  /// Called by the session's actor only, one event at a time: the loss a subscriber is owed is
+  /// read and written back around the stream's writes without anybody else touching it.
+  private func yield(_ event: TerminalEvent, to reader: Reader) {
+    var lost = lock.withLock {
+      defer { subscribers[reader.id]?.unannouncedLoss = 0 }
+      return subscribers[reader.id]?.unannouncedLoss ?? 0
+    }
     // The subscriber fell far enough behind that its oldest event was evicted. Tell it how much
     // output it lost so it can show the gap rather than silently rendering a corrupt stream: as
-    // its own loss, not the history's, since the history still holds those bytes (#248). A
-    // dropped state change needs no notice: the current state is always readable from `state()`,
-    // and the subscriber re-reads it when the stream ends.
-    if case .output(let lost) = discarded {
-      _ = continuation.yield(.outputDropped(byteCount: lost.count))
+    // its own loss, not the history's, since the history still holds those bytes (#248).
+    lost += Self.lostBytes(reader.continuation.yield(event))
+    guard lost > 0 else { return }
+    // The notice takes a place in the full stream too, and evicts the next oldest event. Told at
+    // once with a notice of its own, that one would evict another, down the whole stream: what it
+    // evicts is told with the next notice instead (#367).
+    let evicted = Self.lostBytes(reader.continuation.yield(.outputDropped(byteCount: lost)))
+    guard evicted > 0 else { return }
+    lock.withLock { subscribers[reader.id]?.unannouncedLoss += evicted }
+  }
+
+  /// The output an eviction took from a subscriber. A dropped state change needs no notice: the
+  /// current state is always readable from `state()`, and the subscriber re-reads it when the
+  /// stream ends.
+  private static func lostBytes(_ result: AsyncStream<TerminalEvent>.Continuation.YieldResult)
+    -> Int
+  {
+    guard case .dropped(let discarded) = result else { return 0 }
+    switch discarded {
+    case .output(let bytes): return bytes.count
+    case .outputDropped(let byteCount): return byteCount
+    case .stateChanged, .historyTruncated, .outputPulse: return 0
     }
   }
 }
