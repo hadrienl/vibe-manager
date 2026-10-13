@@ -4,10 +4,45 @@ import SwiftUI
 public struct ComposerCoordination {
   public let isOn: Bool
   public let set: (Bool) -> Void
+  /// Restarts an agent started without the coordination tools, resuming its conversation with
+  /// them; `nil` when it has them, or is not running.
+  public let restart: (() -> Void)?
 
-  public init(isOn: Bool, set: @escaping (Bool) -> Void) {
+  public init(isOn: Bool, set: @escaping (Bool) -> Void, restart: (() -> Void)? = nil) {
     self.isOn = isOn
     self.set = set
+    self.restart = restart
+  }
+}
+
+/// Offered beside the chip turned on, for an agent started without the coordination tools: an
+/// earlier build started it, or the tools came after it (#352).
+public struct CoordinateRestartButton: View {
+  private let isEnabled: Bool
+  private let font: Font
+  private let action: () -> Void
+
+  public init(isEnabled: Bool, font: Font = .caption, action: @escaping () -> Void) {
+    self.isEnabled = isEnabled
+    self.font = font
+    self.action = action
+  }
+
+  public var body: some View {
+    Button(action: action) {
+      Text(
+        "Restart to Coordinate", bundle: .module,
+        comment: "Beside the Coordinate chip: restarts an agent started without its tools.")
+    }
+    .buttonStyle(.link)
+    .font(font)
+    .disabled(!isEnabled)
+    .help(
+      Text(
+        "This agent was started without the coordination tools. Restarting it resumes its conversation with them.",
+        bundle: .module, comment: "The help of the Restart to Coordinate button.")
+    )
+    .accessibilityIdentifier("composer-coordinate-restart")
   }
 }
 

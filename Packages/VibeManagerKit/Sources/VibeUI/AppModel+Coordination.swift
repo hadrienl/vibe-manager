@@ -167,6 +167,7 @@ extension AppModel {
   func coordinationProcessEnded(_ id: SessionID) {
     coordination.notices[id] = nil
     coordination.owedRules.remove(id)
+    coordination.serving[id] = nil
     guard let child = sessions.first(where: { $0.id == id }),
       let coordinatorID = child.coordination?.coordinatorID
     else { return }
@@ -347,7 +348,9 @@ extension AppModel {
       return
     }
     await reload()
-    if launcher?.isRunning(id) == true {
+    // An agent started without the tools is told nothing: they come with its next launch, which
+    // the composer offers.
+    if launcher?.isRunning(id) == true, await readCoordinationServing(of: id) != false {
       // Turned back before the next message, nothing is said.
       if let pending = coordination.notices[id], pending != isOn {
         coordination.notices[id] = nil
@@ -375,9 +378,57 @@ extension AppModel {
     guard let session = sessions.first(where: { $0.id == id }) else { return nil }
     let isOn = session.coordination?.isCoordinator == true
     guard isOn || canCoordinate(session) else { return nil }
-    return ComposerCoordination(isOn: isOn) { [weak self] value in
-      Task { await self?.setCoordinating(value, for: id) }
+    let lacksTools = launcher?.isRunning(id) == true && servesCoordination(id) == false
+    return ComposerCoordination(
+      isOn: isOn,
+      set: { [weak self] value in
+        Task { await self?.setCoordinating(value, for: id) }
+      },
+      restart: lacksTools
+        ? { [weak self] in Task { await self?.restartForCoordination(id) } } : nil)
+  }
+
+  /// Whether a session's running agent was started with the coordination tools; `nil` while it
+  /// is not known yet, the command line being read meanwhile.
+  func servesCoordination(_ id: SessionID) -> Bool? {
+    guard let terminal = pane(for: id)?.session else { return nil }
+    if let known = coordination.serving[id], known.terminal == ObjectIdentifier(terminal) {
+      return known.isServed
     }
+    if coordination.readingServing.insert(id).inserted {
+      Task { [weak self] in
+        _ = await self?.readCoordinationServing(of: id)
+        self?.coordination.readingServing.remove(id)
+      }
+    }
+    return nil
+  }
+
+  /// Reads from its command line whether a session's agent was started with the coordination
+  /// tools. `nil` when it is not running; `true` when the line cannot be read, rather than
+  /// offering a restart that may not be needed.
+  @discardableResult
+  func readCoordinationServing(of id: SessionID) async -> Bool? {
+    guard let terminal = pane(for: id)?.session,
+      case .running(let processIdentifier) = await terminal.state()
+    else { return nil }
+    let arguments = await Task.detached { ProcessArguments.of(processIdentifier) }.value
+    let isServed =
+      arguments?.contains { $0.contains(CoordinationToolCatalog.serverName) } ?? true
+    coordination.serving[id] = CoordinationServing(
+      terminal: ObjectIdentifier(terminal), isServed: isServed)
+    return isServed
+  }
+
+  /// Stops an agent started without the coordination tools, at rest, and starts it again with
+  /// them, resuming its conversation.
+  func restartForCoordination(_ id: SessionID) async {
+    guard launcher?.isRunning(id) == true else { return }
+    if case .working = activity(for: id)?.activity { return }
+    _ = await closeInBatch(id)
+    await reload()
+    coordination.serving[id] = nil
+    await restart(id)
   }
 }
 

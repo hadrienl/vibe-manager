@@ -292,3 +292,13 @@ struct CoordinationDigestTests {
     #expect(bounded.hasSuffix("answer 29"))
   }
 }
+
+@Suite("What an agent was started with")
+struct ProcessArgumentsTests {
+  @Test("A running process's arguments are read, its own executable first; a gone one has none")
+  func arguments() throws {
+    let own = try #require(ProcessArguments.of(getpid()))
+    #expect(own.first == CommandLine.arguments.first)
+    #expect(ProcessArguments.of(-1) == nil)
+  }
+}

@@ -25546,6 +25546,107 @@
         }
       }
     },
+    "Restart to Coordinate" : {
+      "comment" : "Beside the Coordinate chip: restarts an agent started without its tools.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة التشغيل للتنسيق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zum Koordinieren neu starten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reiniciar para coordinar"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer pour coordonner"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "समन्वय के लिए फिर से शुरू करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riavvia per coordinare"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再起動してコーディネート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 시작하여 코디네이트"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Herstarten om te coördineren"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uruchom ponownie, aby koordynować"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reiniciar para coordenar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустить для координации"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Koordinasyon için yeniden başlat"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапустити для координації"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新启动以协调"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新啟動以協調"
+          }
+        }
+      }
+    },
     "Restore Defaults" : {
       "localizations" : {
         "ar" : {
@@ -32823,6 +32924,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "找不到主題"
+          }
+        }
+      }
+    },
+    "This agent was started without the coordination tools. Restarting it resumes its conversation with them." : {
+      "comment" : "The help of the Restart to Coordinate button.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "بدأ هذا الوكيل بدون أدوات التنسيق. إعادة تشغيله تستأنف محادثته معها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Agent wurde ohne die Koordinationswerkzeuge gestartet. Ein Neustart setzt seine Unterhaltung mit ihnen fort."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este agente se inició sin las herramientas de coordinación. Al reiniciarlo, retoma su conversación con ellas."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cet agent a été lancé sans les outils de coordination. Le relancer reprend sa conversation avec eux."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह एजेंट समन्वय टूल के बिना शुरू हुआ था। इसे फिर से शुरू करने पर इसकी बातचीत उन टूल के साथ आगे बढ़ती है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo agente è stato avviato senza gli strumenti di coordinamento. Riavviarlo riprende la sua conversazione con essi."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このエージェントはコーディネート用のツールなしで起動されました。再起動すると、ツール付きで会話を再開します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 에이전트는 코디네이트 도구 없이 시작되었습니다. 다시 시작하면 도구와 함께 대화를 이어 갑니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze agent is gestart zonder de coördinatiehulpmiddelen. Herstarten hervat het gesprek met die hulpmiddelen."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ten agent został uruchomiony bez narzędzi koordynacji. Ponowne uruchomienie wznawia jego rozmowę z nimi."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este agente foi iniciado sem as ferramentas de coordenação. Reiniciá-lo retoma a conversa com elas."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Этот агент запущен без инструментов координации. Перезапуск продолжит его разговор уже с ними."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu ajan koordinasyon araçları olmadan başlatıldı. Yeniden başlatmak, sohbetini bu araçlarla sürdürür."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цього агента запущено без інструментів координації. Перезапуск продовжить його розмову вже з ними."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此智能体启动时没有协调工具。重新启动后，会带着这些工具继续它的对话。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此代理程式啟動時沒有協調工具。重新啟動後，會帶著這些工具繼續它的對話。"
           }
         }
       }

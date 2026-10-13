@@ -41,6 +41,11 @@ public final class CoordinationModel {
   /// The sessions coordination was turned on for while their agent ran, launched without the
   /// coordinator's instructions: the first answer of a tool gives them.
   @ObservationIgnored var owedRules: Set<SessionID> = []
+  /// Whether each running agent was started with the coordination tools, read from its command
+  /// line, for the terminal it runs in: an agent started by an earlier build has none until it is
+  /// started again.
+  var serving: [SessionID: CoordinationServing] = [:]
+  @ObservationIgnored var readingServing: Set<SessionID> = []
 
   @ObservationIgnored var inbox = CoordinationInbox()
   /// Messages a coordinator sent to a child busy with a turn, typed once it is at rest, in order.
@@ -106,6 +111,12 @@ public final class CoordinationModel {
     let stored = await store.trace(of: child)
     if !stored.isEmpty { traces[child] = stored }
   }
+}
+
+/// Whether the agent of one terminal was started with the coordination tools (#352).
+struct CoordinationServing: Equatable {
+  let terminal: ObjectIdentifier
+  let isServed: Bool
 }
 
 /// How many entries a child's trace keeps, as the store keeps them.
