@@ -40,6 +40,10 @@ public struct AgentActivityState: Hashable, Sendable {
   /// (#283): the first of them is answered from the palette all the same, once the dialog read
   /// off the screen names it.
   public var drawnCandidates: Set<AgentRequestID> = []
+  /// Forms answered from outside whose result Claude Code has not reported yet: each one's
+  /// `ElicitationResult` comes after its answer took it away, and says nothing of the requests
+  /// left behind it.
+  var resultsOwed = 0
 
   public init(
     activity: AgentActivity = .idle,
@@ -127,11 +131,13 @@ public enum AgentActivityMachine {
       next.lastOutputAt = nil
       next.lastUserInputAt = nil
       next.clearRequests()
+      next.resultsOwed = 0
 
     case .processEnded:
       next.activity = .idle
       next.lastOutputAt = nil
       next.clearRequests()
+      next.resultsOwed = 0
 
     case .signal(let signal):
       next = apply(signal, to: next, context: context)
@@ -194,9 +200,10 @@ public enum AgentActivityMachine {
       }
 
     case .answerSent(let id):
-      guard next.requests.first?.id == id else { break }
+      guard let first = next.requests.first, first.id == id else { break }
       next.drawnBeforeReport = nil
       next.settleFirstRequest(isKnownAnswered: true)
+      if case .elicitation = first.content { next.resultsOwed += 1 }
 
     case .tick:
       if case .unconfirmed(let since) = next.source,
@@ -250,6 +257,7 @@ public enum AgentActivityMachine {
       // just started waits for its prompt.
       if !state.isStructured { next.activity = .idle }
     case .promptSubmitted(let byUser):
+      if byUser { next.resultsOwed = 0 }
       // A dialog only announced was the main agent's: a new turn means it is behind it.
       if byUser { next.dropAnnouncedRequests() }
       // A background task finishing starts a turn of the main agent while a sub-agent's dialog
@@ -270,6 +278,9 @@ public enum AgentActivityMachine {
         next.reportFollows(drawnDialogAt: added)
       }
       next.activity = .awaitingUser(next.requests.first?.kind ?? kind)
+    case .questionResolved where next.resultsOwed > 0:
+      // The result of a form answered from outside, already taken away.
+      next.resultsOwed -= 1
     case .questionResolved:
       // Nothing says which request was answered. Alone, it was; behind others, the first is taken
       // as the one, and the dialog on screen is no longer known for sure.
@@ -360,12 +371,14 @@ public enum AgentActivityMachine {
       // plan?" is — and its word read before the end's.
       next.dropAnnouncedRequests { [.network, .permission, .other].contains($0.kind) }
       next.requests.removeAll { !$0.isShown }
+      next.resultsOwed = 0
       if next.requests.isEmpty { next.clearRequests() }
       next.activity = next.requests.first.map { .awaitingUser($0.kind) } ?? .idle
       if !context.isVisible { next.unreadSince = next.unreadSince ?? context.now }
     case .interrupted, .agentEnded:
       next.activity = .idle
       next.clearRequests()
+      next.resultsOwed = 0
     case .waitingForInput:
       if next.activity == .working { next.activity = .idle }
     }
@@ -498,9 +511,11 @@ extension AgentActivityState {
     // Only a report of a drawn dialog completes one announced before it (#283): two reports not
     // drawn yet are two calls — Codex asking twice for the same tool, or two patches of the same
     // files — and one taking the other's place would show a card what another dialog asks.
-    if notice.isShown, let index = requests.firstIndex(where: {
-      !$0.isShown && $0.reference.match(notice.reference) == .same
-    }) {
+    if notice.isShown,
+      let index = requests.firstIndex(where: {
+        !$0.isShown && $0.reference.match(notice.reference) == .same
+      })
+    {
       // Drawn behind a dialog that was drawn before it: the queue's order is not the screen's.
       if notice.isShown, requests[(index + 1)...].contains(where: \.isShown) {
         isFirstRequestUncertain = true

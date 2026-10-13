@@ -731,6 +731,25 @@ struct ConversationModelTests {
     #expect(answers.given.first?.0 == .chatAboutThis)
     #expect(!terminal.written.isEmpty)
     #expect(model.draft.isEmpty)
+    // The questions still drawn a moment after their digit: the message waits for the prompt.
+    let (late, lateTerminal, _, _) = asking(
+      [Self.colour, size], answers: [.chooseOption, .writeText, .chatAboutThis])
+    late.answerRequest = { _, _ in
+      late.activity = .working
+      return true
+    }
+    let reads = ScreenReads()
+    late.readScreen = {
+      reads.count += 1
+      return reads.count < 3
+        ? "❯ 1. Red\n  4. Chat about this\nEnter to select · Tab/Arrow keys to navigate · Esc to cancel"
+        : "❯ \n  ? for shortcuts"
+    }
+    late.draft = "Stop"
+    #expect(await late.send())
+    #expect(reads.count >= 3)
+    #expect(!lateTerminal.written.isEmpty)
+    #expect(late.terminalPanel == nil)
     // Another dialog drawn as they are set aside: nothing typed, the draft kept.
     let (held, heldTerminal, _, _) = asking(
       [Self.colour, size], answers: [.chooseOption, .writeText, .chatAboutThis])
@@ -745,6 +764,10 @@ struct ConversationModelTests {
     // A CLI without "Chat about this" keeps the composer closed.
     let (closed, _, _, _) = asking([Self.colour, size], answers: [.chooseOption])
     #expect(closed.composerState == .awaitingAnswer)
+  }
+
+  @MainActor private final class ScreenReads {
+    var count = 0
   }
 
   @Test("A request no call holds is shown above the composer")

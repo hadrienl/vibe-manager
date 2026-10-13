@@ -1197,13 +1197,20 @@ public final class ConversationModel {
   }
 
   /// Whether the composer is ready again within a moment of the questions being set aside: the
-  /// tracker says so as it settles them, through the session's activity.
+  /// tracker says so as soon as their digit is typed, and the screen once the CLI has drawn its
+  /// prompt again — before, it still shows the questions, whose hint reads as a panel's.
   private func promptIsBack() async -> Bool {
     for _ in 0..<40 {
-      if composerState == .ready { return true }
+      if composerState == .ready {
+        guard let readScreen else { return true }
+        let screen = await readScreen()
+        if screen.map(AgentPanelRecognition.showsPanel(screen:)) != true {
+          return composerState == .ready
+        }
+      }
       try? await Task.sleep(for: .milliseconds(50))
     }
-    return composerState == .ready
+    return false
   }
 
   /// Chooses an option of a question: one question of one choice is answered at once; otherwise
