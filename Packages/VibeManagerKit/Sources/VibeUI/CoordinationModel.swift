@@ -34,6 +34,9 @@ public final class CoordinationModel {
   /// The agents that can coordinate: those handed tools and instructions at launch. Read once the
   /// agents are known; until then, none.
   public internal(set) var coordinatingAgents: Set<String> = []
+  /// The coordinators whose done children the user asked to see, for this run: otherwise they are
+  /// left out of the sidebar, behind a row that counts them.
+  var showingDoneChildren: Set<SessionID> = []
 
   /// What the user's next message to a session says first: coordination turned on (`true`) or off
   /// while its agent runs. Turned back before it is sent, nothing is said.

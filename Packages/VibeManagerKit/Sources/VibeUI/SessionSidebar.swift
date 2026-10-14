@@ -240,18 +240,38 @@ struct SessionSidebar: View {
   private func rows(
     _ sessions: [WorkSession], positions: [SessionID: Int], width: CGFloat
   ) -> some View {
-    ForEach(sessions) { session in
-      row(for: session, position: positions[session.id], width: width)
-        .tag(session.id)
+    // Only a session some child names can have done children: the others are not counted.
+    let parents = Set(model.sessions.compactMap { $0.coordination?.coordinatorID })
+    let items = SidebarItem.items(of: sessions) {
+      parents.contains($0) ? model.doneChildren(ofCoordinator: $0) : nil
     }
-    .onMove(perform: model.canReorder ? { move(sessions, from: $0, to: $1) } : nil)
+    return ForEach(items) { item in
+      switch item {
+      case .session(let session):
+        row(for: session, position: positions[session.id], width: width)
+          .tag(session.id)
+      case .doneChildren(let coordinator, let done):
+        DoneChildrenRow(done: done) {
+          model.setShowingDoneChildren(!done.isShown, coordinator: coordinator)
+        }
+        .moveDisabled(true)
+      }
+    }
+    .onMove(perform: model.canReorder ? { move(items, from: $0, to: $1) } : nil)
   }
 
   /// `destination` counts the rows before the move; the model counts them without the one moved.
-  private func move(_ sessions: [WorkSession], from source: IndexSet, to destination: Int) {
-    guard let first = source.first, sessions.indices.contains(first) else { return }
+  private func move(_ items: [SidebarItem], from source: IndexSet, to destination: Int) {
+    guard let first = source.first, items.indices.contains(first),
+      case .session(let moved) = items[first]
+    else { return }
+    let sessions = items.compactMap(\.session)
+    let before = items[..<min(destination, items.count)].compactMap(\.session).count
     closeSwipe(animated: false)
-    let id = sessions[first].id
+    move(sessions, id: moved.id, to: before)
+  }
+
+  private func move(_ sessions: [WorkSession], id: SessionID, to destination: Int) {
     // Counted among the rows the session moves with — the coordinators, or its siblings (#352).
     let movable = Set((model.reorderingSubset(of: id) ?? sessions).map(\.id))
     let index = sessions[..<min(destination, sessions.count)]

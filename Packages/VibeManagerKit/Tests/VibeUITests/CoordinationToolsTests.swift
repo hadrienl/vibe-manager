@@ -86,10 +86,12 @@ struct CoordinationToolsTests {
     name: "Alone", createdAt: Date(timeIntervalSince1970: 0),
     updatedAt: Date(timeIntervalSince1970: 100), taskStatus: .doing, rank: 4)
 
-  private func child(_ name: String, of coordinator: WorkSession, rank: Int) -> WorkSession {
+  private func child(
+    _ name: String, of coordinator: WorkSession, rank: Int, status: SessionTaskStatus = .todo
+  ) -> WorkSession {
     WorkSession(
       name: name, createdAt: Date(timeIntervalSince1970: 0),
-      updatedAt: Date(timeIntervalSince1970: 100), taskStatus: .todo, rank: rank,
+      updatedAt: Date(timeIntervalSince1970: 100), taskStatus: status, rank: rank,
       coordination: .child(of: coordinator.id))
   }
 
@@ -311,6 +313,25 @@ struct CoordinationToolsTests {
     #expect(model.visibleSessions.map(\.name) == ["V2", "#351", "Other", "Alone"])
     #expect(model.summary(of: .doing).count == 4)
     #expect(model.summary(of: .todo).count == 0)
+  }
+
+  @Test("A coordinator's done children wait behind a row that counts them, until it shows them")
+  func doneChildrenHidden() async {
+    let model = await makeModel([
+      child("#351", of: parent, rank: 1), child("#350", of: parent, rank: 2, status: .done),
+    ])
+    #expect(model.displayedSessions.map(\.name) == ["V2", "#351", "Other", "Alone"])
+    #expect(model.doneChildren(ofCoordinator: parent.id) == .init(count: 1, isShown: false))
+    let items = SidebarItem.items(of: model.displayedSessions) {
+      model.doneChildren(ofCoordinator: $0)
+    }
+    #expect(items.map(\.id).firstIndex(of: "done-" + parent.id.rawValue.uuidString) == 2)
+    model.setShowingDoneChildren(true, coordinator: parent.id)
+    #expect(model.displayedSessions.map(\.name) == ["V2", "#351", "#350", "Other", "Alone"])
+    #expect(model.doneChildren(ofCoordinator: parent.id)?.isShown == true)
+    // Folded, the coordinator has no row of the kind either.
+    model.setExpanded(false, coordinator: parent.id)
+    #expect(model.doneChildren(ofCoordinator: parent.id) == nil)
   }
 
   @Test("A coordinator with nothing running is stopped without the question about its children")

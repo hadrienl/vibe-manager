@@ -186,6 +186,9 @@ public final class BrowserChannelListener {
   }
 
   public func stop() {
+    // A copy that found the socket taken never listened: the file is the other copy's, and
+    // removing it would leave that copy's agents unable to reach it.
+    guard listener >= 0 else { return }
     source?.cancel()
     source = nil
     listener = -1
