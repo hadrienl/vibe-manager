@@ -48462,7 +48462,7 @@
       }
     },
     "Automatic tells the language from what it hears. Choose one if it guesses wrong." : {
-      "comment" : "Under the language picker of Settings › Dictation.",
+      "comment" : "Under the language picker of Settings › Voice.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -67471,7 +67471,7 @@
       }
     },
     "Dictation runs on this Mac, with Whisper: what you say is never sent anywhere. A model is downloaded once, from Hugging Face, the first time you dictate." : {
-      "comment" : "The footer of Settings › Dictation.",
+      "comment" : "The footer of Settings › Voice.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -87479,7 +87479,7 @@
       }
     },
     "Large understands technical words and every language best. Small is lighter, for a Mac with little memory." : {
-      "comment" : "Under the model picker of Settings › Dictation. Large and Small are the models' names.",
+      "comment" : "Under the model picker of Settings › Voice. Large and Small are the models' names.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
@@ -140350,7 +140350,7 @@
       }
     },
     "Speech Model" : {
-      "comment" : "A section of Settings › Dictation.",
+      "comment" : "A section of Settings › Voice.",
       "localizations" : {
         "ar" : {
           "stringUnit" : {

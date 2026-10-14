@@ -113,7 +113,6 @@ public struct ConversationView: View {
     .environment(\.conversationAppearance, appearance)
     .environment(\.conversationIsLive, isActive)
     .environment(\.readAloud, model.readAloud)
-    // The voice loaded while the conversation is read, not when its first answer is (#357).
     // The models loaded while the conversation is read, the dictation's first (#357): their
     // first load compiles them for this Mac, which takes minutes. One at a time.
     .task {
@@ -128,6 +127,7 @@ public struct ConversationView: View {
     // The audio mode (#357): the answers that arrive are read, in the conversation on screen.
     .onChange(of: model.agentAnswers.map(\.id), initial: true) { followAnswers() }
     .onChange(of: isActive) { followAnswers() }
+    .onChange(of: model.snapshot.availability == .loading) { followAnswers() }
     .environment(\.colorScheme, theme.colorScheme)
     // Coming on screen is when the composer takes the keyboard, as the terminal does (#105): only
     // then, never for a message that arrives or a state that changes. Asked of the model rather
@@ -505,7 +505,7 @@ struct BlockView: View {
         UserPromptView(text: text, attachments: attachments, date: entry.date)
           .environment(\.selectionBlock, selectionBlock)
       case .agentText(let text):
-        AgentTextView(text: text, readAloud: model.readAloud)
+        AgentTextView(text: text, id: entry.id, readAloud: model.readAloud)
           .environment(\.selectionBlock, selectionBlock)
       case .reasoning(let text):
         ReasoningRow(id: entry.id, text: text, model: model)
@@ -639,6 +639,8 @@ extension ConversationSelection.Source {
 extension ConversationView {
   /// Tells the reading aloud the answers this conversation has now, and whether it is on screen.
   fileprivate func followAnswers() {
+    // Not before the conversation is read: its history would be taken for answers just arrived.
+    guard model.snapshot.availability != .loading else { return }
     model.readAloud?.follow(
       model.agentAnswers, in: ObjectIdentifier(model), isOnScreen: isActive)
   }

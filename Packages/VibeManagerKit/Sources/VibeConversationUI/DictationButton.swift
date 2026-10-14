@@ -253,7 +253,7 @@ struct DictationPopover: View {
       Text("What you said could not be transcribed.", bundle: .module).font(.headline)
       Text(
         """
-        Try again. If it keeps failing, delete the model in Settings › Dictation and download it \
+        Try again. If it keeps failing, delete the model in Settings › Voice and download it \
         again.
         """,
         bundle: .module

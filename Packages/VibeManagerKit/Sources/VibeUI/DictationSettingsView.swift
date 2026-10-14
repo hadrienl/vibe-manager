@@ -31,7 +31,7 @@ struct DictationSettingsView: View {
           modelRow(variant)
         }
       } header: {
-        Text("Speech Model", bundle: .module, comment: "A section of Settings › Dictation.")
+        Text("Speech Model", bundle: .module, comment: "A section of Settings › Voice.")
       } footer: {
         Text(
           """
