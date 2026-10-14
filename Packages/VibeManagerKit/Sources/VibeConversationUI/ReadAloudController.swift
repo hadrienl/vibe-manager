@@ -37,10 +37,11 @@ public final class ReadAloudController {
     didSet {
       guard settings != oldValue else { return }
       store.settings = settings
-      // The audio mode turned off: what it was reading, and what it was going to, stops.
+      // The audio mode turned off: what it was reading, and what it was going to, stops — not an
+      // answer read by hand, nor a discussion's.
       if oldValue.readsAnswers, !settings.readsAnswers {
-        queue = []
-        stop()
+        queue.removeAll { $0.conversation != readsConversation }
+        if let readsFor, readsFor != readsConversation { stopReading() }
       }
       // Another voice or language: prepared now, rather than at the next answer.
       if settings.voice != oldValue.voice || settings.language != oldValue.language, isWarm {
@@ -66,10 +67,15 @@ public final class ReadAloudController {
   @ObservationIgnored private var task: Task<Void, Never>?
   @ObservationIgnored private var isWarm = false
   @ObservationIgnored private var warming: Task<Void, Never>?
-  /// The answers the audio mode will read next, in their order.
-  @ObservationIgnored private var queue: [(id: String, text: String)] = []
+  /// The answers the audio mode will read next, in their order, with their conversation.
+  @ObservationIgnored private var queue: [(id: String, text: String, conversation: ObjectIdentifier)] = []
   /// The answers each conversation already had: only the ones after are new.
   @ObservationIgnored private var seen: [ObjectIdentifier: Set<String>] = [:]
+  /// When each conversation came on screen: an answer written before, while it was out of sight,
+  /// is not read when it is shown.
+  @ObservationIgnored private var shownSince: [ObjectIdentifier: Date] = [:]
+  /// The conversation whose answer the audio mode reads now; `nil` for one read by hand.
+  @ObservationIgnored private var readsFor: ObjectIdentifier?
 
   public init(synthesizer: any SpeechSynthesizing, store: any SpeechSettingsStore) {
     self.synthesizer = synthesizer
@@ -112,28 +118,41 @@ public final class ReadAloudController {
   }
 
   /// The answers of a conversation, as they are now (#357). Those it did not have before are read
-  /// in the audio mode, one after the other, if the conversation is on screen; the ones it had
-  /// when first followed never are — the audio mode reads what arrives, not the history.
+  /// in the audio mode, one after the other, if they were written while it was on screen: the
+  /// audio mode reads what arrives before the user's eyes — not the history, not what came while
+  /// they looked elsewhere. A conversation out of sight stops what it was reading and going to.
+  /// - Parameter now: the moment it is told, for the tests.
   public func follow(
-    _ answers: [(id: String, text: String)], in conversation: ObjectIdentifier, isOnScreen: Bool
+    _ answers: [(id: String, text: String, date: Date?)], in conversation: ObjectIdentifier,
+    isOnScreen: Bool, now: Date = Date()
   ) {
     let known = seen[conversation]
     seen[conversation, default: []].formUnion(answers.map(\.id))
-    guard let known, isOnScreen, isModelInstalled,
-      settings.readsAnswers || readsConversation == conversation
-    else { return }
-    let isLast = readsNextAnswerOnly && readsConversation == conversation
+    let arrived = known.map { known in answers.filter { !known.contains($0.id) } } ?? []
+    // A discussion ended on a sentence: its next answer ends it, read or not.
+    let endsDiscussion =
+      readsNextAnswerOnly && readsConversation == conversation && !arrived.isEmpty
     defer {
-      if isLast, answers.contains(where: { !known.contains($0.id) }) {
+      if endsDiscussion {
         readsConversation = nil
         readsNextAnswerOnly = false
       }
     }
-    for answer in answers where !known.contains(answer.id) {
+    guard isOnScreen else {
+      shownSince[conversation] = nil
+      leave(conversation)
+      return
+    }
+    let since = shownSince[conversation] ?? now
+    shownSince[conversation] = since
+    guard isModelInstalled, settings.readsAnswers || readsConversation == conversation else {
+      return
+    }
+    for answer in arrived where (answer.date ?? now) >= since {
       if isReading || !queue.isEmpty {
-        queue.append(answer)
+        queue.append((answer.id, answer.text, conversation))
       } else {
-        start(answer.text, id: answer.id)
+        start(answer.text, id: answer.id, for: conversation)
       }
     }
   }
@@ -141,6 +160,14 @@ public final class ReadAloudController {
   /// The conversation is let go of: what it had is forgotten with it.
   public func forget(_ conversation: ObjectIdentifier) {
     seen[conversation] = nil
+    shownSince[conversation] = nil
+    leave(conversation)
+  }
+
+  /// The conversation out of sight: the audio mode reads nothing more of it.
+  private func leave(_ conversation: ObjectIdentifier) {
+    queue.removeAll { $0.conversation == conversation }
+    if readsFor == conversation { stopReading() }
   }
 
   /// Reads the answer `markdown` aloud, its code left out; another being read stops first. Without
@@ -152,10 +179,11 @@ public final class ReadAloudController {
     }
     // A reading asked for takes the place of the audio mode's.
     queue = []
-    start(markdown, id: id)
+    start(markdown, id: id, for: nil)
   }
 
-  private func start(_ markdown: String, id: String) {
+  /// - Parameter conversation: the one the audio mode reads for; `nil` for an answer read by hand.
+  private func start(_ markdown: String, id: String, for conversation: ObjectIdentifier?) {
     switch phase {
     case .downloading, .preparing: return
     case .idle, .reading, .loading: break
@@ -166,9 +194,11 @@ public final class ReadAloudController {
     guard !text.isEmpty else {
       // Nothing to read in it, code alone: the answer read before stops all the same.
       task = nil
+      readsFor = nil
       phase = .idle
       return readNext()
     }
+    readsFor = conversation
     phase = .loading(id: id)
     isWarm = true
     let settings = settings
@@ -184,6 +214,7 @@ public final class ReadAloudController {
       // A reading stopped for another one leaves its place to it.
       guard !Task.isCancelled, isReading(id) else { return }
       phase = .idle
+      readsFor = nil
       readNext()
     }
   }
@@ -192,12 +223,18 @@ public final class ReadAloudController {
   private func readNext() {
     guard !queue.isEmpty else { return }
     let next = queue.removeFirst()
-    start(next.text, id: next.id)
+    start(next.text, id: next.id, for: next.conversation)
   }
 
   /// Stops the voice at once, and what the audio mode was going to read with it.
   public func stop() {
     queue = []
+    stopReading()
+  }
+
+  /// The voice silent; what the audio mode waits to read stays.
+  private func stopReading() {
+    readsFor = nil
     guard isReading else { return }
     task?.cancel()
     task = nil
