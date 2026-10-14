@@ -141,6 +141,23 @@ struct ReadAloudControllerTests {
     #expect(readAloud.phase == .idle)
   }
 
+  @Test("The model deleted and downloaded again is loaded again in the background")
+  func warmsUpAfterDeletion() async {
+    let synthesizer = FakeSynthesizer(installed: true)
+    let readAloud = ReadAloudController(
+      synthesizer: synthesizer, store: InMemorySpeechSettingsStore())
+
+    readAloud.warmUp()
+    await until { synthesizer.prepared == 1 }
+    await readAloud.removeModel()
+    #expect(!readAloud.isModelInstalled)
+    readAloud.downloadModel()
+    await until { readAloud.isModelInstalled && readAloud.phase == .idle }
+    readAloud.warmUp()
+    await until { synthesizer.prepared == 2 }
+    #expect(synthesizer.prepared == 2)
+  }
+
   @Test("An answer of code alone reads nothing")
   func nothingToRead() {
     let synthesizer = FakeSynthesizer(installed: true)
@@ -149,6 +166,19 @@ struct ReadAloudControllerTests {
 
     readAloud.read("```\nls\n```", id: "a")
     #expect(readAloud.phase == .idle)
+  }
+
+  @Test("An answer of code alone asked for while another is read stops that one")
+  func nothingToReadStopsTheReading() async {
+    let synthesizer = FakeSynthesizer(installed: true)
+    let readAloud = ReadAloudController(
+      synthesizer: synthesizer, store: InMemorySpeechSettingsStore())
+
+    readAloud.read("Les tests passent.", id: "a")
+    await until { readAloud.phase == .reading(id: "a") }
+    readAloud.read("```\nls\n```", id: "b")
+    #expect(readAloud.phase == .idle)
+    #expect(!readAloud.isReading)
   }
 }
 

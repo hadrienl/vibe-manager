@@ -163,7 +163,12 @@ public final class ReadAloudController {
     task?.cancel()
     problem = nil
     let text = SpeechText.readable(fromMarkdown: markdown)
-    guard !text.isEmpty else { return readNext() }
+    guard !text.isEmpty else {
+      // Nothing to read in it, code alone: the answer read before stops all the same.
+      task = nil
+      phase = .idle
+      return readNext()
+    }
     phase = .loading(id: id)
     isWarm = true
     let settings = settings
@@ -228,6 +233,10 @@ public final class ReadAloudController {
 
   public func removeModel() async {
     guard phase == .idle else { return }
+    // The model loaded in the background is dropped with it, and loaded again once downloaded.
+    warming?.cancel()
+    warming = nil
+    isWarm = false
     try? await synthesizer.remove()
     installedSize = synthesizer.installedSize()
   }
