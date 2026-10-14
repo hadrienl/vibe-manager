@@ -269,8 +269,7 @@ public final class DictationController {
       if held || !started {
         toggle(request)
       } else {
-        _ = recorder.stop()
-        startDiscussion()
+        clicked()
       }
     case .idle:
       // The system still asks about the microphone: the recording starts once it answered.
@@ -278,6 +277,14 @@ public final class DictationController {
     case .offeringDownload, .downloading, .preparing, .transcribing:
       break
     }
+  }
+
+  /// Space clicked: what it recorded is let go of, and the discussion starts — where a voice reads
+  /// the answers. Before macOS 15 there is none: a click does nothing.
+  private func clicked() {
+    _ = recorder.stop()
+    guard readAloud != nil else { return end() }
+    startDiscussion()
   }
 
   private func startDiscussion() {
@@ -556,8 +563,7 @@ public final class DictationController {
     switch earlyRelease {
     case .click:
       earlyRelease = nil
-      _ = recorder.stop()
-      return startDiscussion()
+      return clicked()
     case .hold:
       // Let go of while the system asked: there is nothing to dictate.
       earlyRelease = nil

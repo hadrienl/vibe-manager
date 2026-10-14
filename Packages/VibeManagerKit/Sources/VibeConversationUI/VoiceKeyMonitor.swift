@@ -3,8 +3,8 @@ import SwiftUI
 import WebKit
 
 /// Space as the microphone (#357): pressed, it listens; let go of, a short press starts or ends
-/// the discussion, a long one inserts what was dictated — but only where Space types nothing: not
-/// in a field being written, the terminal or the web view. Escape ends a discussion wherever the
+/// the discussion, a long one inserts what was dictated — but only where Space does nothing else:
+/// not in a field being written, the terminal or the web view, nor on a focused button or list. Escape ends a discussion wherever the
 /// keyboard is. One monitor, installed by the conversation on screen, for its own window.
 @MainActor
 final class VoiceKeyMonitor {
@@ -15,7 +15,8 @@ final class VoiceKeyMonitor {
   private weak var window: NSWindow?
 
   struct Actions {
-    var press: () -> Void
+    /// Returns whether the microphone took the press: refused, Space goes where it would have.
+    var press: () -> Bool
     var release: () -> Void
     /// Returns whether Escape was used: a discussion ended.
     var escape: () -> Bool
@@ -69,17 +70,19 @@ final class VoiceKeyMonitor {
     // Held, the key repeats: the press goes on.
     if event.isARepeat { return isSpaceDown }
     let modifiers = event.modifierFlags.intersection([.command, .option, .control, .shift])
-    guard modifiers.isEmpty, !Self.typesSpace(window.firstResponder) else { return false }
+    guard modifiers.isEmpty, !Self.usesSpace(window.firstResponder), actions.press() else {
+      return false
+    }
     isSpaceDown = true
-    actions.press()
     return true
   }
 
-  /// Where Space is a character, or a key of the agent's: a field being written, the terminal,
-  /// the web view.
-  private static func typesSpace(_ responder: NSResponder?) -> Bool {
+  /// Where Space is a character, a key of the agent's, or what presses the focused control: a field
+  /// being written, the terminal, the web view, a button or a list reached from the keyboard.
+  static func usesSpace(_ responder: NSResponder?) -> Bool {
     guard let responder else { return false }
     if let text = responder as? NSTextView, text.isEditable { return true }
+    if responder is NSControl || responder is NSTableView { return true }
     // A page — its own fields, or keys it listens to — has the keyboard: the web view, or one of
     // its subviews.
     if let view = responder as? NSView,

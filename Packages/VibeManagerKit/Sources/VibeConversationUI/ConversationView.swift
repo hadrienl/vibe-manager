@@ -659,9 +659,10 @@ extension ConversationView {
       in: window,
       VoiceKeyMonitor.Actions(
         press: {
-          guard model.acceptsInput || dictation.phase == .discussing else { return }
+          guard model.acceptsInput || dictation.phase == .discussing else { return false }
           model.readAloud?.stop()
           dictation.pressBegan(model.dictationRequest())
+          return true
         },
         release: { dictation.pressEnded(model.dictationRequest()) },
         escape: {
