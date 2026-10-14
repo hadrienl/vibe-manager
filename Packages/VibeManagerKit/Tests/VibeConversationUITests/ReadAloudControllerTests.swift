@@ -199,11 +199,11 @@ struct AudioModeTests {
     let readAloud = controller(synthesizer)
     let conversation = ObjectIdentifier(Conversation())
 
-    readAloud.follow([("old", "Old answer.")], in: conversation, isOnScreen: true)
+    readAloud.follow([("old", "Old answer.", nil)], in: conversation, isOnScreen: true)
     #expect(readAloud.phase == .idle)
 
     readAloud.follow(
-      [("old", "Old answer."), ("a", "First."), ("b", "Second.")], in: conversation,
+      [("old", "Old answer.", nil), ("a", "First.", nil), ("b", "Second.", nil)], in: conversation,
       isOnScreen: true)
     await until { synthesizer.spoken.count == 2 && readAloud.phase == .idle }
     #expect(synthesizer.spoken.map(\.text) == ["First.", "Second."])
@@ -216,11 +216,11 @@ struct AudioModeTests {
     let conversation = ObjectIdentifier(Conversation())
 
     readAloud.follow([], in: conversation, isOnScreen: true)
-    readAloud.follow([("a", "Off.")], in: conversation, isOnScreen: true)
+    readAloud.follow([("a", "Off.", nil)], in: conversation, isOnScreen: true)
     readAloud.settings.readsAnswers = true
-    readAloud.follow([("a", "Off."), ("b", "Hidden.")], in: conversation, isOnScreen: false)
+    readAloud.follow([("a", "Off.", nil), ("b", "Hidden.", nil)], in: conversation, isOnScreen: false)
     readAloud.follow(
-      [("a", "Off."), ("b", "Hidden."), ("c", "Shown.")], in: conversation, isOnScreen: true)
+      [("a", "Off.", nil), ("b", "Hidden.", nil), ("c", "Shown.", nil)], in: conversation, isOnScreen: true)
     await until { synthesizer.spoken.count == 1 && readAloud.phase == .idle }
     #expect(synthesizer.spoken.map(\.text) == ["Shown."])
   }
@@ -234,9 +234,9 @@ struct AudioModeTests {
     readAloud.follow([], in: conversation, isOnScreen: true)
     readAloud.readsConversation = conversation
     readAloud.readsNextAnswerOnly = true
-    readAloud.follow([("a", "The answer.")], in: conversation, isOnScreen: true)
+    readAloud.follow([("a", "The answer.", nil)], in: conversation, isOnScreen: true)
     await until { synthesizer.spoken.count == 1 && readAloud.phase == .idle }
-    readAloud.follow([("a", "The answer."), ("b", "Another.")], in: conversation, isOnScreen: true)
+    readAloud.follow([("a", "The answer.", nil), ("b", "Another.", nil)], in: conversation, isOnScreen: true)
     for _ in 0..<100 { await Task.yield() }
     #expect(synthesizer.spoken.map(\.text) == ["The answer."])
     #expect(readAloud.readsConversation == nil)
@@ -249,19 +249,68 @@ struct AudioModeTests {
     let conversation = ObjectIdentifier(Conversation())
 
     readAloud.follow([], in: conversation, isOnScreen: true)
-    readAloud.follow([("a", "One."), ("b", "Two.")], in: conversation, isOnScreen: true)
+    readAloud.follow([("a", "One.", nil), ("b", "Two.", nil)], in: conversation, isOnScreen: true)
     await until { synthesizer.spoken.count == 1 }
     readAloud.stop()
     for _ in 0..<200 { await Task.yield() }
     #expect(synthesizer.spoken.map(\.text) == ["One."])
 
     readAloud.follow(
-      [("a", "One."), ("b", "Two."), ("c", "Three."), ("d", "Four.")], in: conversation,
+      [("a", "One.", nil), ("b", "Two.", nil), ("c", "Three.", nil), ("d", "Four.", nil)], in: conversation,
       isOnScreen: true)
     await until { synthesizer.spoken.count == 2 }
     readAloud.settings.readsAnswers = false
     for _ in 0..<200 { await Task.yield() }
     #expect(synthesizer.spoken.map(\.text) == ["One.", "Three."])
     #expect(readAloud.phase == .idle)
+  }
+
+  @Test("Back on a conversation, what came while it was out of sight is not read; what comes is")
+  func notTheBacklog() async {
+    let synthesizer = FakeSynthesizer(installed: true, readsUntilCancelled: false)
+    let readAloud = controller(synthesizer)
+    let conversation = ObjectIdentifier(Conversation())
+    let start = Date(timeIntervalSince1970: 1_000)
+
+    readAloud.follow([], in: conversation, isOnScreen: true, now: start)
+    readAloud.follow([], in: conversation, isOnScreen: false, now: start + 1)
+    // Shown again at 3600: the answers written meanwhile are laid out after it.
+    readAloud.follow([], in: conversation, isOnScreen: true, now: start + 3_600)
+    readAloud.follow(
+      [("a", "While away.", start + 60), ("b", "Away too.", start + 1_800)], in: conversation,
+      isOnScreen: true, now: start + 3_601)
+    readAloud.follow(
+      [("a", "While away.", start + 60), ("b", "Away too.", start + 1_800),
+       ("c", "Now.", start + 3_610)],
+      in: conversation, isOnScreen: true, now: start + 3_611)
+    await until { synthesizer.spoken.count == 1 && readAloud.phase == .idle }
+    #expect(synthesizer.spoken.map(\.text) == ["Now."])
+  }
+
+  @Test("A conversation out of sight stops what the audio mode read of it, and what it was to read")
+  func leavingStops() async {
+    let synthesizer = FakeSynthesizer(installed: true)
+    let readAloud = controller(synthesizer)
+    let conversation = ObjectIdentifier(Conversation())
+
+    readAloud.follow([], in: conversation, isOnScreen: true)
+    readAloud.follow([("a", "One.", nil), ("b", "Two.", nil)], in: conversation, isOnScreen: true)
+    await until { readAloud.phase == .reading(id: "a") }
+    readAloud.follow([("a", "One.", nil), ("b", "Two.", nil)], in: conversation, isOnScreen: false)
+    #expect(readAloud.phase == .idle)
+    for _ in 0..<200 { await Task.yield() }
+    #expect(synthesizer.spoken.map(\.text) == ["One."])
+  }
+
+  @Test("The audio mode turned off leaves an answer read by hand to its end")
+  func offKeepsTheReadingByHand() async {
+    let synthesizer = FakeSynthesizer(installed: true)
+    let readAloud = controller(synthesizer)
+
+    readAloud.read("Read by hand.", id: "a")
+    await until { readAloud.phase == .reading(id: "a") }
+    readAloud.settings.readsAnswers = false
+    #expect(readAloud.phase == .reading(id: "a"))
+    readAloud.stop()
   }
 }

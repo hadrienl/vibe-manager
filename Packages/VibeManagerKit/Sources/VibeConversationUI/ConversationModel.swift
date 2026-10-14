@@ -309,12 +309,12 @@ public final class ConversationModel {
   /// microphone.
   @ObservationIgnored public var dictation: DictationController?
   /// The agent's answers, in their order: what the audio mode reads as they arrive (#357).
-  public var agentAnswers: [(id: String, text: String)] {
+  public var agentAnswers: [(id: String, text: String, date: Date?)] {
     blocks.compactMap { block in
       guard case .entry(let entry) = block, case .agentText(let text) = entry.content else {
         return nil
       }
-      return (entry.id, text)
+      return (entry.id, text, entry.date)
     }
   }
 
