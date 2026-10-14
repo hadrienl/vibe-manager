@@ -7,15 +7,34 @@ extension View {
   public func instantTooltip(_ text: Text) -> some View {
     modifier(InstantTooltip(text: text))
   }
+
+  /// Shown from the start, for a test to measure where the bubble stands.
+  func instantTooltip(_ text: Text, isShown: Bool) -> some View {
+    modifier(InstantTooltip(text: text, isShown: isShown))
+  }
+}
+
+/// Where the bubble stands in the window, for a test.
+struct TooltipBubbleFrameKey: PreferenceKey {
+  static let defaultValue: CGRect? = nil
+
+  static func reduce(value: inout CGRect?, nextValue: () -> CGRect?) {
+    value = value ?? nextValue()
+  }
 }
 
 private struct InstantTooltip: ViewModifier {
   let text: Text
-  @State private var isShown = false
+  @State private var isShown: Bool
   @State private var appearing: Task<Void, Never>?
   /// The view's frame in the window, to keep the bubble off the window's leading edge.
   @State private var frame = CGRect.zero
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+  init(text: Text, isShown: Bool = false) {
+    self.text = text
+    _isShown = State(initialValue: isShown)
+  }
 
   func body(content: Content) -> some View {
     content
@@ -42,23 +61,33 @@ private struct InstantTooltip: ViewModifier {
       }
       // Centred over the view; near the window's leading edge, the bubble sits against the edge and
       // only its arrow stays over the view.
+      // The guide is set outside the condition: set within it, SwiftUI drops it, and the bubble
+      // hangs down from the view's top, over it, instead of standing above it.
       .overlay(alignment: .top) {
-        if isShown {
-          let shift = TooltipBubble.shift(forViewAt: frame)
-          TooltipBubble(text: text, arrowX: TooltipBubble.width / 2 - shift)
-            .alignmentGuide(.top) { $0[.bottom] + 3 }
-            .offset(x: shift)
-            .allowsHitTesting(false)
-            .transition(.opacity)
-            .accessibilityHidden(true)
+        let shift = TooltipBubble.shift(forViewAt: frame)
+        Group {
+          if isShown {
+            TooltipBubble(text: text, arrowX: TooltipBubble.width / 2 - shift)
+              .background {
+                GeometryReader {
+                  Color.clear.preference(
+                    key: TooltipBubbleFrameKey.self, value: $0.frame(in: .global))
+                }
+              }
+              .transition(.opacity)
+          }
         }
+        .alignmentGuide(.top) { $0[.bottom] + 3 }
+        .offset(x: shift)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
       }
       .zIndex(isShown ? 1 : 0)
       .accessibilityHint(text)
   }
 }
 
-private struct TooltipBubble: View {
+struct TooltipBubble: View {
   static let width: CGFloat = 250
   /// Kept between the bubble and the window's leading edge.
   static let margin: CGFloat = 8
