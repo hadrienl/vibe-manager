@@ -153,7 +153,7 @@ struct CodeBlockView: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(theme.secondaryText.color)
-        .help(Text("Copy the code", bundle: .module))
+        .instantTooltip(Text("Copy the code", bundle: .module))
       }
       .padding(.horizontal, 12)
       .padding(.vertical, 6)

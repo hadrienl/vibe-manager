@@ -137,7 +137,7 @@ struct SettingsSplitView: View {
         } label: {
           Image(systemName: "chevron.left")
         }
-        .help(Text("Back", bundle: .module))
+        .instantTooltip(Text("Back", bundle: .module))
         .accessibilityLabel(Text("Back", bundle: .module))
       }
     } else if #available(macOS 26, *) {

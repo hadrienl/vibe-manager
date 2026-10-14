@@ -100,7 +100,7 @@ struct AttachmentTile: View {
   var body: some View {
     content
       .contextMenu { menu }
-      .help(attachment.file?.path ?? name)
+      .instantTooltip(attachment.file?.path ?? name)
       // Again when its source changes: the file of a pasted image is named a line later.
       .task(id: attachment) {
         let preview = await AttachmentPreviews.shared.preview(

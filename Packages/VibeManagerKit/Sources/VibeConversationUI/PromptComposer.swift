@@ -196,7 +196,7 @@ struct PromptComposer: View {
         .buttonStyle(.plain)
         .disabled(!model.canSend)
         .accessibilityLabel(isShell ? Text("Run", bundle: .module) : Text("Send", bundle: .module))
-        .help(
+        .instantTooltip(
           isShell ? Text("Run (Return)", bundle: .module) : Text("Send (Return)", bundle: .module))
       }
     }
@@ -517,7 +517,7 @@ public struct AttachmentChip: View {
       RoundedRectangle(cornerRadius: 9).stroke(
         usesSystemColors ? Color(nsColor: .separatorColor) : theme.border.color)
     )
-    .help(file.path)
+    .instantTooltip(file.path)
     .quickLookPreview($quickLook, in: siblings)
     .task(id: file) {
       let preview = await AttachmentPreviews.shared.preview(
@@ -618,7 +618,7 @@ struct RequestHint: View {
       }
       .buttonStyle(.plain)
       .foregroundStyle(theme.secondaryText.color)
-      .help(Text("Answer in the Terminal", bundle: .module))
+      .instantTooltip(Text("Answer in the Terminal", bundle: .module))
       .accessibilityLabel(Text("Answer in the Terminal", bundle: .module))
       Group {
         if model.composerState == .answeringQuestion {

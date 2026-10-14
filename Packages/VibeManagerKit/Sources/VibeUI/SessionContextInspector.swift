@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The right column: what this session works on, and with what (#66).
@@ -365,7 +366,7 @@ private struct GitAccessory: View {
       if let refresh {
         Button(action: refresh) { Image(systemName: "arrow.clockwise") }
           .buttonStyle(.borderless)
-          .help(Text("Read the repositories again", bundle: .module))
+          .instantTooltip(Text("Read the repositories again", bundle: .module))
           .accessibilityLabel(Text("Read the repositories again", bundle: .module))
       }
     }
@@ -739,7 +740,7 @@ private struct RepositoryHeader: View {
         Spacer(minLength: 4)
         count
       }
-      .help(group.repositoryPath)
+      .instantTooltip(group.repositoryPath)
 
       HStack(alignment: .firstTextBaseline, spacing: 5) {
         Image(systemName: "arrow.triangle.branch")
@@ -760,7 +761,7 @@ private struct RepositoryHeader: View {
           Text(arrows)
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
-            .help(group.distanceHelp)
+            .instantTooltip(group.distanceHelp)
         }
       }
 
@@ -804,7 +805,7 @@ private struct RepositoryHeader: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .background(Capsule().fill(Color.secondary.opacity(0.18)))
-        .help(Text("\(group.changeCount) changed entries", bundle: .module))
+        .instantTooltip(Text("\(group.changeCount) changed entries", bundle: .module))
     }
   }
 }
@@ -864,7 +865,7 @@ private struct FileSectionView: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.tertiary)
       }
-      .help(section.help ?? "")
+      .instantTooltip(section.help ?? "")
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(
         [
@@ -975,7 +976,7 @@ private struct FileRowView: View {
         Image(systemName: "questionmark.circle")
           .font(.caption)
           .foregroundStyle(.tertiary)
-          .help(FileRow.unattributedHelp)
+          .instantTooltip(FileRow.unattributedHelp)
       }
       if let directory {
         Button(action: directory.toggle) {
@@ -983,7 +984,7 @@ private struct FileRowView: View {
             .font(.caption)
         }
         .buttonStyle(.borderless)
-        .help(
+        .instantTooltip(
           directory.isExpanded
             ? Text("Hide the files of this folder", bundle: .module)
             : Text("Show the files of this folder", bundle: .module)
@@ -994,7 +995,7 @@ private struct FileRowView: View {
       }
     }
     .opacity(isStale ? 0.6 : 1)
-    .help(row.help)
+    .instantTooltip(row.help)
     .accessibilityElement(children: .combine)
     .accessibilityLabel(row.accessibilityLabel)
   }
@@ -1061,7 +1062,7 @@ private struct PlainFolderRow: View {
       .lineLimit(nil)
       .fixedSize(horizontal: false, vertical: true)
     }
-    .help(path)
+    .instantTooltip(path)
     .contextMenu {
       Button(action: reveal) { Text("Reveal in Finder", bundle: .module) }
     }

@@ -70,7 +70,7 @@ struct DictationButton: View {
     .accessibilityLabel(
       isRecording
         ? Text("Stop Dictation", bundle: .module) : Text("Dictate", bundle: .module))
-    .help(
+    .instantTooltip(
       isRecording
         ? Text("Stop and insert what you said", bundle: .module)
         : Text("Dictate a message, transcribed on this Mac", bundle: .module))

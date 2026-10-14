@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import VibeConversationUI
 import VibeDomain
 
 /// A few sessions as the sidebar would show them, on a light or a dark window, with the lists as
@@ -72,7 +73,7 @@ struct SymbolSearch: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(Text(verbatim: symbol))
+            .instantTooltip(Text(verbatim: symbol))
             .accessibilityLabel(Text(SessionSymbolName.label(for: symbol)))
             .accessibilityAddTraits(chosen == symbol ? [.isSelected] : [])
           }
@@ -464,7 +465,7 @@ struct SwatchEditor: View {
         }
         .buttonStyle(.plain)
         .disabled(isTaken)
-        .help(Text(verbatim: color))
+        .instantTooltip(Text(verbatim: color))
         .accessibilityLabel(Text(verbatim: ColorNaming.name(ofHex: color) ?? color))
         .accessibilityAddTraits(selected == color ? [.isSelected] : [])
       }

@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import VibeApplication
 import VibeBrowser
+import VibeConversationUI
 import VibeDomain
 import WebKit
 
@@ -110,7 +111,7 @@ private struct BrowserTabStrip: View {
           .frame(width: 24, height: 24)
       }
       .buttonStyle(.borderless)
-      .help(Text("New Tab", bundle: .module))
+      .instantTooltip(Text("New Tab", bundle: .module))
       .accessibilityLabel(Text("New Tab", bundle: .module))
 
       Spacer(minLength: 0)
@@ -134,7 +135,7 @@ private struct BrowserTabStrip: View {
       }
       .buttonStyle(.borderless)
       .padding(.trailing, 8)
-      .help(Text("Agent Actions", bundle: .module))
+      .instantTooltip(Text("Agent Actions", bundle: .module))
       .accessibilityLabel(Text("Agent Actions", bundle: .module))
       .accessibilityValue(
         Text(
@@ -207,7 +208,7 @@ private struct BrowserTabButton: View {
         }
         .buttonStyle(.borderless)
         .focused($focus, equals: .close)
-        .help(Text("Close Tab", bundle: .module))
+        .instantTooltip(Text("Close Tab", bundle: .module))
         .accessibilityLabel(Text("Close Tab", bundle: .module))
       }
     }
@@ -225,7 +226,7 @@ private struct BrowserTabButton: View {
     )
     .contentShape(Rectangle())
     .onHover { isHovering = $0 }
-    .help(Text(verbatim: tab.url.absoluteString))
+    .instantTooltip(Text(verbatim: tab.url.absoluteString))
     .contextMenu { menu }
     .accessibilityElement(children: .ignore)
     .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
@@ -355,7 +356,7 @@ private struct BrowserAddressBar: View {
         Image(systemName: "chevron.left").frame(width: 26, height: 24)
       }
       .disabled(!(tab?.canGoBack ?? false))
-      .help(Text("Back", bundle: .module))
+      .instantTooltip(Text("Back", bundle: .module))
       .accessibilityLabel(Text("Back", bundle: .module))
 
       Button {
@@ -364,7 +365,7 @@ private struct BrowserAddressBar: View {
         Image(systemName: "chevron.right").frame(width: 26, height: 24)
       }
       .disabled(!(tab?.canGoForward ?? false))
-      .help(Text("Forward", bundle: .module))
+      .instantTooltip(Text("Forward", bundle: .module))
       .accessibilityLabel(Text("Forward", bundle: .module))
 
       Button {
@@ -375,7 +376,7 @@ private struct BrowserAddressBar: View {
           .frame(width: 26, height: 24)
       }
       .disabled(tab == nil)
-      .help(
+      .instantTooltip(
         tab?.isLoading == true ? Text("Stop", bundle: .module) : Text("Reload", bundle: .module)
       )
       .accessibilityLabel(
@@ -413,7 +414,7 @@ private struct BrowserAddressBar: View {
         Image(systemName: "arrow.up.forward.app").frame(width: 26, height: 24)
       }
       .disabled(tab.map { !model.opensOutside($0.url) } ?? true)
-      .help(Text("Open in Browser", bundle: .module))
+      .instantTooltip(Text("Open in Browser", bundle: .module))
       .accessibilityLabel(Text("Open in Browser", bundle: .module))
 
       Menu {
@@ -424,7 +425,7 @@ private struct BrowserAddressBar: View {
       .menuStyle(.borderlessButton)
       .menuIndicator(.hidden)
       .frame(width: 30)
-      .help(Text("More", bundle: .module))
+      .instantTooltip(Text("More", bundle: .module))
       .accessibilityLabel(Text("More", bundle: .module))
     }
     .buttonStyle(.borderless)
@@ -497,7 +498,8 @@ private struct BrowserAddressBar: View {
         .padding(.vertical, 1)
         .foregroundStyle(.green)
         .background(RoundedRectangle(cornerRadius: 3).fill(Color.green.opacity(0.12)))
-        .help(Text("A page of this Mac: the agent may act on it without asking.", bundle: .module))
+        .instantTooltip(
+          Text("A page of this Mac: the agent may act on it without asking.", bundle: .module))
       } else if origin.scheme == "https" {
         Image(systemName: "lock.fill")
           .foregroundStyle(.secondary)
