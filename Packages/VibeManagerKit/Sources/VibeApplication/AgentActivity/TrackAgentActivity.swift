@@ -484,15 +484,26 @@ public actor TrackAgentActivity {
   }
 
   /// The dialog a session's start waits on, read off its screen: one the keymap answers —
-  /// an update offered — takes the place of the request that only guessed a dialog is there.
+  /// an update offered — takes the place of the request that only guessed a dialog is there; the
+  /// prompt at rest says there is none.
   public func startupDialogOnScreen(_ text: String, isFor id: AgentRequestID) {
     guard var tracked = sessions[id.sessionID], let keymap = tracked.decoder?.answerKeymap,
       let index = tracked.state.requests.firstIndex(where: { $0.id == id }),
       case .inTerminal(let guessed) = tracked.state.requests[index].content,
-      guessed.kind == .startup, let prompt = keymap.startupDialog(onScreen: text)
+      guessed.kind == .startup
     else { return }
     let previous = tracked.state
-    tracked.state.requests[index].content = .inTerminal(prompt)
+    if let prompt = keymap.startupDialog(onScreen: text) {
+      tracked.state.requests[index].content = .inTerminal(prompt)
+    } else if keymap.showsPromptAtRest(onScreen: text) {
+      tracked.state.requests.remove(at: index)
+      if tracked.state.requests.isEmpty {
+        tracked.state.clearRequests()
+        tracked.state.activity = .idle
+      }
+    } else {
+      return
+    }
     sessions[id.sessionID] = tracked
     changed(id.sessionID, from: previous)
   }

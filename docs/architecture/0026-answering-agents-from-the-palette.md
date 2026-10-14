@@ -112,6 +112,11 @@ silent start is read off the screen once it is made, and an `Update available` w
 version (0.159.2); updating, which runs a script, is left to the terminal. A request no call of the
 conversation holds is shown above its composer.
 
+The same reading may find no dialog at all: Codex resumed at its prompt says nothing until its
+first turn, its hooks silent past the ten seconds. Its prompt drawn at the foot of the screen — `›`
+followed by no option's number, no panel's hint below — takes the guess away: nothing waits on the
+user.
+
 ### What would be allowed is what is shown
 
 A permission whose payload was cut at the hook's limit can only be refused from outside. Text an

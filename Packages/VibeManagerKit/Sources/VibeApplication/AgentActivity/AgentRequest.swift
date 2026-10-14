@@ -494,6 +494,9 @@ public protocol AgentAnswerKeymap: Sendable {
   /// What a dialog of the CLI's start says, read off the screen, when it is one this keymap
   /// answers: an update offered.
   func startupDialog(onScreen text: String) -> AgentTerminalPrompt?
+  /// Whether the screen shows the CLI's prompt waiting for words, no dialog over it: hooks silent
+  /// past a start then wait on nothing — a resumed Codex says nothing until its first turn.
+  func showsPromptAtRest(onScreen text: String) -> Bool
 }
 
 extension AgentAnswerKeymap {
@@ -513,6 +516,10 @@ extension AgentAnswerKeymap {
 
   public func startupDialog(onScreen text: String) -> AgentTerminalPrompt? {
     nil
+  }
+
+  public func showsPromptAtRest(onScreen text: String) -> Bool {
+    false
   }
 }
 
