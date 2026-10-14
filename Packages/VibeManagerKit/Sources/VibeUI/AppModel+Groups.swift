@@ -148,10 +148,11 @@ extension AppModel {
   /// Unfolds whatever hides a session.
   func reveal(_ id: SessionID) {
     // A child is under its coordinator, which unfolds to show it (#352).
-    if let session = sessions.first(where: { $0.id == id }), let parent = coordinator(of: session),
-      layout.collapsedCoordinators.contains(parent.id)
-    {
-      layout.setCollapsed(false, coordinators: [parent.id])
+    if let session = sessions.first(where: { $0.id == id }), let parent = coordinator(of: session) {
+      if layout.collapsedCoordinators.contains(parent.id) {
+        layout.setCollapsed(false, coordinators: [parent.id])
+      }
+      if session.taskStatus == .done { coordination.showingDoneChildren.insert(parent.id) }
     }
     guard sidebarMode == .byFolder,
       let session = sessions.first(where: { $0.id == id }), session.taskStatus != .archived

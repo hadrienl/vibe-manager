@@ -116,6 +116,26 @@ struct BrowserChannelTests {
     #expect(runner.sessions == [session])
   }
 
+  @Test("A copy that found the socket taken leaves it to the copy listening on it, as it quits")
+  func secondCopyKeepsTheSocket() throws {
+    let path = Self.socketPath()
+    let make = {
+      BrowserChannelListener(
+        socketPath: path,
+        prepare: {
+          // Nothing to prepare in a test.
+        }, runner: RecordingRunner(),
+        sessions: { [] })
+    }
+    let first = make()
+    try first.start()
+    defer { first.stop() }
+    let second = make()
+    #expect(throws: POSIXError.self) { try second.start() }
+    second.stop()
+    #expect(FileManager.default.fileExists(atPath: path))
+  }
+
   @Test("A process from nowhere is refused, and its bridge says the web view is not there")
   func refused() async throws {
     let runner = RecordingRunner()

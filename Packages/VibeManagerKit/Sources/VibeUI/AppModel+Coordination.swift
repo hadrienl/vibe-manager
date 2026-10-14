@@ -14,6 +14,12 @@ public struct CoordinatorSummary: Equatable, Sendable {
   public static let none = CoordinatorSummary(count: 0, running: 0, needingUser: 0)
 }
 
+/// A coordinator's done children, counted on the row that shows or hides them.
+public struct CoordinatorDoneChildren: Equatable, Sendable {
+  public let count: Int
+  public let isShown: Bool
+}
+
 // MARK: - The hierarchy
 
 extension AppModel {
@@ -58,17 +64,41 @@ extension AppModel {
     pruneSelection()
   }
 
-  /// The rows drawn: a folded coordinator's children are left out, unless a search is under way.
+  /// The rows drawn: a folded coordinator's children are left out, and its done ones unless the
+  /// user asked for them; a search shows them all.
   func hidingFoldedChildren(_ listed: [WorkSession]) -> [WorkSession] {
+    guard filter.trimmedSearchText.isEmpty else { return listed }
     let collapsed = layout.collapsedCoordinators
-    guard filter.trimmedSearchText.isEmpty, !collapsed.isEmpty else { return listed }
     var shownParents: Set<SessionID> = []
     return listed.filter { session in
       if let parent = session.coordination?.coordinatorID, shownParents.contains(parent) {
-        return !collapsed.contains(parent)
+        return !collapsed.contains(parent) && !hidesAsDone(session, under: parent)
       }
       shownParents.insert(session.id)
       return true
+    }
+  }
+
+  private func hidesAsDone(_ child: WorkSession, under parent: SessionID) -> Bool {
+    child.taskStatus == .done && !coordination.showingDoneChildren.contains(parent)
+  }
+
+  /// The row after a coordinator's children, when some are done: how many, and whether they show.
+  /// None while it is folded, or during a search, which shows every child.
+  public func doneChildren(ofCoordinator id: SessionID) -> CoordinatorDoneChildren? {
+    guard filter.trimmedSearchText.isEmpty, isExpanded(coordinator: id) else { return nil }
+    let count = children(of: id).filter { $0.taskStatus == .done }.count
+    guard count > 0 else { return nil }
+    return CoordinatorDoneChildren(
+      count: count, isShown: coordination.showingDoneChildren.contains(id))
+  }
+
+  public func setShowingDoneChildren(_ isShown: Bool, coordinator id: SessionID) {
+    if isShown {
+      coordination.showingDoneChildren.insert(id)
+    } else {
+      coordination.showingDoneChildren.remove(id)
+      pruneSelection()
     }
   }
 
