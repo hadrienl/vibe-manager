@@ -275,7 +275,12 @@ struct SidebarKeyboardTests {
     try await waitUntil("the in-progress session's terminal", in: workspace) {
       workspace.list != nil && workspace.shownTerminal(of: sessions[1]) != nil
     }
-    // The keyboard in the terminal, where a click on a tab finds it.
+    // The list had the keyboard, then the terminal took it: the list's focus can be left standing
+    // (#128), and the tab must still bring the keyboard back.
+    model.focusSidebar()
+    try await waitUntil("the keyboard in the list first", in: workspace) {
+      workspace.keyboardIsInTheList
+    }
     let terminal = try #require(workspace.shownTerminal(of: sessions[1]))
     try await moveKeyboard(to: terminal, in: workspace)
     #expect(!workspace.keyboardIsInTheList)
