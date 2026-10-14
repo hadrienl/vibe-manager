@@ -66,7 +66,19 @@ public enum ControllingTerminal {
 
   /// The arguments that start `executablePath` through the trampoline, or `nil` when there is none.
   static func arguments(for executablePath: String, arguments: [String]) -> (String, [String])? {
-    guard let trampoline = trampolinePath else { return nil }
+    Self.arguments(for: executablePath, arguments: arguments, trampoline: trampolinePath)
+  }
+
+  /// `nil` too when the trampoline can no longer be run (#382): its path is read once, when the
+  /// process starts, and the terminal host outlives the bundle it was started from — a build moved
+  /// or deleted. Spawning it would fail with `ENOENT`, and every side terminal with it; the shell
+  /// is started as an agent is instead, without job control but at all.
+  static func arguments(
+    for executablePath: String, arguments: [String], trampoline: String?
+  ) -> (String, [String])? {
+    guard let trampoline, FileManager.default.isExecutableFile(atPath: trampoline) else {
+      return nil
+    }
     return (trampoline, [trampoline, argument, executablePath, executablePath] + arguments)
   }
 

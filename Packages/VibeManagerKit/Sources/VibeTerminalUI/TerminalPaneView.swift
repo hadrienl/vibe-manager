@@ -84,6 +84,9 @@ public struct TerminalPaneView<Accessory: View>: View {
               Text("Try Again", bundle: .module)
             }
           }
+          // The whole pane: the surface behind, mounted with its cursor, read as a terminal that
+          // runs beside the card (#382).
+          .frame(maxWidth: .infinity, maxHeight: .infinity)
           .background(.background)
         } else if model.session == nil {
           ProgressView {

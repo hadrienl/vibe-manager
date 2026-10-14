@@ -102,3 +102,17 @@ func runsInTheRequestedWorkingDirectory() async throws {
   #expect(outcome.text.contains("present"))
   #expect(outcome.state == .exited(code: 0))
 }
+
+@Test("A trampoline that no longer exists starts the shell directly, not a false missing shell")
+func missingTrampolineFallsBackToTheShell() throws {
+  // The terminal host outlived the build it was started from (#382): spawning the trampoline
+  // failed with ENOENT, reported as "No executable was found at /bin/zsh".
+  let gone = "/tmp/vibe-manager-gone-\(UUID().uuidString)/Vibe Manager"
+  #expect(
+    ControllingTerminal.arguments(for: "/bin/zsh", arguments: ["-l"], trampoline: gone) == nil)
+
+  let present = try #require(
+    ControllingTerminal.arguments(for: "/bin/zsh", arguments: ["-l"], trampoline: "/bin/sh"))
+  #expect(present.0 == "/bin/sh")
+  #expect(present.1 == ["/bin/sh", ControllingTerminal.argument, "/bin/zsh", "/bin/zsh", "-l"])
+}
