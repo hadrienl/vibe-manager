@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 
 /// A section of the context column, as it declares itself (#66): what it is called, how it sizes,
 /// what it says folded, and what it shows. Where it goes, whether it is folded and how tall it is
@@ -375,7 +376,7 @@ struct InspectorSectionHeader: View {
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
-      .help(
+      .instantTooltip(
         Self.help(isCollapsed: isCollapsed, summary: isCollapsed ? section.summaryText?() : nil)
       )
       .accessibilityLabel(Text(section.title))

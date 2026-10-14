@@ -472,7 +472,7 @@ public struct ConversationSettingsView: View {
               .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
-          .help(Text(Self.accentName(accent)))
+          .instantTooltip(Text(Self.accentName(accent)))
           .accessibilityLabel(Text(Self.accentName(accent)))
           .accessibilityAddTraits(appearance.accent == accent ? .isSelected : [])
         }
@@ -486,7 +486,7 @@ public struct ConversationSettingsView: View {
             .frame(width: 24, height: 24)
             .allowsHitTesting(false)
         )
-        .help(Text("Choose a colour of your own", bundle: .module))
+        .instantTooltip(Text("Choose a colour of your own", bundle: .module))
         .accessibilityLabel(Text("Custom colour", bundle: .module))
         Text(Self.accentName(appearance.accent))
           .font(.caption)

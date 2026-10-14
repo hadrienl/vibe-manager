@@ -1912,7 +1912,7 @@ private struct ArchivedSessionDetail: View {
                 Text(AgentNaming.label(agent, names: agentNames))
                   .font(.callout)
                   .foregroundStyle(.secondary)
-                  .help(Text(verbatim: agent.providerID))
+                  .instantTooltip(Text(verbatim: agent.providerID))
               }
             }
           }
@@ -2049,7 +2049,8 @@ struct SidebarFooter: View {
       .menuStyle(.borderlessButton)
       .fixedSize()
       // Where the order arranged by hand is found, for whoever looks for how to drag a row (#44).
-      .help(model.reorderUnavailableReason.map { Text($0) } ?? Text(model.filter.sort.label))
+      .instantTooltip(
+        model.reorderUnavailableReason.map { Text($0) } ?? Text(model.filter.sort.label))
 
       Spacer(minLength: 0)
 
@@ -2063,7 +2064,7 @@ struct SidebarFooter: View {
           .contentShape(Rectangle())
       }
       .buttonStyle(.borderless)
-      .help(groupingHelp)
+      .instantTooltip(groupingHelp)
       .accessibilityLabel(Text("Group Sessions by Folder", bundle: .module))
       .accessibilityAddTraits(isGrouped ? [.isSelected] : [])
       .accessibilityIdentifier("sidebar-group-toggle")
@@ -2075,7 +2076,7 @@ struct SidebarFooter: View {
           Image(systemName: "line.3.horizontal.decrease.circle.fill")
         }
         .buttonStyle(.borderless)
-        .help(Text("Filtering is on. Click to clear it.", bundle: .module))
+        .instantTooltip(Text("Filtering is on. Click to clear it.", bundle: .module))
         .accessibilityLabel(Text("Clear filter", bundle: .module))
       }
     }
@@ -2298,7 +2299,7 @@ struct SessionRow: View {
         if let agent = session.agent {
           HStack(spacing: 4) {
             Text(AgentNaming.name(of: agent.providerID, names: commands.model.agentNames))
-              .help(Text(verbatim: agent.providerID))
+              .instantTooltip(Text(verbatim: agent.providerID))
             // A child is listed in its coordinator's column: its own is said here (#352).
             if let parent, parent.taskStatus != session.taskStatus {
               Text(verbatim: "·")
@@ -2329,7 +2330,7 @@ struct SessionRow: View {
         // colour and its symbol.
         .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
         // The exit code or the signal, for whoever wants it, behind words that say what happened.
-        .help(status.detail ?? "")
+        .instantTooltip(status.detail ?? "")
         .lineLimit(1)
         if isCoordinator {
           CoordinatorRowSummary(model: commands.model, sessionID: session.id)
@@ -2341,12 +2342,13 @@ struct SessionRow: View {
       case .waitingForApproval:
         Image(systemName: "hand.raised.fill")
           .foregroundStyle(.orange)
-          .help(Text("The agent is waiting for your approval in the web view", bundle: .module))
+          .instantTooltip(
+            Text("The agent is waiting for your approval in the web view", bundle: .module))
       case .agentOpenedPage:
         Image(systemName: "globe")
           .font(.caption)
           .foregroundStyle(Color.accentColor)
-          .help(Text("The agent loaded a page in the web view", bundle: .module))
+          .instantTooltip(Text("The agent loaded a page in the web view", bundle: .module))
       case nil:
         EmptyView()
       }
@@ -2574,7 +2576,7 @@ private struct PresentationPicker: View {
     .pickerStyle(.segmented)
     .labelsHidden()
     .fixedSize()
-    .help(Text("Switch between the conversation and the terminal (⌥⌘T)", bundle: .module))
+    .instantTooltip(Text("Switch between the conversation and the terminal (⌥⌘T)", bundle: .module))
   }
 }
 

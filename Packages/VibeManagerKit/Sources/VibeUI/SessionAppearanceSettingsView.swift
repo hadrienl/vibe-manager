@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The Badges tab (#199): the symbols and colours a session may be given, in the order the
@@ -57,7 +58,7 @@ struct SessionAppearanceSettingsView: View {
                 isAddingSymbol = false
               }
             }
-            .help(Text("Add a Symbol", bundle: .module))
+            .instantTooltip(Text("Add a Symbol", bundle: .module))
             .accessibilityLabel(Text("Add a Symbol", bundle: .module))
         }
       } header: {
@@ -109,7 +110,7 @@ struct SessionAppearanceSettingsView: View {
                 isAddingSwatch = false
               }
             }
-            .help(Text("Add a Colour", bundle: .module))
+            .instantTooltip(Text("Add a Colour", bundle: .module))
             .accessibilityLabel(Text("Add a Colour", bundle: .module))
         }
       } header: {
@@ -297,7 +298,7 @@ extension View {
           .strokeBorder(Color.accentColor, lineWidth: 2)
           .opacity(focus.wrappedValue == identifier ? 1 : 0)
       }
-      .help(label)
+      .instantTooltip(label)
       .focusable()
       .focused(focus, equals: identifier)
       .focusEffectDisabled()

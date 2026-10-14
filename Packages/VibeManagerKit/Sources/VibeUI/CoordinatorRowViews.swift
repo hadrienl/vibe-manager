@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The chevron of a coordinator's row, which folds its children away (#352). Drawn whether or not
@@ -27,7 +28,7 @@ struct CoordinatorDisclosure: View {
     .buttonStyle(.plain)
     .opacity(hasChildren ? 1 : 0)
     .disabled(!hasChildren)
-    .help(
+    .instantTooltip(
       isExpanded
         ? Text("Hide Children", bundle: .module, comment: "Folds a coordinator session's children.")
         : Text(
@@ -78,7 +79,7 @@ struct CoordinatorRowSummary: View {
     .font(.caption)
     .foregroundStyle(.secondary)
     .lineLimit(1)
-    .help(
+    .instantTooltip(
       model.coordination.calls[sessionID].map { Text(verbatim: DisplaySafeText.visible($0)) }
         ?? Text(verbatim: ""))
   }

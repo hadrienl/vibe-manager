@@ -691,7 +691,7 @@ struct AvatarRow<Menu: View>: View {
           .fontWeight(.semibold)
           .lineLimit(1)
           .truncationMode(.middle)
-          .help(Text(verbatim: name))
+          .instantTooltip(Text(verbatim: name))
         Group {
           if let redrawing {
             AvatarProgressText(avatars: avatars, job: redrawing)

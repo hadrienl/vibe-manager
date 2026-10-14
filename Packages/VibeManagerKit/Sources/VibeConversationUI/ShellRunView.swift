@@ -155,7 +155,7 @@ struct ShellRunView: View {
             }
           }
           .buttonStyle(.plain)
-          .help(Text("Copy the command and its output", bundle: .module))
+          .instantTooltip(Text("Copy the command and its output", bundle: .module))
         }
         .font(theme.interfaceFont(size: size * 0.9))
         .foregroundStyle(theme.secondaryText.color)

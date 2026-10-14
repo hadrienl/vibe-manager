@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The symbols, the colours and the project's icon a session may wear: the New Session draft's
@@ -125,7 +126,7 @@ struct SessionAppearancePopover: View {
           editor.revertToDefault()
         }
         .disabled(editor.defaultAppearance == nil || editor.isDefault)
-        .help(
+        .instantTooltip(
           Text(
             "The icon a new session with this name and this folder would get.", bundle: .module)
         )

@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import VibeConversationUI
 
 /// The handle between two panes that share a length: seen, easy to grab, and driven from the
 /// keyboard and VoiceOver. One component, so that every divider of the window reads the same way:
@@ -112,7 +113,7 @@ struct SplitHandle: View {
       onDoubleClick()
       return .handled
     }
-    .help(help ?? Text(verbatim: ""))
+    .instantTooltip(help)
     .accessibilityElement()
     .accessibilityLabel(label)
     .accessibilityValue(

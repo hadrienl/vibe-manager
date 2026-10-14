@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 
 /// The preview of Settings › Requests › Avatars (#154): the avatar selected in its role — animated
 /// beside a request's bubble — its name, where it comes from, what can be done with it, and its
@@ -56,7 +57,7 @@ extension AvatarLibraryView {
         .font(.title3.weight(.semibold))
         .lineLimit(1)
         .truncationMode(.middle)
-        .help(Text(verbatim: name))
+        .instantTooltip(Text(verbatim: name))
         Spacer(minLength: 4)
         if entry.isDraft {
           AvatarBadge(kind: .toCheck)
@@ -74,7 +75,7 @@ extension AvatarLibraryView {
         .font(.caption)
         .foregroundStyle(.secondary)
         .lineLimit(3)
-        .help(Text(verbatim: description))
+        .instantTooltip(Text(verbatim: description))
         .padding(.horizontal, 8)
         .padding(.vertical, 5)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -165,7 +166,7 @@ extension AvatarLibraryView {
       }
       .menuIndicator(.hidden)
       .fixedSize()
-      .help(Text("More Actions", bundle: .module))
+      .instantTooltip(Text("More Actions", bundle: .module))
       .accessibilityLabel(Text("More Actions", bundle: .module))
       .accessibilityIdentifier("avatar-menu")
     }
@@ -611,7 +612,7 @@ struct ExpressionTile: View {
           .buttonStyle(.plain)
           .offset(x: 5, y: -5)
           .disabled(!isEnabled)
-          .help(
+          .instantTooltip(
             image == nil
               ? Text("Generate this expression", bundle: .module)
               : Text("Generate this expression again", bundle: .module)

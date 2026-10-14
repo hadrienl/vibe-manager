@@ -58,7 +58,7 @@ struct TerminalPanelBlock: View {
           }
         }
         .buttonStyle(PanelButtonStyle())
-        .help(Text("Closes the panel, as Escape does in the terminal", bundle: .module))
+        .instantTooltip(Text("Closes the panel, as Escape does in the terminal", bundle: .module))
       }
       .padding(.horizontal, 14)
       .padding(.vertical, 9)

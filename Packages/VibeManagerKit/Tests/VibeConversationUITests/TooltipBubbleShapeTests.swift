@@ -25,65 +25,72 @@ struct TooltipBubbleShapeTests {
     #expect(!path.contains(CGPoint(x: 1, y: rect.maxY - 1)))
     #expect(path.contains(CGPoint(x: 15, y: rect.maxY - 1)))
   }
+
+  @Test("Pointing up, the arrow's tip is at the top")
+  func pointsUp() {
+    let rect = CGRect(x: 0, y: 0, width: 250, height: 60)
+    let path = TooltipBubbleShape(arrowX: 125, pointsDown: false).path(in: rect)
+    #expect(path.boundingRect.minY == rect.minY)
+    #expect(path.contains(CGPoint(x: 125, y: rect.minY + 1)))
+    #expect(!path.contains(CGPoint(x: 20, y: rect.minY + 1)))
+  }
 }
 
-/// The bubble laid out in a window never put on screen, next to the view it explains.
-@MainActor
-@Suite("Where the tooltip stands", .serialized, .timeLimit(.minutes(1)))
+/// Where the bubble stands on screen, its origin at the bottom as AppKit's.
+@Suite("Where the tooltip stands")
 struct TooltipPlacementTests {
-  private final class Frames {
-    var bubble: CGRect?
-    var anchor: CGRect?
-  }
-
-  private func measure(anchorX: CGFloat) async throws -> Frames {
-    let frames = Frames()
-    let window = NSWindow(
-      contentRect: NSRect(x: 0, y: 0, width: 500, height: 300),
-      styleMask: [.titled], backing: .buffered, defer: false)
-    window.isReleasedWhenClosed = false
-    window.contentView = NSHostingView(
-      rootView: ZStack(alignment: .bottomLeading) {
-        Color.clear
-        Text(verbatim: "Coordinate")
-          .padding(4)
-          .instantTooltip(
-            Text(verbatim: "The agent can create sessions of its own."), isShown: true
-          )
-          .onGeometryChange(for: CGRect.self) {
-            $0.frame(in: .global)
-          } action: {
-            frames.anchor = $0
-          }
-          .padding(.leading, anchorX)
-          .padding(.bottom, 20)
-      }
-      .onPreferenceChange(TooltipBubbleFrameKey.self) { frames.bubble = $0 }
-      .frame(width: 500, height: 300))
-    while frames.bubble == nil || frames.anchor == nil {
-      try Task.checkCancellation()
-      window.layoutIfNeeded()
-      try await Task.sleep(for: .milliseconds(10))
-    }
-    return frames
-  }
+  private let screen = CGRect(x: 0, y: 0, width: 1440, height: 875)
+  private let window = CGRect(x: 100, y: 100, width: 800, height: 600)
+  private let size = CGSize(width: 200, height: 40)
 
   @Test("Above the view, its arrow's tip just over it, centred on it")
-  func aboveAndCentred() async throws {
-    let frames = try await measure(anchorX: 200)
-    let bubble = try #require(frames.bubble)
-    let anchor = try #require(frames.anchor)
-    #expect(bubble.maxY <= anchor.minY)
-    #expect(anchor.minY - bubble.maxY < 6)
-    #expect(abs(bubble.midX - anchor.midX) < 1)
+  func aboveAndCentred() {
+    let anchor = CGRect(x: 400, y: 300, width: 80, height: 20)
+    let placement = TooltipPlacement(size: size, anchor: anchor, window: window, screen: screen)
+    #expect(placement.pointsDown)
+    #expect(placement.frame.minY == anchor.maxY + TooltipPlacement.gap)
+    #expect(placement.frame.midX == anchor.midX)
+    #expect(placement.arrowX == size.width / 2)
   }
 
-  @Test("Near the window's leading edge, the bubble keeps in it")
-  func keepsInTheWindow() async throws {
-    let frames = try await measure(anchorX: 4)
-    let bubble = try #require(frames.bubble)
-    let anchor = try #require(frames.anchor)
-    #expect(bubble.minX >= TooltipBubble.margin - 1)
-    #expect(bubble.maxY <= anchor.minY)
+  @Test("Near the window's sides, the bubble keeps in it, its arrow still over the view")
+  func keepsInTheWindow() {
+    let leading = CGRect(x: 104, y: 300, width: 30, height: 20)
+    let left = TooltipPlacement(size: size, anchor: leading, window: window, screen: screen)
+    #expect(left.frame.minX == window.minX + TooltipPlacement.margin)
+    #expect(left.frame.minX + left.arrowX == leading.midX)
+
+    let trailing = CGRect(x: 870, y: 300, width: 30, height: 20)
+    let right = TooltipPlacement(size: size, anchor: trailing, window: window, screen: screen)
+    #expect(right.frame.maxX == window.maxX - TooltipPlacement.margin)
+    #expect(right.frame.minX + right.arrowX == trailing.midX)
+  }
+
+  @Test("At the top of the screen, the bubble goes under the view, its arrow up")
+  func underAtTheTop() {
+    let anchor = CGRect(x: 400, y: 850, width: 80, height: 20)
+    let placement = TooltipPlacement(size: size, anchor: anchor, window: window, screen: screen)
+    #expect(!placement.pointsDown)
+    #expect(placement.frame.maxY == anchor.minY - TooltipPlacement.gap)
+  }
+}
+
+/// The bubble measured for its text, in a hosting controller never put in a window.
+@MainActor
+@Suite("The tooltip's size")
+struct TooltipSizeTests {
+  private func size(of text: String) -> CGSize {
+    TooltipBubble.size(of: Text(verbatim: text))
+  }
+
+  @Test("As wide as a short text; a long one wraps at the widest")
+  func fitsItsText() {
+    let short = size(of: "Back")
+    let long = size(of: String(repeating: "The agent can create sessions of its own. ", count: 4))
+    #expect(short.width < 100)
+    #expect(short.width >= 2 * TooltipBubbleShape.arrowClearance)
+    #expect(long.width <= TooltipBubble.maximumWidth)
+    #expect(long.width > TooltipBubble.maximumWidth - 30)
+    #expect(long.height > 2 * short.height)
   }
 }

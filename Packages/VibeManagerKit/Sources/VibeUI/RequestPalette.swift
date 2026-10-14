@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The requests of the sessions in the background, over the foot of the sidebar (#40).
@@ -142,7 +143,7 @@ struct RequestPalette: View {
         Image(systemName: "chevron.down")
       }
       .buttonStyle(.borderless)
-      .help(Text("Fold the requests", bundle: .module))
+      .instantTooltip(Text("Fold the requests", bundle: .module))
       .accessibilityLabel(Text("Fold the requests", bundle: .module))
     }
     .padding(.horizontal, 12)
@@ -283,7 +284,7 @@ struct RequestCard: View {
           .foregroundStyle(.secondary)
           .lineLimit(1)
           .truncationMode(.middle)
-          .help(Text(verbatim: pending.folderPath ?? ""))
+          .instantTooltip(Text(verbatim: pending.folderPath ?? ""))
         if let subagent = RequestPresentation.subagentLine(for: pending) {
           Label {
             Text(subagent)
@@ -378,7 +379,7 @@ struct RequestCard: View {
           }
         }
         .buttonStyle(.borderedProminent)
-        .help(Text(verbatim: url.absoluteString))
+        .instantTooltip(Text(verbatim: url.absoluteString))
         Text(verbatim: url.host() ?? url.absoluteString)
           .font(.caption)
           .foregroundStyle(.secondary)
@@ -537,7 +538,7 @@ struct RequestCard: View {
           } label: {
             Text("Always", bundle: .module, comment: "Allows what an agent asks, from now on.")
           }
-          .help(Text(RequestPresentation.alwaysAllowTitle(allow)))
+          .instantTooltip(Text(RequestPresentation.alwaysAllowTitle(allow)))
           .accessibilityLabel(Text(RequestPresentation.alwaysAllowTitle(allow)))
         }
         if answers.contains(.deny) { denyButton }
@@ -590,7 +591,7 @@ struct RequestCard: View {
           } label: {
             Text("Reject", bundle: .module, comment: "Rejects an agent's plan.")
           }
-          .help(Text(Self.stopsTheTurn))
+          .instantTooltip(Text(Self.stopsTheTurn))
           .accessibilityHint(Text(Self.stopsTheTurn))
         }
       case .inTerminal:
@@ -632,7 +633,7 @@ struct RequestCard: View {
     } label: {
       Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
     }
-    .help(Text(Self.stopsTheTurn))
+    .instantTooltip(Text(Self.stopsTheTurn))
     .accessibilityHint(Text(Self.stopsTheTurn))
   }
 
@@ -649,7 +650,7 @@ struct RequestCard: View {
       .labelStyle(isOnlyWay ? AnyLabelStyle(.titleAndIcon) : AnyLabelStyle(.iconOnly))
     }
     .buttonStyle(isOnlyWay ? AnyButtonStyle(.borderedProminent) : AnyButtonStyle(.borderless))
-    .help(Text("Open Session", bundle: .module))
+    .instantTooltip(Text("Open Session", bundle: .module))
   }
 
   @ViewBuilder private var accessibilityActions: some View {
@@ -854,7 +855,7 @@ struct RequestPaletteToolbarButton: View {
       .labelStyle(.titleAndIcon)
       .foregroundStyle(.orange)
     }
-    .help(Text("Pending requests: \(count)", bundle: .module))
+    .instantTooltip(Text("Pending requests: \(count)", bundle: .module))
     .popover(isPresented: $isShowingPalette, arrowEdge: .bottom) {
       RequestPalette(model: model, maxHeight: 480)
         .frame(width: 340)

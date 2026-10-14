@@ -141,7 +141,7 @@ public struct ConversationThemePicker: View {
     .buttonStyle(.plain)
     .accessibilityLabel(label(option))
     .accessibilityAddTraits(isCurrent ? .isSelected : [])
-    .help(label(option))
+    .instantTooltip(label(option))
   }
 
   /// What the conversation is drawn with when it follows the settings, now.
