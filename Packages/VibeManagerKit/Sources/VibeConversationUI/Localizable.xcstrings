@@ -34943,103 +34943,103 @@
         }
       }
     },
-    "Try again. If it keeps failing, delete the model in Settings › Dictation and download it again." : {
+    "Try again. If it keeps failing, delete the model in Settings › Voice and download it again." : {
       "comment" : "Under “What you said could not be transcribed.”",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "حاول مرة أخرى. إذا استمر الفشل، فاحذف النموذج في الإعدادات › الإملاء ونزّله من جديد."
+            "value" : "حاول مرة أخرى. إذا استمر الفشل، فاحذف النموذج في الإعدادات › الصوت ونزّله من جديد."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Versuche es erneut. Wenn es weiter fehlschlägt, lösche das Modell unter „Einstellungen“ › „Diktat“ und lade es neu."
+            "value" : "Versuche es erneut. Wenn es weiter fehlschlägt, lösche das Modell unter „Einstellungen“ › „Stimme“ und lade es neu."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Inténtalo de nuevo. Si sigue fallando, elimina el modelo en Ajustes › Dictado y vuelve a descargarlo."
+            "value" : "Inténtalo de nuevo. Si sigue fallando, elimina el modelo en Ajustes › Voz y vuelve a descargarlo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Réessayez. Si l’échec persiste, supprimez le modèle dans Réglages › Dictée et téléchargez-le à nouveau."
+            "value" : "Réessayez. Si l’échec persiste, supprimez le modèle dans Réglages › Voix et téléchargez-le à nouveau."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "फिर से कोशिश करें। अगर यह विफल होता रहे, तो सेटिंग्ज़ › डिक्टेशन में मॉडल हटाकर उसे फिर से डाउनलोड करें।"
+            "value" : "फिर से कोशिश करें। अगर यह विफल होता रहे, तो सेटिंग्ज़ › आवाज़ में मॉडल हटाकर उसे फिर से डाउनलोड करें।"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Riprova. Se continua a non funzionare, elimina il modello in Impostazioni › Dettatura e scaricalo di nuovo."
+            "value" : "Riprova. Se continua a non funzionare, elimina il modello in Impostazioni › Voce e scaricalo di nuovo."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "もう一度お試しください。失敗が続く場合は、「設定」›「音声入力」でモデルを削除してから再度ダウンロードしてください。"
+            "value" : "もう一度お試しください。失敗が続く場合は、「設定」›「音声」でモデルを削除してから再度ダウンロードしてください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "다시 시도하십시오. 계속 실패하면 설정 › 받아쓰기에서 모델을 삭제한 후 다시 다운로드하십시오."
+            "value" : "다시 시도하십시오. 계속 실패하면 설정 › 음성에서 모델을 삭제한 후 다시 다운로드하십시오."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Probeer het opnieuw. Als het blijft mislukken, verwijder het model in Instellingen › Dicteren en download het opnieuw."
+            "value" : "Probeer het opnieuw. Als het blijft mislukken, verwijder het model in Instellingen › Stem en download het opnieuw."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Spróbuj ponownie. Jeśli to nie pomoże, usuń model w Ustawieniach › Dyktowanie i pobierz go ponownie."
+            "value" : "Spróbuj ponownie. Jeśli to nie pomoże, usuń model w Ustawieniach › Głos i pobierz go ponownie."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tente novamente. Se continuar falhando, apague o modelo em Ajustes › Ditado e baixe-o de novo."
+            "value" : "Tente novamente. Se continuar falhando, apague o modelo em Ajustes › Voz e baixe-o de novo."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Попробуйте ещё раз. Если ошибка повторяется, удалите модель в «Настройках» › «Диктовка» и загрузите её заново."
+            "value" : "Попробуйте ещё раз. Если ошибка повторяется, удалите модель в «Настройках» › «Голос» и загрузите её заново."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Yeniden deneyin. Başarısız olmaya devam ederse modeli Ayarlar › Dikte bölümünde silip yeniden indirin."
+            "value" : "Yeniden deneyin. Başarısız olmaya devam ederse modeli Ayarlar › Ses bölümünde silip yeniden indirin."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Спробуйте ще раз. Якщо помилка повторюється, видаліть модель у «Параметрах» › «Диктування» й завантажте її знову."
+            "value" : "Спробуйте ще раз. Якщо помилка повторюється, видаліть модель у «Параметрах» › «Голос» й завантажте її знову."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "请重试。如果仍然失败，请在“设置”›“听写”中删除模型，然后重新下载。"
+            "value" : "请重试。如果仍然失败，请在“设置”›“语音”中删除模型，然后重新下载。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "請重試。如果仍然失敗，請在「設定」›「聽寫」中刪除模型，然後重新下載。"
+            "value" : "請重試。如果仍然失敗，請在「設定」›「語音」中刪除模型，然後重新下載。"
           }
         }
       }

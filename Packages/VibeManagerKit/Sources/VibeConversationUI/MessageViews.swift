@@ -128,6 +128,9 @@ private struct SpokenPrompt: ViewModifier {
 /// What the agent answered, in full width, and the button that reads it aloud (#357).
 struct AgentTextView: View {
   let text: String
+  /// The answer's entry: the audio mode reads it under the same identifier, and two answers alike
+  /// are not both read.
+  var id: String?
   /// `nil` before macOS 15, or in a sub-agent's result: no button.
   var readAloud: ReadAloudController?
   @Environment(\.openSettings) private var openSettings
@@ -142,9 +145,9 @@ struct AgentTextView: View {
             Text("Copy Message", bundle: .module)
           }
           if let readAloud {
-            let isReading = readAloud.isReading(text)
+            let isReading = readAloud.isReading(id ?? text)
             Button {
-              toggleReading(text, with: readAloud) { openSettings() }
+              toggleReading(text, id: id ?? text, with: readAloud) { openSettings() }
             } label: {
               isReading
                 ? Text("Stop Reading", bundle: .module) : Text("Read Aloud", bundle: .module)
@@ -152,7 +155,7 @@ struct AgentTextView: View {
           }
         }
       if let readAloud {
-        ReadAloudButton(text: text, readAloud: readAloud) { openSettings() }
+        ReadAloudButton(text: text, id: id ?? text, readAloud: readAloud) { openSettings() }
       }
     }
   }
@@ -162,31 +165,31 @@ struct AgentTextView: View {
 /// it is downloaded.
 @MainActor
 private func toggleReading(
-  _ text: String, with readAloud: ReadAloudController, showSettings: () -> Void
+  _ text: String, id: String, with readAloud: ReadAloudController, showSettings: () -> Void
 ) {
-  if readAloud.isReading(text) {
+  if readAloud.isReading(id) {
     readAloud.stop()
   } else {
-    readAloud.read(text, id: text)
+    readAloud.read(text, id: id)
     if !readAloud.isModelInstalled { showSettings() }
   }
 }
 
-/// ▶ under an answer: reads it aloud, or stops it while it is read. The text itself identifies
-/// the answer.
+/// ▶ under an answer: reads it aloud, or stops it while it is read.
 private struct ReadAloudButton: View {
   let text: String
+  let id: String
   let readAloud: ReadAloudController
   let showSettings: () -> Void
   @Environment(\.conversationTheme) private var theme
 
   var body: some View {
-    let isReading = readAloud.isReading(text)
+    let isReading = readAloud.isReading(id)
     Button {
-      toggleReading(text, with: readAloud, showSettings: showSettings)
+      toggleReading(text, id: id, with: readAloud, showSettings: showSettings)
     } label: {
       Group {
-        if readAloud.isLoading(text) {
+        if readAloud.isLoading(id) {
           ProgressView().controlSize(.mini)
         } else {
           Image(systemName: isReading ? "stop.fill" : "play.fill")
