@@ -76,10 +76,15 @@ public enum ControllingTerminal {
   static func arguments(
     for executablePath: String, arguments: [String], trampoline: String?
   ) -> (String, [String])? {
-    guard let trampoline, FileManager.default.isExecutableFile(atPath: trampoline) else {
-      return nil
-    }
+    guard let trampoline, !isMissing(trampoline) else { return nil }
     return (trampoline, [trampoline, argument, executablePath, executablePath] + arguments)
+  }
+
+  /// Whether a trampoline was set but can no longer be run: a side terminal then starts without
+  /// job control (#382).
+  static func isMissing(_ trampoline: String?) -> Bool {
+    guard let trampoline else { return false }
+    return !FileManager.default.isExecutableFile(atPath: trampoline)
   }
 
   private static func withCStrings<Result>(
