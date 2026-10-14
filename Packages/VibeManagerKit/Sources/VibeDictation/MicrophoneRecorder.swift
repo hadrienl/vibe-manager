@@ -31,6 +31,8 @@ public final class MicrophoneRecorder: AudioRecording {
     if input.isVoiceProcessingEnabled != cancellingEcho {
       try? input.setVoiceProcessingEnabled(cancellingEcho)
     }
+    // A recording that was not stopped leaves its tap: a second one on the bus raises.
+    input.removeTap(onBus: 0)
     let format = input.outputFormat(forBus: 0)
     guard format.sampleRate > 0,
       let target = AVAudioFormat(

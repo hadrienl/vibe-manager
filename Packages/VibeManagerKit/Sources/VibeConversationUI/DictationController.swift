@@ -120,6 +120,8 @@ public final class DictationController {
   @ObservationIgnored private var vocabulary: Task<String, Never>?
   /// When the microphone was pressed: a press shorter than this is a click.
   @ObservationIgnored private var pressedAt: Date?
+  /// The press under way started the recording: let go of quickly, it is a discussion.
+  @ObservationIgnored private var pressRecords = false
   /// A press let go of before the recording it asked for had started.
   @ObservationIgnored private var earlyRelease: EarlyRelease?
   private enum EarlyRelease { case click, hold }
@@ -242,6 +244,7 @@ public final class DictationController {
     // letting go does.
     guard phase == .idle else { return }
     earlyRelease = nil
+    pressRecords = true
     toggle(request)
   }
 
@@ -254,12 +257,16 @@ public final class DictationController {
       "Microphone released, \(held ? "held" : "clicked", privacy: .public), \(String(describing: self.phase), privacy: .public)"
     )
     pressedAt = nil
+    // A dictation started by the button rather than by this press: a click on Space ends it, as a
+    // click on the button would — it is never thrown away for a discussion.
+    let started = pressRecords
+    pressRecords = false
     guard owner == request.owner else { return }
     switch phase {
     case .discussing:
       if !held { endDiscussion() }
     case .recording:
-      if held {
+      if held || !started {
         toggle(request)
       } else {
         _ = recorder.stop()
@@ -381,11 +388,17 @@ public final class DictationController {
     Self.log.notice("Discussion ended")
     listening?.cancel()
     listening = nil
-    _ = detector.feed(recorder.stop())
+    // The last tenth of a second may end a sentence on its pause: it is sent as any other.
+    var ended = false
+    for case .utterance(let samples) in detector.feed(recorder.stop()) {
+      queue(samples)
+      ended = true
+    }
     let last = detector.flush()
     if let last { queue(last) }
+    let endsOnSentence = ended || last != nil
     readAloud?.stop()
-    if last != nil || pendingSentences > 0 {
+    if endsOnSentence || pendingSentences > 0 {
       // The discussion ended on a sentence: its answer is still read.
       readAloud?.readsNextAnswerOnly = true
     } else {
@@ -401,7 +414,7 @@ public final class DictationController {
     downloadModel()
   }
 
-  /// Settings › Dictation: the model chosen, downloaded now, for no dictation in particular.
+  /// Settings › Voice: the model chosen, downloaded now, for no dictation in particular.
   public func downloadSelectedModel() {
     guard phase == .idle else { return }
     request = nil
@@ -514,7 +527,7 @@ public final class DictationController {
     request = nil
   }
 
-  /// Settings › Dictation › Delete: the model leaves the disk.
+  /// Settings › Voice › Delete: the model leaves the disk.
   public func removeModel(_ variant: DictationModelVariant) async {
     guard phase == .idle else { return }
     try? await transcriber.remove(variant)
@@ -580,21 +593,22 @@ public final class DictationController {
       fail(.transcriptionFailed)
     }
     defer { watchdog.cancel() }
+    let attempt = attempt
     let prompt = await vocabulary?.value ?? ""
     vocabulary = nil
     guard let request else { return end() }
     // Nothing said is nothing inserted: a silence given to Whisper comes back as a made-up line.
     guard DictationTranscript.containsSpeech(samples) else { return fail(.nothingHeard) }
-    do {
-      let text = try await transcriber.transcribe(
-        samples, with: settings.variant, language: settings.language, prompt: prompt)
-      isModelReady = true
-      let cleaned = DictationTranscript.cleaned(text)
-      if !cleaned.isEmpty { request.insert(cleaned) }
-      end()
-    } catch {
-      fail(.transcriptionFailed)
-    }
+    let text = try? await transcriber.transcribe(
+      samples, with: settings.variant, language: settings.language, prompt: prompt)
+    // Given up on by the watchdog, and the microphone perhaps open again since: what comes back
+    // this late is not inserted, and ends nothing.
+    guard attempt == self.attempt, phase == .transcribing else { return }
+    guard let text else { return fail(.transcriptionFailed) }
+    isModelReady = true
+    let cleaned = DictationTranscript.cleaned(text)
+    if !cleaned.isEmpty { request.insert(cleaned) }
+    end()
   }
 
   private func fail(_ problem: Problem) {
