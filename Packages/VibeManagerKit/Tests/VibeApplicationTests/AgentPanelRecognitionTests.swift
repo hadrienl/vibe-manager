@@ -57,5 +57,17 @@ struct AgentPanelRecognitionTests {
       !AgentPanelRecognition.showsSendNowHint(
         screen: "Manage MCP servers\n❯ figma\nEnter to confirm · Esc to cancel"))
     #expect(!AgentPanelRecognition.showsSendNowHint(screen: ""))
+    // The same words above the prompt — the agent's, or a message queued — are no offer.
+    #expect(
+      !AgentPanelRecognition.showsSendNowHint(
+        screen: """
+          Claude Code shows ctrl+x ctrl+s to send now.
+          ✻ Running… (esc to interrupt)
+          ────
+          ❯ 
+          ────
+            ? for shortcuts
+          """))
+    #expect(!AgentPanelRecognition.showsSendNowHint(screen: "Press ctrl+x ctrl+s to send now"))
   }
 }

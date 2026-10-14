@@ -1076,7 +1076,8 @@ public final class ConversationModel {
     switch composerState {
     case .ready:
       // Keys typed now would go to the panel open in the conversation, not to the prompt.
-      return !isSubmitting && !PromptSubmission(text: draft, attachments: attachments).isEmpty
+      return !isSubmitting && !isSendingNow
+        && !PromptSubmission(text: draft, attachments: attachments).isEmpty
         && shellHold == nil && terminalPanel == nil
     case .answeringQuestion, .chattingAboutQuestion:
       return request?.isSending == false && !freeAnswer.isEmpty
@@ -1758,12 +1759,14 @@ public final class ConversationModel {
   private(set) var turn = 0
   /// The messages Send Now was clicked for: the key is not written twice for them.
   private var sentNow: Set<UUID> = []
+  /// From the click on Send Now to its key written: a prompt typed meanwhile would be cut by it.
+  private(set) var isSendingNow = false
 
   /// The echo under which Send Now shows: the last message queued in this turn, since the key
   /// sends them all — while the turn goes on, and no request or dialog would take the keys.
   public var sendNowEchoID: UUID? {
     guard promptFormat.sendNowKey != nil, isAgentWorking, composerState == .ready,
-      terminalPanel == nil, !isSubmitting
+      terminalPanel == nil, !isSubmitting, !isSendingNow
     else { return nil }
     return echoes.last(where: { $0.queuedInTurn == turn && !sentNow.contains($0.id) })?.id
   }
@@ -1781,9 +1784,13 @@ public final class ConversationModel {
     let sent = Set(echoes.filter { $0.queuedInTurn == turn }.map(\.id))
     let sentTurn = turn
     sentNow.formUnion(sent)
+    isSendingNow = true
+    defer { isSendingNow = false }
     let screen = await readScreen?()
     // Reading the screen takes a moment: the turn may have ended, a request come meanwhile.
-    guard isAgentWorking, composerState == .ready, terminalPanel == nil, turn == sentTurn else {
+    guard isAgentWorking, composerState == .ready, terminalPanel == nil, !isSubmitting,
+      turn == sentTurn
+    else {
       sentNow.subtract(sent)
       return
     }

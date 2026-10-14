@@ -165,12 +165,56 @@ struct SendNowTests {
     #expect(terminal.written.isEmpty)
   }
 
+  @Test("A prompt sent while the screen is read is held: the key never cuts it")
+  func promptDuringRead() async {
+    let terminal = Terminal()
+    let model = model(terminal: terminal)
+    await send("hello", to: model)
+    terminal.written = []
+    var sentDuringRead: Bool?
+    model.readScreen = { [weak model] in
+      await MainActor.run {
+        guard let model, sentDuringRead == nil else { return }
+        model.draft = "typed meanwhile"
+        #expect(!model.canSend)
+        sentDuringRead = false
+      }
+      if let model, sentDuringRead == false { sentDuringRead = await model.send() }
+      return Self.queuedScreen
+    }
+    await model.sendNow()
+    #expect(sentDuringRead == false)
+    #expect(terminal.written == [Self.sendNowKey])
+    #expect(model.draft == "typed meanwhile")
+    #expect(model.canSend)
+  }
+
+  @Test("The turn ended and another started while the screen is read: nothing written")
+  func turnChangedWhileReading() async {
+    let terminal = Terminal()
+    let model = model(terminal: terminal)
+    await send("hello", to: model)
+    terminal.written = []
+    model.readScreen = { [weak model] in
+      await MainActor.run {
+        model?.activity = .idle
+        model?.activity = .working
+      }
+      return Self.queuedScreen
+    }
+    await model.sendNow()
+    #expect(terminal.written.isEmpty)
+  }
+
   @Test("The prompts the transcript writes once sent confirm both echoes")
   func confirmedByTranscript() async {
-    let model = model(terminal: Terminal())
+    let terminal = Terminal()
+    let model = model(terminal: terminal)
     await send("first", to: model)
     await send("second", to: model)
+    terminal.written = []
     await model.sendNow()
+    #expect(terminal.written == [Self.sendNowKey])
     model.apply(
       ConversationSnapshot(
         entries: [
