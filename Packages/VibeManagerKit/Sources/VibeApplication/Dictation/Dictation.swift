@@ -273,12 +273,18 @@ public struct UtteranceDetector: Sendable {
       for sample in frame { sum += sample * sample }
       let rms = (sum / Float(frame.count)).squareRoot()
       level = rms
+      // The voice not heard yet — loading, or buffering its first words, in silence: its echo is
+      // the first tenth of a second that stands out of the room.
+      let echoHeard = echo >= max(0.01, floor * 3)
+      if whileSpeaking, !echoHeard { echo = max(echo, rms) }
       let isLoud = rms >= threshold(whileSpeaking: whileSpeaking)
       if whileSpeaking {
-        // The voice's echo is learnt apart from the room, from its first tenth of a second —
-        // and hardly at all from what stands out of it: the user cutting in.
-        let weight: Float = isLoud ? 0.01 : 0.1
-        echo = echo == 0 ? rms : echo * (1 - weight) + rms * weight
+        if echoHeard {
+          // The voice's echo is learnt apart from the room — and hardly at all from what stands
+          // out of it: the user cutting in.
+          let weight: Float = isLoud ? 0.01 : 0.1
+          echo = echo * (1 - weight) + rms * weight
+        }
       } else {
         echo *= 0.8
         recent.append(rms)

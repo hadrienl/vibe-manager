@@ -122,6 +122,21 @@ struct UtteranceDetectorTests {
     #expect(events == [.speechStarted])
   }
 
+  @Test("A voice that starts after a silence is learnt, not taken for the user")
+  func voiceAfterSilence() {
+    var detector = UtteranceDetector()
+    var events: [UtteranceDetector.Event] = []
+    for _ in 0..<5 { events += detector.feed(Self.silence) }
+    // Speaking, but nothing heard yet: the model loads, the first words are buffered.
+    for _ in 0..<10 { events += detector.feed(Self.silence, whileSpeaking: true) }
+    // Then the voice's echo, loud.
+    for _ in 0..<20 { events += detector.feed(Self.voice(0.06), whileSpeaking: true) }
+    #expect(events.isEmpty)
+    // The user still cuts in over it.
+    for _ in 0..<4 { events += detector.feed(Self.voice(0.3), whileSpeaking: true) }
+    #expect(events == [.speechStarted])
+  }
+
   @Test("A loud room is learnt, not taken for a voice: a sentence over it still ends")
   func loudRoom() {
     var detector = UtteranceDetector()

@@ -554,6 +554,46 @@ struct DiscussionTests {
     #expect(composer.sent == ["Mets le label v1.1.0."])
   }
 
+  @Test("A click on Space ends a dictation the button started: inserted, no discussion")
+  func spaceEndsTheButtonsDictation() async {
+    let recorder = FakeRecorder()
+    recorder.heard = speech
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Relance la CI."
+    let dictation = controller(recorder, transcriber)
+    let composer = Composer()
+
+    dictation.toggle(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressBegan(request(composer))
+    dictation.pressEnded(request(composer))
+    await until { dictation.phase == .idle }
+    #expect(composer.inserted == ["Relance la CI."])
+    #expect(composer.sent.isEmpty)
+    #expect(!recorder.isRecording)
+  }
+
+  @Test("A pause completed by the last tenth of a second heard still sends its sentence")
+  func lastTenthEndsTheSentence() async {
+    let recorder = FakeRecorder()
+    // A sentence, then a pause one tenth short of ending it: the microphone's last tenth does.
+    recorder.stream =
+      Array(repeating: voicedTenth, count: 6)
+      + Array(repeating: silentTenth, count: UtteranceDetector.pauseFrames - 1)
+    recorder.heard = silentTenth
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Mets le label v1.1.0."
+    let dictation = controller(recorder, transcriber)
+    let composer = Composer()
+
+    dictation.toggleDiscussion(request(composer))
+    await until { dictation.phase == .discussing }
+    await eventually { recorder.stream.isEmpty }
+    dictation.endDiscussion()
+    await eventually { !composer.sent.isEmpty }
+    #expect(composer.sent == ["Mets le label v1.1.0."])
+  }
+
   @Test("A discussion ended on a sentence that sent nothing reads nothing more, then or after")
   func endOnNothingReadsNothing() async {
     let recorder = FakeRecorder()
