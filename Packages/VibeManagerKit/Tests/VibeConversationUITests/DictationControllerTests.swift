@@ -432,14 +432,22 @@ struct DiscussionTests {
     return request
   }
 
-  /// A press is a click however long the machine takes, unless `holds`.
+  /// The voice the discussion reads with: macOS 15 and later. Kept here, the controller holding
+  /// it weakly.
+  private let voice = ReadAloudController(
+    synthesizer: FakeSynthesizer(installed: true), store: InMemorySpeechSettingsStore())
+
+  /// A press is a click however long the machine takes, unless `holds`. `speaks` without a voice,
+  /// as before macOS 15.
   private func controller(
-    _ recorder: FakeRecorder, _ transcriber: FakeTranscriber, holds: Bool = false
+    _ recorder: FakeRecorder, _ transcriber: FakeTranscriber, holds: Bool = false,
+    speaks: Bool = true
   ) -> DictationController {
     let dictation = DictationController(
       transcriber: transcriber, recorder: recorder, store: InMemoryDictationSettingsStore())
     dictation.holdThreshold = holds ? 0 : 3_600
     dictation.listenInterval = .milliseconds(5)
+    if speaks { dictation.readAloud = voice }
     return dictation
   }
 
@@ -499,6 +507,22 @@ struct DiscussionTests {
     #expect(composer.interrupted == 1)
     #expect(composer.sent.isEmpty)
     dictation.endDiscussion()
+  }
+
+  @Test("Without a voice, before macOS 15, a click on Space does nothing; held, it dictates")
+  func noVoiceNoDiscussion() async {
+    let recorder = FakeRecorder()
+    recorder.heard = speech
+    let dictation = controller(recorder, FakeTranscriber(installed: [.largeTurbo]), speaks: false)
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    #expect(dictation.phase == .idle)
+    #expect(!recorder.isRecording)
+    #expect(composer.inserted.isEmpty)
+    #expect(composer.sent.isEmpty)
   }
 
   @Test("A held press dictates into the draft, as before")
