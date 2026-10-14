@@ -29,11 +29,18 @@ public protocol RequestNotifying: AnyObject {
   /// The dictation's speech model is ready (#340): a notification when `notifies`, a sound
   /// otherwise.
   func postDictationReady(notifies: Bool)
+  /// The voice that reads the answers is ready (#357).
+  func postSpeechReady(notifies: Bool)
 }
 
 extension RequestNotifying {
   public func postOutcome(_ notification: SessionOutcomeNotification) {}
-  public func postDictationReady(notifies: Bool) {}
+  public func postDictationReady(notifies _: Bool) {
+    // Nothing: a notifier that does not say the dictation is ready stays silent.
+  }
+  public func postSpeechReady(notifies _: Bool) {
+    // Nothing: a notifier that does not say the voice is ready stays silent.
+  }
 }
 
 /// An answer given from outside the terminal, said for a moment.

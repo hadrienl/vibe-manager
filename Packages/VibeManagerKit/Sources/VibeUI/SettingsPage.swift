@@ -26,7 +26,8 @@ public enum SettingsPage: Hashable, Sendable {
   case webView
   /// The prompt templates: a list, an editor and a preview.
   case templates
-  /// The composer's dictation (#340): the speech model, and the language spoken.
+  /// The composer's dictation (#340): the speech model, and the language spoken; the voice that
+  /// reads the answers aloud (#357).
   case dictation
   /// The titles of the tickets a new session names (#89).
   case tickets
@@ -106,7 +107,8 @@ public enum SettingsPage: Hashable, Sendable {
         "Templates", bundle: .module, comment: "A page of the Settings window.")
     case .dictation:
       LocalizedStringResource(
-        "Dictation", bundle: .module, comment: "A page of the Settings window.")
+        "Voice", bundle: .module,
+        comment: "A page of the Settings window: dictation, and the answers read aloud.")
     case .tickets:
       LocalizedStringResource("Tickets", bundle: .module, comment: "A page of the Settings window.")
     case .ticketResolvers:

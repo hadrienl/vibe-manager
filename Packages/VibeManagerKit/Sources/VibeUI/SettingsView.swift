@@ -398,7 +398,7 @@ struct SettingsPageView: View {
         conversationAppearance: model.conversations.appearance)
     case .dictation:
       if let dictation = model.dictation {
-        DictationSettingsView(dictation: dictation)
+        DictationSettingsView(dictation: dictation, readAloud: model.readAloud)
       }
     case .tickets:
       TicketSettingsView(model: model.ticketTitles, pane: .general) { model.settingsPage = $0 }
