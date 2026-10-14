@@ -425,6 +425,7 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
       guard case .retiring(accepted: true) = await request(.retire) else { return }
     }
     restartArmed = false
+    noteAllTruncationsLeft()
     let hostProcess = identity?.processIdentifier
     diagnostics.record(.host, .notice, "host.retired", ["sessions": .count(mirrors.count)])
     _ = await request(.goodbye(keepRunning: false), timeout: .seconds(1))
@@ -658,8 +659,10 @@ public actor HostedTerminalSupervisor: TerminalSupervisor, TerminalHosting, Agen
         if restartArmed { Task { await self.restartIfIdle() } }
       }
     case .truncated(let id, let count):
+      // A session this copy no longer follows — let go of on the way out — has nobody to tell.
+      guard let mirror = mirrors[id] else { break }
       noteTruncation(of: count, in: id)
-      await mirrors[id]?.receive(truncated: count)
+      await mirror.receive(truncated: count)
     default:
       break
     }

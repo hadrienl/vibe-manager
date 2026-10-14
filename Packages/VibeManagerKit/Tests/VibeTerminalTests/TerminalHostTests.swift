@@ -640,13 +640,19 @@ struct TerminalHostTests {
     let limits = TerminalScrollbackLimits(maximumLineCount: 5, maximumByteCount: 8_000_000)
     let session = try await first.start(
       TerminalTestSupport.spec(
-        // A line at a time, each read as a block of its own, so the host trims its history; then
-        // it waits, still running, for the next launch to take it back.
-        script: "i=0; while [ $i -lt 40 ]; do echo line-$i; sleep 0.02; i=$((i + 1)); done; "
-          + "echo done-now; read go",
+        // Two batches of more lines than the limits, the second written only once the first was
+        // read: two blocks at least, however the runner stalls, so the host trims the first.
+        // Then it waits, still running, for the next launch to take it back.
+        script: "i=0; while [ $i -lt 10 ]; do echo line-$i; i=$((i + 1)); done; "
+          + "echo batch-one; read go; "
+          + "while [ $i -lt 20 ]; do echo line-$i; i=$((i + 1)); done; "
+          + "echo done-now; read stop",
         scrollback: limits),
       for: id)
-    #expect(await Transcript.follow(session).waitFor("done-now"))
+    let transcript = await Transcript.follow(session)
+    #expect(await transcript.waitFor("batch-one"))
+    await session.write("go\r")
+    #expect(await transcript.waitFor("done-now"))
     await first.relinquish(keepRunning: true)
 
     let second = host.supervisor()
@@ -670,8 +676,12 @@ struct TerminalHostTests {
     let limits = TerminalScrollbackLimits(maximumLineCount: 5, maximumByteCount: 8_000_000)
     let session = try await first.start(
       TerminalTestSupport.spec(
+        // Two batches, the second written only once the first was read: two blocks at least,
+        // however the runner stalls, so the first one has to go under the session's limits.
         script: "printf 'ready\\n'; read go; i=0; "
-          + "while [ $i -lt 40 ]; do echo line-$i; sleep 0.02; i=$((i + 1)); done; "
+          + "while [ $i -lt 10 ]; do echo line-$i; i=$((i + 1)); done; "
+          + "echo batch-one; read more; "
+          + "while [ $i -lt 20 ]; do echo line-$i; i=$((i + 1)); done; "
           + "echo done-now; read stop",
         scrollback: limits),
       for: id)
@@ -683,14 +693,15 @@ struct TerminalHostTests {
     let adopted = try #require(await second.session(for: id))
     let transcript = await Transcript.follow(adopted)
     await adopted.write("go\r")
+    #expect(await transcript.waitFor("batch-one"))
+    await adopted.write("more\r")
     #expect(await transcript.waitFor("done-now"))
 
-    // Trimmed by the session's limits, as the host's history is: by the default ones, it would
-    // still hold all forty lines.
+    // Trimmed by the session's limits, as the host's history is: by the default ones, nothing
+    // would have gone, the first batch included.
     let history = await adopted.history()
-    let lines = history.bytes.filter { $0 == UInt8(ascii: "\n") }.count
-    #expect(lines <= limits.maximumLineCount + 1)
     #expect(history.startOffset > 0)
+    #expect(!String(decoding: history.bytes, as: UTF8.self).contains("line-0\r\n"))
     await second.relinquish(keepRunning: false)
     await host.shutDown()
   }
