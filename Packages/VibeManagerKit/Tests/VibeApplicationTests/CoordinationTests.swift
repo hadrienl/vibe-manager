@@ -186,7 +186,7 @@ struct CoordinationInboxTests {
   func dropped() {
     var inbox = CoordinationInbox()
     inbox.add(event(.stopped, at: 0), for: coordinator)
-    inbox.drop(coordinator)
+    inbox.forget(coordinator)
     #expect(inbox.isEmpty)
   }
 }

@@ -101,7 +101,7 @@ public struct CoordinationInbox: Sendable {
   }
 
   /// Forgets a coordinator's events: it is gone, or no longer running.
-  public mutating func drop(_ coordinator: SessionID) {
+  public mutating func forget(_ coordinator: SessionID) {
     pending[coordinator] = nil
   }
 

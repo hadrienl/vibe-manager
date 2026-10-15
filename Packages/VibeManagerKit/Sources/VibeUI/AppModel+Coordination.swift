@@ -325,7 +325,7 @@ extension AppModel {
       guard let coordinator = sessions.first(where: { $0.id == id }),
         coordinator.status != .archived, launcher?.isRunning(id) == true
       else {
-        coordination.inbox.drop(id)
+        coordination.inbox.forget(id)
         continue
       }
       let events = coordination.inbox.events(for: id)
