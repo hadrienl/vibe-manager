@@ -2274,11 +2274,7 @@ struct SessionRow: View {
   var body: some View {
     let _ = BodyCounter.tick(.sessionRow)
     HStack(spacing: 10) {
-      // A coordinator folds its children; a child is set in under it (#352).
-      if isCoordinator {
-        CoordinatorDisclosure(model: commands.model, sessionID: session.id)
-      }
-      SessionBadge(appearance: appearance, icon: icon)
+      SessionBadge(appearance: appearance, icon: icon, size: Self.badgeSize)
         .background {
           GeometryReader { proxy in
             Color.clear.preference(
@@ -2360,7 +2356,14 @@ struct SessionRow: View {
       }
     }
     .padding(.vertical, 4)
-    .padding(.leading, parent == nil ? 0 : Self.childIndent)
+    // A child is set in under its coordinator; the coordinator stays in line with the sessions
+    // around it, its chevron in the margin left of every badge (#387).
+    .padding(.leading, Self.disclosureMargin + (parent == nil ? 0 : Self.childIndent))
+    .overlay(alignment: .leading) {
+      if isCoordinator {
+        CoordinatorDisclosure(model: commands.model, sessionID: session.id)
+      }
+    }
     // The menu is the list's (#77): it knows whether the click landed in a selection of several.
     // Its name field, while it is renamed, is reached on its own.
     .accessibilityElement(children: commands.isRenaming ? .contain : .combine)
@@ -2427,8 +2430,12 @@ struct SessionRow: View {
     }
   }
 
-  /// How far a child's row is set in under its coordinator's: the width of the disclosure.
-  static let childIndent: CGFloat = 22
+  /// Left of every row's badge: where a coordinator's chevron sits (#387).
+  static let disclosureMargin: CGFloat = 12
+  /// How far a child's badge is set in from its coordinator's: room for the elbow of the line
+  /// that ties them (#387).
+  static let childIndent: CGFloat = 28
+  static let badgeSize: CGFloat = 36
 
   private var isCoordinator: Bool {
     commands.model.showsAsCoordinator(session)
