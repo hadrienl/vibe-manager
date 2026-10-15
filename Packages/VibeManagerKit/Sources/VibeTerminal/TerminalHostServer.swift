@@ -353,6 +353,9 @@ public actor TerminalHostServer {
         ["session": configuration.diagnostics.pseudonym(id), "running": .count(running)])
       return .startFailed(.tooManySessions(limit: configuration.maximumRunningSessions))
     }
+    Self.noteMissingTrampoline(
+      for: spec, id: id, trampoline: ControllingTerminal.trampolinePath,
+      diagnostics: configuration.diagnostics)
     do {
       let session = try PTYTerminalSession.start(id: id, spec: spec)
       configuration.diagnostics.record(
@@ -377,6 +380,16 @@ public actor TerminalHostServer {
     } catch {
       return .startFailed(.spawnFailed(code: 0))
     }
+  }
+
+  /// A side terminal whose trampoline is gone is started without job control (#382): said, since
+  /// nothing on screen tells it apart from one that has it.
+  static func noteMissingTrampoline(
+    for spec: TerminalSpec, id: TerminalID, trampoline: String?, diagnostics: Diagnostics
+  ) {
+    guard spec.role == .auxiliary, ControllingTerminal.isMissing(trampoline) else { return }
+    diagnostics.record(
+      .session, .notice, "host.trampolineMissing", ["session": diagnostics.pseudonym(id)])
   }
 
   /// History first, then `attached`, then the live stream — one consistent value, as
