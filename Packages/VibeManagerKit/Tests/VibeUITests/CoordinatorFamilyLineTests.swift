@@ -66,7 +66,7 @@ struct CoordinatorFamilyLineTests {
 
   @Test("The line runs under the coordinator's badge and stops short of each child's")
   func geometry() {
-    let x = SessionRow.disclosureMargin + SessionRow.badgeSize / 2
+    let x = SessionRow.badgeSize / 2
     let height: CGFloat = 60
     let parentSegments = FamilyLineGeometry.segments(of: .parent, height: height)
     #expect(parentSegments.count == 1)
@@ -74,7 +74,7 @@ struct CoordinatorFamilyLineTests {
     // Past the bottom of the row, into the inset the list leaves, which the cell cuts at its edge.
     #expect(parentSegments[0].to == CGPoint(x: x, y: height + FamilyLineGeometry.overrun))
 
-    let elbowEnd = SessionRow.disclosureMargin + SessionRow.childIndent - FamilyLineGeometry.gap
+    let elbowEnd = SessionRow.childIndent - FamilyLineGeometry.gap
     let middle = FamilyLineGeometry.segments(of: .child(isLast: false), height: height)
     #expect(
       middle == [

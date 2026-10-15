@@ -65,8 +65,6 @@ struct SessionCreationRow: View {
       Spacer(minLength: 4)
     }
     .padding(.vertical, 4)
-    // In line with the badges of the sessions' rows (#387).
-    .padding(.leading, SessionRow.disclosureMargin)
     .opacity(0.8)
     .selectionDisabled()
     .accessibilityElement(children: .combine)

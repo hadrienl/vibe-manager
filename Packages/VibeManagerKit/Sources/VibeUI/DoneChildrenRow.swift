@@ -62,7 +62,7 @@ struct DoneChildrenRow: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .padding(.leading, SessionRow.disclosureMargin + SessionRow.childIndent)
+    .padding(.leading, SessionRow.childIndent)
     .padding(.vertical, 2)
     .accessibilityIdentifier("coordinator-done-children")
   }

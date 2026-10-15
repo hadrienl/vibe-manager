@@ -2357,15 +2357,8 @@ struct SessionRow: View {
     }
     .padding(.vertical, 4)
     // A child is set in under its coordinator; the coordinator stays in line with the sessions
-    // around it, its chevron in the margin left of every badge (#387).
-    .padding(.leading, Self.disclosureMargin + (parent == nil ? 0 : Self.childIndent))
-    .overlay(alignment: .leading) {
-      if isCoordinator {
-        CoordinatorDisclosure(model: commands.model, sessionID: session.id)
-          // Centred between the edge of the row's selection and the badge.
-          .offset(x: -Self.selectionInset)
-      }
-    }
+    // around it, and folds its children from the words that count them (#387).
+    .padding(.leading, parent == nil ? 0 : Self.childIndent)
     // The menu is the list's (#77): it knows whether the click landed in a selection of several.
     // Its name field, while it is renamed, is reached on its own.
     .accessibilityElement(children: commands.isRenaming ? .contain : .combine)
@@ -2432,11 +2425,6 @@ struct SessionRow: View {
     }
   }
 
-  /// Left of every row's badge: where a coordinator's chevron sits (#387).
-  nonisolated static let disclosureMargin: CGFloat = 12
-  /// Between the edge of the selection the list draws and the row's content: measured on the
-  /// sidebar of macOS 27.
-  nonisolated static let selectionInset: CGFloat = 6
   /// How far a child's badge is set in from its coordinator's: room for the elbow of the line
   /// that ties them (#387).
   nonisolated static let childIndent: CGFloat = 28
@@ -2469,6 +2457,14 @@ struct SessionRow: View {
   }
 
   private var accessibilityValue: Text {
+    // Whether a coordinator's children show: its row is read as one element, the words that fold
+    // them with it (#387).
+    guard let folding else { return stateValue ?? Text(verbatim: "") }
+    guard let stateValue else { return folding }
+    return Text("\(stateValue), \(folding)", bundle: .module)
+  }
+
+  private var stateValue: Text? {
     if isRestoring { return Text("Restoring", bundle: .module) }
     switch webView {
     case .waitingForApproval:
@@ -2476,8 +2472,14 @@ struct SessionRow: View {
     case .agentOpenedPage:
       return Text("The agent loaded a page", bundle: .module)
     case nil:
-      return Text(verbatim: "")
+      return nil
     }
+  }
+
+  private var folding: Text? {
+    guard isCoordinator, !commands.model.children(of: session.id).isEmpty else { return nil }
+    return commands.model.isExpanded(coordinator: session.id)
+      ? Text("Expanded", bundle: .module) : Text("Collapsed", bundle: .module)
   }
 
   /// A working agent's symbol gives way to a spinner; with Reduce Motion the symbol stays, and its

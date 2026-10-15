@@ -55,14 +55,14 @@ enum FamilyLineGeometry {
   /// Between the line and the badges it leaves from or reaches.
   static let gap: CGFloat = 3
   /// Under the middle of the coordinator's badge.
-  static var x: CGFloat { SessionRow.disclosureMargin + SessionRow.badgeSize / 2 }
+  static var x: CGFloat { SessionRow.badgeSize / 2 }
   /// How far a piece that goes on runs past its row, up and down. The list sets a row's content
   /// in from the edges of its cell (4 pt each way on the sidebar of macOS 27), and the cell cuts
   /// whatever runs past its edge: running past by more than the inset meets the next piece
   /// exactly at the edge between the cells, without overlapping it.
   static let overrun: CGFloat = 8
   /// Where a child's elbow stops: short of its badge.
-  static var elbowEnd: CGFloat { SessionRow.disclosureMargin + SessionRow.childIndent - gap }
+  static var elbowEnd: CGFloat { SessionRow.childIndent - gap }
 
   static func segments(of line: FamilyLine, height: CGFloat) -> [Segment] {
     let middle = height / 2
