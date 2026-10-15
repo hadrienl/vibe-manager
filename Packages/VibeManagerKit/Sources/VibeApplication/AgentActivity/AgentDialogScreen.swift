@@ -156,12 +156,14 @@ public struct AgentDialogScreen: Hashable, Sendable {
   }
 
   /// The line of tabs above the options, up to the rule the dialog starts under: boxes, then
-  /// `✔ Submit  →` — after `←`, or after `⏺` as 2.1.288 drew it.
+  /// `✔ Submit  →` — after `←`, or after `⏺` as 2.1.288 drew it. A narrow terminal shortens the
+  /// headers and the spaces between, never the boxes: `←  ☒ P… ☐ Hotfixbr… ✔ Submit →` (2.1.300,
+  /// 40 columns).
   static func questionTabs(above line: Int, in lines: [String]) -> [Bool]? {
     for text in lines[..<line].reversed() {
       if PromptInputRecognition.isRule(text) { return nil }
       let trimmed = text.trimmingCharacters(in: .whitespaces)
-      guard trimmed.hasSuffix("✔ Submit  →") else { continue }
+      guard trimmed.hasSuffix("→"), trimmed.contains("✔ Submit") else { continue }
       let boxes = trimmed.compactMap { $0 == "☒" ? true : $0 == "☐" ? false : nil }
       if !boxes.isEmpty { return boxes }
     }

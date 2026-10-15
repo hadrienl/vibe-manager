@@ -108,9 +108,9 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       else { return nil }
       return groups.last
     }
-    guard Self.isDrawn(questions[shown], on: screen),
-      !screen.options.contains(where: { $0.label.hasPrefix("[") && !$0.label.hasPrefix("[ ]") })
-    else { return nil }
+    guard Self.isDrawn(questions[shown], on: screen), !Self.hasTickedBox(screen) else {
+      return nil
+    }
     return groups[shown...].flatMap { $0 }
   }
 
@@ -173,9 +173,9 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       // The question on screen must be the first, its options where its report puts them: past
       // them come "Type something", then "Chat about this", which a digit one off would take. Its
       // tabs, when drawn, must have no answer yet: one given in the terminal has moved on to a
-      // question whose options may be the same.
+      // question whose options may be the same. Nor may a box be ticked: its digit would untick it.
       guard let first = questions.first, Self.isDrawn(first, on: screen),
-        screen?.questionTabs?.contains(true) != true,
+        screen?.questionTabs?.contains(true) != true, screen.map(Self.hasTickedBox) != true,
         let groups = Self.keystrokeGroups(for: answers, to: questions)
       else { return nil }
       return groups.flatMap { $0 }
@@ -197,6 +197,11 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
     }
     if hasReview(questions) { groups.append([Array("1".utf8)]) }
     return groups
+  }
+
+  /// Whether a box of the options is ticked already: a digit typed for it would untick it.
+  static func hasTickedBox(_ screen: AgentDialogScreen) -> Bool {
+    screen.options.contains { $0.label.hasPrefix("[") && !$0.label.hasPrefix("[ ]") }
   }
 
   /// Several questions, or one of several choices, end on a review of the answers.

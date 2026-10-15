@@ -108,6 +108,16 @@ struct SeveralQuestionsTests {
     #expect(screen(DialogScreens.claudeBash)?.questionTabs == nil)
   }
 
+  @Test("Tabs shortened by a narrow terminal still say which have an answer")
+  func narrowTabs() {
+    // Captured from 2.1.300 at 60, then 40 columns.
+    let options = "\n\nWhich branch?\n\n❯ 1. Main\n  2. Release\n  3. Type something."
+    let sixty = "←  ☒ Prere…  ☐ Hotfixbranch  ☐ Relea…  ☐ Deplo…  ✔ Submit  →" + options
+    let forty = "←  ☒ P… ☐ Hotfixbr… ☐ R… ☐ D… ✔ Submit →" + options
+    #expect(screen(sixty)?.questionTabs == [true, false, false, false])
+    #expect(screen(forty)?.questionTabs == [true, false, false, false])
+  }
+
   @Test("The first key of each question, and the review's, waits for it to be drawn")
   func checkpoints() {
     let all = keymap.keystrokes(
@@ -141,6 +151,20 @@ struct SeveralQuestionsTests {
     #expect(left(Screens.pets("☒ Color  ☒ Pets  ☐ Size", cat: "✔")) == nil)
     #expect(left(Screens.pets("☐ Color  ☐ Pets  ☒ Size")) == nil)
     #expect(left(DialogScreens.claudeBash) == nil)
+    // A box of the first question ticked in the terminal: its digit would untick it.
+    let ticked = AgentRequestContent.questions([
+      AgentQuestion(
+        header: "Pets", text: "Which pets?", options: [.init(label: "Cat"), .init(label: "Dog")],
+        allowsMultipleChoices: true),
+      AgentQuestion(
+        header: "Size", text: "Pick a size?", options: [.init(label: "Small"), .init(label: "Large")]),
+    ])
+    let both = AgentAnswer.answers([.options([0, 1]), .option(0)])
+    let drawn = { (cat: String) in
+      screen(SeveralQuestionsScreens.pets("☐ Pets  ☐ Size", cat: cat))
+    }
+    #expect(keymap.keystrokes(for: both, to: ticked, screen: drawn(" ")) != nil)
+    #expect(keymap.keystrokes(for: both, to: ticked, screen: drawn("✔")) == nil)
   }
 
   @Test("Two questions with the same options are told apart by their tabs")
