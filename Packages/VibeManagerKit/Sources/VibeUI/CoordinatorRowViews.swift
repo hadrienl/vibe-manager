@@ -22,7 +22,10 @@ struct CoordinatorDisclosure: View {
         .font(.caption.weight(.semibold))
         .rotationEffect(.degrees(isExpanded ? 90 : 0))
         .foregroundStyle(.secondary)
-        .frame(width: SessionRow.disclosureMargin - 2, height: SessionRow.badgeSize)
+        .frame(
+          width: SessionRow.selectionInset + SessionRow.disclosureMargin,
+          height: SessionRow.badgeSize
+        )
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
