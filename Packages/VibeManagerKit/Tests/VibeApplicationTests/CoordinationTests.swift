@@ -146,8 +146,9 @@ struct CoordinationInboxTests {
     inbox.add(event(.awaitingUser("permission to use Bash: rm -rf build"), at: 2), for: coordinator)
     #expect(inbox.due(at: Date(timeIntervalSince1970: 4)).isEmpty)
     #expect(inbox.due(at: Date(timeIntervalSince1970: 5)) == [coordinator])
-    let events = inbox.take(for: coordinator)
+    let events = inbox.events(for: coordinator)
     #expect(events.count == 2)
+    inbox.remove(events, for: coordinator)
     #expect(inbox.isEmpty)
     let message = CoordinationInbox.message(for: events)
     #expect(message.hasPrefix("[Vibe Manager] 2 events:"))
@@ -180,6 +181,19 @@ struct CoordinationInboxTests {
     }
     let message = CoordinationInbox.message(for: events)
     #expect(message.contains("and 5 more"))
+  }
+
+  @Test("What arrives while a coordinator is being told stays, for the next message")
+  func arrivesWhileTold() {
+    var inbox = CoordinationInbox()
+    inbox.add(event(.turnEnded, at: 0), for: coordinator)
+    let told = inbox.events(for: coordinator)
+    let other = CoordinationEvent(
+      childID: SessionID(), childName: "#352", kind: .awaitingUser("a question"),
+      date: Date(timeIntervalSince1970: 4))
+    inbox.add(other, for: coordinator)
+    inbox.remove(told, for: coordinator)
+    #expect(inbox.events(for: coordinator) == [other])
   }
 
   @Test("A dropped coordinator is told nothing")

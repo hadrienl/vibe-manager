@@ -319,6 +319,10 @@ public final class ConversationModel {
   /// What the application has to tell the agent in front of the user's next message, taken once:
   /// `nil` when there is nothing (#352).
   @ObservationIgnored public var takePreface: (() -> String?)?
+  /// Takes the agent's input for the user's message once the application types nothing into it,
+  /// until the closure it returns is called (#352): a message it types and the user's would
+  /// interleave.
+  @ObservationIgnored public var claimTyping: (() async -> @MainActor () -> Void)?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.
   @ObservationIgnored public var dictationVocabulary: @MainActor () async -> String = { "" }
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
@@ -1354,6 +1358,14 @@ public final class ConversationModel {
         panelSeen = true
         return false
       }
+    }
+    var release: (@MainActor () -> Void)?
+    defer { release?() }
+    if let claimTyping {
+      release = await claimTyping()
+      // Waiting takes a moment: a request reported, a panel opened meanwhile, and the prompt
+      // would be typed into it after all.
+      guard composerState == .ready, terminalPanel == nil else { return false }
     }
     let shell = promptFormat.shellEntry
     let typed = PromptSubmission(text: draft, attachments: attachments)

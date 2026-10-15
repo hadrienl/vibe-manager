@@ -112,8 +112,15 @@ extension AppModel {
   func connectConversations() {
     conversations.connect = { [weak self] model, session in
       let id = session.id
+      // What the composer writes is the user's: a message the application types waits until
+      // they stop (#352).
       model.write = { [weak self] bytes in
-        await self?.pane(for: id)?.write(bytes)
+        let pane = self?.pane(for: id)
+        pane?.noteKeyboardInput()
+        await pane?.write(bytes)
+      }
+      model.claimTyping = { [weak self] in
+        await self?.claimTyping(of: id) ?? {}
       }
       model.readScreen = { [weak self] in
         await self?.launcher?.screen(of: id)

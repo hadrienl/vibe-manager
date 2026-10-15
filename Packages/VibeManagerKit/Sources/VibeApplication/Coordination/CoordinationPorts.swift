@@ -11,6 +11,8 @@ public protocol CoordinationPreferences: AnyObject {
 public enum CoordinationLimits {
   public static let defaultRunningChildren = 3
   public static let runningChildren = 1...10
+  /// How many entries a child's trace keeps, in memory as in the store.
+  public static let traceEntries = 200
 }
 
 /// One thing a coordinator did to a child, kept with the child so that who did what can be read

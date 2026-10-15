@@ -58,12 +58,18 @@ public final class CoordinationModel {
   /// Children being created and started, per coordinator: counted against the limit before they
   /// run, so that two creations at once cannot both take the last place.
   @ObservationIgnored var startingChildren: [SessionID: Int] = [:]
+  /// The folders of children being created or started, standardized, with the child's name: held
+  /// until they run, so that two of them cannot both take one folder.
+  @ObservationIgnored var startingFolders: [String: String] = [:]
   /// The writes to the store, one after the other: a wake-up taken away is never put back by an
   /// older write that lands after it.
   @ObservationIgnored private var writes: Task<Void, Never>?
   @ObservationIgnored var wakes: [SessionID: CoordinationWake] = [:]
   /// Runs while something waits to be told: an event, or a wake-up.
   @ObservationIgnored var ticker: Task<Void, Never>?
+  /// Whether the ticker sleeps until a wake-up rather than for a second: something new to type
+  /// wakes it.
+  @ObservationIgnored var tickerSleepsLong = false
   /// The traces already read from the store.
   @ObservationIgnored private var loadedTraces: Set<SessionID> = []
 
@@ -91,8 +97,8 @@ public final class CoordinationModel {
 
   func record(_ entry: CoordinationTraceEntry, for child: SessionID) {
     traces[child, default: []].append(entry)
-    if let count = traces[child]?.count, count > FileCoordinationTraceLimit.value {
-      traces[child]?.removeFirst(count - FileCoordinationTraceLimit.value)
+    if let count = traces[child]?.count, count > CoordinationLimits.traceEntries {
+      traces[child]?.removeFirst(count - CoordinationLimits.traceEntries)
     }
     write { await $0.append(entry, to: child) }
   }
@@ -120,11 +126,6 @@ public final class CoordinationModel {
 struct CoordinationServing: Equatable {
   let terminal: ObjectIdentifier
   let isServed: Bool
-}
-
-/// How many entries a child's trace keeps, as the store keeps them.
-enum FileCoordinationTraceLimit {
-  static let value = 200
 }
 
 /// The limit for a workspace assembled without the user defaults.

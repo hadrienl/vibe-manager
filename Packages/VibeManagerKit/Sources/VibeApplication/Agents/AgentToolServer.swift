@@ -58,3 +58,11 @@ extension AgentLaunchPlan {
     )
   }
 }
+
+extension CoordinationPolicy {
+  /// Whether sessions of an agent can coordinate (#352): it is handed tools and instructions at
+  /// launch.
+  public static func canCoordinate(with provider: (any AgentProvider)?) -> Bool {
+    provider is any AgentToolServing && provider is any AgentInstructing
+  }
+}

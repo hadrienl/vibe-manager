@@ -340,6 +340,72 @@ struct CoordinationToolsTests {
     #expect(!model.asksAboutChildren(of: parent, action: .close))
     #expect(model.pendingCoordinatorStop == nil)
   }
+
+  @Test("Turned off, a coordinator's wake-up and what waited to be told to it go")
+  func turnedOffForgetsWakes() async {
+    let model = await makeModel()
+    _ = await call(model, "wake_after", ["minutes": 15, "reason": "check #351"], as: parent.id)
+    model.coordination.inbox.add(.wake("earlier", at: Date()), for: parent.id)
+    await model.setCoordinating(false, for: parent.id)
+    #expect(model.coordination.wakes[parent.id] == nil)
+    #expect(model.coordination.inbox.events(for: parent.id).isEmpty)
+    model.coordination.ticker?.cancel()
+  }
+
+  @Test("A folder a child is being started in is refused to another, until it runs")
+  func folderHeldWhileStarting() async throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("coordination-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let model = await makeModel()
+    model.coordination.startingFolders[CoordinationPolicy.standardized(folder.path)] = "#350"
+    let result = await call(
+      model, "session_create",
+      [
+        "name": "#351", "folder": .string(folder.path), "agent": "claude-code",
+        "mission": "m",
+      ], as: parent.id)
+    #expect(result.isError)
+    #expect(
+      text(result)
+        == CoordinationRefusal.folderInUse(path: folder.path, sessionName: "#350").message)
+    #expect(model.sessions.count == 3)
+  }
+
+  @Test("Something new to tell cuts short the ticker's sleep until a wake-up")
+  func tickerWokenEarly() async throws {
+    let model = await makeModel()
+    _ = await call(model, "wake_after", ["minutes": 15, "reason": "check #351"], as: parent.id)
+    while !model.coordination.tickerSleepsLong {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    // Its coordinator not running, an event is dropped at the next tick: a second, not a minute.
+    model.coordination.inbox.add(.wake("now", at: .distantPast), for: parent.id)
+    model.startCoordinationTicker()
+    let deadline = ContinuousClock.now + .seconds(20)
+    while !model.coordination.inbox.isEmpty, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(20))
+    }
+    #expect(model.coordination.inbox.isEmpty)
+    model.coordination.ticker?.cancel()
+  }
+
+  @Test("The user's message waits for the application's to be typed, then holds the input")
+  func userWaitsForApplicationTyping() async {
+    let model = await makeModel()
+    model.coordination.typing.insert(parent.id)
+    let claim = Task { await model.claimTyping(of: parent.id) }
+    try? await Task.sleep(for: .milliseconds(150))
+    #expect(model.coordination.typing.contains(parent.id))
+    model.coordination.typing.remove(parent.id)
+    let release = await claim.value
+    // Held: the application types nothing into it now.
+    #expect(model.coordination.typing.contains(parent.id))
+    #expect(!(await model.typeCoordinationMessage("x", into: parent.id)))
+    release()
+    #expect(!model.coordination.typing.contains(parent.id))
+  }
 }
 
 @MainActor

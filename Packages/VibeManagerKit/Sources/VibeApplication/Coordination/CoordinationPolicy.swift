@@ -146,7 +146,7 @@ public enum CoordinationPolicy {
     "[Coordinator “\(coordinatorName)”] " + text.trimmingCharacters(in: .whitespacesAndNewlines)
   }
 
-  static func standardized(_ path: String) -> String {
+  public static func standardized(_ path: String) -> String {
     let expanded = (path as NSString).expandingTildeInPath
     var standard = URL(fileURLWithPath: expanded).standardizedFileURL.resolvingSymlinksInPath().path
     while standard.count > 1, standard.hasSuffix("/") { standard.removeLast() }

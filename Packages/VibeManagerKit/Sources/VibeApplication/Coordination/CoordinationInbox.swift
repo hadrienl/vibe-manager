@@ -95,9 +95,10 @@ public struct CoordinationInbox: Sendable {
     }
   }
 
-  /// Takes a coordinator's events, which are no longer pending.
-  public mutating func take(for coordinator: SessionID) -> [CoordinationEvent] {
-    pending.removeValue(forKey: coordinator) ?? []
+  /// Removes the events a coordinator was told; those added while it was being told stay.
+  public mutating func remove(_ told: [CoordinationEvent], for coordinator: SessionID) {
+    let rest = (pending[coordinator] ?? []).filter { !told.contains($0) }
+    pending[coordinator] = rest.isEmpty ? nil : rest
   }
 
   /// Forgets a coordinator's events: it is gone, or no longer running.

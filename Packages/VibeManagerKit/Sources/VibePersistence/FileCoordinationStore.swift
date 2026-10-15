@@ -9,7 +9,7 @@ import VibeDomain
 /// A document that cannot be read is an empty one: it held a trace, or a wake-up the coordinator
 /// can ask again. It is replaced at the next write.
 public actor FileCoordinationStore: CoordinationStore {
-  public static let traceLimit = 200
+  public static let traceLimit = CoordinationLimits.traceEntries
 
   private let directory: URL
 

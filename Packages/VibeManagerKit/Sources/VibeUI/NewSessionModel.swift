@@ -497,7 +497,7 @@ public final class NewSessionModel {
     var coordinating: Set<AgentProviderID> = []
     for option in detected {
       let provider = await registry.provider(id: option.id)
-      if provider is any AgentToolServing, provider is any AgentInstructing {
+      if CoordinationPolicy.canCoordinate(with: provider) {
         coordinating.insert(option.id)
       }
     }

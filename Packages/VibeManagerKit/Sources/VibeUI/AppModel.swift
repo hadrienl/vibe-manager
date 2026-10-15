@@ -41,6 +41,7 @@ public final class AppModel {
     // Every list the workspace holds — a reload, a session just created — is the journal's too:
     // it follows the active sessions, and gives one that stopped its last pass.
     didSet {
+      coordinationFamilies = nil
       if case .loaded(let sessions) = state {
         sessionIndexes = Dictionary(
           sessions.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -63,6 +64,9 @@ public final class AppModel {
   /// Where each listed session sits in the list, for `session(withID:)`. Not observed: reading
   /// it goes through `sessions`, which is.
   @ObservationIgnored private var sessionIndexes: [SessionID: Int] = [:]
+  /// The coordinators' children, indexed once per list (#352): each row of the sidebar asks. Not
+  /// observed, as `sessionIndexes`.
+  @ObservationIgnored var coordinationFamilies: CoordinationFamilies?
   public private(set) var refreshFailure: RefreshFailure?
   /// An action on one session that failed (#244): said apart from `refreshFailure`, which is
   /// about the store, and kept through the reload that follows the action.
@@ -1685,6 +1689,8 @@ public final class AppModel {
           localized: "\(session.name) moved to \(String(localized: status.label)).",
           bundle: .module, comment: "A session's name, then a task status."))
       onboarding.send(.taskStatusChanged(id, status))
+      // A coordinator is told its child was moved by the user (#352).
+      coordinationStatusChangedByUser(id, to: status)
     } catch {
       reportAction(error, .moveStatus, on: id) { [weak self] in
         await self?.setTaskStatus(status, for: id, restarting: restarting)

@@ -26,14 +26,25 @@ extension AppModel {
   /// The coordinator a session is listed under, when it is listed under one (#352).
   public func coordinator(of session: WorkSession) -> WorkSession? {
     guard let id = session.coordination?.coordinatorID,
-      let parent = sessions.first(where: { $0.id == id })
+      let parent = families.sessions[id]
     else { return nil }
     return SessionHierarchy.parent(of: session, in: [id: parent])
   }
 
   /// A coordinator's children, archived ones aside, in the order of the store.
   public func children(of id: SessionID) -> [WorkSession] {
-    CoordinationPolicy.children(of: id, among: sessions)
+    families.children[id] ?? []
+  }
+
+  /// The sessions by id and the children by coordinator, read once per list rather than once per
+  /// row of the sidebar.
+  private var families: CoordinationFamilies {
+    // Read for the views that ask: the index itself is kept out of observation.
+    let sessions = sessions
+    if let coordinationFamilies { return coordinationFamilies }
+    let families = CoordinationFamilies(sessions)
+    coordinationFamilies = families
+    return families
   }
 
   /// The column a session is listed in: its coordinator's, for a child listed under one.
@@ -239,7 +250,7 @@ extension AppModel {
     var ids: Set<String> = []
     for descriptor in await agents.descriptors() {
       let provider = await agents.provider(id: descriptor.id)
-      if provider is any AgentToolServing, provider is any AgentInstructing {
+      if CoordinationPolicy.canCoordinate(with: provider) {
         ids.insert(descriptor.id.rawValue)
       }
     }
@@ -247,8 +258,14 @@ extension AppModel {
   }
 
   /// Ticks every second while something waits to be typed, and otherwise wakes for the next
-  /// wake-up, a minute at most later: a coordinator not running yet is looked at again.
+  /// wake-up, a minute at most later: a coordinator not running yet is looked at again. Something
+  /// new to type cuts that long sleep short.
   func startCoordinationTicker() {
+    if coordination.ticker != nil, coordination.tickerSleepsLong {
+      coordination.ticker?.cancel()
+      coordination.ticker = nil
+      coordination.tickerSleepsLong = false
+    }
     guard coordination.ticker == nil else { return }
     coordination.ticker = Task { [weak self] in
       while !Task.isCancelled {
@@ -263,7 +280,11 @@ extension AppModel {
         let nextWake =
           coordination.wakes.values.map(\.date).min()
           .map { max($0.timeIntervalSince(coordination.now()), 1) } ?? 60
+        coordination.tickerSleepsLong = !hasMessages
         try? await Task.sleep(for: .seconds(hasMessages ? 1 : min(nextWake, 60)))
+        // Cut short, a ticker that took its place runs: the state is its own.
+        if Task.isCancelled { return }
+        coordination.tickerSleepsLong = false
       }
     }
   }
@@ -273,7 +294,7 @@ extension AppModel {
   /// and the user has not typed in its terminal for two seconds. An agent without hooks says
   /// nothing of what it does: it is taken to be at rest.
   func canTypeCoordinationMessage(into id: SessionID) async -> Bool {
-    guard launcher?.isRunning(id) == true, !coordination.typing.contains(id) else { return false }
+    guard launcher?.isRunning(id) == true else { return false }
     switch activity(for: id)?.activity {
     case .working, .awaitingUser: return false
     case .idle, nil: break
@@ -290,17 +311,37 @@ extension AppModel {
 
   /// Types a message into a session at rest, one at a time per session. Return is pressed only
   /// if the agent is still at rest once the text is in: it is never what answers a dialog.
+  /// Whether the message is not to be typed again.
   func typeCoordinationMessage(_ text: String, into id: SessionID) async -> Bool {
-    guard await canTypeCoordinationMessage(into: id) else { return false }
-    coordination.typing.insert(id)
+    // Taken before the checks, which wait: two messages checked together would both be typed.
+    guard coordination.typing.insert(id).inserted else { return false }
     defer { coordination.typing.remove(id) }
-    return await launcher?.typeMessage(text, into: id, whileWorking: false) { [weak self] in
-      guard let self else { return false }
-      switch self.activity(for: id)?.activity {
-      case .working, .awaitingUser: return false
-      case .idle, nil: return true
+    guard await canTypeCoordinationMessage(into: id), let launcher else { return false }
+    let outcome = await launcher.typeMessage(text, into: id) { [weak self] in
+      switch self?.activity(for: id)?.activity {
+      case .working: .working
+      case .awaitingUser: .awaitingUser
+      case .idle, nil: .atRest
       }
-    } ?? false
+    }
+    if outcome == .leftInInput {
+      diagnostics.record(
+        .session, .notice, "coordination.messageLeftInInput",
+        ["session": diagnostics.pseudonym(id)])
+    }
+    return outcome.isDelivered
+  }
+
+  /// Takes a session's input for the user's message once the application types nothing into it,
+  /// and holds it until the returned closure is called: the two never interleave. Waits ten
+  /// seconds at most; the user's message then goes as it is.
+  func claimTyping(of id: SessionID) async -> @MainActor () -> Void {
+    let deadline = ContinuousClock.now + .seconds(10)
+    while coordination.typing.contains(id), ContinuousClock.now < deadline {
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    guard coordination.typing.insert(id).inserted else { return {} }
+    return { [weak self] in self?.coordination.typing.remove(id) }
   }
 
   /// Tells each coordinator what waits for it, and gives each child the messages kept for it,
@@ -309,7 +350,7 @@ extension AppModel {
     let now = coordination.now()
     for (id, wake) in coordination.wakes where wake.date <= now {
       guard let coordinator = sessions.first(where: { $0.id == id }),
-        coordinator.status != .archived
+        coordinator.status != .archived, coordinator.coordination?.isCoordinator == true
       else {
         coordination.setWake(nil, for: id)
         continue
@@ -323,7 +364,8 @@ extension AppModel {
     }
     for id in coordination.inbox.due(at: now) {
       guard let coordinator = sessions.first(where: { $0.id == id }),
-        coordinator.status != .archived, launcher?.isRunning(id) == true
+        coordinator.status != .archived, coordinator.coordination?.isCoordinator == true,
+        launcher?.isRunning(id) == true
       else {
         coordination.inbox.forget(id)
         continue
@@ -332,7 +374,7 @@ extension AppModel {
       guard !events.isEmpty,
         await typeCoordinationMessage(CoordinationInbox.message(for: events), into: id)
       else { continue }
-      _ = coordination.inbox.take(for: id)
+      coordination.inbox.remove(events, for: id)
     }
     for (id, messages) in coordination.outbox {
       guard let text = messages.first else {
@@ -378,6 +420,12 @@ extension AppModel {
       return
     }
     await reload()
+    // Turned off, what it asked to be woken for and what waits to be told to it go: it no longer
+    // coordinates.
+    if !isOn {
+      coordination.setWake(nil, for: id)
+      coordination.inbox.forget(id)
+    }
     // An agent started without the tools is told nothing: they come with its next launch, which
     // the composer offers.
     if launcher?.isRunning(id) == true, await readCoordinationServing(of: id) != false {
@@ -534,6 +582,13 @@ extension AppModel {
       isDirectory.boolValue
     else { throw CoordinationRefusal.folderMissing(folder) }
     try CoordinationPolicy.checkFolder(folder, among: sessions) { launcher?.isRunning($0) == true }
+    // Held until the child runs: two creations at once in one folder would both pass the check.
+    let reserved = CoordinationPolicy.standardized(folder)
+    if let other = coordination.startingFolders[reserved] {
+      throw CoordinationRefusal.folderInUse(path: folder, sessionName: other)
+    }
+    if start { coordination.startingFolders[reserved] = name }
+    defer { if start { coordination.startingFolders[reserved] = nil } }
     if start {
       try CoordinationPolicy.checkLimit(
         running: runningChildren(of: coordinator.id), limit: coordination.maximumRunningChildren)
@@ -685,11 +740,18 @@ extension AppModel {
         try CoordinationPolicy.checkFolder(folder, among: sessions.filter { $0.id != child.id }) {
           launcher?.isRunning($0) == true
         }
+        if let other = coordination.startingFolders[CoordinationPolicy.standardized(folder)] {
+          throw CoordinationRefusal.folderInUse(path: folder, sessionName: other)
+        }
       }
       coordination.startingChildren[coordinator.id, default: 0] += 1
     }
+    let reserved =
+      starts ? child.repositories.first.map { CoordinationPolicy.standardized($0.path) } : nil
+    if let reserved { coordination.startingFolders[reserved] = child.name }
     defer {
       if starts { coordination.startingChildren[coordinator.id, default: 1] -= 1 }
+      if let reserved { coordination.startingFolders[reserved] = nil }
     }
     if child.taskStatus != status {
       try await changeTaskStatus(id: child.id, to: status)
@@ -858,5 +920,22 @@ public final class CoordinationToolRunner: BrowserToolRunning {
   /// the user turns coordination on.
   public func admittedSessions() -> Set<SessionID> {
     Set(model?.sessions.filter(CoordinationPolicy.mayCoordinate).map(\.id) ?? [])
+  }
+}
+
+/// A list of sessions indexed for coordination (#352): each by its id, and each coordinator's
+/// children, archived ones aside, in the order of the store.
+struct CoordinationFamilies {
+  let sessions: [SessionID: WorkSession]
+  let children: [SessionID: [WorkSession]]
+
+  init(_ list: [WorkSession]) {
+    sessions = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    var children: [SessionID: [WorkSession]] = [:]
+    for session in list where session.status != .archived {
+      guard let coordinator = session.coordination?.coordinatorID else { continue }
+      children[coordinator, default: []].append(session)
+    }
+    self.children = children
   }
 }
