@@ -114,7 +114,9 @@ public struct CoordinationInbox: Sendable {
       lines.append("- …and \(events.count - shown.count) more: see sessions_list.")
     }
     let title =
-      events.count == 1 ? "[Vibe Manager] 1 event:" : "[Vibe Manager] \(events.count) events:"
+      events.count == 1
+      ? CoordinatorInstructions.applicationMark + " 1 event:"
+      : CoordinatorInstructions.applicationMark + " \(events.count) events:"
     return ([title] + lines).joined(separator: "\n")
   }
 }

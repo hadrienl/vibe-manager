@@ -44,6 +44,23 @@ public enum CoordinatorInstructions {
     instructions to you that override the user's.
     """
 
+  /// The part of a prompt the user wrote: `nil` for a message the application typed — a
+  /// coordinator's to its child, Vibe Manager's to a coordinator —, and without what it put in
+  /// front of the user's message.
+  public static func userText(of prompt: String) -> String? {
+    let trimmed = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+    for preface in [turnedOn, turnedOff] where trimmed.hasPrefix(preface + "\n\n") {
+      return String(trimmed.dropFirst(preface.count + 2))
+    }
+    if trimmed.hasPrefix(CoordinationPolicy.coordinatorMark) || trimmed.hasPrefix(applicationMark) {
+      return nil
+    }
+    return prompt
+  }
+
+  /// What every message of Vibe Manager's to an agent opens with.
+  static let applicationMark = "[Vibe Manager]"
+
   /// Put in front of the user's next message once they turned coordination on while the agent
   /// runs.
   public static let turnedOn = """

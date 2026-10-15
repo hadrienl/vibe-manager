@@ -30,6 +30,17 @@ struct PromptHistoryTests {
     #expect(history.prompts == ["go", "stop", "go"])
   }
 
+  @Test("What the application typed is left out, and what it put in front of the user's message")
+  func applicationMessages() {
+    let history = PromptHistory(entries: [
+      prompt(CoordinationPolicy.fromCoordinator("Implement #351.", coordinatorName: "V2")),
+      prompt("mine"),
+      prompt(CoordinationInbox.message(for: [.wake("check #351", at: Date())])),
+      prompt(CoordinatorInstructions.turnedOn + "\n\nPlan the release."),
+    ])
+    #expect(history.prompts == ["mine", "Plan the release."])
+  }
+
   @Test("Empty messages, images alone and the CLI's notices are left out")
   func leftOut() {
     let history = PromptHistory(entries: [
