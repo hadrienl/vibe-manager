@@ -8,12 +8,23 @@ import VibeDomain
 /// whose coordinator is archived or gone is an ordinary session again, in its own column. One whose
 /// coordinator had coordination turned off stays under it: what it was started for goes on.
 public enum SessionHierarchy {
-  /// The coordinator a session is listed under, when it is listed under one.
+  /// The coordinator a session is listed under, when it is listed under one. One listed under
+  /// another itself — a store written by hand, or by a later build — lists none: the session
+  /// would show in no column.
   public static func parent(
     of session: WorkSession, in sessions: [SessionID: WorkSession]
   ) -> WorkSession? {
-    guard session.status != .archived, let id = session.coordination?.coordinatorID,
-      let parent = sessions[id], parent.status != .archived
+    guard let parent = listedCoordinator(of: session, in: sessions),
+      listedCoordinator(of: parent, in: sessions) == nil
+    else { return nil }
+    return parent
+  }
+
+  private static func listedCoordinator(
+    of session: WorkSession, in sessions: [SessionID: WorkSession]
+  ) -> WorkSession? {
+    guard let id = CoordinationPolicy.coordinatorID(of: session), let parent = sessions[id],
+      parent.status != .archived
     else { return nil }
     return parent
   }
@@ -30,13 +41,11 @@ public enum SessionHierarchy {
   }
 
   /// What a column lists: the sessions the filter keeps, each coordinator followed by its
-  /// children. A search that finds a child shows its coordinator with it; a folded coordinator
-  /// hides its children, unless a search is under way.
+  /// children. A search that finds a child shows its coordinator with it.
   public static func apply(
     _ filter: SessionFilter,
     to sessions: [WorkSession],
-    notes: [SessionID: String] = [:],
-    collapsed: Set<SessionID> = []
+    notes: [SessionID: String] = [:]
   ) -> [WorkSession] {
     let byID = index(sessions)
     var children: [SessionID: [WorkSession]] = [:]
@@ -61,8 +70,6 @@ public enum SessionHierarchy {
     for root in listed {
       result.append(root)
       guard let own = children[root.id], !own.isEmpty else { continue }
-      let isSearching = !filter.trimmedSearchText.isEmpty
-      guard isSearching || !collapsed.contains(root.id) else { continue }
       // The coordinator found for itself shows all its children; found through some, those.
       let rootMatches = filter.matchesNarrowing(root, notes: notes[root.id])
       let shown =

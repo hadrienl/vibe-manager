@@ -37,6 +37,14 @@ public enum PromptInputRecognition {
     return shown.hasSuffix(expected.suffix(tailLength))
   }
 
+  /// Whether the prompt holds text: a hint shown in an empty one — `Try "fix lint errors"` — is
+  /// none.
+  public static func holdsText(_ input: [String]) -> Bool {
+    let lines = input.map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
+    guard !lines.isEmpty else { return false }
+    return !(lines.count == 1 && lines[0].hasPrefix("Try \"") && lines[0].hasSuffix("\""))
+  }
+
   /// Claude Code shows a long text arriving at once as a placeholder rather than the text.
   public static func showsPastedText(_ input: [String]) -> Bool {
     input.contains { $0.contains("[Pasted text") }

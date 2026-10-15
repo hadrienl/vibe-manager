@@ -117,8 +117,12 @@ public final class CoordinationModel {
     guard let store, loadedTraces.insert(child).inserted else { return }
     // After the writes under way, so that what was recorded meanwhile is in what is read.
     await writes?.value
+    let recorded = traces[child]?.count ?? 0
     let stored = await store.trace(of: child)
-    if !stored.isEmpty { traces[child] = stored }
+    // What was recorded while the store was read is not in it: kept after it.
+    let since = (traces[child] ?? []).dropFirst(recorded)
+    let merged = Array((stored + since).suffix(CoordinationLimits.traceEntries))
+    if !merged.isEmpty { traces[child] = merged }
   }
 }
 

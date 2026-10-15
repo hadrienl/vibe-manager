@@ -14,6 +14,8 @@ public struct CoordinationEvent: Hashable, Sendable {
     case statusChanged(SessionTaskStatus)
     /// A wake-up the coordinator asked for, with what it wanted to check.
     case wake(String)
+    /// The child stopped before the messages kept for it, this many, could be typed.
+    case messagesDropped(Int)
   }
 
   public let childID: SessionID?
@@ -46,6 +48,9 @@ public struct CoordinationEvent: Hashable, Sendable {
       return "The user moved \(child) to \(status.rawValue)."
     case .wake(let reason):
       return "Wake-up you asked for: \(reason)"
+    case .messagesDropped(let count):
+      let messages = count == 1 ? "the message" : "the \(count) messages"
+      return "\(child) stopped before \(messages) you sent it could be typed: they were not sent."
     }
   }
 }

@@ -226,18 +226,19 @@ struct SessionHierarchyTests {
     #expect(SessionHierarchy.column(of: done, in: byID) == .doing)
   }
 
-  @Test("A folded coordinator hides its children, unless a search looks for them")
-  func folded() {
-    let parent = session("V2", id: parentID, task: .doing, coordination: .coordinator)
-    let child = session("Dictation", task: .doing, coordination: .child(of: parentID))
-    var filter = SessionFilter(column: .doing)
+  @Test("A child of a child, or two sessions each the other's child, still show")
+  func nested() {
+    let otherID = SessionID()
+    let a = session("A", id: parentID, task: .doing, coordination: .child(of: otherID))
+    let b = session("B", id: otherID, task: .doing, coordination: .child(of: parentID))
+    let doing = SessionFilter(column: .doing)
+    #expect(Set(SessionHierarchy.apply(doing, to: [a, b]).map(\.name)) == ["A", "B"])
+    let root = session("Root", task: .doing, coordination: .coordinator)
+    let middle = session("Middle", id: otherID, task: .doing, coordination: .child(of: root.id))
+    let leaf = session("Leaf", task: .doing, coordination: .child(of: otherID))
     #expect(
-      SessionHierarchy.apply(filter, to: [parent, child], collapsed: [parentID]).map(\.name)
-        == ["V2"])
-    filter.searchText = "dictation"
-    #expect(
-      SessionHierarchy.apply(filter, to: [parent, child], collapsed: [parentID]).map(\.name)
-        == ["V2", "Dictation"])
+      Set(SessionHierarchy.apply(doing, to: [root, middle, leaf]).map(\.name))
+        == ["Root", "Middle", "Leaf"])
   }
 
   @Test("A search that finds a child shows its coordinator, and only the children found")

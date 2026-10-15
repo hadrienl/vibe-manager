@@ -91,7 +91,12 @@ public enum CoordinationPolicy {
 
   /// A coordinator's children, archived ones aside, in the order the store keeps them.
   public static func children(of id: SessionID, among sessions: [WorkSession]) -> [WorkSession] {
-    sessions.filter { $0.coordination?.coordinatorID == id && $0.status != .archived }
+    sessions.filter { coordinatorID(of: $0) == id }
+  }
+
+  /// The coordinator a session is the child of, archived children aside.
+  public static func coordinatorID(of session: WorkSession) -> SessionID? {
+    session.status == .archived ? nil : session.coordination?.coordinatorID
   }
 
   /// The child an id names. A session that is not the caller's child — another coordinator's, an

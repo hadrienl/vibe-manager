@@ -26,19 +26,17 @@ private struct InstantTooltip: ViewModifier {
   let text: Text?
   @State private var isHovered = false
 
+  // One structure whether there is a text or not: a help that comes and goes — a status's
+  // detail — never rebuilds the view it is on.
   func body(content: Content) -> some View {
-    if let text {
-      content
-        .onHover { isHovered = $0 }
-        .onDisappear { isHovered = false }
-        // Only while the pointer is over the view: a list of rows pays for nothing else.
-        .background {
-          if isHovered { TooltipAnchor(text: text) }
-        }
-        .accessibilityHint(text)
-    } else {
-      content
-    }
+    content
+      .onHover { isHovered = $0 }
+      .onDisappear { isHovered = false }
+      // Only while the pointer is over the view: a list of rows pays for nothing else.
+      .background {
+        if isHovered, let text { TooltipAnchor(text: text) }
+      }
+      .accessibilityHint(text ?? Text(verbatim: ""))
   }
 }
 

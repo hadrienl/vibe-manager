@@ -117,7 +117,7 @@ extension AppModel {
     let children = children(of: id)
     return CoordinatorSummary(
       count: children.count,
-      running: children.filter { launcher?.isRunning($0.id) == true }.count,
+      running: running(children).count,
       needingUser: children.filter {
         if case .awaitingUser = activity(for: $0.id)?.activity { return true }
         return false
@@ -147,8 +147,12 @@ extension AppModel {
 
   /// How many children of a coordinator have their agent running.
   func runningChildren(of id: SessionID) -> Int {
-    children(of: id).filter { launcher?.isRunning($0.id) == true }.count
-      + coordination.startingChildren[id, default: 0]
+    running(children(of: id)).count + coordination.startingChildren[id, default: 0]
+  }
+
+  /// Those of `sessions` whose agent runs.
+  private func running(_ sessions: [WorkSession]) -> [WorkSession] {
+    sessions.filter { launcher?.isRunning($0.id) == true }
   }
 }
 
@@ -158,12 +162,12 @@ extension AppModel {
   /// The children still running of a coordinator about to be stopped: the question offers to stop
   /// them too.
   public func runningChildren(ofCoordinator session: WorkSession) -> [WorkSession] {
-    children(of: session.id).filter { launcher?.isRunning($0.id) == true }
+    running(children(of: session.id))
   }
 
   /// Closes a coordinator's running children, as a batch close would, saying nothing (#352).
   public func closeChildren(of id: SessionID) async {
-    for child in children(of: id) where launcher?.isRunning(child.id) == true {
+    for child in running(children(of: id)) {
       _ = await closeInBatch(child.id)
     }
     await reload()
@@ -277,9 +281,12 @@ extension AppModel {
           coordination.ticker = nil
           return
         }
+        // A wake-up past due waits for its coordinator to run: looked at again a minute later,
+        // not every second.
+        let now = coordination.now()
         let nextWake =
-          coordination.wakes.values.map(\.date).min()
-          .map { max($0.timeIntervalSince(coordination.now()), 1) } ?? 60
+          coordination.wakes.values.map(\.date).filter { $0 > now }.min()
+          .map { max($0.timeIntervalSince(now), 1) } ?? 60
         coordination.tickerSleepsLong = !hasMessages
         try? await Task.sleep(for: .seconds(hasMessages ? 1 : min(nextWake, 60)))
         // Cut short, a ticker that took its place runs: the state is its own.
@@ -302,9 +309,14 @@ extension AppModel {
     if let typed = pane(for: id)?.lastKeyboardInputAt, ContinuousClock.now - typed < .seconds(2) {
       return false
     }
-    if let screen = await launcher?.screen(of: id), AgentPanelRecognition.showsPanel(screen: screen)
-    {
-      return false
+    if let screen = await launcher?.screen(of: id) {
+      if AgentPanelRecognition.showsPanel(screen: screen) { return false }
+      // Text the user left in the prompt would be sent with the message: it waits for them.
+      if let input = PromptInputRecognition.input(screen: screen),
+        PromptInputRecognition.holdsText(input)
+      {
+        return false
+      }
     }
     return true
   }
@@ -385,6 +397,16 @@ extension AppModel {
         launcher?.isRunning(id) == true
       else {
         coordination.outbox[id] = nil
+        // Its coordinator was told they would be typed: it is told they were not.
+        if let child = sessions.first(where: { $0.id == id }),
+          let coordinatorID = child.coordination?.coordinatorID
+        {
+          tell(
+            coordinatorID,
+            CoordinationEvent(
+              childID: id, childName: child.name, kind: .messagesDropped(messages.count),
+              date: coordination.now()))
+        }
         continue
       }
       guard await typeCoordinationMessage(text, into: id) else { continue }
@@ -932,8 +954,8 @@ struct CoordinationFamilies {
   init(_ list: [WorkSession]) {
     sessions = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
     var children: [SessionID: [WorkSession]] = [:]
-    for session in list where session.status != .archived {
-      guard let coordinator = session.coordination?.coordinatorID else { continue }
+    for session in list {
+      guard let coordinator = CoordinationPolicy.coordinatorID(of: session) else { continue }
       children[coordinator, default: []].append(session)
     }
     self.children = children
