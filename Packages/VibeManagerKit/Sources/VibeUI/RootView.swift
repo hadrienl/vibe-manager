@@ -2431,11 +2431,11 @@ struct SessionRow: View {
   }
 
   /// Left of every row's badge: where a coordinator's chevron sits (#387).
-  static let disclosureMargin: CGFloat = 12
+  nonisolated static let disclosureMargin: CGFloat = 12
   /// How far a child's badge is set in from its coordinator's: room for the elbow of the line
   /// that ties them (#387).
-  static let childIndent: CGFloat = 28
-  static let badgeSize: CGFloat = 36
+  nonisolated static let childIndent: CGFloat = 28
+  nonisolated static let badgeSize: CGFloat = 36
 
   private var isCoordinator: Bool {
     commands.model.showsAsCoordinator(session)
