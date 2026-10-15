@@ -45,6 +45,15 @@ struct TerminalHistory {
     droppedByteCount += max(0, byteCount)
   }
 
+  /// Output the stream had delivered, and trimmed, before this buffer started following it — the
+  /// history of the host a relaunched application takes back (#367). Unlike a loss on the way,
+  /// those bytes were passed: they move where the stream stands, as a trim of this buffer would.
+  mutating func noteSkipped(_ byteCount: Int) {
+    let skipped = max(0, byteCount)
+    appendedByteCount += skipped
+    droppedByteCount += skipped
+  }
+
   @discardableResult
   mutating func append(_ bytes: [UInt8]) -> Int {
     guard !bytes.isEmpty else { return 0 }

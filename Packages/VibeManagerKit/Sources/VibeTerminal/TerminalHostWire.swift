@@ -191,6 +191,9 @@ struct HostedSessionRecord: Codable, Equatable, Sendable {
   let endedAt: Date?
   /// Absent from a host that predates side terminals (#43): every session it holds is an agent.
   var role: TerminalRole?
+  /// The session's history limits, which the application's mirror keeps too. Absent from a host
+  /// that predates them (#367).
+  var scrollback: TerminalScrollbackLimits?
 }
 
 /// What the host says: a reply to a request, or news about a session nobody asked for.
