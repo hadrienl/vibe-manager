@@ -489,7 +489,7 @@ public actor TrackAgentActivity {
   }
 
   /// The dialog a session's start waits on, read off its screen: one the keymap answers —
-  /// an update offered — takes the place of the request that only guessed a dialog is there; the
+  /// an update offered, a folder to trust — takes the place of the request that only guessed a dialog is there; the
   /// prompt at rest says there is none.
   public func startupDialogOnScreen(_ text: String, isFor id: AgentRequestID) {
     guard var tracked = sessions[id.sessionID], let keymap = tracked.decoder?.answerKeymap,

@@ -33,7 +33,8 @@ followed took the highlighted option, the wrong one. At `PermissionRequest` the 
 digit sent within the millisecond answered it. Only `PermissionRequest` arms a request; one
 announced by `PreToolUse` is shown, its buttons waiting.
 
-Return never picks an option: a digit does. Refusing is Escape, whatever the options: the digit
+Return never picks an option by itself: a digit does — Return only takes an option once the
+screen shows it highlighted, as for a server's confirmation or the folder's trust. Refusing is Escape, whatever the options: the digit
 of "No" guessed one place off would allow. Escape also ends the agent's turn — and, for Claude
 Code, drops the other requests its sub-agents were waiting on — which the Refuse button says.
 

@@ -25,9 +25,10 @@ import VibeApplication
 ///   trust this folder`, no digit — digits do nothing there (2.1.300). The down arrow, then
 ///   Return, trusts it.
 ///
-/// Return is never pressed alone to pick an option: it takes the highlighted one, whatever that
-/// is. It follows a digit only beside previews, once the digit has moved the highlight, and
-/// accepts a confirmation only once the screen shows `Accept` highlighted.
+/// Return is never pressed blind to pick an option: it takes the highlighted one, whatever that
+/// is. It follows a digit only beside previews, once the digit has moved the highlight, accepts a
+/// confirmation only once the screen shows `Accept` highlighted, and trusts the folder only once
+/// it shows `Yes, I trust this folder` pointed at.
 public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
   public init() {}
 
