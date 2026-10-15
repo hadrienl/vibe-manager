@@ -45,7 +45,16 @@ Code, drops the other requests its sub-agents were waiting on — which the Refu
 
 A server's confirmation, for Claude Code, is Return on `Accept` or Escape, both read on screen.
 
-Questions with several choices toggle, and are sent from a tab of their own: left to the terminal.
+Questions with several choices tick a box per digit; the right arrow leaves them. Several
+questions, or one of several choices, end on a review whose `1. Submit answers` sends them.
+
+Keys typed ahead of a question were seen lost: the first question taken, the next still asked,
+while the card said all were answered. Before the first key of each question, and before the
+review's `1`, the screen is read again — for a second at most — until it shows that question: the
+tabs above it (`←  ☒ … ☐ …  ✔ Submit  →`) ticked up to it, its options drawn, none of its boxes
+ticked. Otherwise nothing more is typed and the request still waits: it is finished in the
+terminal. A first question answered there already, or a box ticked there, leaves the answer from
+outside untyped.
 
 ### A queue per session
 
