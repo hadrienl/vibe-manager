@@ -2362,6 +2362,8 @@ struct SessionRow: View {
     .overlay(alignment: .leading) {
       if isCoordinator {
         CoordinatorDisclosure(model: commands.model, sessionID: session.id)
+          // Centred between the edge of the row's selection and the badge.
+          .offset(x: -Self.selectionInset)
       }
     }
     // The menu is the list's (#77): it knows whether the click landed in a selection of several.
@@ -2432,6 +2434,9 @@ struct SessionRow: View {
 
   /// Left of every row's badge: where a coordinator's chevron sits (#387).
   nonisolated static let disclosureMargin: CGFloat = 12
+  /// Between the edge of the selection the list draws and the row's content: measured on the
+  /// sidebar of macOS 27.
+  nonisolated static let selectionInset: CGFloat = 6
   /// How far a child's badge is set in from its coordinator's: room for the elbow of the line
   /// that ties them (#387).
   nonisolated static let childIndent: CGFloat = 28
