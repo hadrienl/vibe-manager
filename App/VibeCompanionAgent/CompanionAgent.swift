@@ -15,6 +15,8 @@ import os
 final class CompanionAgent {
   private static let logger = Logger(
     subsystem: "eu.hadrien.VibeManager.companion", category: "agent")
+  private static let notifyLogger = Logger(
+    subsystem: "eu.hadrien.VibeManager.companion", category: "notify")
   /// The application is the only peer: the same team, its identifier.
   private static let applicationIdentifier = "eu.hadrien.VibeManager"
   /// How often the zone is asked directly, pushes or not: CloudKit's are silent ones, which the
@@ -147,14 +149,17 @@ final class CompanionAgent {
         await sync.note("application connectée (\(buildLabel.isEmpty ? version : buildLabel))")
         await writeMac(online: true)
         await mergeSessions()
+        await purgeRequests()
         sendSoon()
       }
       answerTests()
     case .snapshot(let sessions):
       Self.logger.notice("link: snapshot of \(sessions.count, privacy: .public) session(s)")
+      let entered = CompanionRequests.entered(previous: snapshot, current: sessions)
       snapshot = sessions
       Task {
         await mergeSessions()
+        await writeRequests(for: entered)
         sendSoon()
       }
     case .testAcknowledged(let nonce, let receivedAt):
@@ -218,10 +223,14 @@ final class CompanionAgent {
       return nil
     }
     let triage = CompanionInbox.triage(pings, handled: handled, now: Date())
-    if !triage.toAnswer.isEmpty || !triage.expired.isEmpty {
+    if !triage.toAnswer.isEmpty || !triage.toNotify.isEmpty || !triage.expired.isEmpty {
       Self.logger.notice(
-        "triage: \(triage.toAnswer.count, privacy: .public) to answer, \(triage.expired.count, privacy: .public) expired"
+        "triage: \(triage.toAnswer.count, privacy: .public) to answer, \(triage.toNotify.count, privacy: .public) to notify, \(triage.expired.count, privacy: .public) expired"
       )
+    }
+    for ping in triage.toNotify {
+      handled.insert(ping.nonce)
+      scheduleTestRequest(ping)
     }
     for ping in triage.toAnswer {
       let age = Date().timeIntervalSince(ping.sentAt)
@@ -255,6 +264,60 @@ final class CompanionAgent {
     await sync.delete(plan.deletions)
   }
 
+  // MARK: - Requests (#368)
+
+  /// One `Request` per session that just started waiting for the user: the phone's subscription
+  /// makes each a visible notification.
+  private func writeRequests(for sessions: [CompanionSessionInfo]) async {
+    guard let installation, !sessions.isEmpty else { return }
+    let now = Date()
+    let requests = sessions.map {
+      CompanionRequests.request(for: $0, macID: installation.id, id: UUID().uuidString, now: now)
+    }
+    for request in requests {
+      Self.notifyLogger.notice(
+        "request: \(request.id, privacy: .public) for session \(request.sessionTitle, privacy: .private)"
+      )
+    }
+    await sync.save(requests.map(CompanionRecord.request))
+    await sync.note("\(requests.count) demande(s) écrite(s)")
+  }
+
+  /// A test of the notifications: a request written `requestDelay` after the phone sent it — time
+  /// for the user to lock it — and the test deleted, without a pong or an alert on the Mac.
+  private func scheduleTestRequest(_ ping: CompanionPing) {
+    let delay = max(0, ping.sentAt.addingTimeInterval(ping.requestDelay ?? 0).timeIntervalSinceNow)
+    Self.notifyLogger.notice(
+      "test request: \(ping.nonce, privacy: .public), written in \(delay, format: .fixed(precision: 1), privacy: .public) s"
+    )
+    Task {
+      await sync.delete([CompanionRecordName.ping(ping.nonce)])
+      sendSoon()
+      try? await Task.sleep(for: .seconds(delay))
+      guard let installation, !isDeparting else { return }
+      let request = CompanionRequest(
+        id: UUID().uuidString, macID: installation.id, sessionTitle: "Notification de test",
+        agent: Self.macName(), text: "vous envoie une notification de test", createdAt: Date())
+      Self.notifyLogger.notice("test request: \(request.id, privacy: .public) written")
+      await sync.save([.request(request)])
+      await sync.note("demande de test \(ping.nonce.prefix(4)) écrite")
+      await sync.sendChanges()
+    }
+  }
+
+  /// Deletes this Mac's requests past their hour: seen or not, they are worth nothing by then.
+  private func purgeRequests() async {
+    guard let installation else { return }
+    let requests = records.compactMap { record -> CompanionRequest? in
+      if case .request(let request) = record { return request }
+      return nil
+    }
+    let names = CompanionRequests.expired(requests, macID: installation.id, now: Date())
+    guard !names.isEmpty else { return }
+    Self.notifyLogger.notice("purge: \(names.count, privacy: .public) request(s)")
+    await sync.delete(names)
+  }
+
   private func writeMac(online: Bool) async {
     guard let installation else { return }
     await sync.save([
@@ -280,6 +343,7 @@ final class CompanionAgent {
         [weak self] _ in
         Task { @MainActor in
           await self?.writeMac(online: true)
+          await self?.purgeRequests()
           self?.sendSoon()
         }
       })

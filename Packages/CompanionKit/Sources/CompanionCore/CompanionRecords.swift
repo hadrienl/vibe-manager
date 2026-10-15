@@ -87,17 +87,22 @@ public struct CompanionSession: Hashable, Codable, Sendable {
   }
 }
 
-/// The test the phone sends: its Mac answers with an alert and a `CompanionPong`.
+/// The test the phone sends: its Mac answers with an alert and a `CompanionPong` — or, with a
+/// `requestDelay`, with a `CompanionRequest` that much later, and nothing else (#368).
 public struct CompanionPing: Hashable, Codable, Sendable {
   public let nonce: String
   public let deviceName: String
   /// The phone's clock.
   public let sentAt: Date
+  /// A test of the notifications rather than of the synchronisation: the Mac writes a request this
+  /// long after `sentAt`, which leaves the user time to lock the phone. `nil` for the plain test.
+  public let requestDelay: TimeInterval?
 
-  public init(nonce: String, deviceName: String, sentAt: Date) {
+  public init(nonce: String, deviceName: String, sentAt: Date, requestDelay: TimeInterval? = nil) {
     self.nonce = nonce
     self.deviceName = deviceName
     self.sentAt = sentAt
+    self.requestDelay = requestDelay
   }
 }
 
@@ -116,12 +121,41 @@ public struct CompanionPong: Hashable, Codable, Sendable {
   }
 }
 
+/// An agent of the Mac that waits for the user — a permission, a question (#368): one record per
+/// entry into `needsAttention`, which the phone's subscription turns into a visible notification.
+///
+/// Its texts are in the clear, unlike the session's: CloudKit builds the notification from the
+/// record's fields on its servers, which cannot read an encrypted one.
+public struct CompanionRequest: Hashable, Codable, Sendable {
+  /// Unique to each entry into waiting: a new record, so a new notification, every time.
+  public let id: String
+  public let macID: String
+  public let sessionTitle: String
+  public let agent: String
+  /// What the agent waits for, said after its name: "attend votre réponse".
+  public let text: String
+  /// The Mac's clock.
+  public let createdAt: Date
+
+  public init(
+    id: String, macID: String, sessionTitle: String, agent: String, text: String, createdAt: Date
+  ) {
+    self.id = id
+    self.macID = macID
+    self.sessionTitle = sessionTitle
+    self.agent = agent
+    self.text = text
+    self.createdAt = createdAt
+  }
+}
+
 /// Any record of the companion's zone.
 public enum CompanionRecord: Hashable, Codable, Sendable {
   case mac(CompanionMac)
   case session(CompanionSession)
   case ping(CompanionPing)
   case pong(CompanionPong)
+  case request(CompanionRequest)
 
   /// Unique in the zone whatever the type, hence the prefix: a ping and its pong share a nonce.
   public var recordName: String {
@@ -130,6 +164,7 @@ public enum CompanionRecord: Hashable, Codable, Sendable {
     case .session(let session): CompanionRecordName.session(session.id)
     case .ping(let ping): CompanionRecordName.ping(ping.nonce)
     case .pong(let pong): CompanionRecordName.pong(pong.nonce)
+    case .request(let request): CompanionRecordName.request(request.id)
     }
   }
 }
@@ -140,4 +175,5 @@ public enum CompanionRecordName {
   public static func session(_ id: String) -> String { "session-\(id)" }
   public static func ping(_ nonce: String) -> String { "ping-\(nonce)" }
   public static func pong(_ nonce: String) -> String { "pong-\(nonce)" }
+  public static func request(_ id: String) -> String { "request-\(id)" }
 }

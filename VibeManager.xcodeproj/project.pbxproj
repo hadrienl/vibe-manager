@@ -42,6 +42,8 @@
 		A00000000000000000000022 /* ChannelSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001F /* ChannelSection.swift */; };
 		A00000000000000000000023 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000010 /* IrohLib */; };
 		A00000000000000000000024 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000011 /* IrohLib */; };
+		A00000000000000000000025 /* CompanionNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* CompanionNotifications.swift */; };
+		A00000000000000000000026 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Localizable.strings */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -75,6 +77,9 @@
 		B0000000000000000000001D /* CompanionEchoServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionEchoServer.swift; sourceTree = "<group>"; };
 		B0000000000000000000001E /* CompanionChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionChannel.swift; sourceTree = "<group>"; };
 		B0000000000000000000001F /* ChannelSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSection.swift; sourceTree = "<group>"; };
+		B00000000000000000000020 /* CompanionNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionNotifications.swift; sourceTree = "<group>"; };
+		B00000000000000000000021 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B00000000000000000000022 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -250,7 +255,9 @@
 				B00000000000000000000014 /* CompanionScreen.swift */,
 				B0000000000000000000001E /* CompanionChannel.swift */,
 				B0000000000000000000001F /* ChannelSection.swift */,
+				B00000000000000000000020 /* CompanionNotifications.swift */,
 				B0000000000000000000001B /* Assets.xcassets */,
+				B00000000000000000000023 /* Localizable.strings */,
 				B00000000000000000000015 /* Info.plist */,
 				B00000000000000000000016 /* VibeCompanion.entitlements */,
 			);
@@ -445,6 +452,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000000000000000000001D /* Assets.xcassets in Resources */,
+				A00000000000000000000026 /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -511,10 +519,23 @@
 				A00000000000000000000021 /* CompanionChannel.swift in Sources */,
 				A00000000000000000000022 /* ChannelSection.swift in Sources */,
 				A00000000000000000000020 /* CompanionIroh.swift in Sources */,
+				A00000000000000000000025 /* CompanionNotifications.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXVariantGroup section */
+		B00000000000000000000023 /* Localizable.strings */ = {
+			isa = PBXVariantGroup;
+			children = (
+				B00000000000000000000021 /* en */,
+				B00000000000000000000022 /* fr */,
+			);
+			name = Localizable.strings;
+			sourceTree = "<group>";
+		};
+/* End PBXVariantGroup section */
 
 /* Begin PBXTargetDependency section */
 		K00000000000000000000001 /* PBXTargetDependency */ = {

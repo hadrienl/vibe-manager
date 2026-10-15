@@ -24,21 +24,68 @@ public enum CompanionInbox {
   public struct Triage: Equatable, Sendable {
     /// Oldest first, so the alerts come in the order the phone sent them.
     public var toAnswer: [CompanionPing]
+    /// The tests of the notifications (#368): the agent answers them alone, with a request, and
+    /// the application never sees them.
+    public var toNotify: [CompanionPing] = []
     public var expired: [CompanionPing]
   }
 
-  /// The tests to hand the application, and the ones to delete. `handled` holds the nonces already
-  /// handed over, so that the same record fetched twice raises a single alert.
+  /// The tests to hand the application, the ones the agent answers itself, and the ones to delete.
+  /// `handled` holds the nonces already taken, so that the same record fetched twice raises a
+  /// single alert.
   public static func triage(_ pings: [CompanionPing], handled: Set<String>, now: Date) -> Triage {
     var triage = Triage(toAnswer: [], expired: [])
     for ping in pings.sorted(by: { $0.sentAt < $1.sentAt }) where !handled.contains(ping.nonce) {
       if now.timeIntervalSince(ping.sentAt) > maximumPingAge {
         triage.expired.append(ping)
+      } else if ping.requestDelay != nil {
+        triage.toNotify.append(ping)
       } else {
         triage.toAnswer.append(ping)
       }
     }
     return triage
+  }
+}
+
+/// The requests the Mac writes for the phone to notify (#368).
+///
+/// A request is a new record each time an agent starts waiting for the user: CloudKit notifies the
+/// creation of a record, never its update. They are worth nothing once seen, and deleted after an
+/// hour so that the zone does not grow with them.
+public enum CompanionRequests {
+  public static let maximumAge: TimeInterval = 60 * 60
+  /// Said after the agent's name in the notification.
+  public static let waitingText = "attend votre réponse"
+  /// What the agent of a session without one is called.
+  public static let unnamedAgent = "L’agent"
+
+  /// The sessions that started waiting for the user between two snapshots: once per entry, however
+  /// many snapshots it lasts. The first snapshot an agent receives is where it starts from, not a
+  /// change: an agent already waiting when the application started was there before, and is not
+  /// notified again at each launch.
+  public static func entered(
+    previous: [CompanionSessionInfo]?, current: [CompanionSessionInfo]
+  ) -> [CompanionSessionInfo] {
+    guard let previous else { return [] }
+    let waiting = Set(previous.filter { $0.state == .needsAttention }.map(\.id))
+    return current.filter { $0.state == .needsAttention && !waiting.contains($0.id) }
+  }
+
+  /// The request for a session that just started waiting.
+  public static func request(
+    for session: CompanionSessionInfo, macID: String, id: String, now: Date
+  ) -> CompanionRequest {
+    CompanionRequest(
+      id: id, macID: macID, sessionTitle: session.title,
+      agent: session.agent.isEmpty ? unnamedAgent : session.agent, text: waitingText,
+      createdAt: now)
+  }
+
+  /// The names of this Mac's requests past `maximumAge`: another Mac's are its own to delete.
+  public static func expired(_ requests: [CompanionRequest], macID: String, now: Date) -> [String] {
+    requests.filter { $0.macID == macID && now.timeIntervalSince($0.createdAt) > maximumAge }
+      .map { CompanionRecordName.request($0.id) }.sorted()
   }
 }
 

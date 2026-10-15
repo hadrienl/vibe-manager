@@ -15,6 +15,10 @@ final class CompanionModel {
   private(set) var status = CompanionSyncStatus()
   private(set) var journal: [CompanionJournalEntry] = []
   private(set) var testRun: CompanionTestRun?
+  /// The newest request in the zone (#368), whichever Mac wrote it, notified or not.
+  private(set) var latestRequest: CompanionRequest?
+  /// When the last test of the notifications was sent, by the phone's clock.
+  private(set) var notificationTestSentAt: Date?
   /// The Mac shown, when several — or several copies of the application — publish.
   var selectedMacID: String?
   /// When the screen last looked at the clock: what "connected" and "seen … ago" are read against.
@@ -72,6 +76,18 @@ final class CompanionModel {
     await sync.sendChanges()
   }
 
+  /// Asks the Mac for a request in `delay` seconds, without an alert on its side: time to lock the
+  /// phone and see the notification come (#368).
+  func sendNotificationTest(delay: TimeInterval = 10) async {
+    let nonce = UUID().uuidString
+    let ping = CompanionPing(
+      nonce: nonce, deviceName: deviceName, sentAt: Date(), requestDelay: delay)
+    notificationTestSentAt = ping.sentAt
+    await sync.save([.ping(ping)])
+    await sync.note("test de notification \(nonce.prefix(4)) envoyé")
+    await sync.sendChanges()
+  }
+
   func apply(_ update: CompanionSyncUpdate) {
     now = Date()
     status = update.status
@@ -79,14 +95,17 @@ final class CompanionModel {
     var pongs: [CompanionPong] = []
     var macs: [CompanionMac] = []
     var sessions: [CompanionSession] = []
+    var requests: [CompanionRequest] = []
     for record in update.records {
       switch record {
       case .mac(let mac): macs.append(mac)
       case .session(let session): sessions.append(session)
       case .pong(let pong): pongs.append(pong)
+      case .request(let request): requests.append(request)
       case .ping: break
       }
     }
+    latestRequest = requests.max { $0.createdAt < $1.createdAt }
     self.macs = macs.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     self.sessions = sessions
     if var run = testRun {

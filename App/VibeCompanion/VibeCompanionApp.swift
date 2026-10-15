@@ -1,6 +1,7 @@
 import CompanionKit
 import SwiftUI
 import UIKit
+import UserNotifications
 
 /// Vibe Companion (#347): a debug application that proves the iPhone and the Mac reach each other
 /// through CloudKit. It shows the connection, the Mac's active sessions — read only — and a test
@@ -14,6 +15,7 @@ struct VibeCompanionApp: App {
       CompanionScreen()
         .environment(delegate.model)
         .environment(delegate.channel)
+        .environment(delegate.notifications)
     }
   }
 }
@@ -21,10 +23,13 @@ struct VibeCompanionApp: App {
 /// Holds the model from the very start of the launch: the sync engine must exist before the first
 /// push can be delivered.
 @MainActor
-final class CompanionAppDelegate: NSObject, UIApplicationDelegate {
+final class CompanionAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate
+{
   let model: CompanionModel
   /// The active channel (#368), opened and closed by the screen with the foreground.
   let channel = CompanionChannel()
+  /// The visible notifications of the Mac's requests (#368).
+  let notifications = CompanionNotifications()
 
   override init() {
     let support =
@@ -41,10 +46,49 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate {
     _ application: UIApplication,
     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
   ) -> Bool {
-    // The engine registers for remote notifications itself; registering here too would hand it
-    // the token twice.
-    Task { await model.start() }
+    // Before the launch ends: a tap on a notification that launched the application is handed
+    // to the delegate set by then.
+    UNUserNotificationCenter.current().delegate = self
+    // The engine registers for remote notifications itself; the notifications ask again once it
+    // has, for the debug screen to see the token come.
+    Task {
+      await model.start()
+      await notifications.start()
+    }
     return true
+  }
+
+  func application(
+    _ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken token: Data
+  ) {
+    notifications.registered(tokenLength: token.count)
+  }
+
+  func application(
+    _ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: any Error
+  ) {
+    notifications.registrationFailed(error)
+  }
+
+  /// A request's alert while the application is open: shown all the same, and noted.
+  nonisolated func userNotificationCenter(
+    _ center: UNUserNotificationCenter, willPresent notification: UNNotification
+  ) async -> UNNotificationPresentationOptions {
+    let content = notification.request.content
+    let delivery = CompanionNotifications.Delivery(
+      title: content.title, body: content.body, date: notification.date)
+    await notifications.delivered(delivery)
+    return [.banner, .list, .sound]
+  }
+
+  /// A tap on the alert: the application opens, which is all it asks (#368).
+  nonisolated func userNotificationCenter(
+    _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
+  ) async {
+    let content = response.notification.request.content
+    let delivery = CompanionNotifications.Delivery(
+      title: content.title, body: content.body, date: response.notification.date)
+    await notifications.delivered(delivery)
   }
 
   /// CloudKit's silent push. The engine fetches on its own; this notes it for the debug screen.

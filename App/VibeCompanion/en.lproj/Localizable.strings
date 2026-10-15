@@ -1,0 +1,8 @@
+/* The visible notification of a Mac's request (#368): CloudKit's push names these keys, and iOS
+   fills them with the Request record's fields. */
+
+/* Title: the session's title. */
+"COMPANION_REQUEST_TITLE" = "%1$@";
+
+/* Body: the agent's name, then what it waits for, as the Mac wrote it ("attend votre réponse"). */
+"COMPANION_REQUEST_BODY" = "%1$@ %2$@";

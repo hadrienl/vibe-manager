@@ -27,6 +27,7 @@ public enum CompanionRecordCodec {
     public static let session = "Session"
     public static let ping = "Ping"
     public static let pong = "Pong"
+    public static let request = "Request"
   }
 
   enum Field {
@@ -46,6 +47,18 @@ public enum CompanionRecordCodec {
     static let receivedAt = "receivedAt"
     static let irohEndpointID = "irohEndpointID"
     static let irohRelayURL = "irohRelayURL"
+    static let requestDelay = "requestDelay"
+    static let sessionTitle = "sessionTitle"
+    static let agentName = "agentName"
+    static let text = "text"
+    static let createdAt = "createdAt"
+  }
+
+  /// The fields of a request the phone's notification is built from (#368), in the clear.
+  public enum RequestField {
+    public static let sessionTitle = Field.sessionTitle
+    public static let agentName = Field.agentName
+    public static let text = Field.text
   }
 
   public static func recordType(of record: CompanionRecord) -> String {
@@ -54,6 +67,7 @@ public enum CompanionRecordCodec {
     case .session: RecordType.session
     case .ping: RecordType.ping
     case .pong: RecordType.pong
+    case .request: RecordType.request
     }
   }
 
@@ -92,10 +106,19 @@ public enum CompanionRecordCodec {
       ckRecord[Field.nonce] = ping.nonce
       secret[Field.deviceName] = ping.deviceName
       ckRecord[Field.sentAt] = ping.sentAt
+      ckRecord[Field.requestDelay] = ping.requestDelay
     case .pong(let pong):
       ckRecord[Field.nonce] = pong.nonce
       ckRecord[Field.macID] = pong.macID
       ckRecord[Field.receivedAt] = pong.receivedAt
+    case .request(let request):
+      // In the clear: CloudKit's servers fill the notification with them, and an encrypted field
+      // is out of their reach. The session's own record keeps its title encrypted.
+      ckRecord[Field.macID] = request.macID
+      ckRecord[Field.sessionTitle] = request.sessionTitle
+      ckRecord[Field.agentName] = request.agent
+      ckRecord[Field.text] = request.text
+      ckRecord[Field.createdAt] = request.createdAt
     }
   }
 
@@ -136,13 +159,24 @@ public enum CompanionRecordCodec {
       else { return nil }
       return .ping(
         CompanionPing(
-          nonce: nonce, deviceName: secret[Field.deviceName] as? String ?? "", sentAt: sentAt))
+          nonce: nonce, deviceName: secret[Field.deviceName] as? String ?? "", sentAt: sentAt,
+          requestDelay: ckRecord[Field.requestDelay] as? Double))
     case RecordType.pong:
       guard let nonce = ckRecord[Field.nonce] as? String,
         let macID = ckRecord[Field.macID] as? String,
         let receivedAt = ckRecord[Field.receivedAt] as? Date
       else { return nil }
       return .pong(CompanionPong(nonce: nonce, macID: macID, receivedAt: receivedAt))
+    case RecordType.request:
+      guard let id = name.dropPrefix("request-"),
+        let macID = ckRecord[Field.macID] as? String,
+        let createdAt = ckRecord[Field.createdAt] as? Date
+      else { return nil }
+      return .request(
+        CompanionRequest(
+          id: id, macID: macID, sessionTitle: ckRecord[Field.sessionTitle] as? String ?? "",
+          agent: ckRecord[Field.agentName] as? String ?? "",
+          text: ckRecord[Field.text] as? String ?? "", createdAt: createdAt))
     default:
       return nil
     }

@@ -8,6 +8,7 @@ import UIKit
 struct CompanionScreen: View {
   @Environment(CompanionModel.self) private var model
   @Environment(CompanionChannel.self) private var channel
+  @Environment(CompanionNotifications.self) private var notifications
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
@@ -20,6 +21,7 @@ struct CompanionScreen: View {
         syncSection
         sessionsSection
         TestSection()
+        NotificationsSection()
         journalSection
       }
       .listStyle(.insetGrouped)
@@ -31,12 +33,16 @@ struct CompanionScreen: View {
         while !Task.isCancelled {
           try? await Task.sleep(for: .seconds(10))
           await model.refresh()
+          await notifications.refresh()
         }
       }
       .onChange(of: scenePhase) { _, phase in
         switch phase {
         case .active:
-          Task { await model.refresh() }
+          Task {
+            await model.refresh()
+            await notifications.refresh()
+          }
           // Back from the background, where it was closed; already up at launch.
           if channel.phase != .connecting && channel.phase != .connected {
             channel.open(to: model.selectedMac)
@@ -226,6 +232,13 @@ private struct TestSection: View {
           .frame(maxWidth: .infinity, minHeight: 44)
       }
       .buttonStyle(.borderedProminent)
+      Button {
+        Task { await model.sendNotificationTest() }
+      } label: {
+        Text("Notification de test dans 10 s")
+          .frame(maxWidth: .infinity, minHeight: 44)
+      }
+      .buttonStyle(.bordered)
       if let run = model.testRun {
         VStack(alignment: .leading, spacing: 4) {
           Text(verbatim: sentLine(run))
@@ -257,10 +270,76 @@ private struct TestSection: View {
   }
 }
 
+/// The notifications of the Mac's requests (#368): whether iOS lets them through, whether CloudKit
+/// holds the subscription, and the last one seen.
+private struct NotificationsSection: View {
+  @Environment(CompanionModel.self) private var model
+  @Environment(CompanionNotifications.self) private var notifications
+
+  var body: some View {
+    Section {
+      LabeledContent("Autorisation", value: notifications.permission.label)
+      LabeledContent("Enregistrement APNs", value: notifications.registration ?? "en attente")
+      LabeledContent("Abonnement CloudKit") {
+        Text(verbatim: subscriptionLabel)
+          .multilineTextAlignment(.trailing)
+          .textSelection(.enabled)
+      }
+      if let sent = model.notificationTestSentAt {
+        LabeledContent("Test demandé à", value: CompanionScreen.time(sent))
+      }
+      LabeledContent("Dernière demande du Mac") {
+        if let request = model.latestRequest {
+          VStack(alignment: .trailing, spacing: 2) {
+            Text(verbatim: request.sessionTitle)
+            Text(verbatim: "\(request.agent) \(request.text)")
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+            Text(verbatim: CompanionScreen.time(request.createdAt))
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        } else {
+          Text("aucune")
+        }
+      }
+      LabeledContent("Dernière notification affichée") {
+        if let delivery = notifications.lastDelivery {
+          VStack(alignment: .trailing, spacing: 2) {
+            Text(verbatim: delivery.title)
+            Text(verbatim: delivery.body).font(.footnote).foregroundStyle(.secondary)
+            Text(verbatim: CompanionScreen.time(delivery.date))
+              .font(.footnote)
+              .foregroundStyle(.secondary)
+          }
+        } else {
+          Text("aucune")
+        }
+      }
+    } header: {
+      Text("Notifications")
+    } footer: {
+      Text(
+        "L’abonnement échoue tant que le Mac n’a écrit aucune demande : le type Request n’existe pas encore. Il est réessayé toutes les 30 s, écran ouvert."
+      )
+    }
+  }
+
+  private var subscriptionLabel: String {
+    switch notifications.subscription {
+    case .notSaved: "pas encore"
+    case .saving: "enregistrement…"
+    case .saved: "enregistré"
+    case .failed(let error): "échec : \(error)"
+    }
+  }
+}
+
 #Preview {
   CompanionScreen()
     .environment(CompanionModel(sync: PreviewCompanionSync(), deviceName: "iPhone"))
     .environment(CompanionChannel())
+    .environment(CompanionNotifications())
 }
 
 /// A synchronisation that only answers with fixed records, for the preview.
