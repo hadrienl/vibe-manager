@@ -347,6 +347,11 @@ public actor TrackAgentActivity {
     return answer.requiredKinds.isSubset(of: offered)
   }
 
+  /// Whether each key of `answer` after the first waits for the screen to ask for it.
+  public func rereadsScreenBetweenKeys(of answer: AgentAnswer, for id: AgentRequestID) -> Bool {
+    sessions[id.sessionID]?.decoder?.answerKeymap?.rereadsScreenBetweenKeys(of: answer) == true
+  }
+
   /// Whether the request is still the one the agent's terminal shows.
   public func isFirstRequest(_ id: AgentRequestID) -> Bool {
     sessions[id.sessionID]?.state.requests.first?.id == id

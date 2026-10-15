@@ -117,6 +117,13 @@ first turn, its hooks silent past the ten seconds. Its prompt drawn at the foot 
 followed by no option's number, no panel's hint below — takes the guess away: nothing waits on the
 user.
 
+Claude Code asks whether to trust the folder it starts in, before any hook speaks (2.1.300):
+`Accessing workspace:`, the folder, then `❯ No, exit` and `Yes, I trust this folder`, no digit —
+a digit does nothing there. Read off the screen, it becomes the folder's trust, answered from the
+conversation: the down arrow, then Return, once the screen shows the same folder; already pointed
+at, Return alone. Return takes whatever is pointed at: it is typed only once the screen, read
+again, shows the arrow moved — otherwise it would exit. Exiting is left to the terminal.
+
 ### What would be allowed is what is shown
 
 A permission whose payload was cut at the hook's limit can only be refused from outside. Text an

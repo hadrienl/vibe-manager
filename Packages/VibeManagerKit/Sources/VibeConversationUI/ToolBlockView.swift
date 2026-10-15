@@ -925,6 +925,18 @@ struct RequestActions: View {
               comment: "Passes over the update an agent's CLI offers, until a newer one.")
           }
         }
+        if answers.contains(.trustFolder) {
+          Button {
+            model.answer(.trustFolder)
+          } label: {
+            Text(
+              "Trust This Folder", bundle: .module,
+              comment:
+                "Trusts the folder an agent's CLI starts in, as it asks before anything else.")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent.color)
+        }
       case .questions:
         EmptyView()
       }
@@ -977,7 +989,7 @@ struct StandaloneRequestCard: View {
       Label {
         title
       } icon: {
-        Image(systemName: isUpdate ? "arrow.down.circle" : "terminal")
+        Image(systemName: symbol)
       }
       .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5), weight: .semibold))
       .foregroundStyle(theme.text.color)
@@ -987,19 +999,37 @@ struct StandaloneRequestCard: View {
     .accessibilityElement(children: .contain)
   }
 
-  private var isUpdate: Bool {
-    if case .inTerminal(let prompt) = request.request.content { return prompt.kind == .update }
-    return false
+  private var kind: AgentTerminalPrompt.Kind? {
+    if case .inTerminal(let prompt) = request.request.content { return prompt.kind }
+    return nil
+  }
+
+  private var symbol: String {
+    switch kind {
+    case .update: "arrow.down.circle"
+    case .trust: "folder.badge.questionmark"
+    default: "terminal"
+    }
   }
 
   private var title: Text {
-    isUpdate
-      ? Text(
+    switch kind {
+    case .update:
+      Text(
         "\(model.agentName) offers an update", bundle: .module,
         comment: "Above the composer: the agent's CLI offers to update itself before it starts.")
-      : Text(
+    case .trust:
+      Text(
+        "\(model.agentName) asks whether to trust this folder", bundle: .module,
+        comment:
+          "Above the composer: the agent's CLI asks, before it starts, whether the folder it works in is to be trusted."
+      )
+    default:
+      Text(
         "\(model.agentName) is waiting for your answer", bundle: .module,
-        comment: "Above the composer: a dialog of the agent that no call of the conversation shows.")
+        comment: "Above the composer: a dialog of the agent that no call of the conversation shows."
+      )
+    }
   }
 }
 

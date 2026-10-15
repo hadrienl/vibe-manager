@@ -21,6 +21,9 @@ import VibeApplication
 ///
 /// - "Chat about this", after a rule under a question's options: its digit declines them all and
 ///   gives the prompt back, the agent's turn going on (2.1.296).
+/// - The folder's trust, asked as it starts, before its hooks speak: `❯ No, exit` then `Yes, I
+///   trust this folder`, no digit — digits do nothing there (2.1.300). The down arrow, then
+///   Return, trusts it.
 ///
 /// Return is never pressed alone to pick an option: it takes the highlighted one, whatever that
 /// is. It follows a digit only beside previews, once the digit has moved the highlight, and
@@ -54,8 +57,22 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       return [.deny]
     case .elicitation(let elicitation) where elicitation.isConfirmation:
       return [.allowOnce, .deny]
+    case .inTerminal(let prompt) where prompt.kind == .trust:
+      return [.trustFolder]
     case .elicitation, .inTerminal:
       return []
+    }
+  }
+
+  /// The folder's trust is taken by Return once the down arrow has moved the pointer onto it: a
+  /// Return read before the arrow would exit instead.
+  public func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool {
+    answer == .trustFolder
+  }
+
+  public func startupDialog(onScreen text: String) -> AgentTerminalPrompt? {
+    AgentDialogScreen(screen: text)?.folderTrust.map {
+      AgentTerminalPrompt(kind: .trust, message: $0.folder)
     }
   }
 
@@ -97,6 +114,12 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
           $0.hasPrefix("Yes") && $0.localizedCaseInsensitiveContains(words)
             && !$0.localizedCaseInsensitiveContains("clear context")
         })
+    case (.trustFolder, .inTerminal(let prompt)) where prompt.kind == .trust:
+      // No digit: the pointer moves onto `Yes, I trust this folder`, then Return takes it — only
+      // the folder of the request, as the screen shows it now.
+      guard let trust = screen?.folderTrust, trust.folder == prompt.message else { return nil }
+      return trust.isTrustPointed
+        ? [TerminalKeys.enter] : [TerminalKeys.downArrow, TerminalKeys.enter]
     case (.chatAboutThis, .questions(let questions)):
       // The questions are declined at once, and the agent's turn goes on, its prompt back
       // (2.1.296): the message is typed there as any other, once nothing else is asked.

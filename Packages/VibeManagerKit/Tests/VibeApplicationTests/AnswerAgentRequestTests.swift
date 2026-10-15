@@ -90,6 +90,39 @@ private struct ScreenKeymap: AgentAnswerKeymap {
   }
 }
 
+/// Refuses by moving the pointer onto `No`, then Return — which waits for the screen to show it
+/// moved, as Claude Code's folder trust does.
+private struct PointerKeymap: AgentAnswerKeymap {
+  func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
+    [.deny]
+  }
+
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
+    guard answer == .deny, let screen, screen.options.count == 2 else { return nil }
+    return screen.options[1].label == "No (pointed)"
+      ? [TerminalKeys.enter] : [TerminalKeys.downArrow, TerminalKeys.enter]
+  }
+
+  func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool {
+    true
+  }
+}
+
+/// What a terminal shows, which a test changes.
+private actor LiveScreen {
+  var text: String?
+
+  init(_ text: String?) {
+    self.text = text
+  }
+
+  func show(_ text: String?) {
+    self.text = text
+  }
+}
+
 private struct Fixture {
   let logs = ScriptedActivityLogs()
   let tracker: TrackAgentActivity
@@ -97,14 +130,20 @@ private struct Fixture {
   let answer: AnswerAgentRequest
   let decoder: PermissionDecoder
 
-  init(screen: String? = nil, keymap: any AgentAnswerKeymap = TwoStepKeymap()) {
+  init(
+    screen: String? = nil, live: LiveScreen? = nil,
+    keymap: any AgentAnswerKeymap = TwoStepKeymap()
+  ) {
     tracker = makeTracker(logs: logs, store: MemoryActivityStore(), clock: TestClock(t1))
     decoder = PermissionDecoder(keymap: keymap)
     let terminals = terminals
     answer = AnswerAgentRequest(
       tracker: tracker,
       write: { id, bytes in await terminals.write(bytes, to: id) },
-      screen: { _ in screen },
+      screen: { _ in
+        guard let live else { return screen }
+        return await live.text
+      },
       sleep: { _ in })
   }
 
@@ -190,6 +229,24 @@ struct AnswerAgentRequestTests {
     }
     #expect(await fixture.answer(.deny, to: request) == .interrupted)
     #expect(await fixture.terminals.written[id] == [[0x33]])
+  }
+
+  @Test("Return waits for the screen to show the pointer moved: unmoved, it is never typed")
+  func rereadBetweenKeys() async {
+    let unmoved = " ❯ 1. Yes\n   2. No"
+    let moved = "   1. Yes\n ❯ 2. No (pointed)"
+    // The arrow moves the pointer: Return follows.
+    let live = LiveScreen(unmoved)
+    let fixture = Fixture(live: live, keymap: PointerKeymap())
+    let (id, request) = await fixture.asking("touch a")
+    await fixture.terminals.setOnWrite { _ in await live.show(moved) }
+    #expect(await fixture.answer(.deny, to: request) == .sent)
+    #expect(await fixture.terminals.written[id] == [TerminalKeys.downArrow, TerminalKeys.enter])
+    // The arrow not read yet: Return would take what is still pointed at, and is not typed.
+    let stuck = Fixture(live: LiveScreen(unmoved), keymap: PointerKeymap())
+    let (stuckID, stuckRequest) = await stuck.asking("touch a")
+    #expect(await stuck.answer(.deny, to: stuckRequest) == .interrupted)
+    #expect(await stuck.terminals.written[stuckID] == [TerminalKeys.downArrow])
   }
 
   @Test("A session whose terminal is gone is not answered")
