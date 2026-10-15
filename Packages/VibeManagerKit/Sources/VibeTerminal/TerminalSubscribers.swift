@@ -216,7 +216,11 @@ final class TerminalSubscribers: @unchecked Sendable {
     guard lost > 0 else { return }
     // The notice takes a place in the full stream too, and evicts the next oldest event. Told at
     // once with a notice of its own, that one would evict another, down the whole stream: what it
-    // evicts is told with the next notice instead (#367).
+    // evicts is told with the next notice instead (#367). A reader that starts over at the first
+    // notice, as the view does, never reads that one: it counts short by what this notice evicted,
+    // and replays that output — already shown, and answered — as new when it draws its screen
+    // again. A notice saying where the stream resumes, rather than how much was lost, would spare
+    // it that.
     let evicted = Self.lostBytes(reader.continuation.yield(.outputDropped(byteCount: lost)))
     guard evicted > 0 else { return }
     lock.withLock { subscribers[reader.id]?.unannouncedLoss += evicted }
