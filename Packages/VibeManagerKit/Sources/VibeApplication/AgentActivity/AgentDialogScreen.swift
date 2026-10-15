@@ -64,15 +64,20 @@ public struct AgentDialogScreen: Hashable, Sendable {
   }
 
   public let options: [Option]
+  /// The tabs Claude Code draws above several questions, each one's box ticked once it has an
+  /// answer: `←  ☒ Color  ☐ Pets  ✔ Submit  →` reads `[true, false]`.
+  public let questionTabs: [Bool]?
   /// The confirmation the screen ends on, when it ends on one rather than on numbered options.
   public let confirmation: Confirmation?
   /// The folder's trust the screen ends on, asked before anything else.
   public let folderTrust: FolderTrust?
 
   public init(
-    options: [Option], confirmation: Confirmation? = nil, folderTrust: FolderTrust? = nil
+    options: [Option], questionTabs: [Bool]? = nil, confirmation: Confirmation? = nil,
+    folderTrust: FolderTrust? = nil
   ) {
     self.options = options
+    self.questionTabs = questionTabs
     self.confirmation = confirmation
     self.folderTrust = folderTrust
   }
@@ -133,6 +138,7 @@ public struct AgentDialogScreen: Hashable, Sendable {
       let folderTrust = Self.folderTrust(in: lines, lastContent: lastContent)
       guard confirmation != nil || folderTrust != nil else { return nil }
       self.options = []
+      self.questionTabs = nil
       self.confirmation = confirmation
       self.folderTrust = folderTrust
       return
@@ -144,8 +150,22 @@ public struct AgentDialogScreen: Hashable, Sendable {
       options.append(Option(number: option.number, label: label, shortcut: shortcut))
     }
     self.options = options
+    self.questionTabs = run.first.flatMap { Self.questionTabs(above: $0.line, in: lines) }
     self.confirmation = nil
     self.folderTrust = nil
+  }
+
+  /// The line of tabs above the options, up to the rule the dialog starts under: boxes, then
+  /// `✔ Submit  →` — after `←`, or after `⏺` as 2.1.288 drew it.
+  static func questionTabs(above line: Int, in lines: [String]) -> [Bool]? {
+    for text in lines[..<line].reversed() {
+      if PromptInputRecognition.isRule(text) { return nil }
+      let trimmed = text.trimmingCharacters(in: .whitespaces)
+      guard trimmed.hasSuffix("✔ Submit  →") else { continue }
+      let boxes = trimmed.compactMap { $0 == "☒" ? true : $0 == "☐" ? false : nil }
+      if !boxes.isEmpty { return boxes }
+    }
+    return nil
   }
 
   /// `Accessing workspace:`, the folder, `Quick safety check: …`, then `❯ No, exit` and `Yes, I

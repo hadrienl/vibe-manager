@@ -105,7 +105,9 @@ private struct PointerKeymap: AgentAnswerKeymap {
       ? [TerminalKeys.enter] : [TerminalKeys.downArrow, TerminalKeys.enter]
   }
 
-  func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool {
+  func rereadsScreen(
+    beforeStep step: Int, of answer: AgentAnswer, to content: AgentRequestContent
+  ) -> Bool {
     true
   }
 }
@@ -247,6 +249,8 @@ struct AnswerAgentRequestTests {
     let (stuckID, stuckRequest) = await stuck.asking("touch a")
     #expect(await stuck.answer(.deny, to: stuckRequest) == .interrupted)
     #expect(await stuck.terminals.written[stuckID] == [TerminalKeys.downArrow])
+    // The request still waits: never shown answered while its dialog asks on.
+    #expect(await stuck.tracker.isFirstRequest(stuckRequest))
   }
 
   @Test("A session whose terminal is gone is not answered")
