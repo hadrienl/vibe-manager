@@ -3,8 +3,8 @@ import VibeApplication
 import VibeConversationUI
 import VibeDomain
 
-/// The chevron of a coordinator's row, which folds its children away (#352). Drawn whether or not
-/// it has children yet, so that the rows of coordinators line up.
+/// The chevron of a coordinator's row, which folds its children away (#352). It sits in the margin
+/// left of the badge (#387), shown only once there are children to fold.
 struct CoordinatorDisclosure: View {
   let model: AppModel
   let sessionID: SessionID
@@ -22,7 +22,7 @@ struct CoordinatorDisclosure: View {
         .font(.caption.weight(.semibold))
         .rotationEffect(.degrees(isExpanded ? 90 : 0))
         .foregroundStyle(.secondary)
-        .frame(width: 12)
+        .frame(width: SessionRow.disclosureMargin - 2, height: SessionRow.badgeSize)
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
