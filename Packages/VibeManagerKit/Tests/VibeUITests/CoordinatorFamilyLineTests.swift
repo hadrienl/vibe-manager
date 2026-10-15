@@ -71,19 +71,23 @@ struct CoordinatorFamilyLineTests {
     let parentSegments = FamilyLineGeometry.segments(of: .parent, height: height)
     #expect(parentSegments.count == 1)
     #expect(parentSegments[0].from == CGPoint(x: x, y: 30 + 18 + FamilyLineGeometry.gap))
-    // Down across the gap between rows, to the first child's piece.
-    #expect(parentSegments[0].to == CGPoint(x: x, y: height + FamilyLineGeometry.rowGap))
+    // Past the bottom of the row, into the inset the list leaves, which the cell cuts at its edge.
+    #expect(parentSegments[0].to == CGPoint(x: x, y: height + FamilyLineGeometry.overrun))
 
     let elbowEnd = SessionRow.disclosureMargin + SessionRow.childIndent - FamilyLineGeometry.gap
     let middle = FamilyLineGeometry.segments(of: .child(isLast: false), height: height)
     #expect(
       middle == [
         .init(
-          from: CGPoint(x: x, y: 0), to: CGPoint(x: x, y: height + FamilyLineGeometry.rowGap)),
+          from: CGPoint(x: x, y: -FamilyLineGeometry.overrun),
+          to: CGPoint(x: x, y: height + FamilyLineGeometry.overrun)),
         .init(from: CGPoint(x: x, y: 30), to: CGPoint(x: elbowEnd, y: 30)),
       ])
     let last = FamilyLineGeometry.segments(of: .child(isLast: true), height: height)
-    #expect(last[0].to == CGPoint(x: x, y: 30))
+    // The last child takes the line from above its row too, and stops at its elbow.
+    #expect(
+      last[0]
+        == .init(from: CGPoint(x: x, y: -FamilyLineGeometry.overrun), to: CGPoint(x: x, y: 30)))
     #expect(last[1] == middle[1])
     // The elbow reaches toward the child's badge, which sits right of the line.
     #expect(elbowEnd > x)
