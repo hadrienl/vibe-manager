@@ -655,7 +655,7 @@ private struct ColumnTabs: View {
     let summary = model.summary(of: column)
     let isSelected = model.filter.column == column
     return Button {
-      model.setColumn(column)
+      model.chooseColumn(column)
     } label: {
       VStack(spacing: 1) {
         HStack(spacing: 3) {

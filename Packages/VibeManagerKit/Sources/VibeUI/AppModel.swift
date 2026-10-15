@@ -1041,6 +1041,15 @@ public final class AppModel {
     reconcileSelection()
   }
 
+  /// A click on a column's tab (#346): the list takes the keyboard, for ⌘A and the commands on
+  /// the whole column. An empty column leaves it where it is: the list would hold nothing but the
+  /// session still on screen. The shortcuts that change column leave it where it is too.
+  public func chooseColumn(_ column: SessionTaskStatus) {
+    setColumn(column)
+    guard !visibleSessions.isEmpty else { return }
+    focusSidebar()
+  }
+
   /// ⌥⌘→ and ⌥⌘← (#240). Stops at both ends, like the selection shortcuts.
   public func showNextColumn() {
     guard let next = filter.column.next.first, next != .archived else { return }
