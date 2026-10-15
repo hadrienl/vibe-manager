@@ -142,6 +142,26 @@ enum DialogScreens {
       GPT-5.6-Sol medium · ~/Documents/vibe-manager
       ? for shortcuts                                        ⚠ 4 warnings · f2 to view
     """
+  /// The folder's trust, as Claude Code 2.1.300 asks it before anything else: no digit.
+  static let claudeTrust = """
+    ────────────────────────────────────────────────────────────────
+     Accessing workspace:
+
+     /Users/hadrien/Documents/prisme.ai/.worktrees/oauth-failure-de
+     sign
+
+     Quick safety check: Is this a project you created or one you trust? (Like your own code, a
+     well-known open source project, or work from your team).
+
+     Claude Code'll be able to read, edit, and execute files here.
+
+     Security guide
+
+     ❯ No, exit
+       Yes, I trust this folder
+
+     Enter to confirm · Esc to cancel
+    """
   /// Two questions, as Claude Code 2.1.296 draws the first: "Chat about this" past a rule.
   static let claudeChatAboutThis = """
     ←  ☐ Color  ☐ Pets  ✔ Submit  →
@@ -304,6 +324,35 @@ struct DialogScreenKeymapTests {
         enter select · esc back
       """
     #expect(!codex.showsPromptAtRest(onScreen: panel))
+  }
+
+  @Test("Claude Code's folder trust, read off the screen: the down arrow, then Return")
+  func claudeTrust() throws {
+    let folder = "/Users/hadrien/Documents/prisme.ai/.worktrees/oauth-failure-design"
+    let prompt = try #require(claude.startupDialog(onScreen: DialogScreens.claudeTrust))
+    #expect(prompt == AgentTerminalPrompt(kind: .trust, message: folder))
+    let trust = AgentRequestContent.inTerminal(prompt)
+    #expect(claude.answers(for: trust) == [.trustFolder])
+    let screen = DialogScreens.dialog(DialogScreens.claudeTrust)
+    #expect(
+      claude.keystrokes(for: .trustFolder, to: trust, screen: screen)
+        == [TerminalKeys.downArrow, TerminalKeys.enter])
+    // Already pointed at: Return alone.
+    let pointed = DialogScreens.claudeTrust
+      .replacingOccurrences(of: "❯ No, exit", with: "  No, exit")
+      .replacingOccurrences(of: "  Yes, I trust", with: "❯ Yes, I trust")
+    #expect(
+      claude.keystrokes(for: .trustFolder, to: trust, screen: DialogScreens.dialog(pointed))
+        == [TerminalKeys.enter])
+    // Another folder's, or no dialog read: nothing typed.
+    let other = AgentRequestContent.inTerminal(AgentTerminalPrompt(kind: .trust, message: "/x"))
+    #expect(claude.keystrokes(for: .trustFolder, to: other, screen: screen) == nil)
+    #expect(claude.keystrokes(for: .trustFolder, to: trust) == nil)
+    // Neither the guess of a start nor Codex's keymap answers it.
+    #expect(
+      claude.answers(for: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil))).isEmpty)
+    #expect(codex.startupDialog(onScreen: DialogScreens.claudeTrust) == nil)
+    #expect(claude.startupDialog(onScreen: DialogScreens.codexUpdate) == nil)
   }
 
   @Test("Claude Code's questions set aside: Chat about this's digit, read on screen, then the text")

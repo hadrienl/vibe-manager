@@ -158,7 +158,7 @@ public enum AgentActivityMachine {
       // and no hook will say so — or, for an update offered, the digit of one of its options.
       if !next.isStructured {
         if case .inTerminal(let prompt) = next.requests.first?.content,
-          [.startup, .update].contains(prompt.kind),
+          [.startup, .update, .trust].contains(prompt.kind),
           bytes == [0x0D] || interruptKeys.contains(bytes)
             || (prompt.kind == .update && Self.updateOptionKeys.contains(bytes))
         {
@@ -177,7 +177,7 @@ public enum AgentActivityMachine {
       // whose letters answer nothing: only Return or Escape ends it.
       if case .inTerminal(let prompt) = next.requests.first?.content {
         let ends =
-          [.form, .question, .plan, .account, .startup, .update].contains(prompt.kind)
+          [.form, .question, .plan, .account, .startup, .update, .trust].contains(prompt.kind)
           ? bytes == [0x0D] : context.approvalAnswerKeys.contains(bytes)
         if ends || interruptKeys.contains(bytes) {
           next.settleFirstRequest(isKnownAnswered: true)
@@ -240,7 +240,7 @@ public enum AgentActivityMachine {
     // Anything the hooks say proves they are wired, even when their `SessionStart` came late —
     // after the fallback already took over. Whatever start held them back is behind the agent.
     next.source = .structured
-    next.dropAnnouncedRequests { [.startup, .update].contains($0.kind) }
+    next.dropAnnouncedRequests { [.startup, .update, .trust].contains($0.kind) }
     next.lastOutputAt = nil
     // A tool that ran, a new turn, its end: the dialog drawn before its report, if any, is gone.
     switch signal {

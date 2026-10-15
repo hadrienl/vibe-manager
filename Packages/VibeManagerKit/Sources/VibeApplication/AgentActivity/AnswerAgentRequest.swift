@@ -17,7 +17,8 @@ public struct AnswerAgentRequest: Sendable {
     case notAnswerable
     /// The session has no running terminal to type into.
     case terminalUnavailable
-    /// The request went away between two keystrokes of a longer answer: the rest was not typed.
+    /// The request went away between two keystrokes of a longer answer, or its dialog did not move
+    /// on to what the next one answers: the rest was not typed.
     case interrupted
     /// The dialog drawn in the terminal does not offer this answer, or could not be read: nothing
     /// was typed (#273).
@@ -103,6 +104,13 @@ public struct AnswerAgentRequest: Sendable {
         // Whatever the agent said meanwhile may have taken the dialog away: the next key would
         // then land in its prompt.
         guard await tracker.isFirstRequest(id) else { return .interrupted }
+        // A key the dialog has not taken yet, or has taken otherwise: the rest is not typed, and
+        // the request still waits — never shown answered while the terminal asks on.
+        if await tracker.rereadsScreen(beforeStep: index, of: answer, for: id),
+          await !screenAsks(Array(steps[index...]), of: answer, to: id)
+        {
+          return .interrupted
+        }
       }
       guard await write(id.sessionID, step) else { return .terminalUnavailable }
     }
@@ -115,6 +123,24 @@ public struct AnswerAgentRequest: Sendable {
   public func readStartupDialog(_ id: AgentRequestID) async {
     guard let text = await screen(id.sessionID) else { return }
     await tracker.startupDialogOnScreen(text, isFor: id)
+  }
+
+  /// Whether the dialog, read again, asks for `keys` and nothing else — waited for up to
+  /// `settleLimit`, the key before having to be read and drawn first.
+  private func screenAsks(_ keys: [[UInt8]], of answer: AgentAnswer, to id: AgentRequestID) async
+    -> Bool
+  {
+    let start = ContinuousClock.now
+    while true {
+      let drawn = await screen(id.sessionID).flatMap(AgentDialogScreen.init(screen:))
+      if await tracker.keystrokesLeft(for: answer, to: id, screen: drawn) == keys { return true }
+      guard ContinuousClock.now - start < Self.settleLimit else { return false }
+      do {
+        try await sleep(Self.quietPeriod)
+      } catch {
+        return false
+      }
+    }
   }
 
   /// Returns once the terminal has been silent for `quietPeriod`, or after `settleLimit`.
@@ -145,6 +171,7 @@ extension AgentAnswer {
     case .rejectPlan: return "rejectPlan"
     case .skipUpdate: return "skipUpdate"
     case .chatAboutThis: return "chatAboutThis"
+    case .trustFolder: return "trustFolder"
     }
   }
 }

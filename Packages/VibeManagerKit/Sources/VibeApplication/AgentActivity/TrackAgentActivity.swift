@@ -347,6 +347,26 @@ public actor TrackAgentActivity {
     return answer.requiredKinds.isSubset(of: offered)
   }
 
+  /// Whether the key at `step` of `answer` waits for the screen to ask for it.
+  public func rereadsScreen(beforeStep step: Int, of answer: AgentAnswer, for id: AgentRequestID)
+    -> Bool
+  {
+    guard let tracked = sessions[id.sessionID], let request = tracked.state.requests.first,
+      request.id == id, let keymap = tracked.decoder?.answerKeymap
+    else { return false }
+    return keymap.rereadsScreen(beforeStep: step, of: answer, to: request.content)
+  }
+
+  /// The keys left to give `answer` to the request, read off its dialog midway through typing them.
+  public func keystrokesLeft(
+    for answer: AgentAnswer, to id: AgentRequestID, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
+    guard offers(answer, to: id), let tracked = sessions[id.sessionID],
+      let request = tracked.state.requests.first, let keymap = tracked.decoder?.answerKeymap
+    else { return nil }
+    return keymap.keystrokesLeft(for: answer, to: request.content, screen: screen)
+  }
+
   /// Whether the request is still the one the agent's terminal shows.
   public func isFirstRequest(_ id: AgentRequestID) -> Bool {
     sessions[id.sessionID]?.state.requests.first?.id == id
@@ -484,7 +504,7 @@ public actor TrackAgentActivity {
   }
 
   /// The dialog a session's start waits on, read off its screen: one the keymap answers —
-  /// an update offered — takes the place of the request that only guessed a dialog is there; the
+  /// an update offered, a folder to trust — takes the place of the request that only guessed a dialog is there; the
   /// prompt at rest says there is none.
   public func startupDialogOnScreen(_ text: String, isFor id: AgentRequestID) {
     guard var tracked = sessions[id.sessionID], let keymap = tracked.decoder?.answerKeymap,

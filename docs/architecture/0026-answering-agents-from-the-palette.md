@@ -33,7 +33,8 @@ followed took the highlighted option, the wrong one. At `PermissionRequest` the 
 digit sent within the millisecond answered it. Only `PermissionRequest` arms a request; one
 announced by `PreToolUse` is shown, its buttons waiting.
 
-Return never picks an option: a digit does. Refusing is Escape, whatever the options: the digit
+Return never picks an option by itself: a digit does — Return only takes an option once the
+screen shows it highlighted, as for a server's confirmation or the folder's trust. Refusing is Escape, whatever the options: the digit
 of "No" guessed one place off would allow. Escape also ends the agent's turn — and, for Claude
 Code, drops the other requests its sub-agents were waiting on — which the Refuse button says.
 
@@ -44,7 +45,16 @@ Code, drops the other requests its sub-agents were waiting on — which the Refu
 
 A server's confirmation, for Claude Code, is Return on `Accept` or Escape, both read on screen.
 
-Questions with several choices toggle, and are sent from a tab of their own: left to the terminal.
+Questions with several choices tick a box per digit; the right arrow leaves them. Several
+questions, or one of several choices, end on a review whose `1. Submit answers` sends them.
+
+Keys typed ahead of a question were seen lost: the first question taken, the next still asked,
+while the card said all were answered. Before the first key of each question, and before the
+review's `1`, the screen is read again — for a second at most — until it shows that question: the
+tabs above it (`←  ☒ … ☐ …  ✔ Submit  →`) ticked up to it, its options drawn, none of its boxes
+ticked. Otherwise nothing more is typed and the request still waits: it is finished in the
+terminal. A first question answered there already, or a box ticked there, leaves the answer from
+outside untyped.
 
 ### A queue per session
 
@@ -116,6 +126,13 @@ The same reading may find no dialog at all: Codex resumed at its prompt says not
 first turn, its hooks silent past the ten seconds. Its prompt drawn at the foot of the screen — `›`
 followed by no option's number, no panel's hint below — takes the guess away: nothing waits on the
 user.
+
+Claude Code asks whether to trust the folder it starts in, before any hook speaks (2.1.300):
+`Accessing workspace:`, the folder, then `❯ No, exit` and `Yes, I trust this folder`, no digit —
+a digit does nothing there. Read off the screen, it becomes the folder's trust, answered from the
+conversation: the down arrow, then Return, once the screen shows the same folder; already pointed
+at, Return alone. Return takes whatever is pointed at: it is typed only once the screen, read
+again, shows the arrow moved — otherwise it would exit. Exiting is left to the terminal.
 
 ### What would be allowed is what is shown
 

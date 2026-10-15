@@ -610,6 +610,17 @@ struct RequestCard: View {
               comment: "Passes over the update an agent's CLI offers, until a newer one.")
           }
         }
+        if answers.contains(.trustFolder) {
+          Button {
+            send(.trustFolder)
+          } label: {
+            Text(
+              "Trust This Folder", bundle: .module,
+              comment:
+                "Trusts the folder an agent's CLI starts in, as it asks before anything else.")
+          }
+          .buttonStyle(.borderedProminent)
+        }
       case .questions:
         EmptyView()
       }
