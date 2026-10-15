@@ -71,13 +71,15 @@ struct CoordinatorFamilyLineTests {
     let parentSegments = FamilyLineGeometry.segments(of: .parent, height: height)
     #expect(parentSegments.count == 1)
     #expect(parentSegments[0].from == CGPoint(x: x, y: 30 + 18 + FamilyLineGeometry.gap))
-    #expect(parentSegments[0].to == CGPoint(x: x, y: height))
+    // Down across the gap between rows, to the first child's piece.
+    #expect(parentSegments[0].to == CGPoint(x: x, y: height + FamilyLineGeometry.rowGap))
 
     let elbowEnd = SessionRow.disclosureMargin + SessionRow.childIndent - FamilyLineGeometry.gap
     let middle = FamilyLineGeometry.segments(of: .child(isLast: false), height: height)
     #expect(
       middle == [
-        .init(from: CGPoint(x: x, y: 0), to: CGPoint(x: x, y: height)),
+        .init(
+          from: CGPoint(x: x, y: 0), to: CGPoint(x: x, y: height + FamilyLineGeometry.rowGap)),
         .init(from: CGPoint(x: x, y: 30), to: CGPoint(x: elbowEnd, y: 30)),
       ])
     let last = FamilyLineGeometry.segments(of: .child(isLast: true), height: height)

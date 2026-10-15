@@ -56,6 +56,9 @@ enum FamilyLineGeometry {
   static let gap: CGFloat = 3
   /// Under the middle of the coordinator's badge.
   static var x: CGFloat { SessionRow.disclosureMargin + SessionRow.badgeSize / 2 }
+  /// Between two rows of the sidebar's list, outside both: a piece that goes on to the next row
+  /// runs down across it, so that the line has no gap.
+  static let rowGap: CGFloat = 8
   /// Where a child's elbow stops: short of its badge.
   static var elbowEnd: CGFloat { SessionRow.disclosureMargin + SessionRow.childIndent - gap }
 
@@ -66,11 +69,11 @@ enum FamilyLineGeometry {
       return [
         Segment(
           from: CGPoint(x: x, y: middle + SessionRow.badgeSize / 2 + gap),
-          to: CGPoint(x: x, y: height))
+          to: CGPoint(x: x, y: height + rowGap))
       ]
     case .child(let isLast):
       return [
-        Segment(from: CGPoint(x: x, y: 0), to: CGPoint(x: x, y: isLast ? middle : height)),
+        Segment(from: CGPoint(x: x, y: 0), to: CGPoint(x: x, y: isLast ? middle : height + rowGap)),
         Segment(from: CGPoint(x: x, y: middle), to: CGPoint(x: elbowEnd, y: middle)),
       ]
     }
