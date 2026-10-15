@@ -56,9 +56,11 @@ enum FamilyLineGeometry {
   static let gap: CGFloat = 3
   /// Under the middle of the coordinator's badge.
   static var x: CGFloat { SessionRow.disclosureMargin + SessionRow.badgeSize / 2 }
-  /// Between two rows of the sidebar's list, outside both: a piece that goes on to the next row
-  /// runs down across it, so that the line has no gap.
-  static let rowGap: CGFloat = 8
+  /// How far a piece that goes on runs past its row, up and down. The list sets a row's content
+  /// in from the edges of its cell (4 pt each way on the sidebar of macOS 27), and the cell cuts
+  /// whatever runs past its edge: running past by more than the inset meets the next piece
+  /// exactly at the edge between the cells, without overlapping it.
+  static let overrun: CGFloat = 8
   /// Where a child's elbow stops: short of its badge.
   static var elbowEnd: CGFloat { SessionRow.disclosureMargin + SessionRow.childIndent - gap }
 
@@ -69,11 +71,13 @@ enum FamilyLineGeometry {
       return [
         Segment(
           from: CGPoint(x: x, y: middle + SessionRow.badgeSize / 2 + gap),
-          to: CGPoint(x: x, y: height + rowGap))
+          to: CGPoint(x: x, y: height + overrun))
       ]
     case .child(let isLast):
       return [
-        Segment(from: CGPoint(x: x, y: 0), to: CGPoint(x: x, y: isLast ? middle : height + rowGap)),
+        Segment(
+          from: CGPoint(x: x, y: -overrun),
+          to: CGPoint(x: x, y: isLast ? middle : height + overrun)),
         Segment(from: CGPoint(x: x, y: middle), to: CGPoint(x: elbowEnd, y: middle)),
       ]
     }
