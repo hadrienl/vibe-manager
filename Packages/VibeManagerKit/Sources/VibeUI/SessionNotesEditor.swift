@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The notes of the selected session, in a plain-text view that behaves like every text view on
@@ -361,7 +362,7 @@ struct NotesStateLabel: View {
         if let title = presentation.title {
           Text(title)
             .foregroundStyle(.secondary)
-            .help(presentation.help ?? "")
+            .instantTooltip(presentation.help ?? "")
         }
       }
     }

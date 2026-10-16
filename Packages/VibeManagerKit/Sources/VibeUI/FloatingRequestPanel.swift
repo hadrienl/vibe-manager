@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 
 /// One expression of an avatar. Decorative: what it means, the bubble says.
 public struct AvatarView: View {
@@ -185,7 +186,7 @@ struct FloatingRequestPanel: View {
         }
     )
     .onTapGesture { panel.toggleCollapsed() }
-    .help(
+    .instantTooltip(
       panel.isCollapsed
         ? Text("Show the requests", bundle: .module)
         : Text("Fold the requests", bundle: .module))
@@ -270,7 +271,7 @@ struct FloatingRequestPanel: View {
       }
       .buttonStyle(.borderless)
       .keyboardShortcut("-", modifiers: .command)
-      .help(Text("Fold the requests", bundle: .module))
+      .instantTooltip(Text("Fold the requests", bundle: .module))
       .accessibilityLabel(Text("Fold the requests", bundle: .module))
     }
     .font(.caption)

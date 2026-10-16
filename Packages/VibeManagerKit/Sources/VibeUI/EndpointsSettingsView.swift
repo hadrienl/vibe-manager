@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// An endpoint's page of the settings (#107, #313): a model server a session can run on, driven
@@ -255,7 +256,7 @@ struct EndpointsSettingsView: View {
                 Image(systemName: "xmark.circle")
               }
               .buttonStyle(.borderless)
-              .help(Text("Remove the key from the keychain", bundle: .module))
+              .instantTooltip(Text("Remove the key from the keychain", bundle: .module))
             }
           }
         } label: {
@@ -363,7 +364,7 @@ struct EndpointsSettingsView: View {
               Image(systemName: "minus.circle")
             }
             .buttonStyle(.borderless)
-            .help(Text("Remove the model", bundle: .module))
+            .instantTooltip(Text("Remove the model", bundle: .module))
           }
           HStack(spacing: 14) {
             Toggle(isOn: $item.supportsTools) {
@@ -385,7 +386,7 @@ struct EndpointsSettingsView: View {
             .labelsHidden()
             .frame(width: 90)
             .multilineTextAlignment(.trailing)
-            .help(Text("The context window, in tokens.", bundle: .module))
+            .instantTooltip(Text("The context window, in tokens.", bundle: .module))
           }
           .toggleStyle(.checkbox)
           .font(.callout)
@@ -467,7 +468,7 @@ struct EndpointsSettingsView: View {
                 Image(systemName: "minus.circle")
               }
               .buttonStyle(.borderless)
-              .help(Text("Remove the header", bundle: .module))
+              .instantTooltip(Text("Remove the header", bundle: .module))
             }
           }
           Button {

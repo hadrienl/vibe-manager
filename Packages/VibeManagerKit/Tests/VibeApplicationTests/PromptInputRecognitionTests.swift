@@ -89,4 +89,12 @@ struct PromptInputRecognitionTests {
     #expect(PromptInputRecognition.holds("merci 🙏🏽", in: ["merci 🙏"]))
     #expect(PromptInputRecognition.holds("merci\u{200B} !", in: ["merci !"]))
   }
+
+  @Test("A prompt holds text, not the hint an empty one shows")
+  func holdsText() {
+    #expect(!PromptInputRecognition.holdsText([""]))
+    #expect(!PromptInputRecognition.holdsText(["Try \"fix lint errors\""]))
+    #expect(PromptInputRecognition.holdsText(["rebase on ma"]))
+    #expect(PromptInputRecognition.holdsText(["first line", "  second"]))
+  }
 }

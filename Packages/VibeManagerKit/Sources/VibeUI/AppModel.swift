@@ -2,8 +2,8 @@ import AppKit
 import Foundation
 import Observation
 import VibeApplication
-import VibeConversationUI
 import VibeBrowser
+import VibeConversationUI
 import VibeDomain
 import VibeTerminalUI
 
@@ -41,6 +41,7 @@ public final class AppModel {
     // Every list the workspace holds — a reload, a session just created — is the journal's too:
     // it follows the active sessions, and gives one that stopped its last pass.
     didSet {
+      coordinationFamilies = nil
       if case .loaded(let sessions) = state {
         sessionIndexes = Dictionary(
           sessions.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { first, _ in first })
@@ -63,6 +64,9 @@ public final class AppModel {
   /// Where each listed session sits in the list, for `session(withID:)`. Not observed: reading
   /// it goes through `sessions`, which is.
   @ObservationIgnored private var sessionIndexes: [SessionID: Int] = [:]
+  /// The coordinators' children, indexed once per list (#352): each row of the sidebar asks. Not
+  /// observed, as `sessionIndexes`.
+  @ObservationIgnored var coordinationFamilies: CoordinationFamilies?
   public private(set) var refreshFailure: RefreshFailure?
   /// An action on one session that failed (#244): said apart from `refreshFailure`, which is
   /// about the store, and kept through the reload that follows the action.
@@ -243,6 +247,9 @@ public final class AppModel {
   /// The ⌘Z of a move from the keyboard that asked a question first (#353), recorded once the
   /// question is answered by a move.
   private var pendingMoveUndo: SessionStatusUndo?
+  /// A coordinator the user asked to close or archive while children of its still run, until they
+  /// say whether the children stop too (#352).
+  public internal(set) var pendingCoordinatorStop: CoordinatorStop?
   /// Closes under way, from the command to the reload that shows the session closed. Until then
   /// the session still reads as running, and a second ⇧⌘W would stop it a second time.
   public private(set) var closingSessionIDs: Set<SessionID> = []
@@ -649,7 +656,7 @@ public final class AppModel {
   /// How the previous run ended, as this launch found it: for the export.
   public private(set) var previousShutdownVerdict: DiagnosticToken?
   private let restoreSession: RestoreSession
-  private let changeTaskStatus: ChangeTaskStatus
+  let changeTaskStatus: ChangeTaskStatus
   private let reorderSessions: ReorderSessions
   private let restartSession: RestartSession?
   private let planAgentSwitch: PlanAgentSwitch?
@@ -680,6 +687,8 @@ public final class AppModel {
   public internal(set) var folderLabelFailure: String?
   /// The symbols and colours the pickers offer, as the Settings edit them (#199).
   public let appearancePalette: SessionAppearancePaletteModel
+  /// Coordinators and their children (#352): settings, traces, wake-ups, who calls the user.
+  public let coordination: CoordinationModel
 
   // MARK: Identity (#183)
 
@@ -772,11 +781,14 @@ public final class AppModel {
     dropStore: (any SessionDropStore)? = nil,
     /// Where the symbols and colours the pickers offer are kept (#199).
     appearancePalette: any SessionAppearancePaletteStore = InMemorySessionAppearancePaletteStore(),
+    /// Coordinators and their children (#352). In memory by default.
+    coordination: CoordinationModel = CoordinationModel(),
     /// Says that a gesture did nothing. Silent in a workspace assembled without it: the tests run
     /// while the user works, and are not to be heard.
     beep: @escaping @MainActor () -> Void = {}
   ) {
     self.beep = beep
+    self.coordination = coordination
     self.appearancePalette = SessionAppearancePaletteModel(store: appearancePalette)
     self.dropStore = dropStore
     self.journal = journal
@@ -961,8 +973,12 @@ public final class AppModel {
     let filter = filter
     // The notes are only read when there is something to look for in them: read every time, each
     // keystroke typed in the notes would redraw the sidebar.
-    guard !filter.trimmedSearchText.isEmpty else { return filter.apply(to: sessions) }
-    return filter.apply(to: sessions, notes: notes.searchIndex)
+    // Each coordinator followed by its children, in its column (#352). A folded coordinator's
+    // children are still listed — the selection stays on one — and only drawn away by the rows.
+    guard !filter.trimmedSearchText.isEmpty else {
+      return SessionHierarchy.apply(filter, to: sessions)
+    }
+    return SessionHierarchy.apply(filter, to: sessions, notes: notes.searchIndex)
   }
 
   public var archivedSessionCount: Int {
@@ -991,12 +1007,17 @@ public final class AppModel {
   public func summary(of column: SessionTaskStatus) -> ColumnSummary {
     let filter = filter
     let notes = filter.trimmedSearchText.isEmpty ? [:] : notes.searchIndex
+    // A child counts in its coordinator's column, where it is listed (#352).
+    let byID = SessionHierarchy.index(sessions)
     let listed = sessions.filter {
-      $0.taskStatus == column && filter.matchesNarrowing($0, notes: notes[$0.id])
+      SessionHierarchy.column(of: $0, in: byID) == column
+        && filter.matchesNarrowing($0, notes: notes[$0.id])
     }
     return ColumnSummary(
       count: listed.count,
-      needsAttention: listed.contains { statusPresentation(for: $0).needsAttention })
+      needsAttention: listed.contains {
+        statusPresentation(for: $0).needsAttention || isCallingUser($0.id)
+      })
   }
 
   /// How the sidebar draws a session's state: the stored status corrected by its terminal and
@@ -1112,8 +1133,10 @@ public final class AppModel {
   /// typed themselves, and clearing it would undo work they can see.
   private func follow(_ id: SessionID) {
     guard let session = sessions.first(where: { $0.id == id }) else { return }
-    if session.taskStatus != filter.column, session.taskStatus != .archived {
-      update { $0.column = session.taskStatus }
+    // A child is listed in its coordinator's column (#352).
+    let column = listedColumn(of: session)
+    if column != filter.column, column != .archived {
+      update { $0.column = column }
     }
     select(id, leavingDraft: false)
   }
@@ -1200,6 +1223,7 @@ public final class AppModel {
   /// be interrupted. Does nothing for a session there is nothing left to close.
   public func requestClose(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canClose(session) else { return }
+    guard !asksAboutChildren(of: session, action: .close) else { return }
     guard !interruptsWork(session) else {
       pendingCloseRequest = CloseRequest(session: session, status: nil)
       return
@@ -1393,6 +1417,8 @@ public final class AppModel {
         .session, .info, "session.taskStatusChanged",
         ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
       onboarding.send(.taskStatusChanged(id, status))
+      // A coordinator is told its child was moved by the user (#352).
+      coordinationStatusChangedByUser(id, to: status)
     } catch {
       return .failed(message: Self.message(for: error), suggestion: nil)
     }
@@ -1445,6 +1471,7 @@ public final class AppModel {
   /// rule and the setting of Close Session. One key, repeated, empties a column.
   public func requestArchive(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }), canArchive(session) else { return }
+    guard !asksAboutChildren(of: session, action: .archive) else { return }
     guard !archiveAsks(session) else {
       pendingArchive = session
       return
@@ -1662,6 +1689,8 @@ public final class AppModel {
           localized: "\(session.name) moved to \(String(localized: status.label)).",
           bundle: .module, comment: "A session's name, then a task status."))
       onboarding.send(.taskStatusChanged(id, status))
+      // A coordinator is told its child was moved by the user (#352).
+      coordinationStatusChangedByUser(id, to: status)
     } catch {
       reportAction(error, .moveStatus, on: id) { [weak self] in
         await self?.setTaskStatus(status, for: id, restarting: restarting)
@@ -2661,6 +2690,9 @@ public final class AppModel {
     // Before anything is said or probed: these agents are running now, and their panes are how
     // the list shows it.
     await reattach(shutdown)
+    // The wake-ups the coordinators asked for before the relaunch, once the agents left running
+    // are adopted: a coordinator not running yet keeps its wake-up (#352).
+    await startCoordination()
     await settleUsage()
     // Now that the host is known: one kept from before the access was granted is restarted here
     // if no agent runs in it, before anything is resumed into it (#76).
@@ -3245,7 +3277,8 @@ public final class AppModel {
     case .restart: String(localized: "Couldn’t restart this session.", bundle: .module)
     case .switchAgent:
       String(localized: "Couldn’t switch the agent of this session.", bundle: .module)
-    case .reorder: String(localized: "Couldn’t save the new order of the sessions.", bundle: .module)
+    case .reorder:
+      String(localized: "Couldn’t save the new order of the sessions.", bundle: .module)
     }
   }
 

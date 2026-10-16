@@ -220,7 +220,7 @@ struct StateSymbol: View {
     }
     .font(.system(size: 13, weight: .semibold))
     .frame(width: 18, height: 18)
-    .help(Self.label(for: state))
+    .instantTooltip(Self.label(for: state))
   }
 
   static func label(for state: ToolCallState) -> String {
@@ -905,7 +905,7 @@ struct RequestActions: View {
           } label: {
             Text("Reject", bundle: .module, comment: "Rejects an agent's plan.")
           }
-          .help(Text(Self.stopsTheTurn))
+          .instantTooltip(Text(Self.stopsTheTurn))
         }
       case .inTerminal:
         // An update the CLI offers as it starts: passed over from here, updated in the terminal.
@@ -971,7 +971,7 @@ struct RequestActions: View {
     } label: {
       Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
     }
-    .help(Text(Self.stopsTheTurn))
+    .instantTooltip(Text(Self.stopsTheTurn))
     .accessibilityHint(Text(Self.stopsTheTurn))
   }
 }

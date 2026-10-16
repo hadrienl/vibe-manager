@@ -50,7 +50,7 @@ struct AgentSwitchSheet: View {
           Text("Try resuming the conversation anyway", bundle: .module)
         }
         .toggleStyle(.checkbox)
-        .help(
+        .instantTooltip(
           Text(
             """
             Worth trying when the previous model is what the agent refused, rather than the \
@@ -160,7 +160,7 @@ struct AgentSwitchSheet: View {
         }
         .buttonStyle(.borderless)
         .disabled(!model.isSummaryEdited)
-        .help(Text("Regenerate the summary, dropping your edits", bundle: .module))
+        .instantTooltip(Text("Regenerate the summary, dropping your edits", bundle: .module))
         .accessibilityLabel(Text("Regenerate the summary", bundle: .module))
       }
       ReplaceableTextEditor(text: $model.summaryText)

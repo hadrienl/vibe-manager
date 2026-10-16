@@ -22,7 +22,7 @@ struct ThemeWorkshopPanel: View {
           Image(systemName: "chevron.up")
         }
         .buttonStyle(.borderless)
-        .help(Text("Fold the panel: a theme not saved is dropped", bundle: .module))
+        .instantTooltip(Text("Fold the panel: a theme not saved is dropped", bundle: .module))
         .accessibilityLabel(Text("Fold the panel", bundle: .module))
       }
       if !themes.optionsLoaded {
@@ -70,7 +70,7 @@ struct ThemeWorkshopPanel: View {
     }
     .pickerStyle(.segmented)
     .disabled(!themes.versions.isEmpty || themes.isGenerating)
-    .help(
+    .instantTooltip(
       themes.versions.isEmpty
         ? Text("The mode the theme is made for", bundle: .module)
         : Text("Start over to make a theme for the other mode", bundle: .module))
@@ -275,7 +275,7 @@ struct NewThemeCard: View {
           .accessibilityValue(
             isOpen ? Text("Unfolded", bundle: .module) : Text("Folded", bundle: .module)
           )
-          .help(
+          .instantTooltip(
             Text("Describe a theme to an agent, and see each version applied", bundle: .module))
           Line()
             .stroke(Color.secondary.opacity(0.6), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
@@ -285,14 +285,14 @@ struct NewThemeCard: View {
             symbol: "square.and.arrow.down", isOn: false, action: importArchive
           )
           .accessibilityLabel(Text("Import a Theme…", bundle: .module))
-          .help(Text("Import a theme exported as a .zip archive", bundle: .module))
+          .instantTooltip(Text("Import a theme exported as a .zip archive", bundle: .module))
           .disabled(!canImport)
         } else {
           half(
             Text("Import a Theme…", bundle: .module), symbol: "square.and.arrow.down", isOn: false,
             action: importArchive
           )
-          .help(Text("Import a theme exported as a .zip archive", bundle: .module))
+          .instantTooltip(Text("Import a theme exported as a .zip archive", bundle: .module))
           .disabled(!canImport)
         }
       }

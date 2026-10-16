@@ -231,7 +231,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       ?? ReportedLaunch(plan: plan, decoder: nil)
     // After the hooks: Codex's approval of them is keyed on the plan they were read from, and the
     // tool server is not theirs to approve.
-    let toolsPlan = await provideTools?(reported.plan) ?? reported.plan
+    let toolsPlan = await provideTools?(reported.plan, for: session) ?? reported.plan
     // Last, and only now: an endpoint's gateway is started for a launch that is really happening,
     // never for a plan built to check a form.
     let plan: AgentLaunchPlan
@@ -392,6 +392,44 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
     await pane.write(keystrokes.submit)
     commandTyped?(id, command)
+  }
+
+  /// Types a message into a session's agent as its composer would, and submits it (#352): a
+  /// coordinator's message to a child, or Vibe Manager's to a coordinator. The caller has checked
+  /// the agent waits for no answer and shows no panel: keys typed into a dialog would answer it.
+  /// `state` is asked again before each write and before Return: an agent gone to work meanwhile
+  /// is given the message queued, as its composer queues one; one gone to wait for the user is
+  /// typed no further, and never given Return.
+  public func typeMessage(
+    _ text: String, into id: SessionID, state: @MainActor () -> TypingState
+  ) async -> TypingOutcome {
+    guard let pane = pane(for: id), pane.status == .running, let terminal = pane.session,
+      let providerID = ((try? await repository.session(id: id)) ?? nil)?.agent?.providerID
+    else { return .notTyped }
+    let format =
+      (await agents.provider(id: AgentProviderID(providerID)) as? any AgentConversationReporting)?
+      .promptFormat ?? AgentPromptFormat()
+    let keystrokes = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: PromptEncoding.sanitized(text)), format: format,
+      whileWorking: false)
+    for (index, keys) in keystrokes.writes.enumerated() {
+      if index > 0 { try? await Task.sleep(for: keystrokes.delay(before: index)) }
+      guard pane.session === terminal else { return index == 0 ? .notTyped : .leftInInput }
+      if case .awaitingUser = state() { return index == 0 ? .notTyped : .leftInInput }
+      await pane.write(keys)
+    }
+    try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
+    guard pane.session === terminal else { return .leftInInput }
+    switch state() {
+    case .awaitingUser:
+      return .leftInInput
+    case .working:
+      await pane.write(format.queueKey)
+      return .queued
+    case .atRest:
+      await pane.write(keystrokes.submit)
+      return .submitted
+    }
   }
 
   /// From the launch to the first byte the agent writes, for Instruments.
@@ -1063,4 +1101,26 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     guard !attachment.state.isFinished else { return }
     for await _ in attachment.events {}
   }
+}
+
+/// Where an agent stands while the application types a message into it (#352).
+public enum TypingState: Sendable {
+  case atRest
+  case working
+  case awaitingUser
+}
+
+/// What became of a message the application typed into an agent (#352).
+public enum TypingOutcome: Equatable, Sendable {
+  /// Nothing was typed: it can be typed again later.
+  case notTyped
+  case submitted
+  /// The agent went to work while it was typed: given as its composer queues one.
+  case queued
+  /// The agent went to wait for the user while it was typed: what was typed stays in its input,
+  /// unsent, for the user to see. Typing it again would put it there twice.
+  case leftInInput
+
+  /// Whether the message reached the agent, or at least its input, and is not to be typed again.
+  public var isDelivered: Bool { self != .notTyped }
 }

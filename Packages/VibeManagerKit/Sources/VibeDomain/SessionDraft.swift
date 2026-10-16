@@ -30,6 +30,8 @@ public struct SessionDraft: Hashable, Sendable {
   public var palette: SessionAppearancePalette
   /// The theme the session's conversation is drawn with (#274); `nil` follows the settings.
   public var conversationTheme: String?
+  /// Whether the session coordinates sessions of its own, or is one of a coordinator's (#352).
+  public var coordination: SessionCoordination?
 
   public init(
     name: String = "",
@@ -43,7 +45,8 @@ public struct SessionDraft: Hashable, Sendable {
     ticketText: String = "",
     projectIcon: ProjectIcon? = nil,
     palette: SessionAppearancePalette = .default,
-    conversationTheme: String? = nil
+    conversationTheme: String? = nil,
+    coordination: SessionCoordination? = nil
   ) {
     self.name = name
     self.initialPrompt = initialPrompt
@@ -57,6 +60,7 @@ public struct SessionDraft: Hashable, Sendable {
     self.projectIcon = projectIcon
     self.palette = palette
     self.conversationTheme = conversationTheme
+    self.coordination = coordination
   }
 
   /// The name of the template field that names the ticket, whatever its case.
@@ -212,7 +216,8 @@ public struct SessionDraft: Hashable, Sendable {
       // The rendered text is what the session keeps; the template is only where it came from.
       template: templateFill?.reference,
       ticket: ticket(repository: repository),
-      conversationTheme: conversationTheme
+      conversationTheme: conversationTheme,
+      coordination: coordination
     )
   }
 

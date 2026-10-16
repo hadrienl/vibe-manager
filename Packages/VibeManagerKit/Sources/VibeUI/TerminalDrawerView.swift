@@ -1,6 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 import VibeTerminalUI
 
@@ -84,7 +85,7 @@ private struct DrawerTabBar: View {
       }
       .buttonStyle(.plain)
       .disabled(!drawer.canAddTerminal)
-      .help(Text("New Terminal (⌘T)", bundle: .module))
+      .instantTooltip(Text("New Terminal (⌘T)", bundle: .module))
       .accessibilityLabel(Text("New Terminal", bundle: .module))
       Spacer(minLength: 0)
       Button {
@@ -96,7 +97,7 @@ private struct DrawerTabBar: View {
       }
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
-      .help(Text("Hide Terminals (⌘J): their processes keep running", bundle: .module))
+      .instantTooltip(Text("Hide Terminals (⌘J): their processes keep running", bundle: .module))
       .accessibilityLabel(Text("Hide Terminals", bundle: .module))
     }
     .frame(height: 28)
@@ -156,7 +157,7 @@ private struct DrawerTab: View {
       }
       .buttonStyle(.plain)
       .foregroundStyle(.secondary)
-      .help(Text("Close Terminal (⌘W)", bundle: .module))
+      .instantTooltip(Text("Close Terminal (⌘W)", bundle: .module))
       .accessibilityLabel(
         Text(
           "Close \(terminal.title)", bundle: .module,
@@ -593,7 +594,7 @@ struct DrawerStatusButton: View {
     }
     .controlSize(.small)
     .disabled(drawer == nil)
-    .help(help(drawer: drawer, isShown: isShown))
+    .instantTooltip(help(drawer: drawer, isShown: isShown))
     .accessibilityLabel(Text(verbatim: accessibilityLabel(drawer: drawer, count: count)))
     .accessibilityValue(
       isShown

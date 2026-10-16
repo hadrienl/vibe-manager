@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import VibeConversationUI
 import VibeDomain
 
 /// Window › Usage: what the agents used, by session, agent or model, over a period.
@@ -195,7 +196,7 @@ public struct UsageWindow: View {
         Text("≈ " + UsagePresentation.tokens(value(row.tokens)))
       } else {
         Text(verbatim: "—")
-          .help(Text("No token usage was reported for this row.", bundle: .module))
+          .instantTooltip(Text("No token usage was reported for this row.", bundle: .module))
       }
     }
     .monospacedDigit()
@@ -208,12 +209,12 @@ public struct UsageWindow: View {
       } icon: {
         Image(systemName: "info.circle")
       }
-      .help(UsagePresentation.costExplanation)
+      .instantTooltip(UsagePresentation.costExplanation)
       Text(
         String(localized: "Tokens (≈) are read from the agents' own transcripts.", bundle: .module)
           + " " + UsagePresentation.privacyNote
       )
-      .help(UsagePresentation.tokensExplanation)
+      .instantTooltip(UsagePresentation.tokensExplanation)
     }
     .font(.caption)
     .foregroundStyle(.secondary)

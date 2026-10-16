@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import VibeConversationUI
 
 /// The window's title as the toolbar draws it (#159): "Vibe Manager" in the secondary style, the
 /// session on screen in the primary one, on one line.
@@ -121,7 +122,7 @@ struct WindowTitleHeader: View {
     )
     // The whole name, truncated or not: knowing whether it is would take a measurement for
     // nothing.
-    .help(title.full)
+    .instantTooltip(title.full)
     .modifier(MovesWindow())
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(title.spoken)

@@ -151,14 +151,14 @@ public struct PromptTemplatesView: View {
         } label: {
           Image(systemName: "plus")
         }
-        .help(Text("New Template", bundle: .module))
+        .instantTooltip(Text("New Template", bundle: .module))
         .accessibilityLabel(Text("New Template", bundle: .module))
         .disabled(model.isReadOnly)
 
         Button(action: requestDeleteSelection) {
           Image(systemName: "minus")
         }
-        .help(Text(deleteTitle))
+        .instantTooltip(Text(deleteTitle))
         .accessibilityLabel(Text(deleteTitle))
         .disabled(model.isReadOnly || model.editing == nil)
 
@@ -169,7 +169,7 @@ public struct PromptTemplatesView: View {
         }
         .menuIndicator(.hidden)
         .fixedSize()
-        .help(Text("More", bundle: .module))
+        .instantTooltip(Text("More", bundle: .module))
         .accessibilityLabel(Text("More actions", bundle: .module))
         Spacer()
       }
@@ -369,7 +369,7 @@ public struct PromptTemplatesView: View {
                   }
                   .buttonStyle(.borderless)
                   .foregroundStyle(.secondary)
-                  .help(Text("No folder", bundle: .module))
+                  .instantTooltip(Text("No folder", bundle: .module))
                   .accessibilityLabel(Text("Remove the folder", bundle: .module))
                 }
               }
@@ -743,7 +743,8 @@ public struct PromptTemplatesView: View {
             model.editing?.appearance = nil
           }
           .controlSize(.small)
-          .help(Text("Sessions made from it keep their own symbol and colour.", bundle: .module))
+          .instantTooltip(
+            Text("Sessions made from it keep their own symbol and colour.", bundle: .module))
         }
       }
     }

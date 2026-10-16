@@ -1,4 +1,5 @@
 import SwiftUI
+import VibeConversationUI
 import VibeDomain
 
 /// What each pattern applied to a field keeps of a value: `/\d+$/ → 1315`, one line per pattern.
@@ -33,7 +34,7 @@ struct ExtractionResultsView: View {
         .foregroundStyle(.secondary)
         .lineLimit(1)
         .truncationMode(.middle)
-        .help(
+        .instantTooltip(
           Text(
             "The first match, or its first group when there is one.", bundle: .module,
             comment: "What a pattern takes out of a field's value."))

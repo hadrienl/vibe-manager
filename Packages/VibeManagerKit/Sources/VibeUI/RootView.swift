@@ -629,6 +629,47 @@ public struct RootView: View {
     } message: { request in
       Text(verbatim: setAsideMessage(for: request))
     }
+    // A coordinator stopped while children of its still run: they stop too, or go on (#352).
+    .confirmationDialog(
+      model.pendingCoordinatorStop.map {
+        $0.action == .close
+          ? Text("Close “\($0.session.name)”?", bundle: .module, comment: "A session's name.")
+          : Text("Archive “\($0.session.name)”?", bundle: .module, comment: "A session's name.")
+      } ?? Text("Close this session?", bundle: .module),
+      isPresented: Binding(
+        get: { model.pendingCoordinatorStop != nil },
+        set: { isPresented in
+          guard !isPresented else { return }
+          model.cancelCoordinatorStop()
+        }
+      ),
+      titleVisibility: .visible,
+      presenting: model.pendingCoordinatorStop
+    ) { stop in
+      Button(
+        LocalizedStringResource(
+          "Stop All", bundle: .module,
+          comment: "Stops a coordinator session and its child sessions.")
+      ) {
+        Task { await model.confirmCoordinatorStop(stop, includingChildren: true) }
+      }
+      Button(
+        LocalizedStringResource(
+          "Stop the Coordinator Only", bundle: .module,
+          comment: "Stops a coordinator session; its child sessions go on.")
+      ) {
+        Task { await model.confirmCoordinatorStop(stop, includingChildren: false) }
+      }
+      Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
+        model.cancelCoordinatorStop()
+      }
+    } message: { stop in
+      Text(
+        "\(stop.runningChildren) child sessions are still running. Children left running go on, and find their coordinator when it starts again.",
+        bundle: .module,
+        comment:
+          "Asked when a coordinator session is stopped while some of its child sessions still run.")
+    }
     // Closing several sessions asks #51's question once, with its "Don't ask again" (#77). So
     // does moving several to To Do or Waiting while their agents run, with its own (#353).
     .confirmationDialog(
@@ -803,7 +844,8 @@ public struct RootView: View {
       ticketTitles: model.ticketTitles,
       leaveNotes: { model.focusSession() },
       usage: model.usage,
-      journal: model.journal
+      journal: model.journal,
+      coordination: model
     )
   }
 
@@ -1870,7 +1912,7 @@ private struct ArchivedSessionDetail: View {
                 Text(AgentNaming.label(agent, names: agentNames))
                   .font(.callout)
                   .foregroundStyle(.secondary)
-                  .help(Text(verbatim: agent.providerID))
+                  .instantTooltip(Text(verbatim: agent.providerID))
               }
             }
           }
@@ -2007,7 +2049,8 @@ struct SidebarFooter: View {
       .menuStyle(.borderlessButton)
       .fixedSize()
       // Where the order arranged by hand is found, for whoever looks for how to drag a row (#44).
-      .help(model.reorderUnavailableReason.map { Text($0) } ?? Text(model.filter.sort.label))
+      .instantTooltip(
+        model.reorderUnavailableReason.map { Text($0) } ?? Text(model.filter.sort.label))
 
       Spacer(minLength: 0)
 
@@ -2021,7 +2064,7 @@ struct SidebarFooter: View {
           .contentShape(Rectangle())
       }
       .buttonStyle(.borderless)
-      .help(groupingHelp)
+      .instantTooltip(groupingHelp)
       .accessibilityLabel(Text("Group Sessions by Folder", bundle: .module))
       .accessibilityAddTraits(isGrouped ? [.isSelected] : [])
       .accessibilityIdentifier("sidebar-group-toggle")
@@ -2033,7 +2076,7 @@ struct SidebarFooter: View {
           Image(systemName: "line.3.horizontal.decrease.circle.fill")
         }
         .buttonStyle(.borderless)
-        .help(Text("Filtering is on. Click to clear it.", bundle: .module))
+        .instantTooltip(Text("Filtering is on. Click to clear it.", bundle: .module))
         .accessibilityLabel(Text("Clear filter", bundle: .module))
       }
     }
@@ -2231,7 +2274,7 @@ struct SessionRow: View {
   var body: some View {
     let _ = BodyCounter.tick(.sessionRow)
     HStack(spacing: 10) {
-      SessionBadge(appearance: appearance, icon: icon)
+      SessionBadge(appearance: appearance, icon: icon, size: Self.badgeSize)
         .background {
           GeometryReader { proxy in
             Color.clear.preference(
@@ -2250,10 +2293,18 @@ struct SessionRow: View {
             .lineLimit(1)
         }
         if let agent = session.agent {
-          Text(AgentNaming.name(of: agent.providerID, names: commands.model.agentNames))
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .help(Text(verbatim: agent.providerID))
+          HStack(spacing: 4) {
+            Text(AgentNaming.name(of: agent.providerID, names: commands.model.agentNames))
+              .instantTooltip(Text(verbatim: agent.providerID))
+            // A child is listed in its coordinator's column: its own is said here (#352).
+            if let parent, parent.taskStatus != session.taskStatus {
+              Text(verbatim: "·")
+              Text(session.taskStatus.label)
+            }
+          }
+          .font(.caption)
+          .foregroundStyle(.secondary)
+          .lineLimit(1)
         }
         // Symbol, words and colour, in that order: the state survives a colour nobody can
         // tell apart, and the identity colour of the session stays free to mean identity.
@@ -2275,8 +2326,11 @@ struct SessionRow: View {
         // colour and its symbol.
         .fontWeight(!isRestoring && status.needsAttention ? .semibold : nil)
         // The exit code or the signal, for whoever wants it, behind words that say what happened.
-        .help(status.detail ?? "")
+        .instantTooltip(status.detail ?? "")
         .lineLimit(1)
+        if isCoordinator {
+          CoordinatorRowSummary(model: commands.model, sessionID: session.id)
+        }
       }
       .sessionThemePopover(model: commands.model, sessionID: session.id, place: .sidebar)
       Spacer(minLength: 4)
@@ -2284,12 +2338,13 @@ struct SessionRow: View {
       case .waitingForApproval:
         Image(systemName: "hand.raised.fill")
           .foregroundStyle(.orange)
-          .help(Text("The agent is waiting for your approval in the web view", bundle: .module))
+          .instantTooltip(
+            Text("The agent is waiting for your approval in the web view", bundle: .module))
       case .agentOpenedPage:
         Image(systemName: "globe")
           .font(.caption)
           .foregroundStyle(Color.accentColor)
-          .help(Text("The agent loaded a page in the web view", bundle: .module))
+          .instantTooltip(Text("The agent loaded a page in the web view", bundle: .module))
       case nil:
         EmptyView()
       }
@@ -2301,6 +2356,9 @@ struct SessionRow: View {
       }
     }
     .padding(.vertical, 4)
+    // A child is set in under its coordinator; the coordinator stays in line with the sessions
+    // around it, and folds its children from the words that count them (#387).
+    .padding(.leading, parent == nil ? 0 : Self.childIndent)
     // The menu is the list's (#77): it knows whether the click landed in a selection of several.
     // Its name field, while it is renamed, is reached on its own.
     .accessibilityElement(children: commands.isRenaming ? .contain : .combine)
@@ -2318,6 +2376,22 @@ struct SessionRow: View {
           commands.perform(action)
         } label: {
           commands.name(of: action)
+        }
+      }
+    }
+    // The chevron of a coordinator, reachable without a pointer (#352).
+    .accessibilityActions {
+      if isCoordinator, !commands.model.children(of: session.id).isEmpty {
+        let isExpanded = commands.model.isExpanded(coordinator: session.id)
+        Button {
+          commands.model.setExpanded(!isExpanded, coordinator: session.id)
+        } label: {
+          isExpanded
+            ? Text(
+              "Hide Children", bundle: .module, comment: "Folds a coordinator session's children.")
+            : Text(
+              "Show Children", bundle: .module, comment: "Unfolds a coordinator session's children."
+            )
         }
       }
     }
@@ -2351,6 +2425,20 @@ struct SessionRow: View {
     }
   }
 
+  /// How far a child's badge is set in from its coordinator's: room for the elbow of the line
+  /// that ties them (#387).
+  nonisolated static let childIndent: CGFloat = 28
+  nonisolated static let badgeSize: CGFloat = 36
+
+  private var isCoordinator: Bool {
+    commands.model.showsAsCoordinator(session)
+  }
+
+  /// The coordinator this row is listed under (#352).
+  private var parent: WorkSession? {
+    commands.model.coordinator(of: session)
+  }
+
   // Read by the row itself rather than handed to it by the list (#254): what an agent does wakes
   // its own row, not the whole list.
   private var status: SessionStatusPresentation {
@@ -2369,6 +2457,14 @@ struct SessionRow: View {
   }
 
   private var accessibilityValue: Text {
+    // Whether a coordinator's children show: its row is read as one element, the words that fold
+    // them with it (#387).
+    guard let folding else { return stateValue ?? Text(verbatim: "") }
+    guard let stateValue else { return folding }
+    return Text("\(stateValue), \(folding)", bundle: .module)
+  }
+
+  private var stateValue: Text? {
     if isRestoring { return Text("Restoring", bundle: .module) }
     switch webView {
     case .waitingForApproval:
@@ -2376,8 +2472,14 @@ struct SessionRow: View {
     case .agentOpenedPage:
       return Text("The agent loaded a page", bundle: .module)
     case nil:
-      return Text(verbatim: "")
+      return nil
     }
+  }
+
+  private var folding: Text? {
+    guard isCoordinator, !commands.model.children(of: session.id).isEmpty else { return nil }
+    return commands.model.isExpanded(coordinator: session.id)
+      ? Text("Expanded", bundle: .module) : Text("Collapsed", bundle: .module)
   }
 
   /// A working agent's symbol gives way to a spinner; with Reduce Motion the symbol stays, and its
@@ -2488,7 +2590,7 @@ private struct PresentationPicker: View {
     .pickerStyle(.segmented)
     .labelsHidden()
     .fixedSize()
-    .help(Text("Switch between the conversation and the terminal (⌥⌘T)", bundle: .module))
+    .instantTooltip(Text("Switch between the conversation and the terminal (⌥⌘T)", bundle: .module))
   }
 }
 

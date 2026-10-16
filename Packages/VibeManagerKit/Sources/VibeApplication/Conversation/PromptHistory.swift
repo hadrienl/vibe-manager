@@ -19,7 +19,10 @@ public struct PromptHistory: Hashable, Sendable {
   public init(entries: [ConversationEntry], pending: [String] = [], hasShellMode: Bool = false) {
     let written = entries.compactMap { entry -> String? in
       switch entry.content {
-      case .userPrompt(let text, _):
+      case .userPrompt(let typed, _):
+        // What the application typed — a coordinator's message, Vibe Manager's events — is not
+        // the user's to recall (#352).
+        guard let text = CoordinatorInstructions.userText(of: typed) else { return nil }
         return hasShellMode ? Self.recalled(message: text) : text
       case .notice(.shell(let run)) where hasShellMode:
         return Self.recalled(command: run.command)
