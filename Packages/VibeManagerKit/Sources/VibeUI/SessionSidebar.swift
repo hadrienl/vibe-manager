@@ -258,7 +258,10 @@ struct SessionSidebar: View {
             .tag(session.id)
         case .doneChildren(let coordinator, let done):
           DoneChildrenRow(done: done) {
-            model.setShowingDoneChildren(!done.isShown, coordinator: coordinator)
+            // As the coordinator's own fold.
+            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+              model.setShowingDoneChildren(!done.isShown, coordinator: coordinator)
+            }
           }
           .moveDisabled(true)
         }
