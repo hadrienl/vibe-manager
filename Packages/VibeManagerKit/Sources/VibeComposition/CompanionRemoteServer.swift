@@ -24,6 +24,8 @@ final class CompanionRemoteServer {
 
   private struct Peer {
     var shown: SessionID?
+    /// The conversation it counts as a viewer of.
+    var viewed: ConversationModel?
     var conversationRevision = 0
   }
 
@@ -55,6 +57,7 @@ final class CompanionRemoteServer {
     case .show(let id):
       guard peers[peer] != nil else { return }
       let sessionID = id.flatMap(UUID.init(uuidString:)).map(SessionID.init(rawValue:))
+      release(peer)
       peers[peer]?.shown = sessionID
       peers[peer]?.conversationRevision += 1
       if let sessionID { follow(sessionID, for: peer) }
@@ -83,8 +86,16 @@ final class CompanionRemoteServer {
   }
 
   func closed(_ peer: String) {
+    release(peer)
     peers[peer] = nil
     Self.logger.notice("\(peer, privacy: .public): gone")
+  }
+
+  /// The phone no longer shows its conversation: one viewer less.
+  private func release(_ peer: String) {
+    guard let model = peers[peer]?.viewed else { return }
+    model.remoteViewers = max(0, model.remoteViewers - 1)
+    peers[peer]?.viewed = nil
   }
 
   // MARK: - Sessions
@@ -173,6 +184,8 @@ final class CompanionRemoteServer {
       return
     }
     let model = appModel.conversations.show(session)
+    model.remoteViewers += 1
+    peers[peer]?.viewed = model
     let revision = peers[peer]?.conversationRevision ?? 0
     sendConversation(of: id, model: model, revision: revision, to: peer)
   }
