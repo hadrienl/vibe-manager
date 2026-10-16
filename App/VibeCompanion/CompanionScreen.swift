@@ -320,7 +320,7 @@ private struct NotificationsSection: View {
       Text("Notifications")
     } footer: {
       Text(
-        "L’abonnement échoue tant que le Mac n’a écrit aucune demande : le type Request n’existe pas encore. Il est réessayé toutes les 30 s, écran ouvert."
+        "L’abonnement échoue tant que le schéma du conteneur n’a pas le type Envelope. Il est réessayé toutes les 30 s, écran ouvert."
       )
     }
   }

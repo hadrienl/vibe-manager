@@ -4,9 +4,10 @@ import Foundation
 import os
 
 /// The visible notification of a request (#368): a subscription the phone saves once, on which
-/// CloudKit's servers push an alert — title, text, sound, badge — at every `Request` record the
-/// Mac creates. Visible pushes are not rationed as silent ones are, and reach a locked phone or an
-/// application in the background.
+/// CloudKit's servers push an alert — title, text, sound, badge — at every request the Mac
+/// creates: an `Envelope` record of kind `request`, the field the subscription filters on (#396).
+/// Visible pushes are not rationed as silent ones are, and reach a locked phone or an application
+/// in the background.
 ///
 /// The alert CloudKit pushes says nothing of the request — « Un agent attend votre réponse » — and
 /// is mutable: the phone's notification service extension fetches the record, whose texts are
@@ -19,10 +20,11 @@ import os
 public enum CompanionRequestAlerts {
   /// Fixed, so that saving it again replaces it rather than adding another. A change of what the
   /// subscription says takes a new identifier, the old one deleted.
-  public static let subscriptionID = "companion-requests-v2"
-  /// The first one, whose alert was made of the record's fields in the clear: deleted when the
-  /// second is saved, or a phone that had it would show two alerts per request.
-  static let retiredSubscriptionIDs = ["companion-requests-v1"]
+  public static let subscriptionID = "companion-requests-v3"
+  /// The earlier ones — the first made its alert of fields in the clear, the second watched the
+  /// `Request` type of the trials (#368): deleted when this one is saved, or a phone that had one
+  /// would show two alerts per request.
+  static let retiredSubscriptionIDs = ["companion-requests-v1", "companion-requests-v2"]
 
   /// The keys of the phone's `Localizable.strings`, in the application and in its extension.
   public enum LocalizationKey {
@@ -38,7 +40,8 @@ public enum CompanionRequestAlerts {
   /// The subscription, as saved: built offline, for the tests to read.
   public static func subscription() -> CKQuerySubscription {
     let subscription = CKQuerySubscription(
-      recordType: CompanionRecordCodec.RecordType.request, predicate: NSPredicate(value: true),
+      recordType: CompanionRecordCodec.RecordType.envelope,
+      predicate: NSPredicate(format: "kind == %@", CompanionRecordCodec.Kind.request),
       subscriptionID: subscriptionID, options: [.firesOnRecordCreation])
     subscription.zoneID = CompanionCloud.zoneID
     let info = CKSubscription.NotificationInfo()

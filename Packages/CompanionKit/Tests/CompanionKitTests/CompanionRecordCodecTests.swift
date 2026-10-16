@@ -28,26 +28,14 @@ func roundTrip(record: CompanionRecord) throws {
   #expect(CompanionRecordCodec.decode(ckRecord) == record)
 }
 
-@Test("Titles, names and states are encrypted; only identifiers and dates are in the clear")
-func encryptedFields() throws {
-  let mac = CompanionRecordCodec.makeRecord(records[0], systemFields: nil)
-  for key in ["name", "version", "buildLabel", "online"] {
-    #expect(mac[key] == nil, "\(key) in the clear")
-    #expect(mac.encryptedValues[key] != nil, "\(key) not encrypted")
-  }
-  #expect(mac["lastSeen"] as? Date == now)
-
-  let session = CompanionRecordCodec.makeRecord(records[1], systemFields: nil)
-  for key in ["title", "agent", "state"] {
-    #expect(session[key] == nil, "\(key) in the clear")
-    #expect(session.encryptedValues[key] != nil, "\(key) not encrypted")
-  }
-  #expect(session["macID"] as? String == "A1")
-  #expect(session.encryptedValues["title"] as? String == "#347 Compagnon mobile")
-
-  let ping = CompanionRecordCodec.makeRecord(records[2], systemFields: nil)
-  #expect(ping["deviceName"] == nil)
-  #expect(ping.encryptedValues["deviceName"] as? String == "iPhone de Hadrien")
+@Test("Every record is an Envelope: its kind in the clear, all else encrypted", arguments: records)
+func envelope(record: CompanionRecord) throws {
+  let ckRecord = CompanionRecordCodec.makeRecord(record, systemFields: nil)
+  #expect(ckRecord.recordType == "Envelope")
+  #expect(Set(ckRecord.allKeys()) == ["kind", "payload"])
+  #expect(ckRecord["payload"] == nil)
+  #expect(ckRecord["kind"] as? String == CompanionRecordCodec.kind(of: record))
+  #expect(ckRecord.encryptedValues["payload"] is Data)
 }
 
 @Test("A record is rebuilt on its saved system fields, and only on its own")
@@ -61,21 +49,39 @@ func systemFieldsAreReused() throws {
   // The fields of another record are not worn by this one.
   let ping = CompanionRecordCodec.makeRecord(records[2], systemFields: fields)
   #expect(ping.recordID.recordName == "ping-7F3A")
-  #expect(ping.recordType == "Ping")
+  #expect(ping.creationDate == nil)
 }
 
-@Test("A record of another zone, another type or missing a field is not read")
-func unreadableRecords() {
-  let elsewhere = CKRecord(
-    recordType: "Session",
-    recordID: CKRecord.ID(recordName: "session-1", zoneID: CKRecordZone.ID(zoneName: "Other")))
-  #expect(CompanionRecordCodec.decode(elsewhere) == nil)
+@Test("A record of another zone, type, kind, format or name is not read")
+func unreadableRecords() throws {
+  let session = CompanionRecordCodec.makeRecord(records[1], systemFields: nil)
+  func copy(
+    type: String = "Envelope", zone: CKRecordZone.ID = CompanionCloud.zoneID,
+    name: String = "session-6F1C"
+  ) -> CKRecord {
+    let record = CKRecord(recordType: type, recordID: CKRecord.ID(recordName: name, zoneID: zone))
+    record["kind"] = session["kind"]
+    record.encryptedValues["payload"] = session.encryptedValues["payload"]
+    return record
+  }
+  #expect(CompanionRecordCodec.decode(copy()) == records[1])
+  #expect(CompanionRecordCodec.decode(copy(zone: CKRecordZone.ID(zoneName: "Other"))) == nil)
+  #expect(CompanionRecordCodec.decode(copy(type: "Session")) == nil)
+  #expect(CompanionRecordCodec.decode(copy(name: "session-other")) == nil)
 
-  let unknown = CKRecord(recordType: "Message", recordID: CompanionCloud.recordID("message-1"))
+  let unknown = copy()
+  unknown["kind"] = "message"
   #expect(CompanionRecordCodec.decode(unknown) == nil)
 
-  let incomplete = CKRecord(recordType: "Session", recordID: CompanionCloud.recordID("session-1"))
-  incomplete["macID"] = "A1"
+  let later = copy()
+  let payload = try #require(session.encryptedValues["payload"] as? Data)
+  var json = try #require(JSONSerialization.jsonObject(with: payload) as? [String: Any])
+  json["v"] = CompanionRecordCodec.payloadVersion + 1
+  later.encryptedValues["payload"] = try JSONSerialization.data(withJSONObject: json)
+  #expect(CompanionRecordCodec.decode(later) == nil)
+
+  let incomplete = copy()
+  incomplete.encryptedValues["payload"] = Data(#"{"v":1,"body":{"id":"6F1C"}}"#.utf8)
   #expect(CompanionRecordCodec.decode(incomplete) == nil)
 }
 

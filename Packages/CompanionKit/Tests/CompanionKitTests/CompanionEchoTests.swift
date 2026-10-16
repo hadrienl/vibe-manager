@@ -112,8 +112,8 @@ func macIrohFields() throws {
     installationID: "A1", name: "MacBook", version: "1.0.2", buildLabel: "", online: true,
     lastSeen: now, irohEndpointID: "ae58ff88", irohRelayURL: "https://euc1-1.relay.n0.iroh.link./")
   let record = CompanionRecordCodec.makeRecord(.mac(mac), systemFields: nil)
-  #expect(record["irohEndpointID"] == nil)
-  #expect(record.encryptedValues["irohEndpointID"] as? String == "ae58ff88")
+  #expect(Set(record.allKeys()) == ["kind", "payload"])
+  #expect(record["payload"] == nil)
   #expect(CompanionRecordCodec.decode(record) == .mac(mac))
 
   var bare = mac

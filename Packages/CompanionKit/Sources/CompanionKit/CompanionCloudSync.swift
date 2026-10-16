@@ -370,7 +370,7 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
     if !fetched.isEmpty || removed > 0 {
       var line = "récupéré"
       if !fetched.isEmpty {
-        line += " : " + CompanionJournal.summary(fetched.map(CompanionRecordCodec.recordType(of:)))
+        line += " : " + CompanionJournal.summary(fetched.map(CompanionRecordCodec.kind(of:)))
       }
       if removed > 0 { line += " ; \(removed) suppression(s)" }
       journal.record(line)
@@ -417,7 +417,7 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
     if !sent.savedRecords.isEmpty || !sent.deletedRecordIDs.isEmpty {
       var line = "envoyé"
       if !sent.savedRecords.isEmpty {
-        line += " : " + CompanionJournal.summary(sent.savedRecords.map(\.recordType))
+        line += " : " + CompanionJournal.summary(sent.savedRecords.map { $0["kind"] as? String ?? $0.recordType })
       }
       if !sent.deletedRecordIDs.isEmpty {
         line += " ; \(sent.deletedRecordIDs.count) suppression(s)"

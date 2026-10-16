@@ -5,10 +5,9 @@ import Foundation
 /// Where the companion's records live in iCloud (#347).
 public enum CompanionCloud {
   /// The same in the iOS application and in the Mac's companion agent: both entitlements name it.
-  /// The POC's own container (#368), whose schema may go to Production for a Developer ID trial
-  /// without binding the real one, `iCloud.eu.hadrien.VibeManager`: a container can be neither
-  /// deleted nor renamed, and a Production schema only grows.
-  public static let containerIdentifier = "iCloud.eu.hadrien.VibeManager.Debug"
+  /// The real one (#396), whose schema holds the `Envelope` type alone; the trials' records went
+  /// to `iCloud.eu.hadrien.VibeManager.Debug` (#368), which stays unused.
+  public static let containerIdentifier = "iCloud.eu.hadrien.VibeManager"
   public static let zoneID = CKRecordZone.ID(
     zoneName: "Companion", ownerName: CKCurrentUserDefaultName)
 
@@ -17,53 +16,51 @@ public enum CompanionCloud {
   }
 }
 
-/// A companion record to a `CKRecord` and back.
+/// A companion record to a `CKRecord` and back (#396).
 ///
-/// Titles, names and states are in `encryptedValues`, end to end encrypted by Apple: only the Mac's
-/// identifier, the nonces and the dates are in the clear. An encrypted field can be neither indexed
-/// nor queried, which the sync engine never does. A field once written encrypted must stay so: the
-/// same key written in the clear would be another field.
+/// One record type alone, `Envelope`, whatever the record: a `kind` in the clear, which the
+/// request subscription filters on, and a `payload` in `encryptedValues` — the record's value as
+/// JSON, with the version of its format. A Production schema only grows, never changes; with one
+/// neutral type, a new kind of record or a new field is the application's business and never a
+/// schema to deploy. Nothing of a session, an agent or a message is readable by CloudKit's
+/// servers, nor by Apple's push service.
 public enum CompanionRecordCodec {
   public enum RecordType {
-    public static let mac = "Mac"
-    public static let session = "Session"
-    public static let ping = "Ping"
-    public static let pong = "Pong"
-    public static let request = "Request"
+    public static let envelope = "Envelope"
   }
 
   enum Field {
-    static let name = "name"
-    static let version = "version"
-    static let buildLabel = "buildLabel"
-    static let online = "online"
-    static let lastSeen = "lastSeen"
-    static let macID = "macID"
-    static let title = "title"
-    static let agent = "agent"
-    static let state = "state"
-    static let updatedAt = "updatedAt"
-    static let deviceName = "deviceName"
-    static let sentAt = "sentAt"
-    static let nonce = "nonce"
-    static let receivedAt = "receivedAt"
-    static let irohEndpointID = "irohEndpointID"
-    static let irohRelayURL = "irohRelayURL"
-    static let requestDelay = "requestDelay"
-    static let sessionTitle = "sessionTitle"
-    static let agentName = "agentName"
-    static let text = "text"
-    static let message = "message"
-    static let createdAt = "createdAt"
+    static let kind = "kind"
+    static let payload = "payload"
   }
 
-  public static func recordType(of record: CompanionRecord) -> String {
+  /// What a record is, in its `kind` field. A kind is never renamed: a version of the application
+  /// reads the kinds it knows and skips the others.
+  public enum Kind {
+    public static let mac = "mac"
+    public static let session = "session"
+    public static let request = "request"
+    /// The debug application's test (#347), in no build that ships.
+    public static let ping = "ping"
+    public static let pong = "pong"
+  }
+
+  /// The payload's format. A change a reader of the previous one cannot read raises it; a reader
+  /// skips a payload of a later format, as written by a newer version.
+  public static let payloadVersion = 1
+
+  struct Payload<Body: Codable>: Codable {
+    let v: Int
+    let body: Body
+  }
+
+  public static func kind(of record: CompanionRecord) -> String {
     switch record {
-    case .mac: RecordType.mac
-    case .session: RecordType.session
-    case .ping: RecordType.ping
-    case .pong: RecordType.pong
-    case .request: RecordType.request
+    case .mac: Kind.mac
+    case .session: Kind.session
+    case .ping: Kind.ping
+    case .pong: Kind.pong
+    case .request: Kind.request
     }
   }
 
@@ -71,117 +68,59 @@ public enum CompanionRecordCodec {
   /// so that CloudKit sees an update of the record it holds rather than a conflicting creation.
   public static func makeRecord(_ record: CompanionRecord, systemFields: Data?) -> CKRecord {
     let id = CompanionCloud.recordID(record.recordName)
-    let type = recordType(of: record)
     let ckRecord =
       systemFields.flatMap(CKRecord.fromArchivedSystemFields).flatMap {
-        $0.recordID == id && $0.recordType == type ? $0 : nil
-      } ?? CKRecord(recordType: type, recordID: id)
+        $0.recordID == id && $0.recordType == RecordType.envelope ? $0 : nil
+      } ?? CKRecord(recordType: RecordType.envelope, recordID: id)
     encode(record, into: ckRecord)
     return ckRecord
   }
 
   static func encode(_ record: CompanionRecord, into ckRecord: CKRecord) {
-    let secret = ckRecord.encryptedValues
-    switch record {
-    case .mac(let mac):
-      secret[Field.name] = mac.name
-      secret[Field.version] = mac.version
-      secret[Field.buildLabel] = mac.buildLabel
-      secret[Field.online] = mac.online
-      ckRecord[Field.lastSeen] = mac.lastSeen
-      // Encrypted like the rest, though a public key: nothing reads them but the phone.
-      secret[Field.irohEndpointID] = mac.irohEndpointID
-      secret[Field.irohRelayURL] = mac.irohRelayURL
-    case .session(let session):
-      ckRecord[Field.macID] = session.macID
-      secret[Field.title] = session.title
-      secret[Field.agent] = session.agent
-      secret[Field.state] = session.state.rawValue
-      ckRecord[Field.updatedAt] = session.updatedAt
-    case .ping(let ping):
-      ckRecord[Field.nonce] = ping.nonce
-      secret[Field.deviceName] = ping.deviceName
-      ckRecord[Field.sentAt] = ping.sentAt
-      ckRecord[Field.requestDelay] = ping.requestDelay
-    case .pong(let pong):
-      ckRecord[Field.nonce] = pong.nonce
-      ckRecord[Field.macID] = pong.macID
-      ckRecord[Field.receivedAt] = pong.receivedAt
-    case .request(let request):
-      // Encrypted, read by the phone's notification service extension rather than by CloudKit's
-      // servers. Under new names: `sessionTitle`, `agentName` and `text` were first written in the
-      // clear (#368), and a field keeps the kind it was first written with.
-      ckRecord[Field.macID] = request.macID
-      secret[Field.title] = request.sessionTitle
-      secret[Field.agent] = request.agent
-      secret[Field.message] = request.text
-      ckRecord[Field.createdAt] = request.createdAt
+    ckRecord[Field.kind] = kind(of: record)
+    ckRecord.encryptedValues[Field.payload] = payload(of: record)
+  }
+
+  static func payload(of record: CompanionRecord) -> Data {
+    let encoder = JSONEncoder()
+    encoder.outputFormatting = .sortedKeys
+    // Plain values: their encoding cannot fail.
+    return switch record {
+    case .mac(let body): try! encoder.encode(Payload(v: payloadVersion, body: body))
+    case .session(let body): try! encoder.encode(Payload(v: payloadVersion, body: body))
+    case .ping(let body): try! encoder.encode(Payload(v: payloadVersion, body: body))
+    case .pong(let body): try! encoder.encode(Payload(v: payloadVersion, body: body))
+    case .request(let body): try! encoder.encode(Payload(v: payloadVersion, body: body))
     }
   }
 
-  /// `nil` for a record of another type, of another zone, or missing a field: a later version may
-  /// write what this one does not read, and that is not this one's to show.
+  /// `nil` for a record of another type or zone, of a kind or format this version does not know,
+  /// or that does not decode: a later version may write what this one does not read, and that is
+  /// not this one's to show.
   public static func decode(_ ckRecord: CKRecord) -> CompanionRecord? {
-    guard ckRecord.recordID.zoneID == CompanionCloud.zoneID else { return nil }
-    let name = ckRecord.recordID.recordName
-    let secret = ckRecord.encryptedValues
-    switch ckRecord.recordType {
-    case RecordType.mac:
-      guard let id = name.dropPrefix("mac-"),
-        let macName = secret[Field.name] as? String,
-        let lastSeen = ckRecord[Field.lastSeen] as? Date
-      else { return nil }
-      return .mac(
-        CompanionMac(
-          installationID: id, name: macName, version: secret[Field.version] as? String ?? "",
-          buildLabel: secret[Field.buildLabel] as? String ?? "",
-          online: secret[Field.online] as? Bool ?? false, lastSeen: lastSeen,
-          irohEndpointID: secret[Field.irohEndpointID] as? String,
-          irohRelayURL: secret[Field.irohRelayURL] as? String))
-    case RecordType.session:
-      guard let id = name.dropPrefix("session-"),
-        let macID = ckRecord[Field.macID] as? String,
-        let title = secret[Field.title] as? String,
-        let updatedAt = ckRecord[Field.updatedAt] as? Date
-      else { return nil }
-      return .session(
-        CompanionSession(
-          id: id, macID: macID, title: title, agent: secret[Field.agent] as? String ?? "",
-          state: (secret[Field.state] as? String).flatMap(CompanionSessionState.init(rawValue:))
-            ?? .waiting,
-          updatedAt: updatedAt))
-    case RecordType.ping:
-      guard let nonce = ckRecord[Field.nonce] as? String,
-        let sentAt = ckRecord[Field.sentAt] as? Date
-      else { return nil }
-      return .ping(
-        CompanionPing(
-          nonce: nonce, deviceName: secret[Field.deviceName] as? String ?? "", sentAt: sentAt,
-          requestDelay: ckRecord[Field.requestDelay] as? Double))
-    case RecordType.pong:
-      guard let nonce = ckRecord[Field.nonce] as? String,
-        let macID = ckRecord[Field.macID] as? String,
-        let receivedAt = ckRecord[Field.receivedAt] as? Date
-      else { return nil }
-      return .pong(CompanionPong(nonce: nonce, macID: macID, receivedAt: receivedAt))
-    case RecordType.request:
-      guard let id = name.dropPrefix("request-"),
-        let macID = ckRecord[Field.macID] as? String,
-        let createdAt = ckRecord[Field.createdAt] as? Date
-      else { return nil }
-      // The fields in the clear are those of the first requests (#368), still in the zone for
-      // their hour.
-      return .request(
-        CompanionRequest(
-          id: id, macID: macID,
-          sessionTitle: secret[Field.title] as? String ?? ckRecord[Field.sessionTitle] as? String
-            ?? "",
-          agent: secret[Field.agent] as? String ?? ckRecord[Field.agentName] as? String ?? "",
-          text: secret[Field.message] as? String ?? ckRecord[Field.text] as? String ?? "",
-          createdAt: createdAt))
-    default:
-      return nil
-    }
+    guard ckRecord.recordID.zoneID == CompanionCloud.zoneID,
+      ckRecord.recordType == RecordType.envelope,
+      let kind = ckRecord[Field.kind] as? String,
+      let payload = ckRecord.encryptedValues[Field.payload] as? Data
+    else { return nil }
+    let record: CompanionRecord? =
+      switch kind {
+      case Kind.mac: body(CompanionMac.self, payload).map(CompanionRecord.mac)
+      case Kind.session: body(CompanionSession.self, payload).map(CompanionRecord.session)
+      case Kind.ping: body(CompanionPing.self, payload).map(CompanionRecord.ping)
+      case Kind.pong: body(CompanionPong.self, payload).map(CompanionRecord.pong)
+      case Kind.request: body(CompanionRequest.self, payload).map(CompanionRecord.request)
+      default: nil
+      }
+    // The record's name is the one its value gives: anything else was not written by a companion.
+    return record?.recordName == ckRecord.recordID.recordName ? record : nil
+  }
+
+  private static func body<Body: Codable>(_ type: Body.Type, _ payload: Data) -> Body? {
+    guard let decoded = try? JSONDecoder().decode(Payload<Body>.self, from: payload),
+      decoded.v <= payloadVersion
+    else { return nil }
+    return decoded.body
   }
 }
 
@@ -202,9 +141,3 @@ extension CKRecord {
   }
 }
 
-extension String {
-  fileprivate func dropPrefix(_ prefix: String) -> String? {
-    guard hasPrefix(prefix), count > prefix.count else { return nil }
-    return String(dropFirst(prefix.count))
-  }
-}
