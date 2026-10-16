@@ -10,8 +10,13 @@ private final class PostingNotifier: RequestNotifying {
   private(set) var posted: [RequestNotification] = []
 
   func post(_ notification: RequestNotification) { posted.append(notification) }
-  func remove(_ ids: [AgentRequestID]) {}
-  func setBadge(_ count: Int?) {}
+  func remove(_: [AgentRequestID]) {
+    // Only what is posted counts here.
+  }
+
+  func setBadge(_: Int?) {
+    // The badge is not what these tests look at.
+  }
   func isAuthorized() async -> Bool? { true }
 }
 
@@ -38,7 +43,9 @@ struct AlertSoundSignallingTests {
     let sounds = AlertSoundLibraryModel(
       library: InMemoryAlertSoundLibrary(), preferences: InMemoryAlertSoundPreferences(),
       player: player, systemSoundsDirectory: nil)
-    sounds.announce = { _ in }
+    sounds.announce = { _ in
+      // VoiceOver is not what these tests look at.
+    }
     model.alertSounds = sounds
     model.floatingPanel = FloatingRequestPanelModel(
       preferences: InMemoryFloatingPanelPreferences(showsFloatingPanel: floating))

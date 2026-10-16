@@ -26,7 +26,7 @@ private final class RecordingInstaller: NotificationSoundInstalling, @unchecked 
   var installed: [String] { lock.withLock { names } }
   var cleared: Int { lock.withLock { clears } }
 
-  func install(_ source: URL, name: String) throws -> String {
+  func install(_: URL, name: String) throws -> String {
     lock.withLock { names.append(name) }
     return "Test – \(name).wav"
   }
@@ -100,7 +100,9 @@ struct AlertSoundLibraryModelTests {
       player: player, systemSoundsDirectory: try systemFolder(),
       cacheDirectory: folder.appendingPathComponent("Cache", isDirectory: true), language: "fr",
       now: { clock.now })
-    model.announce = { _ in }
+    model.announce = { _ in
+      // VoiceOver is not what these tests look at.
+    }
     return model
   }
 

@@ -142,7 +142,9 @@ struct AlertSoundSynthesizerTests {
   @Test("The same recipe always gives the same sound, noise included")
   func deterministic() {
     let recipe = BundledAlertSound.tick.recipe
-    #expect(AlertSoundSynthesizer.render(recipe) == AlertSoundSynthesizer.render(recipe))
+    let first = AlertSoundSynthesizer.render(recipe)
+    let second = AlertSoundSynthesizer.render(recipe)
+    #expect(first == second)
   }
 
   @Test("Silent before its first note")
@@ -257,7 +259,7 @@ struct GenerateAlertSoundTests {
 private struct FakeDecoder: AlertSoundDecoding {
   let result: Result<DecodedAlertSound, AlertSoundImportProblem>
 
-  func decode(_ url: URL, maximumDuration: Double) throws(AlertSoundImportProblem)
+  func decode(_: URL, maximumDuration: Double) throws(AlertSoundImportProblem)
     -> DecodedAlertSound
   {
     switch result {

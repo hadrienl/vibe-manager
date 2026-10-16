@@ -128,7 +128,7 @@ public struct CodexAlertSoundCommand: AlertSoundCommand {
     // Nothing to set: the command is the same for every sound.
   }
 
-  public func arguments(for request: AlertSoundGenerationRequest, in workspace: URL) throws
+  public func arguments(for _: AlertSoundGenerationRequest, in workspace: URL) throws
     -> [String]
   {
     let schema = workspace.appendingPathComponent(Self.schemaFile)

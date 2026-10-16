@@ -105,7 +105,9 @@ struct RequestsSettingsTests {
       library: library,
       preferences: InMemoryAlertSoundPreferences(
         alertSound: composed.map { .custom($0.id) } ?? .systemDefault))
-    sounds.announce = { _ in }
+    sounds.announce = { _ in
+      // VoiceOver is not what these tests look at.
+    }
     await sounds.load()
     sounds.showOutlines()
     await sounds.outlineTask?.value
