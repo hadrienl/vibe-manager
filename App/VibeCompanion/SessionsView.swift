@@ -11,6 +11,7 @@ struct SessionsView: View {
   @State private var path: [String] = []
   @State private var showsSearch = false
   @State private var showsSettings = false
+  @State private var showsNewSession = false
   /// The row whose swipe buttons are open: one at a time.
   @State private var swipedID: String?
 
@@ -59,6 +60,10 @@ struct SessionsView: View {
         ToolbarItem(placement: .topBarLeading) {
           Button("Réglages", systemImage: "gearshape") { showsSettings = true }
         }
+        ToolbarItem(placement: .topBarTrailing) {
+          Button("Nouvelle session", systemImage: "plus") { showsNewSession = true }
+            .disabled(channel.phase != .connected)
+        }
       }
       .overlay(alignment: .bottomTrailing) {
         Button {
@@ -85,6 +90,15 @@ struct SessionsView: View {
       }
       .sheet(isPresented: $showsSettings) {
         SettingsSheet()
+      }
+      .sheet(isPresented: $showsNewSession) {
+        NewSessionSheet()
+      }
+      .onChange(of: channel.createdSessionID) { _, id in
+        guard let id else { return }
+        channel.createdSessionID = nil
+        showsNewSession = false
+        path.append(id)
       }
       .alert(
         "Le Mac n’a pas pu le faire",

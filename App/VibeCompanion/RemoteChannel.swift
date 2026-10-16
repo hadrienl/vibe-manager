@@ -26,6 +26,10 @@ final class RemoteChannel {
   private(set) var sessions: [RemoteSession] = []
   private(set) var conversation: RemoteConversation?
   private(set) var searchResults: [RemoteSearchResult] = []
+  /// What a new session can be, once the Mac said.
+  private(set) var newSessionOptions: RemoteNewSessionOptions?
+  /// The session just created from the phone, for the list to show it.
+  var createdSessionID: String?
   /// The last thing the Mac could not do, for an alert.
   var failure: String?
   /// This phone's endpoint, once bound: what pairing writes.
@@ -149,9 +153,13 @@ final class RemoteChannel {
     case .searchResults(let token, let results):
       guard token == searchToken else { return }
       searchResults = results
+    case .newSessionOffer(let options):
+      newSessionOptions = options
+    case .created(let id):
+      createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .answer, .setStatus, .search:
+    case .hello, .show, .send, .answer, .setStatus, .search, .newSessionOptions, .createSession:
       break
     }
   }
@@ -196,6 +204,14 @@ final class RemoteChannel {
   func search(_ query: String) {
     searchToken += 1
     write(.search(query: query, token: searchToken))
+  }
+
+  func askNewSessionOptions() {
+    write(.newSessionOptions)
+  }
+
+  func create(_ session: RemoteNewSession) {
+    write(.createSession(session))
   }
 
   // MARK: - Key

@@ -31,6 +31,7 @@
 		A00000000000000000000017 /* VibeCompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* VibeCompanionApp.swift */; };
 		A00000000000000000000018 /* CompanionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000013 /* CompanionModel.swift */; };
 		A00000000000000000000019 /* CompanionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000014 /* CompanionScreen.swift */; };
+		A0000000000000000000C007 /* NewSessionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000C007 /* NewSessionSheet.swift */; };
 		A0000000000000000000C006 /* StatusSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000C006 /* StatusSwipe.swift */; };
 		A0000000000000000000C005 /* SettingsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000C005 /* SettingsSheet.swift */; };
 		A0000000000000000000C004 /* SearchSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000C004 /* SearchSheet.swift */; };
@@ -78,6 +79,7 @@
 		B00000000000000000000012 /* VibeCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeCompanionApp.swift; sourceTree = "<group>"; };
 		B00000000000000000000013 /* CompanionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionModel.swift; sourceTree = "<group>"; };
 		B00000000000000000000014 /* CompanionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionScreen.swift; sourceTree = "<group>"; };
+		B0000000000000000000C007 /* NewSessionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionSheet.swift; sourceTree = "<group>"; };
 		B0000000000000000000C006 /* StatusSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusSwipe.swift; sourceTree = "<group>"; };
 		B0000000000000000000C005 /* SettingsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsSheet.swift; sourceTree = "<group>"; };
 		B0000000000000000000C004 /* SearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SearchSheet.swift; sourceTree = "<group>"; };
@@ -307,6 +309,7 @@
 				B00000000000000000000012 /* VibeCompanionApp.swift */,
 				B00000000000000000000013 /* CompanionModel.swift */,
 				B00000000000000000000014 /* CompanionScreen.swift */,
+				B0000000000000000000C007 /* NewSessionSheet.swift */,
 				B0000000000000000000C006 /* StatusSwipe.swift */,
 				B0000000000000000000C005 /* SettingsSheet.swift */,
 				B0000000000000000000C004 /* SearchSheet.swift */,
@@ -622,6 +625,7 @@
 				A00000000000000000000017 /* VibeCompanionApp.swift in Sources */,
 				A00000000000000000000018 /* CompanionModel.swift in Sources */,
 				A00000000000000000000019 /* CompanionScreen.swift in Sources */,
+				A0000000000000000000C007 /* NewSessionSheet.swift in Sources */,
 				A0000000000000000000C006 /* StatusSwipe.swift in Sources */,
 				A0000000000000000000C005 /* SettingsSheet.swift in Sources */,
 				A0000000000000000000C004 /* SearchSheet.swift in Sources */,

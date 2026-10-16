@@ -182,6 +182,67 @@ public struct RemoteSearchResult: Codable, Hashable, Sendable, Identifiable {
   }
 }
 
+/// An agent a new session can run, with its models.
+public struct RemoteAgent: Codable, Hashable, Sendable, Identifiable {
+  public var id: String
+  public var name: String
+  public var models: [RemoteModel]
+
+  public init(id: String, name: String, models: [RemoteModel]) {
+    self.id = id
+    self.name = name
+    self.models = models
+  }
+}
+
+public struct RemoteModel: Codable, Hashable, Sendable, Identifiable {
+  public var id: String
+  public var name: String
+  public var isDefault: Bool
+
+  public init(id: String, name: String, isDefault: Bool) {
+    self.id = id
+    self.name = name
+    self.isDefault = isDefault
+  }
+}
+
+/// What the New Session sheet offers: the recent folders, the agents.
+public struct RemoteNewSessionOptions: Codable, Hashable, Sendable {
+  public var folders: [String]
+  public var agents: [RemoteAgent]
+
+  public init(folders: [String], agents: [RemoteAgent]) {
+    self.folders = folders
+    self.agents = agents
+  }
+}
+
+/// A session to create, as the phone's sheet fills it.
+public struct RemoteNewSession: Codable, Hashable, Sendable {
+  public var name: String
+  public var folder: String
+  public var agentID: String
+  public var modelID: String?
+  public var prompt: String
+  /// Started at once, in En cours; or left to wait in À faire.
+  public var start: Bool
+  public var coordinates: Bool
+
+  public init(
+    name: String, folder: String, agentID: String, modelID: String?, prompt: String, start: Bool,
+    coordinates: Bool
+  ) {
+    self.name = name
+    self.folder = folder
+    self.agentID = agentID
+    self.modelID = modelID
+    self.prompt = prompt
+    self.start = start
+    self.coordinates = coordinates
+  }
+}
+
 /// Everything either end of the channel says.
 public enum RemoteMessage: Codable, Equatable, Sendable {
   // The phone to the Mac.
@@ -194,6 +255,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case answer(sessionID: String, requestID: String, choiceIDs: [String], text: String?)
   case setStatus(sessionID: String, status: RemoteTaskStatus)
   case search(query: String, token: Int)
+  case newSessionOptions
+  case createSession(RemoteNewSession)
 
   // The Mac to the phone.
   case welcome(protocolVersion: Int, macName: String)
@@ -201,6 +264,9 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case sessions([RemoteSession])
   case conversation(RemoteConversation)
   case searchResults(token: Int, [RemoteSearchResult])
+  case newSessionOffer(RemoteNewSessionOptions)
+  /// The session asked for exists: the phone shows it.
+  case created(sessionID: String)
   /// What the Mac could not do of what was asked, in words for the user.
   case failure(String)
 }

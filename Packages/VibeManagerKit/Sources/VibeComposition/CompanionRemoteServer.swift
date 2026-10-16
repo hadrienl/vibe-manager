@@ -69,7 +69,11 @@ final class CompanionRemoteServer {
       Task { await appModel.setTaskStatus(taskStatus, for: sessionID) }
     case .search(let query, let token):
       Task { await self.search(query, token: token, for: peer) }
-    case .welcome, .sessions, .conversation, .searchResults, .failure:
+    case .newSessionOptions:
+      Task { await self.offerNewSession(to: peer) }
+    case .createSession(let request):
+      Task { await self.create(request, for: peer) }
+    case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created:
       break
     }
   }
@@ -324,6 +328,37 @@ final class CompanionRemoteServer {
             sessionID: $0.sessionID.rawValue.uuidString,
             reason: QuickOpenPresentation.reason($0.reason), isArchived: $0.isArchived)
         }))
+  }
+
+  private func offerNewSession(to peer: String) async {
+    guard let appModel else { return }
+    var agents: [RemoteAgent] = []
+    for descriptor in appModel.agentDescriptors {
+      let models = await appModel.companionModels(of: descriptor.id.rawValue)
+      agents.append(
+        RemoteAgent(
+          id: descriptor.id.rawValue, name: descriptor.displayName,
+          models: models.map {
+            RemoteModel(id: $0.id, name: $0.displayName, isDefault: $0.isDefault)
+          }))
+    }
+    send(
+      peer,
+      .newSessionOffer(
+        RemoteNewSessionOptions(folders: appModel.companionRecentFolders, agents: agents)))
+  }
+
+  private func create(_ request: RemoteNewSession, for peer: String) async {
+    guard let appModel else { return }
+    do {
+      let id = try await appModel.createCompanionSession(
+        name: request.name, folder: request.folder, providerID: request.agentID,
+        modelID: request.modelID, prompt: request.prompt, start: request.start,
+        coordinates: request.coordinates)
+      send(peer, .created(sessionID: id.rawValue.uuidString))
+    } catch {
+      send(peer, .failure(error.localizedDescription))
+    }
   }
 
   private static func sessionID(_ text: String) -> SessionID? {
