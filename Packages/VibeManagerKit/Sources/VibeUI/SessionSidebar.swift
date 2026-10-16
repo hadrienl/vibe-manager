@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The sidebar as a task board (#80): four columns behind four tabs, and a swipe on a row to move
@@ -259,7 +260,7 @@ struct SessionSidebar: View {
         case .doneChildren(let coordinator, let done):
           DoneChildrenRow(done: done) {
             // As the coordinator's own fold.
-            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+            withAnimation(reduceMotion ? nil : .fold) {
               model.setShowingDoneChildren(!done.isShown, coordinator: coordinator)
             }
           }
