@@ -32,6 +32,8 @@ public struct ConversationView: View {
   @State private var pager = ConversationPager()
   /// Where a page leads, in the messages: a mark that SwiftUI scrolls to (#227).
   @State private var pageTarget = 0.0
+  /// One selection from one message to the next (#381).
+  @State private var selection = ConversationSelection()
 
   private static let bottomID = "conversation.bottom"
   private static let pageTargetID = "conversation.page"
@@ -152,7 +154,9 @@ public struct ConversationView: View {
   private var spacing: Double { layout.blockSpacing }
 
   private var conversation: some View {
-    ScrollViewReader { proxy in
+    // What it reads of the messages scrolled away, with the theme and the size they are shown at.
+    let _ = selection.source = .of(model, theme: theme, appearance: appearance)
+    return ScrollViewReader { proxy in
       ScrollView {
         LazyVStack(alignment: .leading, spacing: spacing) {
           ForEach(model.blocks) { block in
@@ -180,6 +184,7 @@ public struct ConversationView: View {
             .frame(height: 1)
             .id(Self.bottomID)
         }
+        .environment(\.conversationSelection, selection)
         .frame(maxWidth: layout.contentWidth)
         .padding(.horizontal, layout.sideMargin)
         .padding(.top, layout.topPadding)
@@ -434,6 +439,9 @@ struct BlockView: View {
   /// Inside a sub-agent's activity.
   var isNested = false
 
+  /// Its text is part of the conversation's selection, unless it is a sub-agent's (#381).
+  private var selectionBlock: String? { isNested ? nil : block.id }
+
   var body: some View {
     switch block {
     case .toolGroup:
@@ -444,10 +452,13 @@ struct BlockView: View {
       switch entry.content {
       case .userPrompt(let text, let attachments):
         UserPromptView(text: text, attachments: attachments, date: entry.date)
+          .environment(\.selectionBlock, selectionBlock)
       case .agentText(let text):
         AgentTextView(text: text)
+          .environment(\.selectionBlock, selectionBlock)
       case .reasoning(let text):
         ReasoningRow(id: entry.id, text: text, model: model)
+          .environment(\.selectionBlock, selectionBlock)
       case .tool(let call) where call.kind == .subagent:
         SubagentBlockView(call: call, model: model, isNested: isNested)
       case .tool:
@@ -531,5 +542,45 @@ private struct ToolbarVeil: ViewModifier {
     } else {
       content
     }
+  }
+}
+
+extension ConversationSelection.Source {
+  /// The conversation's blocks, and the text of its prompts, answers and unfolded reasoning as
+  /// their views show it: a copy takes it from here once they have scrolled away (#381).
+  @MainActor
+  static func of(
+    _ model: ConversationModel, theme: ConversationTheme, appearance: ConversationAppearance
+  ) -> Self {
+    let size = appearance.textSize.pointSize
+    let spacing = theme.layout.at(appearance.density).paragraphSpacing
+    func pieces(_ contents: [SegmentView.Content]) -> [SelectionText.Piece] {
+      contents.map {
+        SelectionText.Piece(
+          kind: $0.kind,
+          text: SegmentView.text(of: $0, theme: theme, size: size, spacing: spacing))
+      }
+    }
+    return Self(
+      blocks: { model.blocks.map(\.id) },
+      pieces: { id in
+        guard case .entry(let entry) = model.blocks.first(where: { $0.id == id }) else {
+          return []
+        }
+        switch entry.content {
+        case .userPrompt(let text, let attachments):
+          let shown = AttachedPaths.displayText(
+            text, joinedCount: attachments.filter(\.isWrittenInText).count)
+          guard !shown.isEmpty else { return [] }
+          let color = appearance.userMessageStyle == .bubbles ? theme.bubbleText : theme.text
+          return pieces([.plain(shown, color: color)])
+        case .agentText(let text):
+          return pieces(MarkdownBlocksView.contents(MarkdownCache.shared.blocks(for: text)))
+        case .reasoning(let text?) where model.isExpanded(id: entry.id, default: false):
+          return pieces(MarkdownBlocksView.contents(MarkdownCache.shared.blocks(for: text)))
+        default:
+          return []
+        }
+      })
   }
 }
