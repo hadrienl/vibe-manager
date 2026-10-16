@@ -35,7 +35,9 @@ extension AppModel {
         self.requestAnswering = self.requestAnswering.filter {
           $0.key.sessionID != update.sessionID
         }.merging(update.answering) { $1 }
+        self.isReadingRestoredRequests = update.isReplayed
         self.requestsDidChange()
+        self.isReadingRestoredRequests = false
         Signposts.end("ui.activityApplied", signpost)
       }
     }
@@ -44,7 +46,9 @@ extension AppModel {
     for id in activities.keys {
       requestAnswering.merge(await activityTracker.answering(for: id)) { $1 }
     }
+    isReadingRestoredRequests = true
     requestsDidChange()
+    isReadingRestoredRequests = false
     await loadHookTrustingAgents()
     updateVisibleSession()
   }

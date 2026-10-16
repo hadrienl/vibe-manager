@@ -836,6 +836,7 @@ extension AppModel {
     let safe = DisplaySafeText.visible(message)
     Announcer.announce(
       Self.announcement(state: safe, sessionName: coordinator.name), priority: .medium)
+    soundAttention()
     let floats = floatingPanel?.isEnabled ?? false
     if !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier {
       // What the agent wrote only when the user asked for the details of requests (#40).

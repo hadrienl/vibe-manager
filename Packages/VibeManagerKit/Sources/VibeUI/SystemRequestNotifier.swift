@@ -80,7 +80,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       let content = UNMutableNotificationContent()
       content.title = notification.title
       content.body = notification.body
-      content.sound = notification.isSilent ? nil : .default
+      content.sound = notification.isSilent ? nil : alertSound
       content.threadIdentifier = notification.id.sessionID.rawValue.uuidString
       content.categoryIdentifier =
         notification.offersAllow
@@ -105,7 +105,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       let content = UNMutableNotificationContent()
       content.title = notification.title
       content.body = notification.body
-      content.sound = .default
+      content.sound = alertSound
       content.threadIdentifier = session
       content.userInfo = [Self.sessionKey: session, Self.outcomeKey: true]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
@@ -133,6 +133,20 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       content.sound = .default
       content.userInfo = [Self.dictationKey: true]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
+  /// The alert sound the user chose (#393): the system's until one is copied where the
+  /// notifications find it, and none when the user chose silence.
+  private var alertSound: UNNotificationSound? {
+    Self.sound(for: model?.alertSounds?.notificationSound ?? .systemDefault)
+  }
+
+  static func sound(for sound: NotificationAlertSound) -> UNNotificationSound? {
+    switch sound {
+    case .systemDefault: .default
+    case .none: nil
+    case .named(let name): UNNotificationSound(named: UNNotificationSoundName(name))
     }
   }
 

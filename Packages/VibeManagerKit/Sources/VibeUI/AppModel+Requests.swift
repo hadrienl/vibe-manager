@@ -241,6 +241,10 @@ extension AppModel {
     // The floating panel shows them where the user is (#41): a notification would say the same
     // request twice.
     let floats = floatingPanel?.isEnabled ?? false
+    // In front, a request of the session on screen is answered there, without a sound; those
+    // read back at launch, or replayed, were there before, and sound neither.
+    let unseen = isApplicationActive ? unknown.filter { !isOnScreen($0.session.id) } : unknown
+    if !unseen.isEmpty, !isReadingRestoredRequests { soundAttention() }
     guard !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier else {
       return
     }
@@ -248,6 +252,16 @@ extension AppModel {
       notifier.post(notification(for: pending))
       postedRequestIDs.insert(pending.id)
     }
+  }
+
+  /// A session out of sight needs the user (#393). A notification carries the alert sound when
+  /// one is posted; with none — the application in front, or the floating panel in its place —
+  /// the sound plays here. With the notifications turned off and no floating panel, the user asked
+  /// for silence, in front as well.
+  func soundAttention() {
+    let floats = floatingPanel?.isEnabled ?? false
+    guard notifiesRequests || floats, isApplicationActive || floats else { return }
+    alertSounds?.playAlert()
   }
 
   func notification(for pending: PendingRequest) -> RequestNotification {

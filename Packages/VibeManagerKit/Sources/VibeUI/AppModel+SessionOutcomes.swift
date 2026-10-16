@@ -68,6 +68,7 @@ extension AppModel {
     // cut.
     Announcer.announce(
       Self.announcement(state: state, sessionName: session.name), priority: .medium)
+    soundAttention()
     // The floating panel replaces the notifications (#41), as the Settings say.
     let floats = floatingPanel?.isEnabled ?? false
     guard !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier else {

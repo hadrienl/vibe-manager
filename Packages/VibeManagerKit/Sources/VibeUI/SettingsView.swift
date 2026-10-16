@@ -370,12 +370,20 @@ struct SettingsPageView: View {
       SessionAppearanceSettingsView(model: model.appearancePalette)
     case .requests:
       SignallingSettings(model: model)
-        // Each time the page appears: the avatars made or deleted meanwhile.
-        .task { await model.avatars?.refresh() }
+        // Each time the page appears: the avatars and the sounds made or deleted meanwhile.
+        .task {
+          await model.avatars?.refresh()
+          await model.alertSounds?.refresh()
+        }
     case .avatars:
       if let avatars = model.avatars {
         AvatarLibraryView(avatars: avatars)
           .task { await avatars.refresh() }
+      }
+    case .alertSounds:
+      if let sounds = model.alertSounds {
+        AlertSoundLibraryView(sounds: sounds)
+          .task { await sounds.refresh() }
       }
     case .agent(let id):
       if let agent = model.settingsAgents.first(where: { $0.id == id }) {
