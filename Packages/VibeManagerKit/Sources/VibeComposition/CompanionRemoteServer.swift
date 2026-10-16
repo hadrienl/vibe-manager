@@ -73,7 +73,11 @@ final class CompanionRemoteServer {
       Task { await self.offerNewSession(to: peer) }
     case .createSession(let request):
       Task { await self.create(request, for: peer) }
-    case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created:
+    case .listFolder(let path):
+      let listing = Self.listing(of: path)
+      send(peer, .folderListing(listing))
+    case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
+      .folderListing:
       break
     }
   }
@@ -358,6 +362,28 @@ final class CompanionRemoteServer {
       send(peer, .created(sessionID: id.rawValue.uuidString))
     } catch {
       send(peer, .failure(error.localizedDescription))
+    }
+  }
+
+  /// The subfolders of a folder of the Mac, hidden ones and packages left out, as the Finder
+  /// shows them.
+  static func listing(of path: String?) -> RemoteFolderListing {
+    let folder = URL(
+      fileURLWithPath: path.map { ($0 as NSString).expandingTildeInPath }
+        ?? FileManager.default.homeDirectoryForCurrentUser.path, isDirectory: true
+    ).standardizedFileURL
+    do {
+      let entries = try FileManager.default.contentsOfDirectory(
+        at: folder, includingPropertiesForKeys: [.isDirectoryKey, .isPackageKey],
+        options: [.skipsHiddenFiles, .skipsPackageDescendants])
+      let names = entries.filter {
+        let values = try? $0.resourceValues(forKeys: [.isDirectoryKey, .isPackageKey])
+        return values?.isDirectory == true && values?.isPackage != true
+      }.map(\.lastPathComponent).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
+      return RemoteFolderListing(path: folder.path, folders: names)
+    } catch {
+      return RemoteFolderListing(
+        path: folder.path, folders: [], problem: "Ce dossier ne peut pas être lu sur le Mac.")
     }
   }
 

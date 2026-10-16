@@ -243,6 +243,21 @@ public struct RemoteNewSession: Codable, Hashable, Sendable {
   }
 }
 
+/// A folder of the Mac, as the phone browses it for a new session: its subfolders alone.
+public struct RemoteFolderListing: Codable, Hashable, Sendable {
+  public var path: String
+  /// Names, sorted as the Finder sorts them.
+  public var folders: [String]
+  /// Why it could not be read, in words for the user.
+  public var problem: String?
+
+  public init(path: String, folders: [String], problem: String? = nil) {
+    self.path = path
+    self.folders = folders
+    self.problem = problem
+  }
+}
+
 /// Everything either end of the channel says.
 public enum RemoteMessage: Codable, Equatable, Sendable {
   // The phone to the Mac.
@@ -257,6 +272,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case search(query: String, token: Int)
   case newSessionOptions
   case createSession(RemoteNewSession)
+  /// A folder's subfolders; `nil` for the user's home.
+  case listFolder(path: String?)
 
   // The Mac to the phone.
   case welcome(protocolVersion: Int, macName: String)
@@ -265,6 +282,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case conversation(RemoteConversation)
   case searchResults(token: Int, [RemoteSearchResult])
   case newSessionOffer(RemoteNewSessionOptions)
+  case folderListing(RemoteFolderListing)
   /// The session asked for exists: the phone shows it.
   case created(sessionID: String)
   /// What the Mac could not do of what was asked, in words for the user.

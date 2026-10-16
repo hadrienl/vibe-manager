@@ -28,6 +28,10 @@ final class RemoteChannel {
   private(set) var searchResults: [RemoteSearchResult] = []
   /// What a new session can be, once the Mac said.
   private(set) var newSessionOptions: RemoteNewSessionOptions?
+  /// The folders listed for the browser, by path.
+  private(set) var folderListings: [String: RemoteFolderListing] = [:]
+  /// The home folder's path, once listed.
+  private(set) var homePath: String?
   /// The session just created from the phone, for the list to show it.
   var createdSessionID: String?
   /// The last thing the Mac could not do, for an alert.
@@ -155,11 +159,17 @@ final class RemoteChannel {
       searchResults = results
     case .newSessionOffer(let options):
       newSessionOptions = options
+    case .folderListing(let listing):
+      folderListings[listing.path] = listing
+      if pendingHome {
+        pendingHome = false
+        homePath = listing.path
+      }
     case .created(let id):
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .answer, .setStatus, .search, .newSessionOptions, .createSession:
+    case .hello, .show, .send, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder:
       break
     }
   }
@@ -208,6 +218,14 @@ final class RemoteChannel {
 
   func askNewSessionOptions() {
     write(.newSessionOptions)
+  }
+
+  private var pendingHome = false
+
+  /// Asks for a folder's subfolders; `nil` for the home folder.
+  func list(_ path: String?) {
+    if path == nil { pendingHome = true }
+    write(.listFolder(path: path))
   }
 
   func create(_ session: RemoteNewSession) {
