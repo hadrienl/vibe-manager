@@ -33,7 +33,8 @@ followed took the highlighted option, the wrong one. At `PermissionRequest` the 
 digit sent within the millisecond answered it. Only `PermissionRequest` arms a request; one
 announced by `PreToolUse` is shown, its buttons waiting.
 
-Return never picks an option: a digit does. Refusing is Escape, whatever the options: the digit
+Return never picks an option by itself: a digit does — Return only takes an option once the
+screen shows it highlighted, as for a server's confirmation or the folder's trust. Refusing is Escape, whatever the options: the digit
 of "No" guessed one place off would allow. Escape also ends the agent's turn — and, for Claude
 Code, drops the other requests its sub-agents were waiting on — which the Refuse button says.
 
@@ -116,6 +117,13 @@ The same reading may find no dialog at all: Codex resumed at its prompt says not
 first turn, its hooks silent past the ten seconds. Its prompt drawn at the foot of the screen — `›`
 followed by no option's number, no panel's hint below — takes the guess away: nothing waits on the
 user.
+
+Claude Code asks whether to trust the folder it starts in, before any hook speaks (2.1.300):
+`Accessing workspace:`, the folder, then `❯ No, exit` and `Yes, I trust this folder`, no digit —
+a digit does nothing there. Read off the screen, it becomes the folder's trust, answered from the
+conversation: the down arrow, then Return, once the screen shows the same folder; already pointed
+at, Return alone. Return takes whatever is pointed at: it is typed only once the screen, read
+again, shows the arrow moved — otherwise it would exit. Exiting is left to the terminal.
 
 ### What would be allowed is what is shown
 

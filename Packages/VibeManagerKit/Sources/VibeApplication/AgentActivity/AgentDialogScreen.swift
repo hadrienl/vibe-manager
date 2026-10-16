@@ -48,13 +48,33 @@ public struct AgentDialogScreen: Hashable, Sendable {
     }
   }
 
+  /// Whether to trust the folder the CLI starts in, as Claude Code asks it (2.1.300): `Accessing
+  /// workspace:`, the folder, then `No, exit` and `Yes, I trust this folder`, no option numbered,
+  /// one pointed at.
+  public struct FolderTrust: Hashable, Sendable {
+    /// The folder, its wrapped lines joined.
+    public let folder: String
+    /// Whether `Yes, I trust this folder` is pointed at: Return takes the option pointed at.
+    public let isTrustPointed: Bool
+
+    public init(folder: String, isTrustPointed: Bool) {
+      self.folder = folder
+      self.isTrustPointed = isTrustPointed
+    }
+  }
+
   public let options: [Option]
   /// The confirmation the screen ends on, when it ends on one rather than on numbered options.
   public let confirmation: Confirmation?
+  /// The folder's trust the screen ends on, asked before anything else.
+  public let folderTrust: FolderTrust?
 
-  public init(options: [Option], confirmation: Confirmation? = nil) {
+  public init(
+    options: [Option], confirmation: Confirmation? = nil, folderTrust: FolderTrust? = nil
+  ) {
     self.options = options
     self.confirmation = confirmation
+    self.folderTrust = folderTrust
   }
 
   /// How far from the bottom of what is drawn the dialog must end: Codex draws a form's footer
@@ -109,11 +129,12 @@ public struct AgentDialogScreen: Hashable, Sendable {
     guard let last = run.last, lastContent - last.line <= Self.bottomDistance,
       run.filter(\.isPointed).count == 1
     else {
-      guard let confirmation = Self.confirmation(in: lines, lastContent: lastContent) else {
-        return nil
-      }
+      let confirmation = Self.confirmation(in: lines, lastContent: lastContent)
+      let folderTrust = Self.folderTrust(in: lines, lastContent: lastContent)
+      guard confirmation != nil || folderTrust != nil else { return nil }
       self.options = []
       self.confirmation = confirmation
+      self.folderTrust = folderTrust
       return
     }
     var options: [Option] = []
@@ -124,6 +145,28 @@ public struct AgentDialogScreen: Hashable, Sendable {
     }
     self.options = options
     self.confirmation = nil
+    self.folderTrust = nil
+  }
+
+  /// `Accessing workspace:`, the folder, `Quick safety check: …`, then `❯ No, exit` and `Yes, I
+  /// trust this folder` right under it, one pointed at, near the bottom — and nothing else
+  /// pointed at between.
+  static func folderTrust(in lines: [String], lastContent: Int) -> FolderTrust? {
+    let trimmed = lines.map { $0.trimmingCharacters(in: .whitespaces) }
+    func label(_ line: String) -> String {
+      line.hasPrefix("❯") ? line.dropFirst().trimmingCharacters(in: .whitespaces) : line
+    }
+    guard let trust = trimmed.lastIndex(where: { label($0) == "Yes, I trust this folder" }),
+      lastContent - trust <= bottomDistance,
+      let exit = trimmed[..<trust].lastIndex(where: { !$0.isEmpty }),
+      label(trimmed[exit]) == "No, exit",
+      [exit, trust].filter({ trimmed[$0].hasPrefix("❯") }).count == 1,
+      let title = trimmed[..<exit].lastIndex(of: "Accessing workspace:"),
+      let check = trimmed[title..<exit].firstIndex(where: { $0.hasPrefix("Quick safety check") })
+    else { return nil }
+    let folder = trimmed[(title + 1)..<check].joined()
+    guard !folder.isEmpty else { return nil }
+    return FolderTrust(folder: folder, isTrustPointed: trimmed[trust].hasPrefix("❯"))
   }
 
   /// `MCP server “github” requests your input`, its words under it, then its two choices, one

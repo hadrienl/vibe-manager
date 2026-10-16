@@ -50,7 +50,7 @@ extension AppModel {
   }
 
   /// A dialog of the start is guessed to wait: its screen says which, when it is one that can be
-  /// answered from here — Codex's update offered — or that there is none, the prompt at rest. Read
+  /// answered from here — Codex's update offered, Claude Code's folder to trust — or that there is none, the prompt at rest. Read
   /// once, as the guess is made: by then the dialog is drawn.
   private func readStartupDialog(of state: AgentActivityState, previous: AgentActivityState?) {
     func startup(_ state: AgentActivityState?) -> AgentRequestID? {

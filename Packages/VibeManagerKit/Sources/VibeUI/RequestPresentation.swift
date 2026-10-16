@@ -107,7 +107,14 @@ public enum RequestPresentation {
     case .update:
       return LocalizedStringResource(
         "Update available", bundle: .module,
-        comment: "The title of a request of an agent: its CLI offers to update itself as it starts.")
+        comment: "The title of a request of an agent: its CLI offers to update itself as it starts."
+      )
+    case .trust:
+      return LocalizedStringResource(
+        "Trust this folder?", bundle: .module,
+        comment:
+          "The title of a request of an agent: its CLI asks, as it starts, whether the folder it works in is to be trusted."
+      )
     case .other:
       return LocalizedStringResource(
         "Waiting in the terminal", bundle: .module,
@@ -184,6 +191,7 @@ public enum RequestPresentation {
       case .account: return "person.crop.circle.badge.exclamationmark"
       case .startup: return "power"
       case .update: return "arrow.down.circle"
+      case .trust: return "folder.badge.questionmark"
       case .other: return "terminal"
       }
     }

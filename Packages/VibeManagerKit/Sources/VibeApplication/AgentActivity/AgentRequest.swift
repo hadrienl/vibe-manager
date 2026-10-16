@@ -163,6 +163,9 @@ public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
     /// The CLI offers to update itself before it starts — Codex's `Update available` — read off
     /// the screen of a start whose hooks have not spoken.
     case update
+    /// The CLI asks whether the folder it starts in is to be trusted — Claude Code's `Accessing
+    /// workspace` — read off the screen of a start whose hooks have not spoken.
+    case trust
     /// Anything else the agent stopped for.
     case other
   }
@@ -393,6 +396,8 @@ public enum AgentAnswer: Hashable, Sendable {
   /// The questions are set aside — Claude Code's "Chat about this" — for a message the agent gets
   /// instead, typed into its prompt as any other.
   case chatAboutThis
+  /// The folder the CLI starts in is trusted.
+  case trustFolder
 }
 
 extension AgentAnswer {
@@ -406,6 +411,7 @@ extension AgentAnswer {
     case .rejectPlan: return [.rejectPlan]
     case .skipUpdate: return [.skipUpdate]
     case .chatAboutThis: return [.chatAboutThis]
+    case .trustFolder: return [.trustFolder]
     case .answers(let answers):
       return Set(
         answers.map { answer -> AgentAnswerKind in
@@ -470,6 +476,7 @@ public enum AgentAnswerKind: Hashable, Sendable {
   case approvePlan, rejectPlan
   case skipUpdate
   case chatAboutThis
+  case trustFolder
 }
 
 /// Types an answer into the terminal of one CLI, keystroke by keystroke, as the user would (#40).
@@ -497,6 +504,10 @@ public protocol AgentAnswerKeymap: Sendable {
   /// Whether the screen shows the CLI's prompt waiting for words, no dialog over it: hooks silent
   /// past a start then wait on nothing — a resumed Codex says nothing until its first turn.
   func showsPromptAtRest(onScreen text: String) -> Bool
+  /// Whether each key of `answer` after the first waits for the screen to ask for it: its keys
+  /// read off the dialog again must be the ones left to type. Return, which takes the option
+  /// pointed at, must not reach a dialog the key before has not moved yet.
+  func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool
 }
 
 extension AgentAnswerKeymap {
@@ -519,6 +530,10 @@ extension AgentAnswerKeymap {
   }
 
   public func showsPromptAtRest(onScreen text: String) -> Bool {
+    false
+  }
+
+  public func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool {
     false
   }
 }
@@ -558,6 +573,7 @@ public enum TerminalKeys {
   public static let escape: [UInt8] = [0x1B]
   public static let enter: [UInt8] = [0x0D]
   public static let rightArrow: [UInt8] = [0x1B, 0x5B, 0x43]
+  public static let downArrow: [UInt8] = [0x1B, 0x5B, 0x42]
 
   /// The digit that picks the option at `index`, when one digit can.
   public static func digit(forOption index: Int) -> [UInt8]? {
