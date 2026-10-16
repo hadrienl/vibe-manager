@@ -23,7 +23,8 @@ struct VibeCompanionApp: App {
 /// Holds the model from the very start of the launch: the sync engine must exist before the first
 /// push can be delivered.
 @MainActor
-final class CompanionAppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate
+final class CompanionAppDelegate: NSObject, UIApplicationDelegate,
+  @preconcurrency UNUserNotificationCenterDelegate
 {
   let model: CompanionModel
   /// The active channel (#368), opened and closed by the screen with the foreground.
@@ -71,24 +72,31 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate, UNUserNotific
   }
 
   /// A request's alert while the application is open: shown all the same, and noted.
-  nonisolated func userNotificationCenter(
-    _ center: UNUserNotificationCenter, willPresent notification: UNNotification
-  ) async -> UNNotificationPresentationOptions {
-    let content = notification.request.content
-    let delivery = CompanionNotifications.Delivery(
-      title: content.title, body: content.body, date: notification.date)
-    await notifications.delivered(delivery)
-    return [.banner, .list, .sound]
+  ///
+  /// The completion-handler forms, on the main actor: the `async` ones resume UIKit off the main
+  /// thread, and a tap on the alert then aborted the application in its state restoration (#368).
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter, willPresent notification: UNNotification,
+    withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+  ) {
+    note(notification)
+    completionHandler([.banner, .list, .sound])
   }
 
   /// A tap on the alert: the application opens, which is all it asks (#368).
-  nonisolated func userNotificationCenter(
-    _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
-  ) async {
-    let content = response.notification.request.content
+  func userNotificationCenter(
+    _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
+    withCompletionHandler completionHandler: @escaping () -> Void
+  ) {
+    note(response.notification)
+    completionHandler()
+  }
+
+  private func note(_ notification: UNNotification) {
+    let content = notification.request.content
     let delivery = CompanionNotifications.Delivery(
-      title: content.title, body: content.body, date: response.notification.date)
-    await notifications.delivered(delivery)
+      title: content.title, body: content.body, date: notification.date)
+    notifications.delivered(delivery)
   }
 
   /// CloudKit's silent push. The engine fetches on its own; this notes it for the debug screen.
