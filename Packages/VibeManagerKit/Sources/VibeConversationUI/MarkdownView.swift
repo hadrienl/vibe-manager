@@ -7,15 +7,26 @@ import VibeApplication
 /// Its prose — headings, paragraphs, lists and quotes that follow one another — is one text view,
 /// selectable from one paragraph to the next (`MarkdownProse`); code blocks and tables are text
 /// views of their own, rules plain views, between them. One selection runs across all of them
-/// (`MessageSelection`, #189), but not from one message to the next: Copy Message makes up for it.
+/// (#189), and from one message to the next in the conversation (`ConversationSelection`, #381).
 struct MarkdownView: View {
   let text: String
-  @State private var selection = MessageSelection()
 
   var body: some View {
     MarkdownBlocksView(blocks: MarkdownCache.shared.blocks(for: text), markdown: text)
       .frame(maxWidth: .infinity, alignment: .leading)
-      .environment(\.messageSelection, selection)
+      .modifier(MessageSelectionScope())
+  }
+}
+
+/// The conversation's selection for one of its prompts, answers or reasoning (#381); for any
+/// other message — a plan, a sub-agent's prompt, a prompt still on its way —, one of its own.
+struct MessageSelectionScope: ViewModifier {
+  @State private var own = ConversationSelection()
+  @Environment(\.conversationSelection) private var conversation
+  @Environment(\.selectionBlock) private var block
+
+  func body(content: Content) -> some View {
+    content.environment(\.conversationSelection, block == nil ? own : conversation ?? own)
   }
 }
 
@@ -39,6 +50,35 @@ struct MarkdownBlocksView: View {
           SegmentView(content: .prose(blocks, secondary: secondary), markdown: markdown)
         case .block(let block):
           MarkdownBlockView(block: block, markdown: markdown, secondary: secondary)
+        }
+      }
+    }
+  }
+}
+
+extension MarkdownBlocksView {
+  /// The segments the blocks are drawn by, in reading order, as `MarkdownBlocksView` and
+  /// `MarkdownBlockView` lay them out: what a copy takes of a message no longer on screen (#381).
+  static func contents(_ blocks: [MarkdownBlock], secondary: Bool = false) -> [SegmentView.Content]
+  {
+    MarkdownProse.segments(blocks).flatMap { segment -> [SegmentView.Content] in
+      switch segment {
+      case .prose(let blocks):
+        return [.prose(blocks, secondary: secondary)]
+      case .block(let block):
+        switch block {
+        case .heading, .paragraph:
+          return [.prose([block], secondary: secondary)]
+        case .list(_, _, let items):
+          return items.flatMap { contents($0.blocks, secondary: secondary) }
+        case .quote(let blocks):
+          return contents(blocks, secondary: true)
+        case .code(let language, let code):
+          return [.code(code, language: language)]
+        case .table(let header, let rows):
+          return [.table(header: header, rows: rows)]
+        case .rule:
+          return []
         }
       }
     }

@@ -10,7 +10,6 @@ struct UserPromptView: View {
   let attachments: [MessageAttachment]
   let date: Date?
   var isEcho = false
-  @State private var selection = MessageSelection()
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
@@ -84,14 +83,14 @@ struct UserPromptView: View {
   }
 
   private func content(_ shown: String, size: Double) -> some View {
-    // A segment of its own: selecting in it clears the selection of an answer (#189).
+    // Part of the conversation's selection, from one message to the next (#381).
     SegmentView(
       content: .plain(
         shown,
         color: appearance.userMessageStyle == .bubbles ? theme.bubbleText : theme.text),
       markdown: shown, hugsText: true
     )
-    .environment(\.messageSelection, selection)
+    .modifier(MessageSelectionScope())
   }
 }
 
