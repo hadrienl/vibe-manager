@@ -711,6 +711,81 @@ struct ConversationModelTests {
     #expect(model.draft.isEmpty)
   }
 
+  @Test("Questions the composer does not answer: what it sends sets them aside, as a message")
+  func chatAboutThis() async {
+    let size = AgentQuestion(
+      header: "Size", text: "Which size?", options: [.init(label: "S"), .init(label: "L")])
+    let (model, terminal, answers, _) = asking(
+      [Self.colour, size], answers: [.chooseOption, .writeText, .chatAboutThis])
+    #expect(model.composerState == .chattingAboutQuestion)
+    #expect(model.acceptsInput)
+    model.draft = "Stop, a ticket instead"
+    #expect(model.canSend)
+    // Set aside, the questions give the prompt back: the message is typed there.
+    model.answerRequest = { answer, id in
+      answers.given.append((answer, id))
+      model.activity = .working
+      return true
+    }
+    #expect(await model.send())
+    #expect(answers.given.first?.0 == .chatAboutThis)
+    #expect(!terminal.written.isEmpty)
+    #expect(model.draft.isEmpty)
+    // The questions still drawn a moment after their digit: the message waits for the prompt.
+    let (late, lateTerminal, _, _) = asking(
+      [Self.colour, size], answers: [.chooseOption, .writeText, .chatAboutThis])
+    late.answerRequest = { _, _ in
+      late.activity = .working
+      return true
+    }
+    let reads = ScreenReads()
+    late.readScreen = {
+      reads.count += 1
+      return reads.count < 3
+        ? "❯ 1. Red\n  4. Chat about this\nEnter to select · Tab/Arrow keys to navigate · Esc to cancel"
+        : "❯ \n  ? for shortcuts"
+    }
+    late.draft = "Stop"
+    #expect(await late.send())
+    #expect(reads.count >= 3)
+    #expect(!lateTerminal.written.isEmpty)
+    #expect(late.terminalPanel == nil)
+    // Another dialog drawn as they are set aside: nothing typed, the draft kept.
+    let (held, heldTerminal, _, _) = asking(
+      [Self.colour, size], answers: [.chooseOption, .writeText, .chatAboutThis])
+    held.answerRequest = { _, _ in
+      held.activity = .awaitingUser(.approval)
+      return true
+    }
+    held.draft = "Stop"
+    #expect(await held.send() == false)
+    #expect(heldTerminal.written.isEmpty)
+    #expect(held.draft == "Stop")
+    // A CLI without "Chat about this" keeps the composer closed.
+    let (closed, _, _, _) = asking([Self.colour, size], answers: [.chooseOption])
+    #expect(closed.composerState == .awaitingAnswer)
+  }
+
+  @MainActor private final class ScreenReads {
+    var count = 0
+  }
+
+  @Test("A request no call holds is shown above the composer")
+  func standaloneRequest() {
+    let (model, _) = model()
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: model.sessionID, key: "startup"), receivedAt: Date(),
+      kind: .approval,
+      content: .inTerminal(AgentTerminalPrompt(kind: .update, message: "0.159.2 → 0.162.1")),
+      reference: AgentToolReference(tool: nil), isShown: true)
+    model.pendingRequest = {
+      ConversationRequest(request: request, answers: [.skipUpdate], isSending: false)
+    }
+    model.answerRequest = { _, _ in true }
+    model.activity = .awaitingUser(.approval)
+    #expect(model.standaloneRequest?.request.id == request.id)
+  }
+
   @Test("A free answer that could not be typed stays in the composer")
   func freeAnswerKept() async {
     let (model, _, answers, _) = asking([Self.colour], answers: [.chooseOption, .writeText])
@@ -768,6 +843,39 @@ struct ConversationModelTests {
     #expect(model.pendingCall?.callID == "t2")
     #expect(model.request(for: first) != nil)
     #expect(model.request(for: last) == nil)
+  }
+
+  @Test("A server's confirmation goes under its running call, its group unfolded")
+  func elicitationUnderItsServersCall() throws {
+    let (model, _) = model()
+    let calls = (1...3).map {
+      ToolCall(
+        callID: "t\($0)", kind: .mcp(server: "claude_ai_Supabase", tool: "execute_sql"),
+        state: $0 < 3 ? .succeeded : .running)
+    }
+    model.apply(
+      ConversationSnapshot(
+        entries: calls.map { ConversationEntry(id: "e\($0.callID)", content: .tool($0)) },
+        availability: .available))
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: model.sessionID, key: "f"), receivedAt: Date(),
+      kind: .question,
+      content: .elicitation(
+        AgentElicitation(server: "claude.ai Supabase", message: "Run it?", fieldCount: 0)),
+      reference: AgentToolReference(tool: nil), isShown: true)
+    model.pendingRequest = {
+      ConversationRequest(request: request, answers: [.allowOnce, .deny], isSending: false)
+    }
+    model.answerRequest = { _, _ in true }
+    model.activity = .awaitingUser(.question)
+    #expect(model.request(for: calls[2]) != nil)
+    #expect(model.request(for: calls[0]) == nil)
+    let group = try #require(model.blocks.first)
+    guard case .toolGroup = group else {
+      Issue.record("The calls are not grouped")
+      return
+    }
+    #expect(model.isExpanded(group))
   }
 
   @Test("A question only its terminal can answer leaves the options and the composer closed")

@@ -2,6 +2,7 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// Settings › Tickets (#89): whether ticket titles go to the notes, and in what line; then, on a
@@ -187,21 +188,21 @@ struct TicketSettingsView: View {
         } label: {
           Image(systemName: "plus")
         }
-        .help(Text("Add a resolver", bundle: .module))
+        .instantTooltip(Text("Add a resolver", bundle: .module))
         Button {
           duplicate()
         } label: {
           Image(systemName: "plus.square.on.square")
         }
         .disabled(selectedID == nil)
-        .help(Text("Duplicate the resolver", bundle: .module))
+        .instantTooltip(Text("Duplicate the resolver", bundle: .module))
         Button {
           remove()
         } label: {
           Image(systemName: "minus")
         }
         .disabled(selectedID == nil)
-        .help(Text("Delete the resolver", bundle: .module))
+        .instantTooltip(Text("Delete the resolver", bundle: .module))
         Spacer()
         Menu {
           Button {
@@ -297,7 +298,7 @@ struct TicketSettingsView: View {
                   Image(systemName: "minus.circle")
                 }
                 .buttonStyle(.borderless)
-                .help(Text("Remove the rule", bundle: .module))
+                .instantTooltip(Text("Remove the rule", bundle: .module))
               }
             }
             Button {

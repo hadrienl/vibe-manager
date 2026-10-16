@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The header of a group of the sidebar: its folder, how many sessions it holds and the most
@@ -65,12 +66,12 @@ struct SessionGroupHeader: View {
       if let headline = summary.headline {
         Image(systemName: headline.symbolName)
           .foregroundStyle(tint(headline.severity))
-          .help(Text(headline.label))
+          .instantTooltip(Text(headline.label))
       }
     }
     .font(.subheadline.weight(.semibold))
     .lineLimit(1)
-    .help(helpText)
+    .instantTooltip(helpText)
     .onHover { isHovering = $0 }
     .contextMenu { menu(isExpanded: isExpanded) }
     .accessibilityElement(children: .ignore)
@@ -150,7 +151,7 @@ struct SessionGroupHeader: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.borderless)
-    .help(newSessionHelp(newSession))
+    .instantTooltip(newSessionHelp(newSession))
     .accessibilityHidden(true)
   }
 

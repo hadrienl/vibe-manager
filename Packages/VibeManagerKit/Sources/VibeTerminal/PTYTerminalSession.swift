@@ -22,6 +22,9 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private let subscribers = TerminalSubscribers()
   private var exitSource: DispatchSourceProcess?
   private var lastSize: TerminalSize
+  /// Counts the redraws, and the resizes that overtake one, so that only the last redraw gives
+  /// the terminal its size back.
+  private var redrawGeneration = 0
   /// A side terminal's shell (#43) is hung up on, as a terminal window closing does, and each of
   /// its jobs with it: they live in groups of their own under job control, which a signal to the
   /// shell's group alone would leave running.
@@ -114,18 +117,39 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   public func resize(to size: TerminalSize) {
     guard size.isUsable, size != lastSize, !isFinalized else { return }
     lastSize = size
+    // A redraw under way has nothing to give back: the terminal has its new size.
+    redrawGeneration += 1
     terminal.resize(to: size)
   }
 
-  /// Tells the program to draw itself again, at the size it already has.
+  /// How long a redraw keeps the terminal a row shorter: long enough for the program to read that
+  /// size when the signal reaches it.
+  public static let redrawHold: Duration = .milliseconds(250)
+
+  /// Has the program draw its whole screen again, at the size it already has.
   ///
   /// A view that attaches to a program already running is given its history, and a full-screen
-  /// program's history is a stream of redraws cut wherever the replay buffer was trimmed. The
-  /// kernel only raises `SIGWINCH` when the size changes, and a view reopened at the same size
-  /// changes nothing — so the signal is sent here, to the group the child leads.
-  public func redraw() {
+  /// program's history is a stream of redraws cut wherever the replay buffer was trimmed; output
+  /// lost on its way to the application leaves a damaged screen too. A `SIGWINCH` at the same size
+  /// is not enough: Node, and so the agents built on it, only redraw when the size they read has
+  /// changed, and a program that draws by differences sends nothing for an unchanged screen. The
+  /// terminal is made a row shorter, then given its size back once `hold` has passed (#367).
+  public func redraw(holdingFor hold: Duration = PTYTerminalSession.redrawHold) {
     guard !isFinalized else { return }
-    terminal.signalProcessGroup(SIGWINCH)
+    let size = lastSize
+    terminal.resize(
+      to: TerminalSize(columns: size.columns, rows: size.rows > 1 ? size.rows - 1 : size.rows + 1))
+    redrawGeneration += 1
+    let generation = redrawGeneration
+    Task { [weak self] in
+      try? await Task.sleep(for: hold)
+      await self?.endRedraw(generation)
+    }
+  }
+
+  private func endRedraw(_ generation: Int) {
+    guard generation == redrawGeneration, !isFinalized else { return }
+    terminal.resize(to: lastSize)
   }
 
   public func stop(gracePeriod: Duration) async {
@@ -190,8 +214,8 @@ public actor PTYTerminalSession: VibeApplication.TerminalSession {
   private func consume(_ event: TerminalReadEvent) async {
     switch event {
     case .bytes(let bytes):
-      let dropped = historyBuffer.append(bytes)
-      subscribers.output(bytes, historyDropped: dropped)
+      historyBuffer.append(bytes)
+      subscribers.output(bytes)
       reader.didConsume(byteCount: bytes.count)
     case .endOfFile:
       isReaderFinished = true

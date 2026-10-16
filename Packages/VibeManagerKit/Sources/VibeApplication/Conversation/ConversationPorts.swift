@@ -174,6 +174,9 @@ public struct AgentPromptFormat: Hashable, Sendable {
   public var queueKey: [UInt8]
   /// What stops the agent's turn: Escape for both CLIs.
   public var interruptKey: [UInt8]
+  /// What sends at once the prompts queued during a turn, the turn stopped; `nil` for an agent
+  /// that cannot (#341).
+  public var sendNowKey: [UInt8]?
   /// Between the paste and the key that sends it: a TUI that times keystrokes to tell a paste
   /// from typing must have seen the paste end.
   public var submitDelay: Duration
@@ -183,21 +186,29 @@ public struct AgentPromptFormat: Hashable, Sendable {
   public var attachmentDelay: Duration
   /// `nil` for an agent without a shell mode: a `!` typed first is then text (#188).
   public var shellEntry: ShellEntry?
+  /// Whether its prompt can be read on its screen (`PromptInputRecognition`): Return then waits
+  /// for the text to show in it, and the prompt still there once Return is written is sent again
+  /// (#370).
+  public var readsInputOnScreen: Bool
 
   public init(
     textEntry: PromptTextEntry = .bracketedPaste,
     submitKey: [UInt8] = [0x0D],
     queueKey: [UInt8] = [0x0D],
     interruptKey: [UInt8] = [0x1B],
+    sendNowKey: [UInt8]? = nil,
     submitDelay: Duration = .milliseconds(80),
     attachmentDelay: Duration = .milliseconds(500),
-    shellEntry: ShellEntry? = nil
+    shellEntry: ShellEntry? = nil,
+    readsInputOnScreen: Bool = false
   ) {
     self.shellEntry = shellEntry
+    self.readsInputOnScreen = readsInputOnScreen
     self.textEntry = textEntry
     self.submitKey = submitKey
     self.queueKey = queueKey
     self.interruptKey = interruptKey
+    self.sendNowKey = sendNowKey
     self.submitDelay = submitDelay
     self.attachmentDelay = attachmentDelay
   }

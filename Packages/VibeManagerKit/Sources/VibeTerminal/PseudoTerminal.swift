@@ -235,8 +235,9 @@ enum PseudoTerminalLauncher {
       }
     }
 
+    // What failed is what was spawned: the trampoline, for a side terminal, not its shell (#382).
     guard result == 0 else {
-      throw launchError(forSpawnResult: result, executablePath: executablePath)
+      throw launchError(forSpawnResult: result, executablePath: spawnPath)
     }
     return processIdentifier
   }

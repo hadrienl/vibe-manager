@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The top of the inspector (#183): which session it describes, and where to rename it or change
@@ -25,7 +26,7 @@ struct SessionIdentityHeader: View {
       }
       .buttonStyle(.plain)
       .disabled(!model.canEditIdentity(of: session.id))
-      .help(Text("Change Icon", bundle: .module))
+      .instantTooltip(Text("Change Icon", bundle: .module))
       .accessibilityLabel(Text("Change Icon", bundle: .module))
       .accessibilityIdentifier("inspector-session-badge")
       .sessionAppearancePopover(model: model, sessionID: session.id, place: .inspector)
@@ -48,7 +49,7 @@ struct SessionIdentityHeader: View {
             .buttonStyle(.borderless)
             .focused($isRenameFocused)
             .opacity(isHovering || isRenameFocused ? 1 : 0)
-            .help(Text("Rename", bundle: .module, comment: "Renames a session."))
+            .instantTooltip(Text("Rename", bundle: .module, comment: "Renames a session."))
             .accessibilityLabel(Text("Rename", bundle: .module, comment: "Renames a session."))
             .accessibilityIdentifier("inspector-session-rename")
           }
@@ -58,7 +59,7 @@ struct SessionIdentityHeader: View {
             .font(.callout)
             .foregroundStyle(.secondary)
             .lineLimit(1)
-            .help(Text(verbatim: agent.providerID))
+            .instantTooltip(Text(verbatim: agent.providerID))
         }
         themeButton
       }
@@ -89,7 +90,7 @@ struct SessionIdentityHeader: View {
     }
     .buttonStyle(.plain)
     .disabled(!model.canEditIdentity(of: session.id))
-    .help(Text("Change Conversation Theme", bundle: .module))
+    .instantTooltip(Text("Change Conversation Theme", bundle: .module))
     .accessibilityLabel(Text("Conversation Theme: \(name)", bundle: .module))
     .accessibilityIdentifier("inspector-session-theme")
     .sessionThemePopover(model: model, sessionID: session.id, place: .inspector)

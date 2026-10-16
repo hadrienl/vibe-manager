@@ -96,7 +96,7 @@ public enum AgentRequestContent: Hashable, Codable, Sendable {
   /// A plan to accept before the agent starts. `excerpt` is its beginning.
   case plan(excerpt: String, isComplete: Bool)
   /// A form an MCP server asks the user to fill in, or a page to open: only the terminal can
-  /// answer it.
+  /// answer it, unless the form is a mere confirmation.
   case elicitation(AgentElicitation)
   /// The agent asked something its report does not let us read: cut short, or not JSON.
   case unreadable(tool: String?)
@@ -123,11 +123,22 @@ public struct AgentElicitation: Hashable, Codable, Sendable {
   public let message: String?
   /// The page the server asks to open, in URL mode: `http` or `https` only.
   public let url: URL?
+  /// How many fields its form has, when its report says: none makes it a mere confirmation,
+  /// accepted or declined.
+  public let fieldCount: Int?
 
-  public init(server: String? = nil, message: String? = nil, url: URL? = nil) {
+  public init(
+    server: String? = nil, message: String? = nil, url: URL? = nil, fieldCount: Int? = nil
+  ) {
     self.server = server
     self.message = message
     self.url = url.flatMap { ["http", "https"].contains($0.scheme?.lowercased()) ? $0 : nil }
+    self.fieldCount = fieldCount
+  }
+
+  /// A form with nothing to fill in, only to accept or decline.
+  public var isConfirmation: Bool {
+    url == nil && fieldCount == 0
   }
 }
 
@@ -149,6 +160,12 @@ public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
     /// The CLI started, and its hooks have not spoken: a dialog of its own start holds them back —
     /// trusting the folder, approving servers or hooks, signing in (#273).
     case startup
+    /// The CLI offers to update itself before it starts — Codex's `Update available` — read off
+    /// the screen of a start whose hooks have not spoken.
+    case update
+    /// The CLI asks whether the folder it starts in is to be trusted — Claude Code's `Accessing
+    /// workspace` — read off the screen of a start whose hooks have not spoken.
+    case trust
     /// Anything else the agent stopped for.
     case other
   }
@@ -374,6 +391,13 @@ public enum AgentAnswer: Hashable, Sendable {
   case answers([AgentQuestionAnswer])
   case approvePlan(AgentPlanApproval)
   case rejectPlan
+  /// The CLI's update is passed over: this time, or until the next version.
+  case skipUpdate(untilNextVersion: Bool)
+  /// The questions are set aside — Claude Code's "Chat about this" — for a message the agent gets
+  /// instead, typed into its prompt as any other.
+  case chatAboutThis
+  /// The folder the CLI starts in is trusted.
+  case trustFolder
 }
 
 extension AgentAnswer {
@@ -385,6 +409,9 @@ extension AgentAnswer {
     case .deny: return [.deny]
     case .approvePlan: return [.approvePlan]
     case .rejectPlan: return [.rejectPlan]
+    case .skipUpdate: return [.skipUpdate]
+    case .chatAboutThis: return [.chatAboutThis]
+    case .trustFolder: return [.trustFolder]
     case .answers(let answers):
       return Set(
         answers.map { answer -> AgentAnswerKind in
@@ -447,6 +474,9 @@ public enum AgentAnswerKind: Hashable, Sendable {
   case allowOnce, allowAlways, deny
   case chooseOption, chooseOptions, writeText
   case approvePlan, rejectPlan
+  case skipUpdate
+  case chatAboutThis
+  case trustFolder
 }
 
 /// Types an answer into the terminal of one CLI, keystroke by keystroke, as the user would (#40).
@@ -468,6 +498,16 @@ public protocol AgentAnswerKeymap: Sendable {
   var readsRequestOnScreen: Bool { get }
   /// The dialog drawn last, as the screen shows it, or `nil` when it cannot be read whole.
   func drawnDialog(onScreen text: String) -> AgentDrawnDialog?
+  /// What a dialog of the CLI's start says, read off the screen, when it is one this keymap
+  /// answers: an update offered.
+  func startupDialog(onScreen text: String) -> AgentTerminalPrompt?
+  /// Whether the screen shows the CLI's prompt waiting for words, no dialog over it: hooks silent
+  /// past a start then wait on nothing — a resumed Codex says nothing until its first turn.
+  func showsPromptAtRest(onScreen text: String) -> Bool
+  /// Whether each key of `answer` after the first waits for the screen to ask for it: its keys
+  /// read off the dialog again must be the ones left to type. Return, which takes the option
+  /// pointed at, must not reach a dialog the key before has not moved yet.
+  func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool
 }
 
 extension AgentAnswerKeymap {
@@ -483,6 +523,18 @@ extension AgentAnswerKeymap {
 
   public func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
     nil
+  }
+
+  public func startupDialog(onScreen text: String) -> AgentTerminalPrompt? {
+    nil
+  }
+
+  public func showsPromptAtRest(onScreen text: String) -> Bool {
+    false
+  }
+
+  public func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool {
+    false
   }
 }
 
@@ -521,6 +573,7 @@ public enum TerminalKeys {
   public static let escape: [UInt8] = [0x1B]
   public static let enter: [UInt8] = [0x0D]
   public static let rightArrow: [UInt8] = [0x1B, 0x5B, 0x43]
+  public static let downArrow: [UInt8] = [0x1B, 0x5B, 0x42]
 
   /// The digit that picks the option at `index`, when one digit can.
   public static func digit(forOption index: Int) -> [UInt8]? {

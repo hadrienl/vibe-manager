@@ -96,6 +96,89 @@ enum DialogScreens {
     ────────
     """
 
+  /// An MCP server's form with nothing to fill in, as Claude Code 2.1.288 draws it, wrapped in a
+  /// narrow pane.
+  static let claudeConfirmation = """
+     Calling Supabase 4 times… (ctrl+o to expand)
+     ⎿  Fulfilling input required by 'tools/call' (round 1)
+
+    ──────────────────────────────────────────────────────────
+     MCP server “claude.ai Supabase” requests your input
+
+     This SQL includes destructive operations (DROP, DELETE,
+     TRUNCATE or UPDATE without WHERE).
+     It may permanently remove data, tables, schemas or other objects.
+     Run it on project msrauwqwfahxpgwrhmlb?
+
+     ❯ Accept    Decline
+
+     Esc to cancel · ↑/↓ to navigate
+    """
+  static let confirmationMessage = """
+    This SQL includes destructive operations (DROP, DELETE, TRUNCATE or UPDATE without WHERE).
+    It may permanently remove data, tables, schemas or other objects.
+    Run it on project msrauwqwfahxpgwrhmlb?
+    """
+
+  /// The update Codex 0.159.2 offers as it starts.
+  static let codexUpdate = """
+      Update available · 0.159.2 → 0.162.1
+      Release notes: https://github.com/openai/codex/releases/latest
+
+    › 1. Update now (runs `sh -c 'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh'`)
+      2. Skip
+      3. Skip until next version
+
+      enter continue · esc skip
+    """
+  /// Codex 0.159.2 resumed, at its prompt: no hook has spoken yet, and none will before a turn.
+  static let codexAtRest = """
+    • CI corrigée et verte sur la PR #373.
+
+      Worked for 32m 33s • Oct 12 at 14:47
+
+    › Ask Codex to do anything
+
+      GPT-5.6-Sol medium · ~/Documents/vibe-manager
+      ? for shortcuts                                        ⚠ 4 warnings · f2 to view
+    """
+  /// The folder's trust, as Claude Code 2.1.300 asks it before anything else: no digit.
+  static let claudeTrust = """
+    ────────────────────────────────────────────────────────────────
+     Accessing workspace:
+
+     /Users/hadrien/Documents/prisme.ai/.worktrees/oauth-failure-de
+     sign
+
+     Quick safety check: Is this a project you created or one you trust? (Like your own code, a
+     well-known open source project, or work from your team).
+
+     Claude Code'll be able to read, edit, and execute files here.
+
+     Security guide
+
+     ❯ No, exit
+       Yes, I trust this folder
+
+     Enter to confirm · Esc to cancel
+    """
+  /// Two questions, as Claude Code 2.1.296 draws the first: "Chat about this" past a rule.
+  static let claudeChatAboutThis = """
+    ←  ☐ Color  ☐ Pets  ✔ Submit  →
+
+    Pick a color?
+
+    ❯ 1. Red
+         Rouge
+      2. Blue
+         Bleu
+      3. Type something.
+    ──────────────────────────────────────────────────────────────
+      4. Chat about this
+
+    Enter to select · Tab/Arrow keys to navigate · Esc to cancel
+    """
+
   static func dialog(_ text: String) -> AgentDialogScreen? { AgentDialogScreen(screen: text) }
 }
 
@@ -105,7 +188,8 @@ struct AgentDialogScreenTests {
   func options() throws {
     let bash = try #require(DialogScreens.dialog(DialogScreens.claudeBash))
     #expect(bash.options.map(\.number) == [1, 2, 3, 4])
-    #expect(bash.options[1].label == "Yes, and always allow access to /Users/a/proj from this project")
+    #expect(
+      bash.options[1].label == "Yes, and always allow access to /Users/a/proj from this project")
     let codex = try #require(DialogScreens.dialog(DialogScreens.codexCommand))
     #expect(codex.options.map(\.shortcut) == ["y", "p", "esc"])
     #expect(codex.options[0].label == "Yes, proceed")
@@ -124,6 +208,29 @@ struct AgentDialogScreenTests {
         """))
     #expect(narrow.options.map(\.number) == [1, 2, 3])
     #expect(narrow.options[1].label.hasSuffix("project from this project"))
+  }
+
+  @Test("A confirmation: its server, its words, and whether Accept is pointed at")
+  func confirmation() throws {
+    let screen = try #require(DialogScreens.dialog(DialogScreens.claudeConfirmation))
+    #expect(screen.options.isEmpty)
+    let form = try #require(screen.confirmation)
+    #expect(form.server == "claude.ai Supabase")
+    #expect(form.isAcceptPointed)
+    let elicitation = AgentElicitation(
+      server: "claude.ai Supabase", message: DialogScreens.confirmationMessage, fieldCount: 0)
+    #expect(form.asks(elicitation))
+    #expect(
+      !form.asks(
+        AgentElicitation(
+          server: "claude.ai Supabase", message: "Run it on another project?", fieldCount: 0)))
+    #expect(
+      !form.asks(
+        AgentElicitation(server: "other", message: DialogScreens.confirmationMessage, fieldCount: 0)
+      ))
+    let declining = DialogScreens.claudeConfirmation.replacingOccurrences(
+      of: "❯ Accept    Decline", with: "  Accept  ❯ Decline")
+    #expect(DialogScreens.dialog(declining)?.confirmation?.isAcceptPointed == false)
   }
 
   @Test("An agent's numbered list, or nothing numbered, is no dialog")
@@ -146,6 +253,137 @@ struct DialogScreenKeymapTests {
     .permission(
       AgentToolPermission(
         tool: tool, toolName: "Bash", subject: "ls", purpose: purpose, alwaysAllow: always))
+  }
+
+  @Test("Claude Code's confirmation: Return once Accept is pointed at under its words, Escape")
+  func claudeConfirmation() {
+    let elicitation = AgentRequestContent.elicitation(
+      AgentElicitation(
+        server: "claude.ai Supabase", message: DialogScreens.confirmationMessage, fieldCount: 0))
+    let screen = DialogScreens.dialog(DialogScreens.claudeConfirmation)
+    #expect(claude.keystrokes(for: .allowOnce, to: elicitation, screen: screen) == [[0x0D]])
+    #expect(claude.keystrokes(for: .deny, to: elicitation, screen: screen) == [[0x1B]])
+    // Not drawn yet: a key would land in the prompt, and Escape stop the turn.
+    #expect(claude.keystrokes(for: .allowOnce, to: elicitation, screen: nil) == nil)
+    #expect(claude.keystrokes(for: .deny, to: elicitation, screen: nil) == nil)
+    // Decline pointed at: Return would decline.
+    let declining = DialogScreens.dialog(
+      DialogScreens.claudeConfirmation.replacingOccurrences(
+        of: "❯ Accept    Decline", with: "  Accept  ❯ Decline"))
+    #expect(claude.keystrokes(for: .allowOnce, to: elicitation, screen: declining) == nil)
+    // A form with fields to fill in, drawn or not, is left to the terminal.
+    let form = AgentRequestContent.elicitation(
+      AgentElicitation(
+        server: "claude.ai Supabase", message: DialogScreens.confirmationMessage, fieldCount: 1))
+    #expect(claude.keystrokes(for: .allowOnce, to: form, screen: screen) == nil)
+  }
+
+  @Test("Codex's update, read off the screen: Skip takes 2, Skip This Version 3, never Update")
+  func codexUpdate() throws {
+    let prompt = try #require(codex.startupDialog(onScreen: DialogScreens.codexUpdate))
+    #expect(prompt == AgentTerminalPrompt(kind: .update, message: "0.159.2 → 0.162.1"))
+    #expect(codex.drawnDialog(onScreen: DialogScreens.codexUpdate) == AgentDrawnDialog(.update))
+    let update = AgentRequestContent.inTerminal(prompt)
+    #expect(codex.answers(for: update) == [.skipUpdate])
+    let screen = DialogScreens.dialog(DialogScreens.codexUpdate)
+    #expect(
+      codex.keystrokes(for: .skipUpdate(untilNextVersion: false), to: update, screen: screen)
+        == [[0x32]])
+    #expect(
+      codex.keystrokes(for: .skipUpdate(untilNextVersion: true), to: update, screen: screen)
+        == [[0x33]])
+    #expect(codex.keystrokes(for: .skipUpdate(untilNextVersion: false), to: update) == nil)
+    // Another dialog of the start is not taken for it.
+    #expect(codex.startupDialog(onScreen: DialogScreens.codexCommand) == nil)
+    #expect(
+      codex.answers(for: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil))).isEmpty)
+  }
+
+  @Test("Codex's prompt at rest: no dialog of its start waits; a dialog's pointer is not it")
+  func codexPromptAtRest() {
+    #expect(codex.showsPromptAtRest(onScreen: DialogScreens.codexAtRest))
+    #expect(codex.startupDialog(onScreen: DialogScreens.codexAtRest) == nil)
+    #expect(!codex.showsPromptAtRest(onScreen: DialogScreens.codexUpdate))
+    #expect(!codex.showsPromptAtRest(onScreen: DialogScreens.codexCommand))
+    #expect(!claude.showsPromptAtRest(onScreen: DialogScreens.codexAtRest))
+    // The folder's trust, a panel: no prompt under them.
+    let trust = """
+      Do you trust the contents of this directory?
+
+      › 1. Yes, continue
+        2. No, quit
+
+        Press enter to continue
+      """
+    #expect(!codex.showsPromptAtRest(onScreen: trust))
+    let panel = """
+      Select Model and Effort
+      › gpt-5.6-sol (current)
+        gpt-5.5
+
+        enter select · esc back
+      """
+    #expect(!codex.showsPromptAtRest(onScreen: panel))
+  }
+
+  @Test("Claude Code's folder trust, read off the screen: the down arrow, then Return")
+  func claudeTrust() throws {
+    let folder = "/Users/hadrien/Documents/prisme.ai/.worktrees/oauth-failure-design"
+    let prompt = try #require(claude.startupDialog(onScreen: DialogScreens.claudeTrust))
+    #expect(prompt == AgentTerminalPrompt(kind: .trust, message: folder))
+    let trust = AgentRequestContent.inTerminal(prompt)
+    #expect(claude.answers(for: trust) == [.trustFolder])
+    let screen = DialogScreens.dialog(DialogScreens.claudeTrust)
+    #expect(
+      claude.keystrokes(for: .trustFolder, to: trust, screen: screen)
+        == [TerminalKeys.downArrow, TerminalKeys.enter])
+    // Already pointed at: Return alone.
+    let pointed = DialogScreens.claudeTrust
+      .replacingOccurrences(of: "❯ No, exit", with: "  No, exit")
+      .replacingOccurrences(of: "  Yes, I trust", with: "❯ Yes, I trust")
+    #expect(
+      claude.keystrokes(for: .trustFolder, to: trust, screen: DialogScreens.dialog(pointed))
+        == [TerminalKeys.enter])
+    // Another folder's, or no dialog read: nothing typed.
+    let other = AgentRequestContent.inTerminal(AgentTerminalPrompt(kind: .trust, message: "/x"))
+    #expect(claude.keystrokes(for: .trustFolder, to: other, screen: screen) == nil)
+    #expect(claude.keystrokes(for: .trustFolder, to: trust) == nil)
+    // Neither the guess of a start nor Codex's keymap answers it.
+    #expect(
+      claude.answers(for: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil))).isEmpty)
+    #expect(codex.startupDialog(onScreen: DialogScreens.claudeTrust) == nil)
+    #expect(claude.startupDialog(onScreen: DialogScreens.codexUpdate) == nil)
+  }
+
+  @Test("Claude Code's questions set aside: Chat about this's digit, read on screen, then the text")
+  func claudeChatAboutThis() {
+    let questions = AgentRequestContent.questions([
+      AgentQuestion(
+        header: "Color", text: "Pick a color?",
+        options: [.init(label: "Red", description: "Rouge"), .init(label: "Blue")]),
+      AgentQuestion(
+        header: "Pets", text: "Pets?", options: [.init(label: "Cat"), .init(label: "Dog")],
+        allowsMultipleChoices: true),
+    ])
+    #expect(claude.answers(for: questions).contains(.chatAboutThis))
+    let screen = DialogScreens.dialog(DialogScreens.claudeChatAboutThis)
+    #expect(claude.keystrokes(for: .chatAboutThis, to: questions, screen: screen) == [[0x34]])
+    #expect(claude.keystrokes(for: .chatAboutThis, to: questions, screen: nil) == nil)
+    // Eight options: "Chat about this" would be the tenth, with no digit.
+    let many = AgentRequestContent.questions([
+      AgentQuestion(
+        header: nil, text: "Which?", options: (1...8).map { .init(label: "o\($0)") })
+    ])
+    #expect(!claude.answers(for: many).contains(.chatAboutThis))
+  }
+
+  @Test("Codex: an MCP tool's form takes the digit of Allow, Escape cancels it")
+  func codexMCPTool() {
+    let tool = permission(.mcp(server: "echo_box", tool: "write_note"), always: nil)
+    let screen = DialogScreens.dialog(CodexApprovalScreens.codexTool)
+    #expect(codex.answers(for: tool) == [.allowOnce, .deny])
+    #expect(codex.keystrokes(for: .allowOnce, to: tool, screen: screen) == [[0x31]])
+    #expect(codex.keystrokes(for: .deny, to: tool, screen: screen) == [[0x1B]])
   }
 
   @Test("Claude Code's plan: each approval takes its own option, wherever it stands")

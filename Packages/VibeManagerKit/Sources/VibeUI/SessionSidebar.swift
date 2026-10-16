@@ -34,6 +34,8 @@ struct SessionSidebar: View {
   @State private var springLoading = SpringLoading()
   /// The row the tour opened to show the swipe (#338), and how far, until it puts it back.
   @State private var demoSwipe: (id: SessionID, translation: CGFloat)?
+  /// A row of the list is being dragged (#387).
+  @State private var isDraggingRow = false
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
   @Environment(\.controlActiveState) private var activeState
 
@@ -109,6 +111,7 @@ struct SessionSidebar: View {
             interrupted: { closeSwipe(animated: true) }
           )
         )
+        .background(ListDragWatch { isDraggingRow = $0 })
         // The tour's bubble on the new session's row shows the gesture it talks about (#338).
         .task(id: demoSessionID) { await playSwipeDemo(on: demoSessionID, width: width) }
         // Over the foot of the list, never over the session on screen, and the list's last rows
@@ -240,19 +243,50 @@ struct SessionSidebar: View {
   private func rows(
     _ sessions: [WorkSession], positions: [SessionID: Int], width: CGFloat
   ) -> some View {
-    ForEach(sessions) { session in
-      row(for: session, position: positions[session.id], width: width)
-        .tag(session.id)
+    // Only a session some child names can have done children: the others are not counted.
+    let parents = Set(model.sessions.compactMap { $0.coordination?.coordinatorID })
+    let items = SidebarItem.items(of: sessions) {
+      parents.contains($0) ? model.doneChildren(ofCoordinator: $0) : nil
     }
-    .onMove(perform: model.canReorder ? { move(sessions, from: $0, to: $1) } : nil)
+    // Gone while a row is dragged: the rows the list moves apart would cut it (#387).
+    let lines = isDraggingRow ? [:] : SidebarItem.familyLines(of: items)
+    return ForEach(items) { item in
+      Group {
+        switch item {
+        case .session(let session):
+          row(for: session, position: positions[session.id], width: width)
+            .tag(session.id)
+        case .doneChildren(let coordinator, let done):
+          DoneChildrenRow(done: done) {
+            model.setShowingDoneChildren(!done.isShown, coordinator: coordinator)
+          }
+          .moveDisabled(true)
+        }
+      }
+      // Behind the row, and not moved with it by a swipe.
+      .background {
+        if let line = lines[item.id] { FamilyLineView(line: line) }
+      }
+    }
+    .onMove(perform: model.canReorder ? { move(items, from: $0, to: $1) } : nil)
   }
 
   /// `destination` counts the rows before the move; the model counts them without the one moved.
-  private func move(_ sessions: [WorkSession], from source: IndexSet, to destination: Int) {
-    guard let first = source.first, sessions.indices.contains(first) else { return }
+  private func move(_ items: [SidebarItem], from source: IndexSet, to destination: Int) {
+    guard let first = source.first, items.indices.contains(first),
+      case .session(let moved) = items[first]
+    else { return }
+    let sessions = items.compactMap(\.session)
+    let before = items[..<min(destination, items.count)].compactMap(\.session).count
     closeSwipe(animated: false)
-    let id = sessions[first].id
-    let index = destination > first ? destination - 1 : destination
+    move(sessions, id: moved.id, to: before)
+  }
+
+  private func move(_ sessions: [WorkSession], id: SessionID, to destination: Int) {
+    // Counted among the rows the session moves with — the coordinators, or its siblings (#352).
+    let movable = Set((model.reorderingSubset(of: id) ?? sessions).map(\.id))
+    let index = sessions[..<min(destination, sessions.count)]
+      .filter { $0.id != id && movable.contains($0.id) }.count
     Task { await model.move(id, toIndex: index) }
   }
 
@@ -655,7 +689,7 @@ private struct ColumnTabs: View {
     let summary = model.summary(of: column)
     let isSelected = model.filter.column == column
     return Button {
-      model.setColumn(column)
+      model.chooseColumn(column)
     } label: {
       VStack(spacing: 1) {
         HStack(spacing: 3) {

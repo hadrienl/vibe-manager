@@ -73,7 +73,7 @@ private struct CodexLikeDecoder: AgentSignalDecoding {
 }
 
 /// Reads the command a dialog shows from its `$ ` line, a patch's paths from its `Destination: `
-/// lines, and allows with `y`.
+/// lines, an MCP tool from a `tool: <server> <tool>` line, and allows with `y`.
 private struct ScreenKeymap: AgentAnswerKeymap {
   func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
     [.allowOnce, .deny]
@@ -91,6 +91,10 @@ private struct ScreenKeymap: AgentAnswerKeymap {
 
   func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
     let lines = text.split(separator: "\n")
+    if let line = lines.last(where: { $0.hasPrefix("tool: ") }) {
+      let names = line.dropFirst(6).split(separator: " ")
+      return AgentDrawnDialog(.mcpTool(server: String(names[0]), tool: String(names[1])))
+    }
     if let line = lines.last(where: { $0.hasPrefix("$ ") }) {
       return AgentDrawnDialog(.shownCommand(String(line.dropFirst(2))))
     }
@@ -98,6 +102,11 @@ private struct ScreenKeymap: AgentAnswerKeymap {
       String($0.dropFirst("Destination: ".count))
     }
     return paths.isEmpty ? nil : AgentDrawnDialog(.patch(Set(paths)))
+  }
+
+  /// `› ` alone on the last line: the prompt, waiting for words.
+  func showsPromptAtRest(onScreen text: String) -> Bool {
+    text.split(separator: "\n").last == "› "
   }
 }
 
@@ -126,11 +135,14 @@ private struct Fixture {
   let answer: AnswerAgentRequest
   let id = SessionID()
 
-  init(sleep: @escaping @Sendable (Duration) async throws -> Void = { _ in
-    try await Task.sleep(for: .seconds(3600))
-  }) {
+  init(
+    clock: TestClock? = nil,
+    sleep: @escaping @Sendable (Duration) async throws -> Void = { _ in
+      try await Task.sleep(for: .seconds(3600))
+    }
+  ) {
     tracker = TrackAgentActivity(
-      logs: logs, store: MemoryActivityStore(), now: { t1 }, sleep: sleep,
+      logs: logs, store: MemoryActivityStore(), now: { clock?.now ?? t1 }, sleep: sleep,
       persistenceDelay: .seconds(3600))
     let screen = screen
     let written = written
@@ -174,6 +186,27 @@ private struct Fixture {
 @Suite("Which request a dialog is, read off the screen (#283)", .timeLimit(.minutes(2)))
 struct DialogOnScreenTests {
   // MARK: - What a dialog shows
+
+  @Test("Hooks silent past a start, the prompt at rest on screen: nothing waits on the user")
+  func promptAtRest() async throws {
+    let clock = TestClock(t1)
+    let fixture = Fixture(clock: clock)
+    await fixture.tracker.processStarted(fixture.id, decoder: CodexLikeDecoder())
+    clock.advance(11)
+    await fixture.tracker.tick()
+    let guessed = try #require(await fixture.tracker.state(for: fixture.id)?.requests.first)
+    #expect(guessed.id.key == "startup")
+    // A dialog on screen, of no kind the keymap knows: the guess stands.
+    await fixture.screen.show("Do you trust this folder?\n› 1. Yes")
+    await fixture.answer.readStartupDialog(guessed.id)
+    #expect(await fixture.tracker.state(for: fixture.id)?.requests.count == 1)
+    // The prompt: no dialog held the hooks back.
+    await fixture.screen.show("Resumed.\n› ")
+    await fixture.answer.readStartupDialog(guessed.id)
+    let state = await fixture.tracker.state(for: fixture.id)
+    #expect(state?.requests.isEmpty == true)
+    #expect(state?.activity == .idle)
+  }
 
   @Test("A wrapped command is the command, however the terminal broke its lines")
   func wrappedCommand() {
@@ -226,7 +259,8 @@ struct DialogOnScreenTests {
 
   // MARK: - Answering
 
-  @Test("Two commands that start alike: the first is offered, and answered once the screen shows it")
+  @Test(
+    "Two commands that start alike: the first is offered, and answered once the screen shows it")
   func sameStartAnsweredOnScreen() async {
     let fixture = Fixture()
     await fixture.start()
@@ -258,9 +292,11 @@ struct DialogOnScreenTests {
     #expect(await fixture.written.bytes == [[0x79]])
   }
 
-  @Test("A screen that shows no dialog, or one cut short, gets nothing typed", arguments: [
-    nil, "› Ask Codex to do anything", "[… 9 lines] ctrl+a view all",
-  ])
+  @Test(
+    "A screen that shows no dialog, or one cut short, gets nothing typed",
+    arguments: [
+      nil, "› Ask Codex to do anything", "[… 9 lines] ctrl+a view all",
+    ])
   func unreadable(_ text: String?) async {
     let fixture = Fixture()
     await fixture.start()
@@ -352,13 +388,35 @@ struct DialogOnScreenTests {
     #expect(await fixture.answer(.allowOnce, to: first) == .sent)
   }
 
-  @Test("An MCP tool's form is never read: its request stays answered in the session")
+  @Test("An MCP tool's form names its tool: alone in the queue, its request is answered")
   func mcpTool() async {
     let fixture = Fixture()
     await fixture.start()
     let tool = await fixture.ask("", event: "mcp")
     await fixture.tracker.terminalNotification(fixture.id, "server:echo-box")
-    #expect(await fixture.answering(tool) == .inTerminalOnly(.uncertain))
+    #expect(await fixture.answering(tool) == .fromPalette([.allowOnce, .deny]))
+
+    // Another tool of the same server is not it.
+    await fixture.screen.show("tool: echo-box read_note")
+    #expect(await fixture.answer(.allowOnce, to: tool) == .otherDialog)
+    #expect(await fixture.written.bytes.isEmpty)
+
+    await fixture.screen.show("tool: echo-box write_note")
+    #expect(await fixture.answer(.allowOnce, to: tool) == .sent)
+    #expect(await fixture.written.bytes == [[0x79]])
+  }
+
+  @Test("Two calls of the same MCP tool read the same: neither is answered from outside")
+  func sameMCPToolTwice() async {
+    let fixture = Fixture()
+    await fixture.start()
+    let first = await fixture.ask("", event: "mcp")
+    _ = await fixture.ask("", event: "mcp")
+    await fixture.tracker.terminalNotification(fixture.id, "server:echo-box")
+    await fixture.screen.show("tool: echo-box write_note")
+    #expect(await fixture.answer(.allowOnce, to: first) == .otherDialog)
+    #expect(await fixture.answer(.deny, to: first) == .otherDialog)
+    #expect(await fixture.written.bytes.isEmpty)
   }
 
   @Test("A dialog that changed while the log was read gets nothing typed")

@@ -98,7 +98,7 @@ struct SubagentHeader: View {
       if run.mode == .background, !call.state.isFinished {
         Image(systemName: "hourglass")
           .foregroundStyle(theme.secondaryText.color)
-          .help(Text("in the background", bundle: .module))
+          .instantTooltip(Text("in the background", bundle: .module))
       }
       SubagentFigures(call: call)
         .font(theme.interfaceFont(size: size * 0.9))
@@ -581,7 +581,7 @@ struct SubagentPill: View {
       .fixedSize()
     }
     .buttonStyle(.plain)
-    .help(Text(verbatim: SubagentPresentation.lastActionHelp(of: call)))
+    .instantTooltip(Text(verbatim: SubagentPresentation.lastActionHelp(of: call)))
     .accessibilityLabel(Text(verbatim: SubagentPresentation.accessibilityLabel(for: call)))
     .accessibilityHint(Text("Shows the sub-agent in the conversation.", bundle: .module))
   }

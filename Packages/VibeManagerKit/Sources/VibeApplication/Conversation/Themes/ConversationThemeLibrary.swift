@@ -29,6 +29,28 @@ public enum ThemeLibraryError: Error, Hashable, Sendable {
   case notFound
 }
 
+/// Why an archive could not be imported (#361). Nothing was written.
+public enum ThemeImportError: Error, Hashable, Sendable {
+  /// Not a zip archive, or one without a theme file.
+  case notATheme
+  case tooLarge
+  /// Its theme file was refused, and why.
+  case file(ThemeFileProblem)
+  case couldNotWrite
+}
+
+/// A theme imported (#361), and the families it asks for that could be found neither in its
+/// archive, nor on this Mac, nor on Google Fonts: the default font draws in their place.
+public struct ThemeImport: Hashable, Sendable {
+  public let theme: ConversationTheme
+  public let missingFonts: [String]
+
+  public init(theme: ConversationTheme, missingFonts: [String] = []) {
+    self.theme = theme
+    self.missingFonts = missingFonts
+  }
+}
+
 /// The user's own themes (#118): one file each, named by the theme's identifier.
 public protocol ConversationThemeLibrary: Sendable {
   func load() async -> ThemeLibraryContents
@@ -38,6 +60,9 @@ public protocol ConversationThemeLibrary: Sendable {
   func remove(_ id: String) async throws
   /// A `.zip` of the theme's file, `theme.json`, and of `preview`, when given, as `preview.png`.
   func archive(_ id: String, preview: Data?) async throws -> Data
+  /// Keeps the theme of an archive `archive` made, wherever it was made (#361): a new theme of
+  /// the user's, named as in the archive, made unique. Throws `ThemeImportError`.
+  func importArchive(_ data: Data) async throws -> ThemeImport
   /// Where the file of a theme, or of a problem, is: shown in the Finder. `nil` when there is no
   /// folder.
   func location(ofFile fileName: String) -> URL?
@@ -72,6 +97,10 @@ public enum ConversationThemeLibraryRules {
   ]
 
   static let fallbackName = "Theme"
+
+  /// The identifier a theme read from an archive has until it is kept: not a personal one, so
+  /// that keeping it gives it its own.
+  public static let importedID = "imported"
 
   static func folded(_ name: String) -> String {
     name.folding(
@@ -142,6 +171,18 @@ public actor InMemoryConversationThemeLibrary: ConversationThemeLibrary {
       throw ThemeLibraryError.notFound
     }
     return ConversationThemeFile.encode(theme)
+  }
+
+  /// The theme's file alone, as `archive` gives it.
+  public func importArchive(_ data: Data) throws -> ThemeImport {
+    let theme: ConversationTheme
+    do {
+      theme = try ConversationThemeFile.theme(
+        from: data, id: ConversationThemeLibraryRules.importedID)
+    } catch {
+      throw ThemeImportError.file(error)
+    }
+    return ThemeImport(theme: save(theme, name: theme.personalName ?? ""))
   }
 
   public nonisolated func location(ofFile _: String) -> URL? { nil }

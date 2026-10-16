@@ -90,6 +90,11 @@ public struct ConversationRequest: Equatable, Sendable {
       && answers.contains(.writeText)
   }
 
+  /// Questions the composer does not answer, set aside by writing to the agent instead.
+  var takesChatAboutThis: Bool {
+    questions != nil && !takesComposerText && answers.contains(.chatAboutThis)
+  }
+
   /// Answered at a click: one question of one choice. Otherwise the choices go together.
   public var answersAtOnce: Bool {
     guard let questions, questions.count == 1 else { return false }
@@ -126,10 +131,16 @@ public struct PendingEcho: Identifiable, Hashable, Sendable {
   /// queued behind ended: it is given ten minutes rather than ten seconds before it is said lost,
   /// and no longer holds back the echoes sent after it.
   let waitsForEnd: Bool
+  /// The turn a message was sent during, which the agent keeps for when that turn ends: it can be
+  /// sent now instead (#341). `nil` for one sent at rest, and for a command.
+  let queuedInTurn: Int?
   public var state: State
+  /// When Return was last written for it: the wait for the transcript runs from there, not from
+  /// the time spent typing it and waiting for the agent to show it (#370).
+  var submittedAt: Date? = nil
 
   var confirmationDeadline: Date {
-    sentAt.addingTimeInterval(waitsForEnd ? 600 : 10)
+    (submittedAt ?? sentAt).addingTimeInterval(waitsForEnd ? 600 : 10)
   }
 
   public var attachmentCount: Int { attachments.count }
@@ -236,6 +247,8 @@ public final class ConversationModel {
       rebuild(changedFrom: nil)
       // A skill or a prompt the agent took up: nothing waits in a panel of its terminal, and the
       // composer gets the keyboard back from the block.
+      // A request answered goes back to the same turn; from rest, a new one starts.
+      if activity == .working, oldValue == .idle || oldValue == nil { turn += 1 }
       if activity == .working {
         initialCommand = nil
         if terminalPanel != nil {
@@ -300,6 +313,16 @@ public final class ConversationModel {
   /// The application's dictation (#340); `nil` where there is none, and the composer shows no
   /// microphone.
   @ObservationIgnored public var dictation: DictationController?
+  /// Coordination, offered in the composer (#352): `nil` where the session cannot coordinate. Read
+  /// each time, so that the composer follows the application's state.
+  @ObservationIgnored public var coordination: () -> ComposerCoordination? = { nil }
+  /// What the application has to tell the agent in front of the user's next message, taken once:
+  /// `nil` when there is nothing (#352).
+  @ObservationIgnored public var takePreface: (() -> String?)?
+  /// Takes the agent's input for the user's message once the application types nothing into it,
+  /// until the closure it returns is called (#352): a message it types and the user's would
+  /// interleave.
+  @ObservationIgnored public var claimTyping: (() async -> @MainActor () -> Void)?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.
   @ObservationIgnored public var dictationVocabulary: @MainActor () async -> String = { "" }
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
@@ -311,6 +334,8 @@ public final class ConversationModel {
   @ObservationIgnored private var knownImages: Set<String>?
   /// Restarts the session, from the composer of a session whose agent stopped.
   @ObservationIgnored public var restart: (() -> Void)?
+  /// Detects the installed agents again after a launch plan pointed at a file that disappeared.
+  @ObservationIgnored public var detectAgentsAgain: (() async -> Void)?
   /// Whether the session can be restarted now: an archived one cannot.
   @ObservationIgnored public var canRestart: () -> Bool = { true }
   /// The first request of the session and how it may be answered, read from the application's
@@ -932,6 +957,10 @@ public final class ConversationModel {
     case .subagentGroup:
       return true
     case .toolGroup(_, let calls):
+      // A request to answer under one of its calls: a running one's, which stays in the group.
+      if calls.contains(where: { $0.toolCall.map { request(for: $0) != nil } ?? false }) {
+        return true
+      }
       return appearance.expandsFailures
         && calls.contains {
           if case .failed = $0.toolCall?.state { return true }
@@ -940,6 +969,7 @@ public final class ConversationModel {
     case .entry(let entry):
       guard let call = entry.toolCall else { return false }
       if call.kind.isShownOpen || call.state == .awaitingPermission { return true }
+      if request(for: call) != nil { return true }
       if case .failed = call.state, appearance.expandsFailures { return true }
       if call.kind == .edit || call.kind == .create { return appearance.expandsEdits }
       return false
@@ -1024,6 +1054,9 @@ public final class ConversationModel {
     case ready
     /// The agent asks a question: what is written is its free answer, the "Other" of its options.
     case answeringQuestion
+    /// Questions wait that the composer does not answer: what it sends sets them aside, and
+    /// goes to the agent as a message.
+    case chattingAboutQuestion
     /// The agent waits for an answer in its terminal: a prompt typed now would be read as one.
     case awaitingAnswer
     /// The agent is starting and has not said it is ready.
@@ -1038,23 +1071,25 @@ public final class ConversationModel {
     guard isProcessRunning else { return .stopped }
     guard isAgentReady else { return .starting }
     if case .awaitingUser = activity {
-      return request?.takesComposerText == true ? .answeringQuestion : .awaitingAnswer
+      if request?.takesComposerText == true { return .answeringQuestion }
+      return request?.takesChatAboutThis == true ? .chattingAboutQuestion : .awaitingAnswer
     }
     return .ready
   }
 
   /// Whether the composer can be typed into: a closed one does not take the keyboard.
   public var acceptsInput: Bool {
-    composerState == .ready || composerState == .answeringQuestion
+    [.ready, .answeringQuestion, .chattingAboutQuestion].contains(composerState)
   }
 
   public var canSend: Bool {
     switch composerState {
     case .ready:
       // Keys typed now would go to the panel open in the conversation, not to the prompt.
-      return !isSubmitting && !PromptSubmission(text: draft, attachments: attachments).isEmpty
+      return !isSubmitting && !isSendingNow
+        && !PromptSubmission(text: draft, attachments: attachments).isEmpty
         && shellHold == nil && terminalPanel == nil
-    case .answeringQuestion:
+    case .answeringQuestion, .chattingAboutQuestion:
       return request?.isSending == false && !freeAnswer.isEmpty
     default:
       return false
@@ -1140,18 +1175,63 @@ public final class ConversationModel {
     return request
   }
 
+  /// The request no call of the conversation holds — a dialog of the CLI's start, an update it
+  /// offers — shown above the composer.
+  public var standaloneRequest: ConversationRequest? {
+    guard let request, requestCall(of: request) == nil else { return nil }
+    // A permission or a question goes under its call, which the transcript brings in a moment.
+    switch request.request.content {
+    case .inTerminal, .elicitation: return request
+    default: return nil
+    }
+  }
+
   private func requestCall(of request: ConversationRequest) -> ToolCall? {
-    guard case .permission(let permission) = request.request.content,
-      let subject = permission.subject
-    else { return pendingCall }
-    let unfinished = ConversationEntry.allCalls(in: shownEntries)
-      .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
-    return unfinished.last { Self.isAbout($0, subject) } ?? pendingCall
+    let unfinished = { [shownEntries] in
+      ConversationEntry.allCalls(in: shownEntries)
+        .filter { !$0.state.isFinished || $0.state == .awaitingPermission }
+    }
+    switch request.request.content {
+    case .permission(let permission):
+      guard let subject = permission.subject else { return pendingCall }
+      return unfinished().last { Self.isAbout($0, subject) } ?? pendingCall
+    case .elicitation(let elicitation):
+      // A server asks while one of its tools runs, which waits on nothing else.
+      guard let server = elicitation.server else { return pendingCall }
+      return unfinished().last { Self.isCall($0, of: server) } ?? pendingCall
+    default:
+      return pendingCall
+    }
+  }
+
+  /// Whether `call` is to a tool of `server`, named in the call as `claude_ai_Supabase` and by
+  /// the server itself as `claude.ai Supabase`.
+  static func isCall(_ call: ToolCall, of server: String) -> Bool {
+    guard case .mcp(let name, _) = call.kind else { return false }
+    let key = { (name: String) in name.lowercased().filter { $0.isLetter || $0.isNumber } }
+    return key(name) == key(server)
   }
 
   /// Whether a permission's subject is what `call` shows.
   static func isAbout(_ call: ToolCall, _ subject: String) -> Bool {
     call.parameter(.command) == subject || call.parameter(.path) == subject
+  }
+
+  /// Whether the composer is ready again within a moment of the questions being set aside: the
+  /// tracker says so as soon as their digit is typed, and the screen once the CLI has drawn its
+  /// prompt again — before, it still shows the questions, whose hint reads as a panel's.
+  private func promptIsBack() async -> Bool {
+    for _ in 0..<40 {
+      if composerState == .ready {
+        guard let readScreen else { return true }
+        let screen = await readScreen()
+        if screen.map(AgentPanelRecognition.showsPanel(screen:)) != true {
+          return composerState == .ready
+        }
+      }
+      try? await Task.sleep(for: .milliseconds(50))
+    }
+    return false
   }
 
   /// Chooses an option of a question: one question of one choice is answered at once; otherwise
@@ -1255,6 +1335,13 @@ public final class ConversationModel {
       if freeAnswer == text { draft = "" }
       return true
     }
+    if composerState == .chattingAboutQuestion {
+      // The questions set aside first, their digit read off the screen; the message then goes as
+      // any other, once the prompt is back — never while another dialog is drawn.
+      guard canSend, let request, let answerRequest,
+        await answerRequest(.chatAboutThis, request.request.id), await promptIsBack()
+      else { return false }
+    }
     guard canSend, let write else { return false }
     isSubmitting = true
     defer { isSubmitting = false }
@@ -1272,9 +1359,24 @@ public final class ConversationModel {
         return false
       }
     }
+    var release: (@MainActor () -> Void)?
+    defer { release?() }
+    if let claimTyping {
+      release = await claimTyping()
+      // Waiting takes a moment: a request reported, a panel opened meanwhile, and the prompt
+      // would be typed into it after all.
+      guard composerState == .ready, terminalPanel == nil else { return false }
+    }
     let shell = promptFormat.shellEntry
-    let submission = PromptSubmission(text: draft, attachments: attachments)
-    let kind = submission.kind(shell: shell)
+    let typed = PromptSubmission(text: draft, attachments: attachments)
+    let kind = typed.kind(shell: shell)
+    // What the application has to tell the agent goes first (#352), never in front of a command —
+    // the shell's or the CLI's.
+    let preface =
+      kind == .message && !draft.hasPrefix("/") ? takePreface?() : nil
+    let submission =
+      preface.map { PromptSubmission(text: $0 + "\n\n" + draft, attachments: attachments) }
+      ?? typed
     let keystrokes = PromptEncoding.keystrokes(
       for: submission, format: promptFormat, whileWorking: isAgentWorking)
     // Prompts still on their way reach the transcript first: this one is confirmed only once
@@ -1292,8 +1394,10 @@ public final class ConversationModel {
       recallText = PromptHistory.recalled(command: command)
     case .message:
       text = PromptEncoding.sanitized(submission.messageText(shell: shell))
+      // Recalled as the user wrote it, without what the application put in front.
+      let written = PromptEncoding.sanitized(typed.messageText(shell: shell))
       recallText =
-        shell == nil ? text : PromptHistory.recalled(message: PromptEncoding.sanitized(draft))
+        shell == nil ? written : PromptHistory.recalled(message: PromptEncoding.sanitized(draft))
     }
     let echoID = UUID()
     // A command of the CLI — `/mcp` — may open a panel of its terminal, and be written to the
@@ -1306,6 +1410,7 @@ public final class ConversationModel {
         // Queued, a command is written once the turn ended, then run.
         waitsForEnd: opensPanel
           || kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
+        queuedInTurn: kind == .message && isAgentWorking ? turn : nil,
         state: .sending))
     let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
@@ -1318,11 +1423,96 @@ public final class ConversationModel {
       await write(keys)
     }
     try? await Task.sleep(for: submitDelay)
+    // Return written before the agent took the text was seen to break the line, or to be lost
+    // (#370): it waits for the prompt to show the text, and the prompt is read again after it.
+    let watched = promptFormat.readsInputOnScreen && !kind.isShell && !text.isEmpty ? text : nil
+    if let watched { await waitForInput(holding: watched) }
     await write(keystrokes.submit)
+    markSubmitted(echoID)
+    if let watched {
+      await submitAgainIfHeld(watched, echo: echoID, submit: keystrokes.submit, write: write)
+    }
     scheduleEchoCheck()
     if opensPanel { watchForTerminalPanel(echoID, command: text) }
     return true
   }
+
+  // MARK: - Return, once the prompt shows the text (#370)
+
+  /// How long Return waits for the agent's prompt to show the text typed, past `submitDelay`.
+  @ObservationIgnored var inputWaitLimit = Duration.seconds(3)
+  /// How long a prompt still showing the text once Return is written is given to be sent.
+  @ObservationIgnored var sendWaitLimit = Duration.milliseconds(1500)
+  /// How long after Return a reading of the screen starts for it to tell whether Return was taken:
+  /// one started sooner may show the prompt as it was before the agent read the key.
+  @ObservationIgnored var sendSettleDelay = Duration.milliseconds(300)
+  /// Between two readings of the screen: each replays the terminal's history.
+  static let screenReadInterval = Duration.milliseconds(100)
+
+  /// Reads the agent's prompt on its screen until `done` says so, or `limit` has passed and a
+  /// reading started at `earliest` at least, and returns the last one read: nil when the screen
+  /// shows none, which tells nothing.
+  private func readInput(
+    for limit: Duration, notBefore earliest: ContinuousClock.Instant = .now,
+    until done: ([String]) -> Bool
+  ) async -> [String]? {
+    guard let readScreen else { return nil }
+    let deadline = ContinuousClock.now + limit
+    while true {
+      let started = ContinuousClock.now
+      guard let screen = await readScreen(),
+        let input = PromptInputRecognition.input(screen: screen)
+      else { return nil }
+      if done(input) || Task.isCancelled { return input }
+      if ContinuousClock.now >= deadline && started >= earliest { return input }
+      try? await Task.sleep(for: Self.screenReadInterval)
+    }
+  }
+
+  private func waitForInput(holding text: String) async {
+    _ = await readInput(for: inputWaitLimit) { input in
+      PromptInputRecognition.holds(text, in: input)
+        || PromptInputRecognition.showsPastedText(input)
+    }
+  }
+
+  /// Return written, a prompt that still shows the text is sent again, once: its line break
+  /// erased first when Return was taken for one, as it is when Return was lost. Not when the
+  /// transcript has the prompt already, nor into a request or a panel that came meanwhile (#319).
+  private func submitAgainIfHeld(
+    _ text: String, echo id: UUID, submit: [UInt8], write: ([UInt8]) async -> Void
+  ) async {
+    func held(_ input: [String]) -> Bool {
+      PromptInputRecognition.holds(text, in: input)
+        || PromptInputRecognition.showsPastedText(input)
+    }
+    let earliest = ContinuousClock.now + sendSettleDelay
+    var lineBreakSeen = false
+    guard
+      let input = await readInput(
+        for: sendWaitLimit, notBefore: earliest,
+        until: { input in
+          guard held(input) else { return true }
+          // Seen twice running, a line break is no prompt being redrawn: it is not waited out.
+          let lineBreak = PromptInputRecognition.endsOnLineBreak(input)
+          defer { lineBreakSeen = lineBreak }
+          return lineBreak && lineBreakSeen
+        }),
+      held(input),
+      composerState == .ready, terminalPanel == nil,
+      echoes.contains(where: { $0.id == id && $0.state == .sending })
+    else { return }
+    if PromptInputRecognition.endsOnLineBreak(input) { await write(Self.backspace) }
+    await write(submit)
+    markSubmitted(id)
+  }
+
+  private func markSubmitted(_ id: UUID) {
+    guard let index = echoes.firstIndex(where: { $0.id == id }) else { return }
+    echoes[index].submittedAt = Date()
+  }
+
+  static let backspace: [UInt8] = [0x7F]
 
   // MARK: - A panel of the agent's terminal
 
@@ -1589,6 +1779,56 @@ public final class ConversationModel {
     await write?(promptFormat.interruptKey)
   }
 
+  // MARK: - Send now (#341)
+
+  /// Counts the turns, for a message queued during one to be told from one left over from an
+  /// earlier turn — put back in the agent's prompt by an Escape, and never sent.
+  private(set) var turn = 0
+  /// The messages Send Now was clicked for: the key is not written twice for them.
+  private var sentNow: Set<UUID> = []
+  /// From the click on Send Now to its key written: a prompt typed meanwhile would be cut by it.
+  private(set) var isSendingNow = false
+
+  /// The echo under which Send Now shows: the last message queued in this turn, since the key
+  /// sends them all — while the turn goes on, and no request or dialog would take the keys.
+  public var sendNowEchoID: UUID? {
+    guard promptFormat.sendNowKey != nil, isAgentWorking, composerState == .ready,
+      terminalPanel == nil, !isSubmitting, !isSendingNow
+    else { return nil }
+    return echoes.last(where: { $0.queuedInTurn == turn && !sentNow.contains($0.id) })?.id
+  }
+
+  public func canSendNow(_ echo: PendingEcho) -> Bool {
+    sendNowEchoID == echo.id
+  }
+
+  /// Sends the messages queued at once, the turn stopped, as the agent's own key does. Written
+  /// only once its screen offers it: otherwise the terminal is shown, for the user to see why.
+  /// The echoes are confirmed as any other, by the prompts the transcript writes.
+  public func sendNow() async {
+    guard let key = promptFormat.sendNowKey, sendNowEchoID != nil, let write else { return }
+    // Held from the first click: a second one, while the screen is read, writes nothing.
+    let sent = Set(echoes.filter { $0.queuedInTurn == turn }.map(\.id))
+    let sentTurn = turn
+    sentNow.formUnion(sent)
+    isSendingNow = true
+    defer { isSendingNow = false }
+    let screen = await readScreen?()
+    // Reading the screen takes a moment: the turn may have ended, a request come meanwhile.
+    guard isAgentWorking, composerState == .ready, terminalPanel == nil, !isSubmitting,
+      turn == sentTurn
+    else {
+      sentNow.subtract(sent)
+      return
+    }
+    guard let screen, AgentPanelRecognition.showsSendNowHint(screen: screen) else {
+      sentNow.subtract(sent)
+      showTerminal?()
+      return
+    }
+    await write(key)
+  }
+
   private func confirmEchoes() {
     guard !echoes.isEmpty else { return }
     let prompts = echoTallies.count(of: .message)
@@ -1606,6 +1846,7 @@ public final class ConversationModel {
       claimed.insert(index)
       return true
     }
+    sentNow.formIntersection(echoes.map(\.id))
     settleTerminalPanel()
   }
 
@@ -1637,9 +1878,12 @@ public final class ConversationModel {
 public struct ConversationLaunchFailure: Equatable, Sendable {
   public let message: String
   public let suggestion: String?
+  /// A fresh detection can repair this failure without leaving the conversation for Settings.
+  public let canDetectAgain: Bool
 
-  public init(message: String, suggestion: String?) {
+  public init(message: String, suggestion: String?, canDetectAgain: Bool = false) {
     self.message = message
     self.suggestion = suggestion
+    self.canDetectAgain = canDetectAgain
   }
 }

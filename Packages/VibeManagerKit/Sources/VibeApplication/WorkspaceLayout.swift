@@ -40,6 +40,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   public var sessionPresentations: [String: SessionPresentation]
   /// Whether the palette of pending requests is folded into its count (#40).
   public var isRequestPaletteCollapsed: Bool
+  /// The coordinators whose children are folded away in the sidebar (#352). Never pruned, like the
+  /// folders.
+  public var collapsedCoordinators: Set<SessionID>
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -53,7 +56,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     sidebarMode: SidebarMode = .flat,
     collapsedFolders: Set<SessionFolderKey> = [],
     sessionPresentations: [String: SessionPresentation] = [:],
-    isRequestPaletteCollapsed: Bool = false
+    isRequestPaletteCollapsed: Bool = false,
+    collapsedCoordinators: Set<SessionID> = []
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -67,13 +71,14 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.collapsedFolders = collapsedFolders
     self.sessionPresentations = sessionPresentations
     self.isRequestPaletteCollapsed = isRequestPaletteCollapsed
+    self.collapsedCoordinators = collapsedCoordinators
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
     case sessionFilter, inspectorSections, browserWidth
     case sidebarMode, collapsedFolders, sessionPresentations
-    case isRequestPaletteCollapsed
+    case isRequestPaletteCollapsed, collapsedCoordinators
   }
 
   /// What the column was arranged with before #66. Read once, to arrange the sections the same
@@ -108,7 +113,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       sessionPresentations: (try? container.decodeIfPresent(
         [String: SessionPresentation].self, forKey: .sessionPresentations)) ?? [:],
       isRequestPaletteCollapsed: (try? container.decodeIfPresent(
-        Bool.self, forKey: .isRequestPaletteCollapsed)) ?? false
+        Bool.self, forKey: .isRequestPaletteCollapsed)) ?? false,
+      collapsedCoordinators: (try? container.decodeIfPresent(
+        Set<SessionID>.self, forKey: .collapsedCoordinators)) ?? []
     )
   }
 }

@@ -448,6 +448,19 @@ struct SettledRequestsTests {
       #expect(answered.requests.isEmpty)
       #expect(answered.activity == .working)
     }
+    // Read off the screen as an update offered: a digit of its options answers it too.
+    #expect(reduce(.userInput(Array("2".utf8)), drawn).requests.count == 1)
+    var update = drawn
+    update.requests[0].content = .inTerminal(AgentTerminalPrompt(kind: .update, message: nil))
+    #expect(reduce(.userInput(Array("2".utf8)), update).requests.isEmpty)
+    #expect(reduce(.userInput(Array("y".utf8)), update).requests.count == 1)
+    #expect(feed(.channelConfirmed, to: update).requests.isEmpty)
+    // Read as the folder's trust: Return takes it, an arrow only moves the pointer.
+    var trust = drawn
+    trust.requests[0].content = .inTerminal(AgentTerminalPrompt(kind: .trust, message: "/p"))
+    #expect(reduce(.userInput([0x0D]), trust).requests.isEmpty)
+    #expect(reduce(.userInput([0x1B, 0x5B, 0x42]), trust).requests.count == 1)
+    #expect(feed(.channelConfirmed, to: trust).requests.isEmpty)
     // Without hooks, nothing is waited for.
     let bare = AgentActivityMachine.reduce(
       AgentActivityState(activity: .idle, source: .inferred), .tick,

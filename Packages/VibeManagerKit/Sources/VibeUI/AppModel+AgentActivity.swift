@@ -29,6 +29,7 @@ extension AppModel {
         if let state = update.state {
           self.activityDidChange(
             update.sessionID, from: previous, to: state, isReplayed: update.isReplayed)
+          self.readStartupDialog(of: state, previous: previous)
         }
         self.conversations.activityChanged(update.sessionID, to: update.state)
         self.requestAnswering = self.requestAnswering.filter {
@@ -48,6 +49,20 @@ extension AppModel {
     updateVisibleSession()
   }
 
+  /// A dialog of the start is guessed to wait: its screen says which, when it is one that can be
+  /// answered from here — Codex's update offered, Claude Code's folder to trust — or that there is none, the prompt at rest. Read
+  /// once, as the guess is made: by then the dialog is drawn.
+  private func readStartupDialog(of state: AgentActivityState, previous: AgentActivityState?) {
+    func startup(_ state: AgentActivityState?) -> AgentRequestID? {
+      guard let request = state?.requests.first, case .inTerminal(let prompt) = request.content,
+        prompt.kind == .startup
+      else { return nil }
+      return request.id
+    }
+    guard let id = startup(state), startup(previous) != id, let answerRequest else { return }
+    Task { await answerRequest.readStartupDialog(id) }
+  }
+
   /// The main window was hidden, minimised or covered — or shown again.
   public func mainWindowVisibilityChanged(_ isVisible: Bool) {
     guard isMainWindowVisible != isVisible else { return }
@@ -58,8 +73,10 @@ extension AppModel {
   /// The session in front of the user, if any: selected, in a window on screen, in the active
   /// application. A sheet over the window does not hide it.
   func updateVisibleSession() {
-    guard let activityTracker else { return }
     let visible = isApplicationActive && isMainWindowVisible ? selectedSessionID : nil
+    // A coordinator that called the user is answered once it is in front of them (#352).
+    coordinationSessionShown(visible)
+    guard let activityTracker else { return }
     let previous = visibleSessionUpdate
     visibleSessionUpdate = Task {
       await previous?.value

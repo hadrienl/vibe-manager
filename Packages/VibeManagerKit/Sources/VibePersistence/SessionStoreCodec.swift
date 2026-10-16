@@ -19,9 +19,12 @@ struct SessionStoreCodec {
   /// v5 adds the ticket a session works on (#69), and v6 each session's task status (#80), for
   /// the same reason: an older build would erase them. v7 adds the project icon of a session's
   /// appearance (#27), again for that reason. v8 adds each session's place in the order arranged
-  /// by hand (#44), and v9 the conversation theme chosen for a session (#274). Each shape is the
-  /// one before with one more optional field, so all six are read by the same structure.
-  static let currentSchemaVersion = 9
+  /// by hand (#44), v9 the conversation theme chosen for a session (#274), and v10 whether a
+  /// session coordinates others or is one of their children (#352). Each shape is the one before
+  /// with one more optional field, so all seven are read by the same structure.
+  static let currentSchemaVersion = 10
+  /// v9 is v10 without coordination: every session is an ordinary one.
+  static let uncoordinatedSchemaVersion = 9
   /// v8 is v9 without the themes: every session follows the settings.
   static let themelessSchemaVersion = 8
   /// v7 is v8 without the ranks: the sessions are ranked in the order the store lists them.
@@ -74,7 +77,8 @@ struct SessionStoreCodec {
         let previous = try Self.makeDecoder().decode(StoreEnvelopeV9.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: false) }
         requiresRewrite = true
-      case Self.iconlessSchemaVersion, Self.ranklessSchemaVersion, Self.themelessSchemaVersion:
+      case Self.iconlessSchemaVersion, Self.ranklessSchemaVersion, Self.themelessSchemaVersion,
+        Self.uncoordinatedSchemaVersion:
         let previous = try Self.makeDecoder().decode(StoreEnvelopeV9.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: true) }
         requiresRewrite = true
@@ -240,7 +244,7 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-/// Reads v4 to v8 as well: a v8 session is a v9 one without a theme, a v7 one has no rank either,
+/// Reads v4 to v9 as well: a v9 session is a v10 one without coordination, a v8 one has no theme, a v7 one has no rank either,
 /// a v6 one no icon, a v5 one no `taskStatus`, and a v4 one no `ticket`.
 private struct StoreEnvelopeV9: Codable {
   let schemaVersion: Int
@@ -249,7 +253,8 @@ private struct StoreEnvelopeV9: Codable {
 }
 
 /// A v2 session, the history of its agent switches (v4), its ticket (v5), its task status (v6) and
-/// its project icon (v7), its rank (v8) and its conversation theme (v9).
+/// its project icon (v7), its rank (v8), its conversation theme (v9) and its part in a coordination
+/// (v10).
 private struct StoredSessionV9: Codable {
   let id: UUID
   let name: String
@@ -269,6 +274,8 @@ private struct StoredSessionV9: Codable {
   let rank: Int?
   /// Absent before v9, and for a session that follows the settings.
   let conversationTheme: String?
+  /// Absent before v10, and for an ordinary session.
+  let coordination: StoredCoordinationV10?
 
   init(_ session: WorkSession) {
     id = session.id.rawValue
@@ -285,6 +292,7 @@ private struct StoredSessionV9: Codable {
     taskStatus = session.taskStatus.rawValue
     rank = session.rank
     conversationTheme = session.conversationTheme
+    coordination = session.coordination.map(StoredCoordinationV10.init)
   }
 
   /// - Parameter recordsStart: the document was written by a build that records the start of
@@ -313,6 +321,7 @@ private struct StoredSessionV9: Codable {
       rank: rank ?? 0,
       // An empty one, which no build writes, follows the settings rather than failing the store.
       conversationTheme: conversationTheme.flatMap { $0.isEmpty ? nil : $0 },
+      coordination: coordination?.domainValue(for: id),
       infersStartedAt: !recordsStart
     )
   }
@@ -322,6 +331,36 @@ private struct StoredSessionV9: Codable {
   private var storedTaskStatus: SessionTaskStatus? {
     guard let status = taskStatus.flatMap(SessionTaskStatus.init(rawValue:)) else { return nil }
     return (status == .archived) == (lifecycle.status == .archived) ? status : nil
+  }
+}
+
+/// A session's part in a coordination, field by field: a role written by a later build, or a child
+/// said to be its own, reads as an ordinary session rather than as a store that cannot be opened.
+private struct StoredCoordinationV10: Codable {
+  let role: String
+  let coordinator: UUID?
+
+  init(_ coordination: SessionCoordination) {
+    switch coordination {
+    case .coordinator:
+      role = "coordinator"
+      coordinator = nil
+    case .child(let id):
+      role = "child"
+      coordinator = id.rawValue
+    }
+  }
+
+  func domainValue(for session: UUID) -> SessionCoordination? {
+    switch role {
+    case "coordinator":
+      return .coordinator
+    case "child":
+      guard let coordinator, coordinator != session else { return nil }
+      return .child(of: SessionID(rawValue: coordinator))
+    default:
+      return nil
+    }
   }
 }
 

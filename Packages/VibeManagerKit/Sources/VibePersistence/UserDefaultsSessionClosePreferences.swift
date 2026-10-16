@@ -7,6 +7,7 @@ import VibeApplication
 @MainActor
 public final class UserDefaultsSessionClosePreferences: SessionClosePreferences {
   private let key = "sessions.close.skipsRunningAgentConfirmation.v1"
+  private let setAsideKey = "sessions.close.onSetAside.v1"
   private let defaults: UserDefaults
 
   public init(suiteName: String? = nil) {
@@ -16,5 +17,11 @@ public final class UserDefaultsSessionClosePreferences: SessionClosePreferences 
   public var confirmsStoppingRunningAgent: Bool {
     get { !defaults.bool(forKey: key) }
     set { defaults.set(!newValue, forKey: key) }
+  }
+
+  /// A value never written, or one this version does not know, reads as the question.
+  public var setAsideClose: SetAsideClose {
+    get { defaults.string(forKey: setAsideKey).flatMap(SetAsideClose.init(rawValue:)) ?? .ask }
+    set { defaults.set(newValue.rawValue, forKey: setAsideKey) }
   }
 }

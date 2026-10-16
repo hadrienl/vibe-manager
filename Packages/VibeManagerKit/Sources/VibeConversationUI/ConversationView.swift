@@ -297,6 +297,13 @@ public struct ConversationView: View {
           }
           .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           Spacer()
+          if failure.canDetectAgain, let detectAgain = model.detectAgentsAgain {
+            Button {
+              Task { await detectAgain() }
+            } label: {
+              Text("Detect Again", bundle: .module)
+            }
+          }
           stoppedActions
         }
         .modifier(StatusGlass())
@@ -331,6 +338,10 @@ public struct ConversationView: View {
         }
         .modifier(StatusGlass())
       }
+      if let request = model.standaloneRequest {
+        StandaloneRequestCard(model: model, request: request)
+          .modifier(StatusGlass())
+      }
       PromptComposer(model: model, isActive: isActive)
     }
     .frame(maxWidth: layout.contentWidth)
@@ -359,12 +370,16 @@ public struct ConversationView: View {
   private func echoStatus(_ echo: PendingEcho) -> some View {
     switch echo.state {
     case .sending:
-      Text("Sending…", bundle: .module)
-        .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
-        .foregroundStyle(theme.secondaryText.color)
+      HStack(spacing: 8) {
+        Text("Sending…", bundle: .module)
+        sendNowButton(echo)
+      }
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
+      .foregroundStyle(theme.secondaryText.color)
     case .unconfirmed:
       HStack(spacing: 8) {
         Text("Not confirmed by the agent yet", bundle: .module)
+        sendNowButton(echo)
         Button {
           model.showTerminal?()
         } label: {
@@ -381,6 +396,19 @@ public struct ConversationView: View {
       }
       .font(theme.interfaceFont(size: appearance.textSize.scaled(11)))
       .foregroundStyle(theme.warning.color)
+    }
+  }
+
+  /// Under the last message queued during a turn: sends them all now, the turn stopped (#341).
+  @ViewBuilder
+  private func sendNowButton(_ echo: PendingEcho) -> some View {
+    if model.canSendNow(echo) {
+      Button {
+        Task { await model.sendNow() }
+      } label: {
+        Text("Send Now", bundle: .module)
+      }
+      .buttonStyle(.link)
     }
   }
 

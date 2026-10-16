@@ -97,17 +97,46 @@ public struct AnswerAgentRequest: Sendable {
     else {
       return await tracker.isFirstRequest(id) ? .notOnScreen : .requestGone
     }
+    let rereads = await tracker.rereadsScreenBetweenKeys(of: answer, for: id)
     for (index, step) in steps.enumerated() {
       if index > 0 {
         await settle(id.sessionID)
         // Whatever the agent said meanwhile may have taken the dialog away: the next key would
         // then land in its prompt.
         guard await tracker.isFirstRequest(id) else { return .interrupted }
+        if rereads, await !screenAsks(Array(steps[index...]), of: answer, to: id) {
+          return .interrupted
+        }
       }
       guard await write(id.sessionID, step) else { return .terminalUnavailable }
     }
     await tracker.answerSent(id)
     return .sent
+  }
+
+  /// Reads which dialog of its start a session waits on, off its screen: one its keymap answers
+  /// — an update offered — takes the place of the request that only guessed one is there.
+  public func readStartupDialog(_ id: AgentRequestID) async {
+    guard let text = await screen(id.sessionID) else { return }
+    await tracker.startupDialogOnScreen(text, isFor: id)
+  }
+
+  /// Whether the dialog, read again, asks for `keys` and nothing else — waited for up to
+  /// `settleLimit`, the key before having to be read and drawn first.
+  private func screenAsks(_ keys: [[UInt8]], of answer: AgentAnswer, to id: AgentRequestID) async
+    -> Bool
+  {
+    let start = ContinuousClock.now
+    while true {
+      let drawn = await screen(id.sessionID).flatMap(AgentDialogScreen.init(screen:))
+      if await tracker.keystrokes(for: answer, to: id, screen: drawn) == keys { return true }
+      guard ContinuousClock.now - start < Self.settleLimit else { return false }
+      do {
+        try await sleep(Self.quietPeriod)
+      } catch {
+        return false
+      }
+    }
   }
 
   /// Returns once the terminal has been silent for `quietPeriod`, or after `settleLimit`.
@@ -136,6 +165,9 @@ extension AgentAnswer {
     case .answers: return "answers"
     case .approvePlan: return "approvePlan"
     case .rejectPlan: return "rejectPlan"
+    case .skipUpdate: return "skipUpdate"
+    case .chatAboutThis: return "chatAboutThis"
+    case .trustFolder: return "trustFolder"
     }
   }
 }

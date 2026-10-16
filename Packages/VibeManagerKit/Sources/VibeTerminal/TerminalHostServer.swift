@@ -70,6 +70,7 @@ public actor TerminalHostServer {
   private struct Hosted {
     let session: PTYTerminalSession
     let role: TerminalRole
+    let scrollback: TerminalScrollbackLimits
     var endedAt: Date?
   }
 
@@ -328,7 +329,7 @@ public actor TerminalHostServer {
       records.append(
         HostedSessionRecord(
           session: id, state: await hosted.session.state(), endedAt: hosted.endedAt,
-          role: hosted.role))
+          role: hosted.role, scrollback: hosted.scrollback))
     }
     return records
   }
@@ -353,12 +354,15 @@ public actor TerminalHostServer {
         ["session": configuration.diagnostics.pseudonym(id), "running": .count(running)])
       return .startFailed(.tooManySessions(limit: configuration.maximumRunningSessions))
     }
+    Self.noteMissingTrampoline(
+      for: spec, id: id, trampoline: ControllingTerminal.trampolinePath,
+      diagnostics: configuration.diagnostics)
     do {
       let session = try PTYTerminalSession.start(id: id, spec: spec)
       configuration.diagnostics.record(
         .session, .info, "host.sessionStarted",
         ["session": configuration.diagnostics.pseudonym(id), "running": .count(running + 1)])
-      sessions[id] = Hosted(session: session, role: spec.role)
+      sessions[id] = Hosted(session: session, role: spec.role, scrollback: spec.scrollback)
       watch(session)
       updateIdleState()
       guard case .running(let processIdentifier) = await session.state() else {
@@ -377,6 +381,16 @@ public actor TerminalHostServer {
     } catch {
       return .startFailed(.spawnFailed(code: 0))
     }
+  }
+
+  /// A side terminal whose trampoline is gone is started without job control (#382): said, since
+  /// nothing on screen tells it apart from one that has it.
+  static func noteMissingTrampoline(
+    for spec: TerminalSpec, id: TerminalID, trampoline: String?, diagnostics: Diagnostics
+  ) {
+    guard spec.role == .auxiliary, ControllingTerminal.isMissing(trampoline) else { return }
+    diagnostics.record(
+      .session, .notice, "host.trampolineMissing", ["session": diagnostics.pseudonym(id)])
   }
 
   /// History first, then `attached`, then the live stream — one consistent value, as
@@ -421,7 +435,11 @@ public actor TerminalHostServer {
           // Not asked for: the host forwards everything, and the application's own session
           // serves each of its subscribers what it reads.
           continue
-        case .historyTruncated(let count), .outputDropped(let count):
+        case .historyTruncated:
+          // Not served for a trim of the host's own history, whose bytes were forwarded already
+          // and are trimmed by the application's history by itself (#364).
+          continue
+        case .outputDropped(let count):
           // Output this forward dropped never reaches the application: lost to its history too.
           await connection.sendAndWait(
             .control(

@@ -52,7 +52,7 @@ struct PromptComposer: View {
           // A file dropped on the field is a chip, as anywhere else on the conversation (#146).
           .overlay(ComposerFileDropCatcher())
           .focused($isFocused)
-          .disabled(state != .ready && state != .answeringQuestion)
+          .disabled(![.ready, .answeringQuestion, .chattingAboutQuestion].contains(state))
           .accessibilityLabel(
             state == .answeringQuestion
               ? Text("Other answer to \(model.agentName)", bundle: .module)
@@ -158,12 +158,24 @@ struct PromptComposer: View {
             model: model, dictation: dictation, isEnabled: state == .ready && !isShell,
             isActive: isActive)
         }
+        // Whether the agent may create sessions of its own (#352): turned on at any time.
+        if !isShell, let coordination = model.coordination() {
+          CoordinateToggle(
+            isOn: Binding(get: { coordination.isOn }, set: { coordination.set($0) }),
+            font: theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
+          if coordination.isOn, let restart = coordination.restart {
+            // Not while it works: restarting it would stop the turn under way.
+            CoordinateRestartButton(
+              isEnabled: !model.isAgentWorking,
+              font: theme.interfaceFont(size: appearance.textSize.scaled(11.5)), action: restart)
+          }
+        }
         if let dictation = model.dictation, let line = dictationHint(dictation) {
           line
             .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
             .foregroundStyle(theme.secondaryText.color)
             .lineLimit(1)
-        } else if state == .awaitingAnswer || state == .answeringQuestion {
+        } else if [.awaitingAnswer, .answeringQuestion, .chattingAboutQuestion].contains(state) {
           RequestHint(model: model)
         } else {
           hint(state)
@@ -184,7 +196,7 @@ struct PromptComposer: View {
         .buttonStyle(.plain)
         .disabled(!model.canSend)
         .accessibilityLabel(isShell ? Text("Run", bundle: .module) : Text("Send", bundle: .module))
-        .help(
+        .instantTooltip(
           isShell ? Text("Run (Return)", bundle: .module) : Text("Send (Return)", bundle: .module))
       }
     }
@@ -373,6 +385,10 @@ struct PromptComposer: View {
     case .ready: Text("Write to \(model.agentName)…", bundle: .module)
     case .answeringQuestion:
       Text("Another answer…", bundle: .module, comment: "The composer, as a question's Other.")
+    case .chattingAboutQuestion:
+      Text(
+        "Or write to \(model.agentName) instead…", bundle: .module,
+        comment: "The composer while questions wait: what it sends sets them aside.")
     case .awaitingAnswer: Text("Answer the request first", bundle: .module)
     case .starting:
       Text(
@@ -501,7 +517,7 @@ public struct AttachmentChip: View {
       RoundedRectangle(cornerRadius: 9).stroke(
         usesSystemColors ? Color(nsColor: .separatorColor) : theme.border.color)
     )
-    .help(file.path)
+    .instantTooltip(file.path)
     .quickLookPreview($quickLook, in: siblings)
     .task(id: file) {
       let preview = await AttachmentPreviews.shared.preview(
@@ -602,11 +618,15 @@ struct RequestHint: View {
       }
       .buttonStyle(.plain)
       .foregroundStyle(theme.secondaryText.color)
-      .help(Text("Answer in the Terminal", bundle: .module))
+      .instantTooltip(Text("Answer in the Terminal", bundle: .module))
       .accessibilityLabel(Text("Answer in the Terminal", bundle: .module))
       Group {
         if model.composerState == .answeringQuestion {
           Text("↩ sends this answer · ⇧↩ new line", bundle: .module)
+        } else if model.composerState == .chattingAboutQuestion {
+          Text(
+            "↩ sets the questions aside and sends this", bundle: .module,
+            comment: "Under the composer while questions wait that it does not answer.")
         } else if model.activity == .awaitingUser(.question) {
           Text("\(model.agentName) is asking you a question", bundle: .module)
         } else {

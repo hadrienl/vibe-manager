@@ -92,7 +92,8 @@ struct SettingsSplitView: View {
             // squeezing it the time it takes. Its least size stays out of the window's.
             .frame(
               width: max(proxy.size.width, page.detailWidth), height: proxy.size.height,
-              alignment: .topLeading)
+              alignment: .topLeading
+            )
             .id(page)
             // Each page by its depth: a page reached from another comes in from the trailing edge
             // and leaves to it, the page it was reached from goes to the leading edge and comes
@@ -118,7 +119,8 @@ struct SettingsSplitView: View {
     .modifier(SettingsToolbarVeil())
     .frame(
       minWidth: Self.standardWidth, idealWidth: Self.standardWidth,
-      minHeight: Self.minimumHeight, idealHeight: Self.idealHeight)
+      minHeight: Self.minimumHeight, idealHeight: Self.idealHeight
+    )
     .background(SettingsWindowSizer(width: Self.sidebarWidth + target.detailWidth))
   }
 
@@ -135,7 +137,7 @@ struct SettingsSplitView: View {
         } label: {
           Image(systemName: "chevron.left")
         }
-        .help(Text("Back", bundle: .module))
+        .instantTooltip(Text("Back", bundle: .module))
         .accessibilityLabel(Text("Back", bundle: .module))
       }
     } else if #available(macOS 26, *) {
@@ -247,6 +249,7 @@ struct SettingsSidebarContent {
     var tools: [SettingsPage] = []
     if model.browser != nil { tools.append(.webView) }
     tools.append(.templates)
+    tools.append(.coordination)
     if model.dictation != nil { tools.append(.dictation) }
     if model.ticketTitles.canReadPages { tools.append(.tickets) }
     groups.append(
@@ -392,6 +395,8 @@ struct SettingsPageView: View {
       if let browser = model.browser {
         WebViewSettings(browser: browser)
       }
+    case .coordination:
+      CoordinationSettingsView(coordination: model.coordination)
     case .templates:
       PromptTemplatesView(
         model: model.templates, themes: model.conversations.themes,
@@ -424,6 +429,7 @@ struct GeneralSettingsPage: View {
       Section {
         OpenSessionsInRow(appearance: Bindable(model.conversations).appearance)
         SessionCloseRow(model: model)
+        SetAsideCloseRow(model: model)
         QuitBehaviorRow(model: model)
       } header: {
         Text("Sessions", bundle: .module, comment: "A section of the Settings window.")
@@ -668,7 +674,8 @@ struct PrivacySettingsView: View {
     }
     .formStyle(.grouped)
     .restartNowConfirmation(
-      permissions: permissions, origin: .settings, sessionName: model.sessionName(for:))
+      permissions: permissions, origin: .settings, sessionName: model.sessionName(for:)
+    )
     .task { await permissions?.recheck() }
   }
 }
@@ -1153,6 +1160,32 @@ private struct SessionCloseRow: View {
   }
 }
 
+/// What moving a session whose agent runs to To Do or Waiting does (#353), and the way back to
+/// the question once "Don't ask again" was ticked.
+private struct SetAsideCloseRow: View {
+  @Bindable var model: AppModel
+
+  var body: some View {
+    Picker(selection: $model.setAsideClose) {
+      Text("Ask", bundle: .module, comment: "A setting's answer: the question is asked each time.")
+        .tag(SetAsideClose.ask)
+      Text(
+        "Close it", bundle: .module,
+        comment: "What to do when a running session moves to To Do or Waiting."
+      )
+      .tag(SetAsideClose.close)
+      Text(
+        "Keep it open", bundle: .module,
+        comment: "What to do when a running session moves to To Do or Waiting."
+      )
+      .tag(SetAsideClose.keepOpen)
+    } label: {
+      Text("When a running session moves to To Do or Waiting", bundle: .module)
+      Text("Moving a session to Done always closes it.", bundle: .module)
+    }
+  }
+}
+
 /// The question asked when quitting with agents running, and the way back to it once
 /// "Don't ask again" was ticked.
 private struct QuitBehaviorRow: View {
@@ -1161,8 +1194,10 @@ private struct QuitBehaviorRow: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 6) {
       Picker(selection: $model.quitBehavior) {
-        Text("Ask", bundle: .module, comment: "What to do when quitting with agents running.")
-          .tag(QuitBehavior.ask)
+        Text(
+          "Ask", bundle: .module, comment: "A setting's answer: the question is asked each time."
+        )
+        .tag(QuitBehavior.ask)
         Text(
           "Keep them running", bundle: .module,
           comment: "What to do when quitting with agents running."

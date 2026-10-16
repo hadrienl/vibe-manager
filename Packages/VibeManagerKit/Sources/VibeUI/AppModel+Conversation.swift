@@ -112,8 +112,15 @@ extension AppModel {
   func connectConversations() {
     conversations.connect = { [weak self] model, session in
       let id = session.id
+      // What the composer writes is the user's: a message the application types waits until
+      // they stop (#352).
       model.write = { [weak self] bytes in
-        await self?.pane(for: id)?.write(bytes)
+        let pane = self?.pane(for: id)
+        pane?.noteKeyboardInput()
+        await pane?.write(bytes)
+      }
+      model.claimTyping = { [weak self] in
+        await self?.claimTyping(of: id) ?? {}
       }
       model.readScreen = { [weak self] in
         await self?.launcher?.screen(of: id)
@@ -141,6 +148,13 @@ extension AppModel {
         self?.setPresentation(.terminal, of: id)
       }
       model.dictation = self?.dictation
+      // The “Coordinate” chip, and what turning it on or off tells the agent (#352).
+      model.coordination = { [weak self] in
+        self?.composerCoordination(for: id)
+      }
+      model.takePreface = { [weak self] in
+        self?.takeCoordinationNotice(for: id)
+      }
       model.dictationVocabulary = { [weak self] in
         guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
           return ""
@@ -169,6 +183,9 @@ extension AppModel {
       }
       model.restart = { [weak self] in
         Task { await self?.restart(id) }
+      }
+      model.detectAgentsAgain = { [weak self] in
+        await self?.refreshAgents(forceRefresh: true)
       }
       model.canRestart = { [weak self] in
         guard let self, let session = self.sessions.first(where: { $0.id == id }) else {
@@ -234,6 +251,19 @@ enum ConversationStopReport {
   /// Why the agent could not be launched, as its terminal says it.
   @MainActor
   static func launchFailure(of pane: TerminalPaneModel?) -> ConversationLaunchFailure? {
-    pane?.failure.map { ConversationLaunchFailure(message: $0.message, suggestion: $0.suggestion) }
+    pane?.failure.map {
+      ConversationLaunchFailure(
+        message: $0.message,
+        suggestion: $0.suggestion,
+        canDetectAgain: pane?.launchError?.isMissingExecutable == true
+      )
+    }
+  }
+}
+
+private extension TerminalError {
+  var isMissingExecutable: Bool {
+    if case .executableNotFound = self { return true }
+    return false
   }
 }

@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// What the session did (#36): the summary its agent writes, then the tickets, requests, branches
@@ -234,7 +235,7 @@ private struct EntryRow: View {
         .lineLimit(nil)
         .fixedSize(horizontal: false, vertical: true)
     }
-    .help(links.map(\.absoluteString).joined(separator: "\n"))
+    .instantTooltip(links.map(\.absoluteString).joined(separator: "\n"))
     .accessibilityElement(children: .combine)
     .accessibilityLabel(Text(verbatim: "\(time), \(ActivityPresentation.entryText(entry))"))
     .accessibilityActions {
@@ -273,7 +274,7 @@ struct ResourceRow: View {
       }
       .frame(maxWidth: .infinity, alignment: .leading)
     }
-    .help(ActivityPresentation.help(resource))
+    .instantTooltip(ActivityPresentation.help(resource))
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(verbatim: ActivityPresentation.spokenLabel(resource)))
     .accessibilityAddTraits(.isButton)

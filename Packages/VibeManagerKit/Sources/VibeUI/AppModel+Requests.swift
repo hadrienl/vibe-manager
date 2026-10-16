@@ -164,7 +164,7 @@ extension AppModel {
       return LocalizedStringResource(
         "Refused · \(sessionName)", bundle: .module,
         comment: "Said once an agent's request was refused from the palette.")
-    case .answers:
+    case .answers, .skipUpdate, .chatAboutThis, .trustFolder:
       return LocalizedStringResource(
         "Answered · \(sessionName)", bundle: .module,
         comment: "Said once an agent's question was answered from the palette.")
@@ -178,8 +178,9 @@ extension AppModel {
     guard let session = sessions.first(where: { $0.id == id.sessionID }) else { return }
     // From the floating panel, another application is in front (#41).
     if !isApplicationActive { activateApplication() }
-    if session.taskStatus != .archived, filter.column != session.taskStatus {
-      setColumn(session.taskStatus)
+    let column = listedColumn(of: session)
+    if column != .archived, filter.column != column {
+      setColumn(column)
     }
     select(session.id)
     focusSession()

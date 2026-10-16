@@ -89,6 +89,70 @@ func followsWindowResize() async throws {
   await session.stop(gracePeriod: .seconds(2))
 }
 
+@Test("A redraw has the program read another size, even when the view's has not changed (#367)")
+func redrawChangesTheSizeTheProgramReads() async throws {
+  let session = try TerminalTestSupport.makeSession(
+    script: """
+      trap 'stty size' WINCH
+      stty size
+      while :; do sleep 0.05; done
+      """,
+    size: TerminalSize(columns: 100, rows: 30)
+  )
+  let observer = await TerminalObserver.attach(to: session)
+  #expect(await observer.waitForText("30 100"))
+
+  // Held for longer than any test: the size the program reads is the shorter one, whatever the
+  // pace of the runner. A program that redraws only when its size changes redraws for it.
+  await session.redraw(holdingFor: .seconds(3_600))
+
+  #expect(await observer.waitForText("29 100"))
+  await session.stop(gracePeriod: .seconds(2))
+}
+
+@Test("A redraw gives the terminal its size back")
+func redrawRestoresTheSize() async throws {
+  let session = try TerminalTestSupport.makeSession(
+    script: """
+      trap 'stty size' WINCH
+      stty size
+      while :; do sleep 0.05; done
+      """,
+    size: TerminalSize(columns: 100, rows: 30)
+  )
+  let observer = await TerminalObserver.attach(to: session)
+  #expect(await observer.waitForText("30 100"))
+
+  await session.redraw(holdingFor: .zero)
+
+  // Told of the size it has again, by the signal that gives it back.
+  #expect(await observer.waitForText("30 100", occurrences: 2))
+  await session.stop(gracePeriod: .seconds(2))
+}
+
+@Test("A redraw gives back the size the view last set, not the one it started from")
+func redrawRestoresTheLatestSize() async throws {
+  let session = try TerminalTestSupport.makeSession(
+    script: """
+      trap 'stty size' WINCH
+      stty size
+      while :; do sleep 0.05; done
+      """,
+    size: TerminalSize(columns: 100, rows: 30)
+  )
+  let observer = await TerminalObserver.attach(to: session)
+  #expect(await observer.waitForText("30 100"))
+
+  await session.redraw(holdingFor: .seconds(3_600))
+  #expect(await observer.waitForText("29 100"))
+  await session.resize(to: TerminalSize(columns: 120, rows: 40))
+  #expect(await observer.waitForText("40 120"))
+  // The redraw that follows gives back the new size, not the one the first started from.
+  await session.redraw(holdingFor: .zero)
+  #expect(await observer.waitForText("40 120", occurrences: 2))
+  await session.stop(gracePeriod: .seconds(2))
+}
+
 @Test("An unusable or unchanged size is ignored")
 func ignoresUnusableResize() async throws {
   let session = try TerminalTestSupport.makeSession(

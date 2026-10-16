@@ -102,3 +102,43 @@ func runsInTheRequestedWorkingDirectory() async throws {
   #expect(outcome.text.contains("present"))
   #expect(outcome.state == .exited(code: 0))
 }
+
+@Test("A trampoline that no longer exists starts the shell directly, not a false missing shell")
+func missingTrampolineFallsBackToTheShell() throws {
+  // The terminal host outlived the build it was started from (#382): spawning the trampoline
+  // failed with ENOENT, reported as "No executable was found at /bin/zsh".
+  let gone = "/tmp/vibe-manager-gone-\(UUID().uuidString)/Vibe Manager"
+  #expect(
+    ControllingTerminal.arguments(for: "/bin/zsh", arguments: ["-l"], trampoline: gone) == nil)
+
+  let present = try #require(
+    ControllingTerminal.arguments(for: "/bin/zsh", arguments: ["-l"], trampoline: "/bin/sh"))
+  #expect(present.0 == "/bin/sh")
+  #expect(present.1 == ["/bin/sh", ControllingTerminal.argument, "/bin/zsh", "/bin/zsh", "-l"])
+}
+
+@Test("A side terminal started without its trampoline is said in the host's log, once per start")
+func missingTrampolineIsLogged() {
+  let log = RecordingDiagnosticLog()
+  let diagnostics = Diagnostics(log: log, pseudonym: .ephemeral())
+  let gone = "/tmp/vibe-manager-gone-\(UUID().uuidString)/Vibe Manager"
+  var shell = TerminalSpec(
+    executableURL: URL(fileURLWithPath: "/bin/zsh"),
+    workingDirectoryURL: URL(fileURLWithPath: NSTemporaryDirectory(), isDirectory: true),
+    role: .auxiliary)
+
+  TerminalHostServer.noteMissingTrampoline(
+    for: shell, id: TerminalID(), trampoline: gone, diagnostics: diagnostics)
+  #expect(log.events(named: "host.trampolineMissing").count == 1)
+  #expect(log.events(named: "host.trampolineMissing").first?.fields.count == 1)
+
+  // Nothing to say with a trampoline that runs, with none at all, or for an agent.
+  TerminalHostServer.noteMissingTrampoline(
+    for: shell, id: TerminalID(), trampoline: "/bin/sh", diagnostics: diagnostics)
+  TerminalHostServer.noteMissingTrampoline(
+    for: shell, id: TerminalID(), trampoline: nil, diagnostics: diagnostics)
+  shell.role = .agent
+  TerminalHostServer.noteMissingTrampoline(
+    for: shell, id: TerminalID(), trampoline: gone, diagnostics: diagnostics)
+  #expect(log.events(named: "host.trampolineMissing").count == 1)
+}

@@ -36,4 +36,38 @@ struct AgentPanelRecognitionTests {
       !AgentPanelRecognition.showsPanel(
         screen: "Esc to cancel, as the menu says.\n› Ask Codex to do anything\n← for agents"))
   }
+
+  @Test("Prompts queued: Claude Code offers to send them now, whatever keys it is bound to (#341)")
+  func sendNowHint() {
+    let queued = """
+      ✻ Running… (esc to interrupt)
+        ⎿  Two messages
+      ────
+      ❯ 
+      ────
+        Press up to edit queued messages · ctrl+x ctrl+s to send now
+      """
+    #expect(AgentPanelRecognition.showsSendNowHint(screen: queued))
+    #expect(
+      AgentPanelRecognition.showsSendNowHint(
+        screen: queued.replacing("ctrl+x ctrl+s", with: "ctrl+g")))
+    #expect(!AgentPanelRecognition.showsSendNowHint(screen: "────\n❯ \n────\n  ? for shortcuts"))
+    #expect(!AgentPanelRecognition.showsSendNowHint(screen: "✻ Thinking… (esc to interrupt)"))
+    #expect(
+      !AgentPanelRecognition.showsSendNowHint(
+        screen: "Manage MCP servers\n❯ figma\nEnter to confirm · Esc to cancel"))
+    #expect(!AgentPanelRecognition.showsSendNowHint(screen: ""))
+    // The same words above the prompt — the agent's, or a message queued — are no offer.
+    #expect(
+      !AgentPanelRecognition.showsSendNowHint(
+        screen: """
+          Claude Code shows ctrl+x ctrl+s to send now.
+          ✻ Running… (esc to interrupt)
+          ────
+          ❯ 
+          ────
+            ? for shortcuts
+          """))
+    #expect(!AgentPanelRecognition.showsSendNowHint(screen: "Press ctrl+x ctrl+s to send now"))
+  }
 }

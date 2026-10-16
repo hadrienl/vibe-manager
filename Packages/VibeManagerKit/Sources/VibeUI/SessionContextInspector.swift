@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The right column: what this session works on, and with what (#66).
@@ -28,6 +29,9 @@ struct SessionContextInspector: View {
   private let leaveNotes: () -> Void
   private let usage: UsageModel?
   private let journal: SessionJournalModel?
+  /// The workspace, for the coordination section (#352): a coordinator's children, a child's
+  /// coordinator.
+  private let coordination: AppModel?
 
   init(
     session: WorkSession,
@@ -46,9 +50,11 @@ struct SessionContextInspector: View {
     ticketTitles: TicketTitlesModel? = nil,
     leaveNotes: @escaping () -> Void = {},
     usage: UsageModel? = nil,
-    journal: SessionJournalModel? = nil
+    journal: SessionJournalModel? = nil,
+    coordination: AppModel? = nil
   ) {
     self.session = session
+    self.coordination = coordination
     self.journal = journal
     self.notes = notes
     self.ticketTitles = ticketTitles
@@ -79,6 +85,9 @@ struct SessionContextInspector: View {
   /// usage — is left out, and keeps its place in the arrangement for when it comes back.
   private var sections: [InspectorSectionDescriptor] {
     var sections: [InspectorSectionDescriptor] = []
+    if let coordination, session.coordination != nil || coordination.showsAsCoordinator(session) {
+      sections.append(coordinationSection(coordination))
+    }
     if let journal {
       sections.append(activitySection(journal))
     }
@@ -115,6 +124,25 @@ extension SessionContextInspector {
             ?? "",
           journal: journal)),
       accessibilityIdentifier: "inspector-activity-section"
+    )
+  }
+
+  fileprivate func coordinationSection(_ model: AppModel) -> InspectorSectionDescriptor {
+    let isCoordinator = model.showsAsCoordinator(session)
+    return InspectorSectionDescriptor(
+      id: .coordination,
+      title: isCoordinator
+        ? String(
+          localized: "Children", bundle: .module,
+          comment: "A section of the inspector: a coordinator's child sessions.")
+        : String(
+          localized: "Coordination", bundle: .module,
+          comment: "A section of the inspector: a child session's coordinator."),
+      systemImage: "person.2",
+      sizing: .fill(minimum: 90),
+      summary: AnyView(CoordinationSummaryText(model: model, session: session)),
+      content: AnyView(CoordinationPane(model: model, session: session)),
+      accessibilityIdentifier: "inspector-coordination-section"
     )
   }
 
@@ -338,7 +366,7 @@ private struct GitAccessory: View {
       if let refresh {
         Button(action: refresh) { Image(systemName: "arrow.clockwise") }
           .buttonStyle(.borderless)
-          .help(Text("Read the repositories again", bundle: .module))
+          .instantTooltip(Text("Read the repositories again", bundle: .module))
           .accessibilityLabel(Text("Read the repositories again", bundle: .module))
       }
     }
@@ -712,7 +740,7 @@ private struct RepositoryHeader: View {
         Spacer(minLength: 4)
         count
       }
-      .help(group.repositoryPath)
+      .instantTooltip(group.repositoryPath)
 
       HStack(alignment: .firstTextBaseline, spacing: 5) {
         Image(systemName: "arrow.triangle.branch")
@@ -733,7 +761,7 @@ private struct RepositoryHeader: View {
           Text(arrows)
             .font(.caption.monospacedDigit())
             .foregroundStyle(.secondary)
-            .help(group.distanceHelp)
+            .instantTooltip(group.distanceHelp)
         }
       }
 
@@ -777,7 +805,7 @@ private struct RepositoryHeader: View {
         .padding(.horizontal, 6)
         .padding(.vertical, 1)
         .background(Capsule().fill(Color.secondary.opacity(0.18)))
-        .help(Text("\(group.changeCount) changed entries", bundle: .module))
+        .instantTooltip(Text("\(group.changeCount) changed entries", bundle: .module))
     }
   }
 }
@@ -837,7 +865,7 @@ private struct FileSectionView: View {
           .font(.caption.monospacedDigit())
           .foregroundStyle(.tertiary)
       }
-      .help(section.help ?? "")
+      .instantTooltip(section.help ?? "")
       .accessibilityElement(children: .ignore)
       .accessibilityLabel(
         [
@@ -948,7 +976,7 @@ private struct FileRowView: View {
         Image(systemName: "questionmark.circle")
           .font(.caption)
           .foregroundStyle(.tertiary)
-          .help(FileRow.unattributedHelp)
+          .instantTooltip(FileRow.unattributedHelp)
       }
       if let directory {
         Button(action: directory.toggle) {
@@ -956,7 +984,7 @@ private struct FileRowView: View {
             .font(.caption)
         }
         .buttonStyle(.borderless)
-        .help(
+        .instantTooltip(
           directory.isExpanded
             ? Text("Hide the files of this folder", bundle: .module)
             : Text("Show the files of this folder", bundle: .module)
@@ -967,7 +995,7 @@ private struct FileRowView: View {
       }
     }
     .opacity(isStale ? 0.6 : 1)
-    .help(row.help)
+    .instantTooltip(row.help)
     .accessibilityElement(children: .combine)
     .accessibilityLabel(row.accessibilityLabel)
   }
@@ -1034,7 +1062,7 @@ private struct PlainFolderRow: View {
       .lineLimit(nil)
       .fixedSize(horizontal: false, vertical: true)
     }
-    .help(path)
+    .instantTooltip(path)
     .contextMenu {
       Button(action: reveal) { Text("Reveal in Finder", bundle: .module) }
     }

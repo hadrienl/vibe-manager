@@ -234,7 +234,7 @@ public struct NewSessionDraftView: View {
       }
       .controlSize(.small)
       .disabled(model.isSubmitting)
-      .help(Text("Discard this draft. No session is created.", bundle: .module))
+      .instantTooltip(Text("Discard this draft. No session is created.", bundle: .module))
       .accessibilityIdentifier("new-session-discard")
     }
     .padding(.horizontal, 20)
@@ -262,7 +262,11 @@ public struct NewSessionDraftView: View {
           .focused($focus, equals: .draft(.name))
           // A plain field shows its prompt, not its label: VoiceOver is given the label itself.
           .accessibilityLabel(
-            Text("Session name", bundle: .module, comment: "The name of a session, as the label or placeholder of the field that sets it."))
+            Text(
+              "Session name", bundle: .module,
+              comment:
+                "The name of a session, as the label or placeholder of the field that sets it.")
+          )
           .accessibilityIdentifier("new-session-name")
         }
         .tourAnchor(.draftName)
@@ -540,7 +544,9 @@ public struct NewSessionDraftView: View {
       appearancePicker
         .padding(16)
     }
-    .help(Text("Appearance", bundle: .module, comment: "The symbol and colour of the session."))
+    .instantTooltip(
+      Text("Appearance", bundle: .module, comment: "The symbol and colour of the session.")
+    )
     .accessibilityLabel(
       Text("Appearance", bundle: .module, comment: "The symbol and colour of the session.")
     )
@@ -819,7 +825,7 @@ public struct NewSessionDraftView: View {
           Text("Edit as Text", bundle: .module)
         }
         .controlSize(.small)
-        .help(
+        .instantTooltip(
           Text(
             "Turn the prompt into free text. The session will not refer to the template.",
             bundle: .module))
@@ -846,9 +852,15 @@ public struct NewSessionDraftView: View {
       }
       .buttonStyle(.plain)
       .disabled(model.draft.templateFill != nil)
-      .help(Text("Attach Files…", bundle: .module, comment: "Joins files to the prompt."))
+      .instantTooltip(Text("Attach Files…", bundle: .module, comment: "Joins files to the prompt."))
       .accessibilityLabel(
         Text("Attach Files…", bundle: .module, comment: "Joins files to the prompt."))
+
+      // The session may create and follow sessions of its own (#352), as a conversation's
+      // composer offers it later.
+      if model.canCoordinate || model.isCoordinator {
+        CoordinateToggle(isOn: $model.isCoordinator)
+      }
 
       if let summary {
         Text(verbatim: summary)
@@ -892,7 +904,7 @@ public struct NewSessionDraftView: View {
       // the draft.
       .keyboardShortcut(.return, modifiers: .command)
       .disabled(!model.canSubmit)
-      .help(
+      .instantTooltip(
         model.missingRequirement.map { Text(verbatim: $0) }
           ?? Text("Create & Launch", bundle: .module)
       )
@@ -1185,7 +1197,7 @@ struct AgentChoiceRow: View {
               "Copy \(command)", bundle: .module,
               comment: "A command line to paste in a terminal: claude auth login.")
           }
-          .help(
+          .instantTooltip(
             Text("Paste it in a terminal to sign in, then detect again.", bundle: .module))
         }
       }
@@ -1221,7 +1233,8 @@ struct AgentChoiceRow: View {
       if agent.warnsBeforeLaunch {
         Image(systemName: "lock")
           .foregroundStyle(.orange)
-          .help(Text("The agent will ask you to sign in inside the terminal.", bundle: .module))
+          .instantTooltip(
+            Text("The agent will ask you to sign in inside the terminal.", bundle: .module))
       }
     }
     .accessibilityLabel(
@@ -1310,7 +1323,7 @@ struct RecentFolderCard: View {
       }
       Spacer()
     }
-    .help(Text(verbatim: option.displayPath))
+    .instantTooltip(Text(verbatim: option.displayPath))
     .contextMenu {
       Button(action: forget) {
         Text("Remove from Recents", bundle: .module, comment: "Forgets a recent folder.")
@@ -1360,7 +1373,7 @@ struct SymbolChoice: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .help(isOffered ? SessionSymbolName.text(for: symbol) : AppearanceChoiceText.offList)
+    .instantTooltip(isOffered ? SessionSymbolName.text(for: symbol) : AppearanceChoiceText.offList)
     .accessibilityLabel(SessionSymbolName.text(for: symbol))
     .accessibilityValue(isOffered ? Text(verbatim: "") : AppearanceChoiceText.offList)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])
@@ -1420,7 +1433,9 @@ struct ProjectIconChoice: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .help(Text("Project icon", bundle: .module, comment: "The icon found in the working folder."))
+    .instantTooltip(
+      Text("Project icon", bundle: .module, comment: "The icon found in the working folder.")
+    )
     .accessibilityLabel(
       Text("Project icon", bundle: .module, comment: "The icon found in the working folder.")
     )
@@ -1448,7 +1463,7 @@ struct ColorChoice: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .help(isOffered ? swatchLabel : AppearanceChoiceText.offList)
+    .instantTooltip(isOffered ? swatchLabel : AppearanceChoiceText.offList)
     .accessibilityLabel(swatchLabel)
     .accessibilityValue(isOffered ? Text(verbatim: "") : AppearanceChoiceText.offList)
     .accessibilityAddTraits(isSelected ? [.isSelected] : [])

@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 /// The usage of the selected session: the content of the inspector's Usage section (#66).
@@ -173,7 +174,7 @@ private struct InspectorLine: View {
       under(underValue)
     }
     .font(font)
-    .help(help ?? "")
+    .instantTooltip(help ?? "")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(label)
     .accessibilityValue(value)

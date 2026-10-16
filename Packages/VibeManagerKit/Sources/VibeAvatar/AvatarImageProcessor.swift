@@ -29,9 +29,24 @@ public struct AvatarImageProcessor: AvatarImageProcessing {
     try SpriteSheetProcessor.sprite(fromImage: data, as: expression, matching: reference)
   }
 
+  /// What the avatar workshop says of an archive refused whole.
+  static func problem(_ error: ZipArchiveError) -> AvatarProblem {
+    switch error {
+    case .unreadable: .archiveUnreadable
+    case .tooLarge: .archiveTooLarge
+    case .unsafeEntry(let name): .archiveUnsafeEntry(name)
+    case .encrypted: .archiveEncrypted
+    }
+  }
+
   public func avatar(fromArchive data: Data) throws -> (avatar: AvatarSpriteSet, ignoredFiles: Int)
   {
-    let entries = try ZipArchiveReader.entries(of: data)
+    let entries: [ZipArchiveReader.Entry]
+    do {
+      entries = try ZipArchiveReader.entries(of: data)
+    } catch {
+      throw Self.problem(error)
+    }
     var manifest: AvatarManifest?
     var sheet: Data?
     var ignored = 0

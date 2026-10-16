@@ -30,8 +30,8 @@ struct SessionConversationThemeStoreTests {
     let v9 = String(
       decoding: try codec.encode(sessions: [session("A", rank: 5), session("B", rank: -2)]),
       as: UTF8.self)
-    #expect(v9.contains(#""schemaVersion" : 9"#))
-    let v8 = v9.replacingOccurrences(of: #""schemaVersion" : 9"#, with: #""schemaVersion" : 8"#)
+    #expect(v9.contains(#""schemaVersion" : 10"#))
+    let v8 = v9.replacingOccurrences(of: #""schemaVersion" : 10"#, with: #""schemaVersion" : 8"#)
 
     let decoded = try codec.decode(Data(v8.utf8))
 

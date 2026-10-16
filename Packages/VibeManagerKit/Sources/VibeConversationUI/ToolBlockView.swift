@@ -220,7 +220,7 @@ struct StateSymbol: View {
     }
     .font(.system(size: 13, weight: .semibold))
     .frame(width: 18, height: 18)
-    .help(Self.label(for: state))
+    .instantTooltip(Self.label(for: state))
   }
 
   static func label(for state: ToolCallState) -> String {
@@ -800,7 +800,8 @@ private struct OptionButtonStyle: ButtonStyle {
 struct RequestActions: View {
   let model: ConversationModel
   let request: ConversationRequest
-  let call: ToolCall
+  /// The call it is shown under, if any: what the call shows is not repeated.
+  let call: ToolCall?
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
@@ -809,7 +810,7 @@ struct RequestActions: View {
       // What would be allowed, unless the block above shows exactly that.
       if case .permission(let permission) = request.request.content,
         let subject = permission.subject,
-        !ConversationModel.isAbout(call, subject)
+        !(call.map { ConversationModel.isAbout($0, subject) } ?? false)
       {
         Text(verbatim: DisplaySafeText.visible(subject))
           .font(theme.codeFont(size: appearance.textSize.scaled(12)))
@@ -820,8 +821,9 @@ struct RequestActions: View {
           .frame(maxWidth: .infinity, alignment: .leading)
           .background(theme.codeBackground.color, in: RoundedRectangle(cornerRadius: 6))
       }
-      // A dialog the agent only announced (#273): its own words are all there is to show.
-      if case .inTerminal(let prompt) = request.request.content, let message = prompt.message {
+      // A dialog the agent only announced (#273), or a server's form: their words are all there
+      // is to show.
+      if let message = Self.message(of: request.request.content) {
         Text(verbatim: DisplaySafeText.visible(message))
           .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
           .foregroundStyle(theme.text.color)
@@ -855,6 +857,24 @@ struct RequestActions: View {
         if answers.contains(.deny) { denyButton }
       case .unreadable:
         if answers.contains(.deny) { denyButton }
+      case .elicitation:
+        // A server's confirmation: Escape cancels it, and the agent's turn goes on.
+        if answers.contains(.allowOnce) {
+          Button {
+            model.answer(.allowOnce)
+          } label: {
+            Text("Allow", bundle: .module, comment: "Allows what an agent asks, this once.")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent.color)
+        }
+        if answers.contains(.deny) {
+          Button {
+            model.answer(.deny)
+          } label: {
+            Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
+          }
+        }
       case .plan:
         if answers.contains(.approvePlan) {
           Menu {
@@ -885,9 +905,39 @@ struct RequestActions: View {
           } label: {
             Text("Reject", bundle: .module, comment: "Rejects an agent's plan.")
           }
-          .help(Text(Self.stopsTheTurn))
+          .instantTooltip(Text(Self.stopsTheTurn))
         }
-      case .questions, .elicitation, .inTerminal:
+      case .inTerminal:
+        // An update the CLI offers as it starts: passed over from here, updated in the terminal.
+        if answers.contains(.skipUpdate) {
+          Button {
+            model.answer(.skipUpdate(untilNextVersion: false))
+          } label: {
+            Text("Skip", bundle: .module, comment: "Passes over the update an agent's CLI offers.")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent.color)
+          Button {
+            model.answer(.skipUpdate(untilNextVersion: true))
+          } label: {
+            Text(
+              "Skip This Version", bundle: .module,
+              comment: "Passes over the update an agent's CLI offers, until a newer one.")
+          }
+        }
+        if answers.contains(.trustFolder) {
+          Button {
+            model.answer(.trustFolder)
+          } label: {
+            Text(
+              "Trust This Folder", bundle: .module,
+              comment:
+                "Trusts the folder an agent's CLI starts in, as it asks before anything else.")
+          }
+          .buttonStyle(.borderedProminent)
+          .tint(theme.accent.color)
+        }
+      case .questions:
         EmptyView()
       }
       if request.isSending {
@@ -907,14 +957,79 @@ struct RequestActions: View {
     "Also interrupts the agent's turn: it waits for your next message.", bundle: .module,
     comment: "What refusing a request does besides refusing.")
 
+  static func message(of content: AgentRequestContent) -> String? {
+    switch content {
+    case .inTerminal(let prompt): return prompt.message
+    case .elicitation(let elicitation): return elicitation.message
+    default: return nil
+    }
+  }
+
   private var denyButton: some View {
     Button {
       model.answer(.deny)
     } label: {
       Text("Refuse", bundle: .module, comment: "Refuses what an agent asks.")
     }
-    .help(Text(Self.stopsTheTurn))
+    .instantTooltip(Text(Self.stopsTheTurn))
     .accessibilityHint(Text(Self.stopsTheTurn))
+  }
+}
+
+/// A request no call holds — a dialog of the CLI's start, an update it offers — above the composer,
+/// with what it says and its answers.
+struct StandaloneRequestCard: View {
+  let model: ConversationModel
+  let request: ConversationRequest
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 8) {
+      Label {
+        title
+      } icon: {
+        Image(systemName: symbol)
+      }
+      .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5), weight: .semibold))
+      .foregroundStyle(theme.text.color)
+      RequestActions(model: model, request: request, call: nil)
+    }
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .accessibilityElement(children: .contain)
+  }
+
+  private var kind: AgentTerminalPrompt.Kind? {
+    if case .inTerminal(let prompt) = request.request.content { return prompt.kind }
+    return nil
+  }
+
+  private var symbol: String {
+    switch kind {
+    case .update: "arrow.down.circle"
+    case .trust: "folder.badge.questionmark"
+    default: "terminal"
+    }
+  }
+
+  private var title: Text {
+    switch kind {
+    case .update:
+      Text(
+        "\(model.agentName) offers an update", bundle: .module,
+        comment: "Above the composer: the agent's CLI offers to update itself before it starts.")
+    case .trust:
+      Text(
+        "\(model.agentName) asks whether to trust this folder", bundle: .module,
+        comment:
+          "Above the composer: the agent's CLI asks, before it starts, whether the folder it works in is to be trusted."
+      )
+    default:
+      Text(
+        "\(model.agentName) is waiting for your answer", bundle: .module,
+        comment: "Above the composer: a dialog of the agent that no call of the conversation shows."
+      )
+    }
   }
 }
 

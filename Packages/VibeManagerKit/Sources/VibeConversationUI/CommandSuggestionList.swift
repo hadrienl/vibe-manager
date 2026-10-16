@@ -187,7 +187,7 @@ struct CommandSuggestionRow: View {
       in: RoundedRectangle(cornerRadius: 8)
     )
     .padding(.horizontal, 4)
-    .help(command.description)
+    .instantTooltip(command.description)
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(Text(verbatim: Self.spokenLabel(command)))
     .accessibilityAddTraits(isSelected ? .isSelected : [])

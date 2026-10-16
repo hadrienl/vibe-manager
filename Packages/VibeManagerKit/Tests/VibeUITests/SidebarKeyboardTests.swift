@@ -16,7 +16,7 @@ import VibeTerminalUI
 struct SidebarKeyboardTests {
   private static let provider = WorkspaceProvider()
 
-  /// Three running sessions, their terminals mounted by the real window's content.
+  /// Three sessions, the running ones' terminals mounted by the real window's content.
   @MainActor private final class Workspace {
     let model: AppModel
     let sessions: [WorkSession]
@@ -91,7 +91,10 @@ struct SidebarKeyboardTests {
     let description: String
   }
 
-  private func workspace() async throws -> Workspace {
+  /// - Parameter columns: the column of each session, in order. All in progress by default.
+  private func workspace(
+    columns: [SessionTaskStatus] = [.doing, .doing, .doing]
+  ) async throws -> Workspace {
     let folder = NSTemporaryDirectory().appending("vibe-sidebar-keyboard-\(UUID().uuidString)")
     try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
     let sessions = ["Alpha one", "Bravo two", "Charlie two"].enumerated().map { index, name in
@@ -102,7 +105,8 @@ struct SidebarKeyboardTests {
         createdAt: Date(timeIntervalSince1970: 1),
         updatedAt: Date(timeIntervalSince1970: TimeInterval(400 - index)),
         closedAt: Date(timeIntervalSince1970: 1),
-        repositories: [RepositoryContext(path: folder)]
+        repositories: [RepositoryContext(path: folder)],
+        taskStatus: columns[index]
       )
     }
     let repository = WorkspaceRepository(sessions: sessions)
@@ -113,7 +117,8 @@ struct SidebarKeyboardTests {
     let model = AppModel(repository: repository, agents: registry, launcher: launcher)
     let plan = try await Self.provider.launchPlan(
       for: AgentLaunchRequest(workingDirectoryPath: folder))
-    for session in sessions {
+    // A session launched is put back In Progress: only those already there run.
+    for session in sessions where session.taskStatus == .doing {
       await launcher.launch(session: session, plan: plan)
     }
     // Loaded here, not by the window's own `.task`: finishing later, on a slow runner, that load
@@ -256,5 +261,47 @@ struct SidebarKeyboardTests {
     #expect(
       Set(model.commandTargets) == [workspace.ids[1], workspace.ids[2]], "\(workspace.state)")
     #expect(model.selectedSessionID == workspace.ids[2])
+  }
+
+  @Test("A click on a tab gives the list the keyboard; ⌘A selects that column alone (#346)")
+  func tabThenSelectAll() async throws {
+    let workspace = try await workspace(columns: [.done, .doing, .done])
+    defer { workspace.close() }
+    let model = workspace.model
+    let sessions = workspace.sessions
+    let finished: Set = [sessions[0].id, sessions[2].id]
+    model.setColumn(.doing)
+    model.select(sessions[1].id)
+    try await waitUntil("the in-progress session's terminal", in: workspace) {
+      workspace.list != nil && workspace.shownTerminal(of: sessions[1]) != nil
+    }
+    // The list had the keyboard, then the terminal took it: the list's focus can be left standing
+    // (#128), and the tab must still bring the keyboard back.
+    model.focusSidebar()
+    try await waitUntil("the keyboard in the list first", in: workspace) {
+      workspace.keyboardIsInTheList
+    }
+    let terminal = try #require(workspace.shownTerminal(of: sessions[1]))
+    try await moveKeyboard(to: terminal, in: workspace)
+    #expect(!workspace.keyboardIsInTheList)
+
+    model.chooseColumn(.done)
+    try await waitUntil("the keyboard in the list", in: workspace) {
+      workspace.keyboardIsInTheList
+    }
+
+    // What ⌘A sends: Select All, to whatever holds the keyboard.
+    let responder = try #require(workspace.window.firstResponder)
+    #expect(responder.tryToPerform(#selector(NSResponder.selectAll(_:)), with: nil))
+    try await waitUntil("the finished sessions selected", in: workspace) {
+      model.selectedSessionIDs == finished
+    }
+    #expect(!model.selectedSessionIDs.contains(sessions[1].id))
+
+    // The menu of the selection archives them all, behind one question.
+    let plan = model.batchPlan(.archive, for: model.commandTargets)
+    #expect(Set(plan.eligible) == finished)
+    await model.requestBatch(plan)
+    #expect(model.pendingBatch?.plan == plan)
   }
 }
