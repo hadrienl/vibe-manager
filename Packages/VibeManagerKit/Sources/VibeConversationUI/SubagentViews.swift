@@ -22,7 +22,7 @@ struct SubagentBlockView: View {
     let isExpanded = model.isSubagentExpanded(call)
     VStack(alignment: .leading, spacing: 0) {
       Button {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+        withAnimation(reduceMotion ? nil : .fold) {
           model.setSubagentExpanded(!isExpanded, call: call)
         }
       } label: {
@@ -316,7 +316,7 @@ struct SectionDisclosure<Content: View>: View {
     let size = appearance.textSize.pointSize * 0.86
     VStack(alignment: .leading, spacing: 8) {
       Button {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) { setExpanded(!isExpanded) }
+        withAnimation(reduceMotion ? nil : .fold) { setExpanded(!isExpanded) }
       } label: {
         HStack(spacing: 8) {
           Image(systemName: "chevron.right")
@@ -403,7 +403,7 @@ struct SubagentGroupView: View {
     let size = appearance.textSize.pointSize * 0.9
     VStack(alignment: .leading, spacing: 0) {
       Button {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+        withAnimation(reduceMotion ? nil : .fold) {
           model.setExpanded(!isExpanded, for: block.id)
         }
       } label: {
