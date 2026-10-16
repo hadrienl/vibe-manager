@@ -158,7 +158,7 @@ func requestPushRecordID() {
     [
       "aps": ["alert": ["loc-key": "COMPANION_REQUEST_ALERT_BODY"], "mutable-content": 1],
       "ck": [
-        "ce": 2, "cid": "iCloud.eu.hadrien.VibeManager", "nid": "N1",
+        "ce": 2, "cid": "iCloud.eu.hadrien.VibeManager.Debug", "nid": "N1",
         "qry": [
           "dbs": 2, "fo": 1, "rid": "request-R1", "sid": subscription, "zid": zone,
           "zoid": "_defaultOwner",

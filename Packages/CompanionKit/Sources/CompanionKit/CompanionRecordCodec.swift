@@ -5,8 +5,10 @@ import Foundation
 /// Where the companion's records live in iCloud (#347).
 public enum CompanionCloud {
   /// The same in the iOS application and in the Mac's companion agent: both entitlements name it.
-  /// Created on 2026-10-10, and final: a container can be neither deleted nor renamed.
-  public static let containerIdentifier = "iCloud.eu.hadrien.VibeManager"
+  /// The POC's own container (#368), whose schema may go to Production for a Developer ID trial
+  /// without binding the real one, `iCloud.eu.hadrien.VibeManager`: a container can be neither
+  /// deleted nor renamed, and a Production schema only grows.
+  public static let containerIdentifier = "iCloud.eu.hadrien.VibeManager.Debug"
   public static let zoneID = CKRecordZone.ID(
     zoneName: "Companion", ownerName: CKCurrentUserDefaultName)
 

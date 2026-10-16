@@ -30,7 +30,7 @@ final class NotificationService: UNNotificationServiceExtension {
     pending.begin(generic: generic, handler: contentHandler)
     guard let recordID = CompanionRequestAlerts.recordID(fromPush: request.content.userInfo) else {
       Self.logger.notice("push: not a request's, delivered as it came")
-      pending.deliver(nil)
+      pending.deliver(nil, diagnostic: "pas une demande")
       return
     }
     Self.logger.notice("push: request \(recordID.recordName, privacy: .public), fetching")
@@ -41,7 +41,7 @@ final class NotificationService: UNNotificationServiceExtension {
           let alert = CompanionRequestAlerts.alert(for: companionRequest)
         else {
           Self.logger.error("fetch: no request to read, generic alert")
-          pending.deliver(nil)
+          pending.deliver(nil, diagnostic: "demande illisible")
           return
         }
         Self.logger.notice("fetch: request read, alert written")
@@ -49,7 +49,7 @@ final class NotificationService: UNNotificationServiceExtension {
       } catch {
         Self.logger.error(
           "fetch: \(CompanionErrorText.describe(error), privacy: .public), generic alert")
-        pending.deliver(nil)
+        pending.deliver(nil, diagnostic: CompanionErrorText.describe(error))
       }
     }
   }
@@ -57,7 +57,7 @@ final class NotificationService: UNNotificationServiceExtension {
   /// iOS's time is up: the generic alert, unless the fetch delivered just before.
   override func serviceExtensionTimeWillExpire() {
     Self.logger.error("fetch: out of time, generic alert")
-    pending.deliver(nil)
+    pending.deliver(nil, diagnostic: "délai dépassé")
   }
 }
 
@@ -84,7 +84,9 @@ private final class PendingAlert: @unchecked Sendable {
 
   /// The request's texts on the generic alert — or `nil`, the generic alert as it is. Only the
   /// first call counts.
-  func deliver(_ texts: Texts?) {
+  /// `diagnostic`, the debug build only: why the alert stayed generic, as its subtitle — the
+  /// extension's logs are out of reach without a cable (#368 trial).
+  func deliver(_ texts: Texts?, diagnostic: String? = nil) {
     let delivery: (handler: (UNNotificationContent) -> Void, content: UNNotificationContent)? =
       lock.withLock {
         guard let handler, let content else { return nil }
@@ -95,6 +97,9 @@ private final class PendingAlert: @unchecked Sendable {
           if !texts.title.isEmpty { content.title = texts.title }
           content.body = texts.body
         }
+        #if DEBUG
+          if let diagnostic { content.subtitle = "Extension : \(diagnostic)" }
+        #endif
         return (handler, content)
       }
     if let delivery { delivery.handler(delivery.content) }
