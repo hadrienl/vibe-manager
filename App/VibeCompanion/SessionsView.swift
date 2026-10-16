@@ -11,6 +11,8 @@ struct SessionsView: View {
   @State private var path: [String] = []
   @State private var showsSearch = false
   @State private var showsSettings = false
+  /// The row whose swipe buttons are open: one at a time.
+  @State private var swipedID: String?
 
   var body: some View {
     NavigationStack(path: $path) {
@@ -29,11 +31,18 @@ struct SessionsView: View {
         ForEach(groups, id: \.path) { group in
           Section {
             ForEach(group.rows) { row in
-              SessionRow(session: row.session, indented: row.indented)
-                .contentShape(Rectangle())
-                .onTapGesture { path.append(row.session.id) }
-                .swipeActions(edge: .leading) { moves(row.session, to: row.session.status.previous) }
-                .swipeActions(edge: .trailing) { moves(row.session, to: row.session.status.next) }
+              StatusSwipe(
+                id: row.session.id, leading: row.session.status.previous,
+                trailing: row.session.status.next, openID: $swipedID,
+                choose: { channel.setStatus($0, of: row.session.id) },
+                tap: { path.append(row.session.id) }
+              ) {
+                SessionRow(session: row.session, indented: row.indented)
+                  .padding(.horizontal, 16)
+                  .padding(.vertical, 10)
+                  .background(Color(.secondarySystemGroupedBackground))
+              }
+              .listRowInsets(EdgeInsets())
             }
           } header: {
             Label(group.name, systemImage: "folder")
@@ -91,18 +100,6 @@ struct SessionsView: View {
 
   private func count(_ status: RemoteTaskStatus) -> Int {
     channel.sessions.filter { $0.status == status }.count
-  }
-
-  @ViewBuilder
-  private func moves(_ session: RemoteSession, to statuses: [RemoteTaskStatus]) -> some View {
-    ForEach(statuses, id: \.self) { status in
-      Button {
-        channel.setStatus(status, of: session.id)
-      } label: {
-        Label(status.label, systemImage: status.symbol)
-      }
-      .tint(status.tint)
-    }
   }
 
   // MARK: - Grouping

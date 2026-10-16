@@ -39,6 +39,14 @@ struct SessionBadge: View {
 }
 
 extension Color {
+  init(light: (Double, Double, Double), dark: (Double, Double, Double)) {
+    self.init(
+      uiColor: UIColor { traits in
+        let c = traits.userInterfaceStyle == .dark ? dark : light
+        return UIColor(red: c.0, green: c.1, blue: c.2, alpha: 1)
+      })
+  }
+
   /// `#RRGGBB`, as the Mac stores a session's colour.
   init?(hex: String) {
     let digits = hex.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
@@ -60,24 +68,32 @@ extension RemoteTaskStatus {
     }
   }
 
+  /// The Mac's symbols and colours (`SessionTaskStatusPresentation`).
   var symbol: String {
     switch self {
     case .todo: "circle.dashed"
-    case .doing: "play.circle"
-    case .waiting: "clock"
-    case .done: "checkmark.circle"
+    case .doing: "circle.lefthalf.filled"
+    case .waiting: "pause.circle"
+    case .done: "checkmark.circle.fill"
     case .archived: "archivebox"
     }
   }
 
   var tint: Color {
     switch self {
-    case .todo: .gray
+    // Slate rather than grey, so that À faire is not mistaken for Archivée.
+    case .todo: Color(light: (0.42, 0.46, 0.53), dark: (0.49, 0.53, 0.60))
     case .doing: .blue
     case .waiting: .purple
-    case .done: .green
-    case .archived: .brown
+    // The system green is too light under white text.
+    case .done: Color(light: (0.12, 0.54, 0.23), dark: (0.14, 0.57, 0.25))
+    case .archived: .gray
     }
+  }
+
+  /// What its swipe button says: Archiver rather than Archivée.
+  var buttonTitle: LocalizedStringKey {
+    self == .archived ? "Archiver" : label
   }
 
   /// The four columns of the Mac's sidebar.
