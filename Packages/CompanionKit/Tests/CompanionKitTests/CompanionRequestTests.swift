@@ -71,16 +71,24 @@ func notificationTestTriage() {
   #expect(CompanionInbox.triage([notify], handled: ["b"], now: now).toNotify.isEmpty)
 }
 
-@Test("A request is in the clear, for CloudKit to build the notification from it")
+@Test("A request's texts are encrypted, and come back from its record as they were")
 func requestRecord() throws {
   let request = CompanionRequest(
     id: "R1", macID: "A1", sessionTitle: "#368 Notifications", agent: "Codex",
     text: "attend votre réponse", createdAt: now)
   let ckRecord = CompanionRecordCodec.makeRecord(.request(request), systemFields: nil)
   #expect(ckRecord.recordType == "Request")
-  #expect(ckRecord["sessionTitle"] as? String == "#368 Notifications")
-  #expect(ckRecord["agentName"] as? String == "Codex")
-  #expect(ckRecord["text"] as? String == "attend votre réponse")
+  for key in ["title", "agent", "message"] {
+    #expect(ckRecord[key] == nil, "\(key) in the clear")
+    #expect(ckRecord.encryptedValues[key] != nil, "\(key) not encrypted")
+  }
+  // Nothing under the names of the first requests, which were in the clear.
+  for key in ["sessionTitle", "agentName", "text"] {
+    #expect(ckRecord[key] == nil && ckRecord.encryptedValues[key] == nil, "\(key) written")
+  }
+  #expect(ckRecord.encryptedValues["title"] as? String == "#368 Notifications")
+  #expect(ckRecord["macID"] as? String == "A1")
+  #expect(ckRecord["createdAt"] as? Date == now)
   #expect(CompanionRecordCodec.decode(ckRecord) == .request(request))
 
   let ping = CompanionPing(nonce: "7F3A", deviceName: "iPhone", sentAt: now, requestDelay: 10)
@@ -88,16 +96,83 @@ func requestRecord() throws {
   #expect(CompanionRecordCodec.decode(pingRecord) == .ping(ping))
 }
 
-@Test("The subscription alerts on each new request of the zone, with the record's own words")
+@Test("A request of the first version, in the clear, is still read")
+func clearRequestRecord() {
+  let ckRecord = CKRecord(recordType: "Request", recordID: CompanionCloud.recordID("request-R0"))
+  ckRecord["macID"] = "A1"
+  ckRecord["sessionTitle"] = "Ancienne"
+  ckRecord["agentName"] = "Claude Code"
+  ckRecord["text"] = "attend votre réponse"
+  ckRecord["createdAt"] = now
+  #expect(
+    CompanionRecordCodec.decode(ckRecord)
+      == .request(
+        CompanionRequest(
+          id: "R0", macID: "A1", sessionTitle: "Ancienne", agent: "Claude Code",
+          text: "attend votre réponse", createdAt: now)))
+}
+
+@Test("The subscription pushes a generic, mutable alert on each new request of the zone")
 func requestSubscription() {
   let subscription = CompanionRequestAlerts.subscription()
-  #expect(subscription.subscriptionID == CompanionRequestAlerts.subscriptionID)
+  #expect(subscription.subscriptionID == "companion-requests-v2")
+  #expect(CompanionRequestAlerts.retiredSubscriptionIDs == ["companion-requests-v1"])
   #expect(subscription.recordType == "Request")
   #expect(subscription.zoneID == CompanionCloud.zoneID)
   #expect(subscription.querySubscriptionOptions == [.firesOnRecordCreation])
   let info = subscription.notificationInfo
-  #expect(info?.titleLocalizationArgs == ["sessionTitle"])
-  #expect(info?.alertLocalizationArgs == ["agentName", "text"])
+  #expect(info?.titleLocalizationKey == CompanionRequestAlerts.LocalizationKey.title)
+  #expect(info?.alertLocalizationKey == CompanionRequestAlerts.LocalizationKey.body)
+  // Nothing of the record in the push: no argument, no desired key.
+  #expect(info?.titleLocalizationArgs?.isEmpty ?? true)
+  #expect(info?.alertLocalizationArgs?.isEmpty ?? true)
+  #expect(info?.desiredKeys?.isEmpty ?? true)
+  #expect(info?.shouldSendMutableContent == true)
   #expect(info?.soundName == "default")
+  #expect(info?.shouldBadge == true)
   #expect(info?.shouldSendContentAvailable == false)
+}
+
+@Test("The extension's alert names the session, then the agent and what it waits for")
+func requestAlertText() throws {
+  func request(_ title: String, _ agent: String, _ text: String) -> CompanionRequest {
+    CompanionRequest(
+      id: "R", macID: "A", sessionTitle: title, agent: agent, text: text, createdAt: now)
+  }
+  let alert = try #require(
+    CompanionRequestAlerts.alert(
+      for: request("#368 Notifications", "Codex", "attend votre réponse")))
+  #expect(alert.title == "#368 Notifications")
+  #expect(alert.body == "Codex attend votre réponse")
+
+  let untitled = try #require(CompanionRequestAlerts.alert(for: request(" ", "Codex", "attend")))
+  #expect(untitled.title.isEmpty)
+  #expect(untitled.body == "Codex attend")
+  #expect(CompanionRequestAlerts.alert(for: request("Session", "", "attend"))?.body == "attend")
+  #expect(CompanionRequestAlerts.alert(for: request("", "", "")) == nil)
+}
+
+@Test("Only a push of the subscription, about the companion's zone, names a request")
+func requestPushRecordID() {
+  func push(subscription: String, zone: String = "Companion") -> [AnyHashable: Any] {
+    [
+      "aps": ["alert": ["loc-key": "COMPANION_REQUEST_ALERT_BODY"], "mutable-content": 1],
+      "ck": [
+        "ce": 2, "cid": "iCloud.eu.hadrien.VibeManager", "nid": "N1",
+        "qry": [
+          "dbs": 2, "fo": 1, "rid": "request-R1", "sid": subscription, "zid": zone,
+          "zoid": "_defaultOwner",
+        ],
+      ],
+    ]
+  }
+  let id = CompanionRequestAlerts.recordID(fromPush: push(subscription: "companion-requests-v2"))
+  #expect(id?.recordName == "request-R1")
+  #expect(id?.zoneID == CompanionCloud.zoneID)
+  #expect(
+    CompanionRequestAlerts.recordID(fromPush: push(subscription: "companion-requests-v1")) == nil)
+  #expect(
+    CompanionRequestAlerts.recordID(
+      fromPush: push(subscription: "companion-requests-v2", zone: "Other")) == nil)
+  #expect(CompanionRequestAlerts.recordID(fromPush: ["aps": ["alert": "x"]]) == nil)
 }

@@ -124,8 +124,8 @@ public struct CompanionPong: Hashable, Codable, Sendable {
 /// An agent of the Mac that waits for the user — a permission, a question (#368): one record per
 /// entry into `needsAttention`, which the phone's subscription turns into a visible notification.
 ///
-/// Its texts are in the clear, unlike the session's: CloudKit builds the notification from the
-/// record's fields on its servers, which cannot read an encrypted one.
+/// Its texts are encrypted like the session's: CloudKit pushes a generic alert, and the phone's
+/// notification service extension fetches the record to write them in it.
 public struct CompanionRequest: Hashable, Codable, Sendable {
   /// Unique to each entry into waiting: a new record, so a new notification, every time.
   public let id: String

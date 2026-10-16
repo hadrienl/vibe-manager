@@ -1,8 +1,10 @@
-/* The visible notification of a Mac's request (#368): CloudKit's push names these keys, and iOS
-   fills them with the Request record's fields. */
+/* The visible notification of a Mac's request (#368): CloudKit's push names these keys, and says
+   nothing of the request. The notification service extension, which has the same file, replaces
+   them with the session and the agent once it read the encrypted record; they are what shows when
+   it cannot. */
 
-/* Title: the session's title. */
-"COMPANION_REQUEST_TITLE" = "%1$@";
+/* Title of the generic alert. */
+"COMPANION_REQUEST_ALERT_TITLE" = "Vibe Manager";
 
-/* Body: the agent's name, then what it waits for, as the Mac wrote it ("attend votre réponse"). */
-"COMPANION_REQUEST_BODY" = "%1$@ %2$@";
+/* Text of the generic alert. */
+"COMPANION_REQUEST_ALERT_BODY" = "Un agent attend votre réponse";

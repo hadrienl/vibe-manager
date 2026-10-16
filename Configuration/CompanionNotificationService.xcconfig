@@ -1,0 +1,20 @@
+// The notification service extension of Vibe Companion (#368), embedded in the application's
+// PlugIns: it fetches the encrypted request a CloudKit push is about and writes its texts in the
+// alert. An App ID and a profile of its own, with the application's iCloud container.
+#include "CompanionBase.xcconfig"
+
+SDKROOT = iphoneos
+SUPPORTED_PLATFORMS = iphoneos iphonesimulator
+IPHONEOS_DEPLOYMENT_TARGET = 17.5
+TARGETED_DEVICE_FAMILY = 1,2
+// Under the application's identifier, as an extension's must be.
+PRODUCT_BUNDLE_IDENTIFIER = eu.hadrien.VibeManager.Companion.NotificationService
+PRODUCT_NAME = VibeCompanionNotificationService
+INFOPLIST_KEY_CFBundleDisplayName = Vibe Companion Notifications
+// Merged with the generated keys: the extension point has no setting.
+INFOPLIST_FILE = App/VibeCompanionNotificationService/Info.plist
+CODE_SIGN_ENTITLEMENTS = App/VibeCompanionNotificationService/VibeCompanionNotificationService.entitlements
+APPLICATION_EXTENSION_API_ONLY = YES
+LD_RUNPATH_SEARCH_PATHS = $(inherited) @executable_path/Frameworks @executable_path/../../Frameworks
+// Inside the application, never an archive's second product.
+SKIP_INSTALL = YES

@@ -44,6 +44,11 @@
 		A00000000000000000000024 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000011 /* IrohLib */; };
 		A00000000000000000000025 /* CompanionNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* CompanionNotifications.swift */; };
 		A00000000000000000000026 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Localizable.strings */; };
+		A00000000000000000000027 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000024 /* NotificationService.swift */; };
+		A00000000000000000000028 /* CompanionCore in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000012 /* CompanionCore */; };
+		A00000000000000000000029 /* CompanionKit in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000013 /* CompanionKit */; };
+		A0000000000000000000002A /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Localizable.strings */; };
+		A0000000000000000000002B /* VibeCompanionNotificationService.appex in Embed the notification service */ = {isa = PBXBuildFile; fileRef = B00000000000000000000027 /* VibeCompanionNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -80,6 +85,11 @@
 		B00000000000000000000020 /* CompanionNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionNotifications.swift; sourceTree = "<group>"; };
 		B00000000000000000000021 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
 		B00000000000000000000022 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B00000000000000000000024 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		B00000000000000000000025 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		B00000000000000000000026 /* VibeCompanionNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VibeCompanionNotificationService.entitlements; sourceTree = "<group>"; };
+		B00000000000000000000027 /* VibeCompanionNotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = VibeCompanionNotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		B00000000000000000000028 /* CompanionNotificationService.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CompanionNotificationService.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXContainerItemProxy section */
@@ -97,6 +107,13 @@
 			remoteGlobalIDString = E00000000000000000000003;
 			remoteInfo = VibeCompanionAgent;
 		};
+		L00000000000000000000003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F00000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E00000000000000000000005;
+			remoteInfo = VibeCompanionNotificationService;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -109,6 +126,17 @@
 				A0000000000000000000001C /* Vibe Manager Companion.app in Embed the companion agent */,
 			);
 			name = "Embed the companion agent";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D00000000000000000000011 /* Embed the notification service */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				A0000000000000000000002B /* VibeCompanionNotificationService.appex in Embed the notification service */,
+			);
+			name = "Embed the notification service";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
@@ -159,6 +187,15 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D0000000000000000000000F /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000028 /* CompanionCore in Frameworks */,
+				A00000000000000000000029 /* CompanionKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -179,6 +216,7 @@
 				C00000000000000000000008 /* VibeCompanionAgent */,
 				C00000000000000000000009 /* VibeCompanion */,
 				C0000000000000000000000A /* VibeCompanionIroh */,
+				C0000000000000000000000B /* VibeCompanionNotificationService */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -202,6 +240,7 @@
 				B0000000000000000000000A /* VibeManagerUITests.xctest */,
 				B00000000000000000000011 /* Vibe Manager Companion.app */,
 				B00000000000000000000017 /* Vibe Companion.app */,
+				B00000000000000000000027 /* VibeCompanionNotificationService.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -216,6 +255,7 @@
 				B00000000000000000000018 /* CompanionBase.xcconfig */,
 				B0000000000000000000001A /* CompanionAgent.xcconfig */,
 				B00000000000000000000019 /* Companion.xcconfig */,
+				B00000000000000000000028 /* CompanionNotificationService.xcconfig */,
 			);
 			path = Configuration;
 			sourceTree = "<group>";
@@ -270,6 +310,16 @@
 				B0000000000000000000001C /* CompanionIroh.swift */,
 			);
 			path = VibeCompanionIroh;
+			sourceTree = "<group>";
+		};
+		C0000000000000000000000B /* VibeCompanionNotificationService */ = {
+			isa = PBXGroup;
+			children = (
+				B00000000000000000000024 /* NotificationService.swift */,
+				B00000000000000000000025 /* Info.plist */,
+				B00000000000000000000026 /* VibeCompanionNotificationService.entitlements */,
+			);
+			path = VibeCompanionNotificationService;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -353,10 +403,12 @@
 				D0000000000000000000000A /* Sources */,
 				D0000000000000000000000B /* Frameworks */,
 				D0000000000000000000000D /* Resources */,
+				D00000000000000000000011 /* Embed the notification service */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				K00000000000000000000003 /* PBXTargetDependency */,
 			);
 			name = VibeCompanion;
 			packageProductDependencies = (
@@ -367,6 +419,27 @@
 			productName = VibeCompanion;
 			productReference = B00000000000000000000017 /* Vibe Companion.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E00000000000000000000005 /* VibeCompanionNotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = H00000000000000000000006 /* Build configuration list for PBXNativeTarget "VibeCompanionNotificationService" */;
+			buildPhases = (
+				D0000000000000000000000E /* Sources */,
+				D0000000000000000000000F /* Frameworks */,
+				D00000000000000000000010 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VibeCompanionNotificationService;
+			packageProductDependencies = (
+				J00000000000000000000012 /* CompanionCore */,
+				J00000000000000000000013 /* CompanionKit */,
+			);
+			productName = VibeCompanionNotificationService;
+			productReference = B00000000000000000000027 /* VibeCompanionNotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -389,6 +462,9 @@
 						CreatedOnToolsVersion = 27.0;
 					};
 					E00000000000000000000004 = {
+						CreatedOnToolsVersion = 27.0;
+					};
+					E00000000000000000000005 = {
 						CreatedOnToolsVersion = 27.0;
 					};
 				};
@@ -432,6 +508,7 @@
 				E00000000000000000000002 /* VibeManagerUITests */,
 				E00000000000000000000003 /* VibeCompanionAgent */,
 				E00000000000000000000004 /* VibeCompanion */,
+				E00000000000000000000005 /* VibeCompanionNotificationService */,
 			);
 		};
 /* End PBXProject section */
@@ -453,6 +530,14 @@
 			files = (
 				A0000000000000000000001D /* Assets.xcassets in Resources */,
 				A00000000000000000000026 /* Localizable.strings in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		D00000000000000000000010 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A0000000000000000000002A /* Localizable.strings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -523,6 +608,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		D0000000000000000000000E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				A00000000000000000000027 /* NotificationService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXVariantGroup section */
@@ -547,6 +640,11 @@
 			isa = PBXTargetDependency;
 			target = E00000000000000000000003 /* VibeCompanionAgent */;
 			targetProxy = L00000000000000000000002 /* PBXContainerItemProxy */;
+		};
+		K00000000000000000000003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E00000000000000000000005 /* VibeCompanionNotificationService */;
+			targetProxy = L00000000000000000000003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -683,6 +781,20 @@
 			};
 			name = Release;
 		};
+		G0000000000000000000000B /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B00000000000000000000028 /* CompanionNotificationService.xcconfig */;
+			buildSettings = {
+			};
+			name = Debug;
+		};
+		G0000000000000000000000C /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = B00000000000000000000028 /* CompanionNotificationService.xcconfig */;
+			buildSettings = {
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -727,6 +839,15 @@
 			buildConfigurations = (
 				G00000000000000000000009 /* Debug */,
 				G0000000000000000000000A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		H00000000000000000000006 /* Build configuration list for PBXNativeTarget "VibeCompanionNotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				G0000000000000000000000B /* Debug */,
+				G0000000000000000000000C /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -840,6 +961,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = I00000000000000000000003 /* XCRemoteSwiftPackageReference "iroh-ffi" */;
 			productName = IrohLib;
+		};
+		J00000000000000000000012 /* CompanionCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */;
+			productName = CompanionCore;
+		};
+		J00000000000000000000013 /* CompanionKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000002 /* XCLocalSwiftPackageReference "CompanionKit" */;
+			productName = CompanionKit;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

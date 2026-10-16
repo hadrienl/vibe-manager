@@ -329,7 +329,7 @@ private struct NotificationsSection: View {
     switch notifications.subscription {
     case .notSaved: "pas encore"
     case .saving: "enregistrement…"
-    case .saved: "enregistré"
+    case .saved: "enregistré (\(CompanionRequestAlerts.subscriptionID))"
     case .failed(let error): "échec : \(error)"
     }
   }

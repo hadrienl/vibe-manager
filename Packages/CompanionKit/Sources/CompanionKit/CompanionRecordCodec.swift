@@ -51,14 +51,8 @@ public enum CompanionRecordCodec {
     static let sessionTitle = "sessionTitle"
     static let agentName = "agentName"
     static let text = "text"
+    static let message = "message"
     static let createdAt = "createdAt"
-  }
-
-  /// The fields of a request the phone's notification is built from (#368), in the clear.
-  public enum RequestField {
-    public static let sessionTitle = Field.sessionTitle
-    public static let agentName = Field.agentName
-    public static let text = Field.text
   }
 
   public static func recordType(of record: CompanionRecord) -> String {
@@ -112,12 +106,13 @@ public enum CompanionRecordCodec {
       ckRecord[Field.macID] = pong.macID
       ckRecord[Field.receivedAt] = pong.receivedAt
     case .request(let request):
-      // In the clear: CloudKit's servers fill the notification with them, and an encrypted field
-      // is out of their reach. The session's own record keeps its title encrypted.
+      // Encrypted, read by the phone's notification service extension rather than by CloudKit's
+      // servers. Under new names: `sessionTitle`, `agentName` and `text` were first written in the
+      // clear (#368), and a field keeps the kind it was first written with.
       ckRecord[Field.macID] = request.macID
-      ckRecord[Field.sessionTitle] = request.sessionTitle
-      ckRecord[Field.agentName] = request.agent
-      ckRecord[Field.text] = request.text
+      secret[Field.title] = request.sessionTitle
+      secret[Field.agent] = request.agent
+      secret[Field.message] = request.text
       ckRecord[Field.createdAt] = request.createdAt
     }
   }
@@ -172,11 +167,16 @@ public enum CompanionRecordCodec {
         let macID = ckRecord[Field.macID] as? String,
         let createdAt = ckRecord[Field.createdAt] as? Date
       else { return nil }
+      // The fields in the clear are those of the first requests (#368), still in the zone for
+      // their hour.
       return .request(
         CompanionRequest(
-          id: id, macID: macID, sessionTitle: ckRecord[Field.sessionTitle] as? String ?? "",
-          agent: ckRecord[Field.agentName] as? String ?? "",
-          text: ckRecord[Field.text] as? String ?? "", createdAt: createdAt))
+          id: id, macID: macID,
+          sessionTitle: secret[Field.title] as? String ?? ckRecord[Field.sessionTitle] as? String
+            ?? "",
+          agent: secret[Field.agent] as? String ?? ckRecord[Field.agentName] as? String ?? "",
+          text: secret[Field.message] as? String ?? ckRecord[Field.text] as? String ?? "",
+          createdAt: createdAt))
     default:
       return nil
     }
