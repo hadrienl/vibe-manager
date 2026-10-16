@@ -1,4 +1,4 @@
-# 0040 — Alert sounds
+# 0042 — Alert sounds
 
 - Status: accepted
 - Date: 2026-10-16

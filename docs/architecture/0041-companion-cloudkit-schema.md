@@ -2,11 +2,11 @@
 
 - Status: accepted
 - Date: 2026-10-16
-- Issues: [#396](https://github.com/hadrienl/vibe-manager/issues/396); follows ADR 0040
+- Issues: [#396](https://github.com/hadrienl/vibe-manager/issues/396); follows ADR 0042
 
 ## Context
 
-ADR 0040 puts the companion's lasting state in the private database of the user's iCloud account:
+ADR 0042 puts the companion's lasting state in the private database of the user's iCloud account:
 the Mac's presence and iroh address, its sessions, the agents' requests. The trials wrote one record
 type per need (`Mac`, `Session`, `Ping`, `Pong`, `Request`) in a container of their own,
 `iCloud.eu.hadrien.VibeManager.Debug`. The real container, `iCloud.eu.hadrien.VibeManager`, has
@@ -31,7 +31,7 @@ through the records (#399), the answers sent from a notification (#401).
   (`kind == "request"`), and says nothing of a session. Names, titles, agents, messages, the
   states, the Mac's iroh address and even the dates are in the payload, out of reach of CloudKit's
   servers and of Apple's push service (end to end with Advanced Data Protection, at rest and in the
-  push otherwise, ADR 0040).
+  push otherwise, ADR 0042).
 - **A new kind or field is the application's business.** A version of the application reads the
   kinds it knows and skips the others; a reader skips a payload whose format `v` is later than its
   own. Neither ever needs a schema deploy.

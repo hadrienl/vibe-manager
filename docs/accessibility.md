@@ -150,7 +150,7 @@ alone; so is an expression the avatar lacks, said "missing".
 
 ## Settings › Notifications › Sounds
 
-The alert sound (#393, ADR 0040) is chosen from the menu of the Sound section, with a Play button
+The alert sound (#393, ADR 0042) is chosen from the menu of the Sound section, with a Play button
 beside it, or on the Sounds page: a list — System Default, None, My Sounds, those shipped, those of
 macOS — and a preview. Selecting a sound in the list plays it once; Use This Sound puts it in use.
 The card "Create a Sound" unfolds where a sound is described to an agent, or a file imported.
