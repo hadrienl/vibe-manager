@@ -63,22 +63,22 @@ xcodebuild \
 rm -rf "$work/derived"
 
 print "==> Exporting with $identity"
-readonly options="$work/ExportOptions.plist"
-plutil -create xml1 "$options"
-plutil -insert method -string developer-id "$options"
-plutil -insert teamID -string "$team" "$options"
-plutil -insert destination -string export "$options"
+readonly export_options="$work/ExportOptions.plist"
+plutil -create xml1 "$export_options"
+plutil -insert method -string developer-id "$export_options"
+plutil -insert teamID -string "$team" "$export_options"
+plutil -insert destination -string export "$export_options"
 if [[ -n "${VIBE_AGENT_PROFILE:-}" ]]; then
-  plutil -insert signingStyle -string manual "$options"
-  plutil -insert signingCertificate -string "$identity" "$options"
-  plutil -insert provisioningProfiles -dictionary "$options"
+  plutil -insert signingStyle -string manual "$export_options"
+  plutil -insert signingCertificate -string "$identity" "$export_options"
+  plutil -insert provisioningProfiles -dictionary "$export_options"
   plutil -insert "provisioningProfiles.${agent_identifier//./\\.}" -string "$VIBE_AGENT_PROFILE" \
-    "$options"
+    "$export_options"
 else
-  plutil -insert signingStyle -string automatic "$options"
+  plutil -insert signingStyle -string automatic "$export_options"
 fi
 xcodebuild -exportArchive -archivePath "$archive" -exportPath "$work/export" \
-  -exportOptionsPlist "$options" -allowProvisioningUpdates \
+  -exportOptionsPlist "$export_options" -allowProvisioningUpdates \
   || fail "the export failed: see the agent's profile above"
 rm -rf "$archive"
 readonly exported="$work/export/Vibe Manager.app"
