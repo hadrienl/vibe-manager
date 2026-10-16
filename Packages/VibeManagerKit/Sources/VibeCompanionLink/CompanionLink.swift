@@ -62,6 +62,8 @@ public actor CompanionLink: CompanionPublishing {
   private var connection: CompanionLinkConnection?
   private var latest: CompanionSnapshot?
   private var onTest: (@Sendable (CompanionTest) async -> Void)?
+  /// What a phone of the direct channel said, or `nil` when its connection closed (#399).
+  private var onRemote: (@Sendable (String, RemoteMessage?) async -> Void)?
   private var launches = 0
   private var isStopping = false
 
@@ -71,8 +73,12 @@ public actor CompanionLink: CompanionPublishing {
   }
 
   /// Listens, then starts the agent. `onTest` is given each test the agent hands over.
-  public func start(onTest: @escaping @Sendable (CompanionTest) async -> Void) async {
+  public func start(
+    onTest: @escaping @Sendable (CompanionTest) async -> Void,
+    onRemote: @escaping @Sendable (String, RemoteMessage?) async -> Void = { _, _ in }
+  ) async {
     self.onTest = onTest
+    self.onRemote = onRemote
     do {
       try configuration.prepare()
       unlink(configuration.socketPath)
@@ -121,6 +127,11 @@ public actor CompanionLink: CompanionPublishing {
     Self.logger.notice(
       "acknowledgement of test \(test.nonce, privacy: .public): \(state, privacy: .public)")
     connection?.send(.testAcknowledged(nonce: test.nonce, receivedAt: receivedAt))
+  }
+
+  /// To one phone of the direct channel, through the agent.
+  public func sendRemote(_ message: RemoteMessage, to peer: String) {
+    connection?.send(.remoteSend(peer: peer, message))
   }
 
   // MARK: - Agent
@@ -190,7 +201,12 @@ public actor CompanionLink: CompanionPublishing {
         if let onTest { Task { await onTest(test) } }
       case .welcome:
         Self.logger.notice("agent says welcome")
-      case .hello, .snapshot, .testAcknowledged:
+      case .remoteReceived(let peer, let message):
+        // In order: a phone's messages are taken one after another.
+        await onRemote?(peer, message)
+      case .remoteClosed(let peer):
+        await onRemote?(peer, nil)
+      case .hello, .snapshot, .testAcknowledged, .remoteSend, .remoteDrop:
         break
       }
     }

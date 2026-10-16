@@ -92,9 +92,14 @@ final class CompanionAgent {
     schedule()
     let echo = self.echo
     Task { [weak self] in
-      await echo.start { [weak self] address in
-        Task { @MainActor in await self?.irohAddressChanged(address) }
-      }
+      await echo.start(
+        authorize: { [weak self] endpointID in await self?.isPaired(endpointID) ?? false },
+        onRemote: { [weak self] event in
+          Task { @MainActor in self?.relay(event) }
+        },
+        onAddress: { [weak self] address in
+          Task { @MainActor in await self?.irohAddressChanged(address) }
+        })
     }
     await sync.fetchChanges()
   }
@@ -173,8 +178,45 @@ final class CompanionAgent {
         await sync.note("test \(nonce.prefix(4)) accusé")
         sendSoon()
       }
-    case .welcome, .testReceived:
+    case .remoteSend(let peer, let message):
+      let echo = self.echo
+      Task { await echo.send(message, to: peer) }
+    case .remoteDrop(let peer):
+      let echo = self.echo
+      Task { await echo.drop(peer) }
+    case .welcome, .testReceived, .remoteReceived, .remoteClosed:
       Self.logger.notice("link: unexpected message from the application")
+    }
+  }
+
+  // MARK: - Direct channel
+
+  /// Whether a phone's endpoint is one of the user's: a `device` record of their private database,
+  /// where nobody else writes (#398). A phone just paired may not be fetched yet: the zone is
+  /// asked once more before it is refused.
+  private func isPaired(_ endpointID: String) async -> Bool {
+    if pairedDevices.contains(endpointID) { return true }
+    await sync.fetchChanges()
+    // The fetched records reach `records` through a task of the main actor.
+    try? await Task.sleep(for: .milliseconds(500))
+    return pairedDevices.contains(endpointID)
+  }
+
+  private var pairedDevices: Set<String> {
+    Set(
+      records.compactMap {
+        if case .device(let device) = $0 { return device.endpointID }
+        return nil
+      })
+  }
+
+  /// A phone's words, to the application; its departure too.
+  private func relay(_ event: CompanionEchoServer.RemoteEvent) {
+    switch event {
+    case .received(let peer, let message):
+      connection?.send(.remoteReceived(peer: peer, message))
+    case .closed(let peer):
+      connection?.send(.remoteClosed(peer: peer))
     }
   }
 

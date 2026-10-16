@@ -1,0 +1,110 @@
+import CompanionCore
+import SwiftUI
+
+/// The session's icon, as the Mac's sidebar draws it — its symbol on its colour — with what the
+/// agent does as a dot on its corner: orange when it waits for the user, blue at work.
+struct SessionBadge: View {
+  let appearance: RemoteAppearance
+  let activity: RemoteActivity
+  var size: CGFloat = 34
+
+  var body: some View {
+    RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+      .fill(Color(hex: appearance.color) ?? .gray)
+      .frame(width: size, height: size)
+      .overlay {
+        Image(systemName: appearance.symbol)
+          .font(.system(size: size * 0.48, weight: .semibold))
+          .foregroundStyle(.white)
+      }
+      .overlay(alignment: .bottomTrailing) {
+        if let dot {
+          Circle()
+            .fill(dot)
+            .frame(width: size * 0.36, height: size * 0.36)
+            .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2.5))
+            .offset(x: 3, y: 3)
+        }
+      }
+      .accessibilityHidden(true)
+  }
+
+  private var dot: Color? {
+    switch activity {
+    case .needsAttention: .orange
+    case .working: .blue
+    case .idle, .stopped: nil
+    }
+  }
+}
+
+extension Color {
+  /// `#RRGGBB`, as the Mac stores a session's colour.
+  init?(hex: String) {
+    let digits = hex.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
+    guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
+    self.init(
+      red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255,
+      blue: Double(value & 0xFF) / 255)
+  }
+}
+
+extension RemoteTaskStatus {
+  var label: LocalizedStringKey {
+    switch self {
+    case .todo: "À faire"
+    case .doing: "En cours"
+    case .waiting: "En attente"
+    case .done: "Terminé"
+    case .archived: "Archivée"
+    }
+  }
+
+  var symbol: String {
+    switch self {
+    case .todo: "circle.dashed"
+    case .doing: "play.circle"
+    case .waiting: "clock"
+    case .done: "checkmark.circle"
+    case .archived: "archivebox"
+    }
+  }
+
+  var tint: Color {
+    switch self {
+    case .todo: .gray
+    case .doing: .blue
+    case .waiting: .purple
+    case .done: .green
+    case .archived: .brown
+    }
+  }
+
+  /// The four columns of the Mac's sidebar.
+  static let columns: [RemoteTaskStatus] = [.todo, .doing, .waiting, .done]
+
+  /// What a swipe offers, nearest first: the columns before, and after — archiving from Terminé
+  /// alone, as on the Mac.
+  var previous: [RemoteTaskStatus] {
+    guard let index = Self.columns.firstIndex(of: self) else { return [.done] }
+    return Self.columns[..<index].reversed()
+  }
+
+  var next: [RemoteTaskStatus] {
+    guard let index = Self.columns.firstIndex(of: self) else { return [] }
+    return Array(Self.columns[(index + 1)...]) + (self == .done ? [.archived] : [])
+  }
+}
+
+extension RemoteSession {
+  /// The second line of its row: what it waits for, or who it is.
+  var subtitle: String {
+    if let detail, activity == .needsAttention { return detail }
+    switch activity {
+    case .working: return "\(agentName) · au travail"
+    case .needsAttention: return "\(agentName) · attend ta réponse"
+    case .idle: return "\(agentName) · à toi de jouer"
+    case .stopped: return agentName
+    }
+  }
+}

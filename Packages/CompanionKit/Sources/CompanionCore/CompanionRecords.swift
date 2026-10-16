@@ -149,6 +149,21 @@ public struct CompanionRequest: Hashable, Codable, Sendable {
   }
 }
 
+/// A phone of the user's, admitted to the direct channel (#398, #399): it writes this record with
+/// its iroh endpoint — its public key — in the user's private database, where nobody else can
+/// write, and the Mac takes connections from those endpoints alone.
+public struct CompanionDevice: Hashable, Codable, Sendable {
+  public let endpointID: String
+  public var name: String
+  public var addedAt: Date
+
+  public init(endpointID: String, name: String, addedAt: Date) {
+    self.endpointID = endpointID
+    self.name = name
+    self.addedAt = addedAt
+  }
+}
+
 /// Any record of the companion's zone.
 public enum CompanionRecord: Hashable, Codable, Sendable {
   case mac(CompanionMac)
@@ -156,6 +171,7 @@ public enum CompanionRecord: Hashable, Codable, Sendable {
   case ping(CompanionPing)
   case pong(CompanionPong)
   case request(CompanionRequest)
+  case device(CompanionDevice)
 
   /// Unique in the zone whatever the type, hence the prefix: a ping and its pong share a nonce.
   public var recordName: String {
@@ -165,6 +181,7 @@ public enum CompanionRecord: Hashable, Codable, Sendable {
     case .ping(let ping): CompanionRecordName.ping(ping.nonce)
     case .pong(let pong): CompanionRecordName.pong(pong.nonce)
     case .request(let request): CompanionRecordName.request(request.id)
+    case .device(let device): CompanionRecordName.device(device.endpointID)
     }
   }
 }
@@ -176,4 +193,5 @@ public enum CompanionRecordName {
   public static func ping(_ nonce: String) -> String { "ping-\(nonce)" }
   public static func pong(_ nonce: String) -> String { "pong-\(nonce)" }
   public static func request(_ id: String) -> String { "request-\(id)" }
+  public static func device(_ endpointID: String) -> String { "device-\(endpointID)" }
 }

@@ -140,6 +140,7 @@ let package = Package(
         "VibeEndpoints", "VibeGit", "VibePersistence", "VibeProcess", "VibeTerminal",
         "VibeTerminalUI",
         "VibeConversationUI", "VibeUI",
+        .product(name: "CompanionCore", package: "CompanionKit"),
       ]
     ),
     // The application's updater (#92): Sparkle, behind the `SoftwareUpdating` port. Linked by the

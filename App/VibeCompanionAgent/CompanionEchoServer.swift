@@ -20,8 +20,21 @@ actor CompanionEchoServer {
   /// How often the home relay is read again: it changes when the Mac's network does, rarely.
   private static let relayCheck: Duration = .seconds(30)
 
+  /// What a phone of the direct channel did (#399).
+  enum RemoteEvent: Sendable {
+    case received(peer: String, RemoteMessage)
+    case closed(peer: String)
+  }
+
   private let keyURL: URL
   private var endpoint: Endpoint?
+  /// Whether a phone's endpoint is one of the user's: asked at each connection.
+  private var authorize: @Sendable (String) async -> Bool = { _ in false }
+  private var onRemote: @Sendable (RemoteEvent) -> Void = { _ in }
+  /// Each phone's way back, by peer.
+  private var remotes: [String: SendStream] = [:]
+  private var remoteConnections: [String: Connection] = [:]
+  private var nextPeer = 0
   private var relayLoop: Task<Void, Never>?
   private var acceptLoop: Task<Void, Never>?
 
@@ -31,14 +44,21 @@ actor CompanionEchoServer {
 
   /// Binds the endpoint and serves the echo until `stop`. `onAddress` is called with the address
   /// as soon as the endpoint is bound, then each time its home relay changes.
-  func start(onAddress: @escaping @Sendable (Address) -> Void) async {
+  func start(
+    authorize: @escaping @Sendable (String) async -> Bool,
+    onRemote: @escaping @Sendable (RemoteEvent) -> Void,
+    onAddress: @escaping @Sendable (Address) -> Void
+  ) async {
     guard endpoint == nil else { return }
+    self.authorize = authorize
+    self.onRemote = onRemote
     let started = ContinuousClock.now
     let endpoint: Endpoint
     do {
       let key = try Self.secretKey(at: keyURL)
       endpoint = try await Endpoint.bind(
-        options: CompanionIroh.options(secretKey: key, alpns: [CompanionIroh.alpn]))
+        options: CompanionIroh.options(
+          secretKey: key, alpns: [CompanionIroh.alpn, CompanionIroh.remoteALPN]))
     } catch {
       CompanionIroh.logger.error(
         "echo: no endpoint: \(CompanionIroh.describe(error), privacy: .public)")
@@ -68,7 +88,7 @@ actor CompanionEchoServer {
     }
     acceptLoop = Task.detached {
       while let incoming = await endpoint.acceptNext() {
-        Task.detached { await Self.serve(incoming) }
+        Task.detached { await self.serve(incoming) }
       }
       CompanionIroh.logger.notice("echo: endpoint closed, no more connections")
     }
@@ -84,7 +104,7 @@ actor CompanionEchoServer {
   // MARK: - Echo
 
   /// One phone's connection: every bidirectional stream it opens is echoed, until it closes.
-  private static func serve(_ incoming: Incoming) async {
+  private func serve(_ incoming: Incoming) async {
     let connection: Connection
     do {
       connection = try await incoming.accept().connect()
@@ -94,6 +114,10 @@ actor CompanionEchoServer {
       return
     }
     let remote = connection.remoteId().fmtShort()
+    if connection.alpn() == CompanionIroh.remoteALPN {
+      await serveRemote(connection)
+      return
+    }
     guard connection.alpn() == CompanionIroh.alpn else {
       CompanionIroh.logger.error("echo: \(remote, privacy: .public) asked another protocol")
       try? connection.close(errorCode: 1, reason: Data("unknown protocol".utf8))
@@ -118,7 +142,7 @@ actor CompanionEchoServer {
     do {
       while true {
         let stream = try await connection.acceptBi()
-        Task.detached { await echo(stream) }
+        Task.detached { await Self.echo(stream) }
       }
     } catch {
       CompanionIroh.logger.notice(
@@ -140,6 +164,68 @@ actor CompanionEchoServer {
     } catch {
       try? await sending.finish()
     }
+  }
+
+  // MARK: - Remote
+
+  /// A phone of the direct channel (#399): admitted only when its endpoint is one the user's
+  /// iCloud account lists, then one stream of frames each way until it goes.
+  private func serveRemote(_ connection: Connection) async {
+    let endpointID = connection.remoteId().description
+    let short = connection.remoteId().fmtShort()
+    guard await authorize(endpointID) else {
+      CompanionIroh.logger.error("remote: \(short, privacy: .public) is not a paired phone: refused")
+      try? connection.close(errorCode: 2, reason: Data("not paired".utf8))
+      return
+    }
+    let stream: BiStream
+    do {
+      stream = try await connection.acceptBi()
+    } catch {
+      CompanionIroh.logger.notice(
+        "remote: \(short, privacy: .public) gone before a stream: \(CompanionIroh.describe(error), privacy: .public)")
+      return
+    }
+    nextPeer += 1
+    let peer = "\(short)-\(nextPeer)"
+    remotes[peer] = stream.send()
+    remoteConnections[peer] = connection
+    CompanionIroh.logger.notice(
+      "remote: \(peer, privacy: .public) connected, \(CompanionIroh.describe(connection.paths()), privacy: .public)")
+    let receiving = stream.recv()
+    var decoder = RemoteFrame.Decoder()
+    do {
+      while true {
+        let header = try await receiving.readExact(size: 4)
+        let length = header.reduce(0) { $0 << 8 | Int($1) }
+        guard length <= RemoteFrame.maximumLength else { break }
+        let body = length == 0 ? Data() : try await receiving.readExact(size: UInt32(length))
+        for message in try decoder.append(header + body) {
+          onRemote(.received(peer: peer, message))
+        }
+      }
+    } catch {
+      CompanionIroh.logger.notice(
+        "remote: \(peer, privacy: .public) gone: \(connection.closeReason() ?? CompanionIroh.describe(error), privacy: .public)")
+    }
+    remotes[peer] = nil
+    remoteConnections[peer] = nil
+    onRemote(.closed(peer: peer))
+  }
+
+  /// To one phone; nothing if it went.
+  func send(_ message: RemoteMessage, to peer: String) async {
+    guard let sending = remotes[peer] else { return }
+    do {
+      try await sending.writeAll(buf: RemoteFrame.encode(message))
+    } catch {
+      CompanionIroh.logger.notice(
+        "remote: \(peer, privacy: .public) unreachable: \(CompanionIroh.describe(error), privacy: .public)")
+    }
+  }
+
+  func drop(_ peer: String) {
+    try? remoteConnections[peer]?.close(errorCode: 0, reason: Data("dropped".utf8))
   }
 
   // MARK: - Key

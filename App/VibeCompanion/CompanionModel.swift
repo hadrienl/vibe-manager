@@ -12,6 +12,8 @@ final class CompanionModel {
 
   private(set) var macs: [CompanionMac] = []
   private(set) var sessions: [CompanionSession] = []
+  /// The phones admitted to the direct channel.
+  private(set) var devices: [CompanionDevice] = []
   private(set) var status = CompanionSyncStatus()
   private(set) var journal: [CompanionJournalEntry] = []
   private(set) var testRun: CompanionTestRun?
@@ -62,6 +64,17 @@ final class CompanionModel {
     now = Date()
   }
 
+  /// This phone, admitted to the Mac's direct channel (#398): its endpoint written in the user's
+  /// private database, once — again only if the record went missing.
+  func register(endpointID: String) async {
+    guard !devices.contains(where: { $0.endpointID == endpointID }) else { return }
+    await sync.save([
+      .device(CompanionDevice(endpointID: endpointID, name: deviceName, addedAt: Date()))
+    ])
+    await sync.note("iPhone appairé : \(endpointID.prefix(10))")
+    await sync.sendChanges()
+  }
+
   func notePush() async {
     await sync.notePush()
     await sync.fetchChanges()
@@ -96,15 +109,18 @@ final class CompanionModel {
     var macs: [CompanionMac] = []
     var sessions: [CompanionSession] = []
     var requests: [CompanionRequest] = []
+    var devices: [CompanionDevice] = []
     for record in update.records {
       switch record {
       case .mac(let mac): macs.append(mac)
       case .session(let session): sessions.append(session)
       case .pong(let pong): pongs.append(pong)
       case .request(let request): requests.append(request)
+      case .device(let device): devices.append(device)
       case .ping: break
       }
     }
+    self.devices = devices
     latestRequest = requests.max { $0.createdAt < $1.createdAt }
     self.macs = macs.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     self.sessions = sessions

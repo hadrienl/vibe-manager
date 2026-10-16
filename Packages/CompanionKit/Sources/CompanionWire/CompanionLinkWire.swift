@@ -10,7 +10,7 @@ public enum CompanionLinkWire {
   public static let protocolVersion = 1
   /// A snapshot of every active session fits many times over; a corrupt length cannot make either
   /// side allocate a gigabyte.
-  public static let maximumPayloadLength = 1 << 20
+  public static let maximumPayloadLength = 8 << 20
   static let headerLength = 5
   static let controlKind: UInt8 = 1
   /// In the private directory of the application's terminal host, which an isolated copy has of
@@ -28,10 +28,20 @@ public enum CompanionLinkMessage: Codable, Equatable, Sendable {
   /// The application has the test: the agent writes its pong at once.
   case testAcknowledged(nonce: String, receivedAt: Date)
 
+  /// For one phone of the direct channel (#399): the agent passes it on as it came.
+  case remoteSend(peer: String, RemoteMessage)
+  /// The application is done with a phone: the agent closes its connection.
+  case remoteDrop(peer: String)
+
   // The agent to the application.
   case welcome(protocolVersion: Int)
   /// A test found in iCloud, for the application to acknowledge and show.
   case testReceived(CompanionPing)
+  /// What a phone of the direct channel said, `peer` naming its connection. Only phones the user
+  /// paired get here: the agent checks the key first.
+  case remoteReceived(peer: String, RemoteMessage)
+  /// The phone's connection closed.
+  case remoteClosed(peer: String)
 }
 
 enum CompanionLinkFrameError: Error, Equatable {

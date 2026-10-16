@@ -3,8 +3,8 @@ import CompanionKit
 import SwiftUI
 import UIKit
 
-/// The one screen of the debug application, in sections (#347 mock-up): the state of the Mac,
-/// iCloud, the synchronisation, the active sessions, the test, the journal.
+/// The connection's diagnostic, reached from the settings (#400) — the trials' debug screen
+/// (#347): the state of the Mac, iCloud, the synchronisation, the channel, the test, the journal.
 struct CompanionScreen: View {
   @Environment(CompanionModel.self) private var model
   @Environment(CompanionChannel.self) private var channel
@@ -12,7 +12,7 @@ struct CompanionScreen: View {
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
-    NavigationStack {
+    Group {
       List {
         if model.macs.count > 1 { macPicker }
         StatusSection()
@@ -116,7 +116,7 @@ struct CompanionScreen: View {
         Text("Aucune session active").foregroundStyle(.secondary)
       }
       ForEach(model.visibleSessions, id: \.id) { session in
-        SessionRow(session: session)
+        CloudSessionRow(session: session)
       }
     } header: {
       Text("Sessions actives sur le Mac · \(model.visibleSessions.count)")
@@ -181,7 +181,7 @@ private struct StatusSection: View {
   }
 }
 
-private struct SessionRow: View {
+private struct CloudSessionRow: View {
   let session: CompanionSession
 
   var body: some View {
@@ -336,7 +336,7 @@ private struct NotificationsSection: View {
 }
 
 #Preview {
-  CompanionScreen()
+  NavigationStack { CompanionScreen() }
     .environment(CompanionModel(sync: PreviewCompanionSync(), deviceName: "iPhone"))
     .environment(CompanionChannel())
     .environment(CompanionNotifications())

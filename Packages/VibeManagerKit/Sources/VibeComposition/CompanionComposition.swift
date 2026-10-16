@@ -19,6 +19,8 @@ final class CompanionComposition {
   private let link: CompanionLink
   private let publish: PublishCompanionSnapshot
   private weak var appModel: AppModel?
+  /// The direct channel's end (#399).
+  private var remote: CompanionRemoteServer?
 
   private init(link: CompanionLink, appModel: AppModel) {
     self.link = link
@@ -51,8 +53,18 @@ final class CompanionComposition {
       diagnostics: diagnostics)
     let composition = CompanionComposition(link: link, appModel: appModel)
     let receive = ReceiveCompanionTest(publisher: link, alerts: AppKitCompanionTestAlert())
+    let remote = CompanionRemoteServer(
+      appModel: appModel, macName: Host.current().localizedName ?? "Mac",
+      send: { peer, message in Task { await link.sendRemote(message, to: peer) } })
+    composition.remote = remote
     Task {
-      await link.start { test in await receive(test) }
+      await link.start(
+        onTest: { test in await receive(test) },
+        onRemote: { peer, message in
+          await MainActor.run {
+            if let message { remote.receive(message, from: peer) } else { remote.closed(peer) }
+          }
+        })
     }
     composition.observe()
     return composition

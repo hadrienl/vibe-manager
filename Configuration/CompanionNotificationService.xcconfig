@@ -5,7 +5,7 @@
 
 SDKROOT = iphoneos
 SUPPORTED_PLATFORMS = iphoneos iphonesimulator
-IPHONEOS_DEPLOYMENT_TARGET = 17.5
+IPHONEOS_DEPLOYMENT_TARGET = 26.0
 TARGETED_DEVICE_FAMILY = 1,2
 // Under the application's identifier, as an extension's must be.
 PRODUCT_BUNDLE_IDENTIFIER = eu.hadrien.VibeManager.Companion.NotificationService

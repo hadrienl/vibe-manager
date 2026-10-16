@@ -3,18 +3,18 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
-/// Vibe Companion (#347): a debug application that proves the iPhone and the Mac reach each other
-/// through CloudKit. It shows the connection, the Mac's active sessions — read only — and a test
-/// button the Mac answers with an alert. In French and English only: it is not a product yet.
+/// Vibe Companion (#347, #400): the Mac's sessions on the iPhone, driven over the direct channel,
+/// with CloudKit for the Mac's address and the notifications.
 @main
 struct VibeCompanionApp: App {
   @UIApplicationDelegateAdaptor private var delegate: CompanionAppDelegate
 
   var body: some Scene {
     WindowGroup {
-      CompanionScreen()
+      RootView()
         .environment(delegate.model)
         .environment(delegate.channel)
+        .environment(delegate.remote)
         .environment(delegate.notifications)
     }
   }
@@ -29,6 +29,8 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate,
   let model: CompanionModel
   /// The active channel (#368), opened and closed by the screen with the foreground.
   let channel = CompanionChannel()
+  /// The direct channel to the Mac (#399, #400).
+  let remote = RemoteChannel(deviceName: UIDevice.current.name)
   /// The visible notifications of the Mac's requests (#368).
   let notifications = CompanionNotifications()
 
@@ -41,6 +43,8 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate,
         storeURL: support.appendingPathComponent("Companion/sync.json", isDirectory: false)),
       deviceName: UIDevice.current.name)
     super.init()
+    let model = self.model
+    remote.onEndpoint = { endpointID in await model.register(endpointID: endpointID) }
   }
 
   func application(
@@ -105,5 +109,46 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate,
   ) async -> UIBackgroundFetchResult {
     await model.notePush()
     return .newData
+  }
+}
+
+/// Opens the direct channel in the foreground and closes it in the background: iOS breaks a
+/// suspended application's socket anyway. A failed channel is tried again every few seconds.
+struct RootView: View {
+  @Environment(CompanionModel.self) private var model
+  @Environment(RemoteChannel.self) private var remote
+  @Environment(CompanionNotifications.self) private var notifications
+  @Environment(\.scenePhase) private var scenePhase
+
+  var body: some View {
+    SessionsView()
+      .task {
+        while !Task.isCancelled {
+          try? await Task.sleep(for: .seconds(10))
+          await model.refresh()
+          await notifications.refresh()
+        }
+      }
+      .task(id: remote.phase) {
+        guard case .failed = remote.phase else { return }
+        try? await Task.sleep(for: .seconds(5))
+        if scenePhase == .active { remote.open(to: model.selectedMac) }
+      }
+      .onChange(of: scenePhase) { _, phase in
+        switch phase {
+        case .active:
+          Task { await model.refresh() }
+          if remote.phase != .connecting && remote.phase != .connected {
+            remote.open(to: model.selectedMac)
+          }
+        case .background:
+          remote.close()
+        default:
+          break
+        }
+      }
+      .onChange(of: model.selectedMac?.irohEndpointID, initial: true) { _, _ in
+        if scenePhase == .active { remote.open(to: model.selectedMac) }
+      }
   }
 }
