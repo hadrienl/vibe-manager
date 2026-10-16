@@ -147,6 +147,9 @@ public final class AppModel {
   @ObservationIgnored public var showWorkspaceWindow: (@MainActor () -> Void)?
   /// The library of avatars: the one in use, and those being made (#41, #154).
   public var avatars: AvatarLibraryModel?
+  /// The alert sound, and the sounds it is chosen from (#393). Set by the composition: a
+  /// workspace assembled without it plays no sound of its own.
+  public var alertSounds: AlertSoundLibraryModel?
   /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
   public var endpoints: EndpointsSettingsModel?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
@@ -172,6 +175,9 @@ public final class AppModel {
   @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var postedRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var announcedRequestIDs: Set<AgentRequestID> = []
+  /// While the requests read back at launch, or replayed, are taken in: they were there before,
+  /// and make no alert sound (#393).
+  @ObservationIgnored var isReadingRestoredRequests = false
   /// How many requests wait in sessions other than the one on screen: what the toolbar and the
   /// menu need to know. Stored rather than counted when read (#254): the count reads every
   /// session's activity, and the window would be evaluated again at each of their transitions.

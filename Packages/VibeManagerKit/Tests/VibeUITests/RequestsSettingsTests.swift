@@ -82,8 +82,34 @@ struct RequestsSettingsTests {
       workshop: AvatarWorkshop(processing: NoProcessing()), library: library, generators: nil)
     await avatars.load()
     model.avatars = avatars
+    model.alertSounds = await Self.alertSounds()
     model.settingsPage = .requests
     return model
+  }
+
+  /// The sounds of #393: one composed, in use, one imported, those shipped and those of macOS.
+  private static func alertSounds() async -> AlertSoundLibraryModel {
+    let library = InMemoryAlertSoundLibrary()
+    var chime = BundledAlertSound.chime.recipe
+    chime.name = "Carillon doux"
+    let composed = try? await library.add(
+      AlertSoundEntry(
+        name: chime.name, origin: .composed(agent: "claude-code"), addedAt: Date(),
+        duration: chime.duration, recipe: chime,
+        requests: ["Un petit carillon doux, deux notes montantes, un peu d'écho"]),
+      wave: AlertSoundWave.encode(AlertSoundSynthesizer.render(chime)))
+    _ = try? await library.add(
+      AlertSoundEntry(name: "gong-bureau", origin: .imported, addedAt: Date(), duration: 2.4),
+      wave: AlertSoundWave.encode(AlertSoundSynthesizer.render(BundledAlertSound.drop.recipe)))
+    let sounds = AlertSoundLibraryModel(
+      library: library,
+      preferences: InMemoryAlertSoundPreferences(
+        alertSound: composed.map { .custom($0.id) } ?? .systemDefault))
+    sounds.announce = { _ in }
+    await sounds.load()
+    sounds.showOutlines()
+    await sounds.outlineTask?.value
+    return sounds
   }
 
   /// The settings on `page`, in a window as wide as the page needs, as the settings window
@@ -132,7 +158,9 @@ struct RequestsSettingsTests {
     #expect(SettingsPage.avatars.parent == .requests)
     #expect(SettingsPage.avatars.sidebarPage == .requests)
     #expect(sidebar.shown(.avatars) == .avatars)
-    #expect(NSImage(systemSymbolName: SettingsPage.requests.symbolName, accessibilityDescription: nil) != nil)
+    #expect(
+      NSImage(systemSymbolName: SettingsPage.requests.symbolName, accessibilityDescription: nil)
+        != nil)
   }
 
   @Test("The page and the avatars are named in French")
@@ -191,7 +219,10 @@ struct RequestsSettingsTests {
     let alerts = bar()
     model.settingsPage = .avatars
     await settle(window, "the avatars") { Self.switches(in: host.view).isEmpty }
-    for _ in 0..<50 { window.contentView?.layoutSubtreeIfNeeded(); await Task.yield() }
+    for _ in 0..<50 {
+      window.contentView?.layoutSubtreeIfNeeded()
+      await Task.yield()
+    }
     #expect(abs(bar() - alerts) < 0.5, "\(alerts) then \(bar())")
     #expect(window.toolbar != nil)
   }
@@ -269,7 +300,7 @@ struct RequestsSettingsTests {
   /// sides. The captures are written when `VIBE_SETTINGS_SNAPSHOTS` names a folder.
   @Test(
     "Each page is whole in the window it gets",
-    arguments: [SettingsPage.requests, .avatars], ["fr", "en"])
+    arguments: [SettingsPage.requests, .avatars, .alertSounds], ["fr", "en"])
   func pageIsWhole(page: SettingsPage, language: String) async throws {
     for dark in [false, true] {
       let model = await workspace()
@@ -278,8 +309,8 @@ struct RequestsSettingsTests {
       let view = host.view
       await settle(window, "the page \(page)") {
         switch page {
-        case .avatars:
-          // The sidebar's list, and the avatars'.
+        case .avatars, .alertSounds:
+          // The sidebar's list, and the avatars' or the sounds'.
           Self.descendants(of: view).filter { $0 is NSTableView }.count == 2
         default: Self.switches(in: view).count == 4
         }
