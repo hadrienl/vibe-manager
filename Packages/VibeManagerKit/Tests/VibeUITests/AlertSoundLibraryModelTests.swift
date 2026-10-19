@@ -50,6 +50,28 @@ private actor RecipeGenerator: AlertSoundGenerating {
   }
 }
 
+/// Answers once let go: what the user does meanwhile happens while the agent works.
+private actor HeldGenerator: AlertSoundGenerating {
+  private let answer: AlertSoundRecipe
+  private var waiting: CheckedContinuation<Void, Never>?
+  private var released = false
+
+  init(_ answer: AlertSoundRecipe) {
+    self.answer = answer
+  }
+
+  func release() {
+    released = true
+    waiting?.resume()
+    waiting = nil
+  }
+
+  func generate(_: AlertSoundGenerationRequest) async throws -> Data {
+    if !released { await withCheckedContinuation { waiting = $0 } }
+    return answer.encoded()
+  }
+}
+
 private struct FixedGenerators: AlertSoundGeneratorResolving {
   let generator: any AlertSoundGenerating
 
@@ -284,6 +306,42 @@ struct AlertSoundLibraryModelTests {
     #expect(sounds.entries.isEmpty)
     sounds.dismiss(job.id)
     #expect(sounds.jobs.isEmpty)
+  }
+
+  @Test("Deleted while an agent changes it: the change is dropped, not added as a new sound")
+  func deletedDuringChange() async throws {
+    let library = InMemoryAlertSoundLibrary(folder: folder)
+    let entry = try await composed(library)
+    let generator = HeldGenerator(BundledAlertSound.drop.recipe)
+    let sounds = try model(library: library, generator: generator)
+    await sounds.load()
+    await sounds.refreshOptions()
+    sounds.select(.sound(.custom(entry.id)))
+    sounds.change = "plus grave"
+    sounds.generateChange()
+    await sounds.remove(entry.id)
+    await generator.release()
+    await sounds.task?.value
+    await sounds.refresh()
+    #expect(sounds.entries.isEmpty)
+    #expect(sounds.jobs.isEmpty)
+  }
+
+  @Test("A failed change is said under its sound, and leaves no row behind")
+  func failedChange() async throws {
+    let library = InMemoryAlertSoundLibrary(folder: folder)
+    let entry = try await composed(library)
+    let sounds = try model(library: library, generator: RecipeGenerator([]))
+    await sounds.load()
+    await sounds.refreshOptions()
+    sounds.select(.sound(.custom(entry.id)))
+    sounds.change = "plus court"
+    sounds.generateChange()
+    await sounds.task?.value
+    #expect(sounds.jobs.isEmpty)
+    #expect(sounds.problem == .generation(.failed("none left")))
+    sounds.select(.sound(.systemDefault))
+    #expect(sounds.problem == nil)
   }
 
   @Test("Cancelled: nothing is written")

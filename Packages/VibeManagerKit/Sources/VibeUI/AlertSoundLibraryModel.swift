@@ -418,6 +418,7 @@ public final class AlertSoundLibraryModel {
     guard selection != self.selection else { return }
     self.selection = selection
     change = ""
+    problem = nil
     if case .sound(let choice) = selection { play(choice) }
   }
 
@@ -571,6 +572,8 @@ public final class AlertSoundLibraryModel {
     else { return }
     jobs.removeAll { $0.id == id }
     let target = failed.target.flatMap(entry)
+    // A change of a sound deleted since is not started again as a new sound.
+    guard failed.target == nil || target != nil else { return }
     start(
       Job(
         id: UUID(), request: failed.request, target: target?.id, provider: provider,
@@ -630,6 +633,11 @@ public final class AlertSoundLibraryModel {
     guard currentRun == run else { return }
     currentRun = nil
     task = nil
+    // The sound to change was deleted meanwhile: what the agent made is not a sound of its own.
+    if let target = job.target, entry(target) == nil {
+      jobs.removeAll { $0.id == job.id }
+      return
+    }
     let samples = AlertSoundSynthesizer.render(recipe)
     let wave = AlertSoundWave.encode(samples)
     let duration = Double(samples.count) / Double(AlertSoundSynthesizer.sampleRate)
@@ -679,7 +687,10 @@ public final class AlertSoundLibraryModel {
     guard currentRun == run else { return }
     currentRun = nil
     task = nil
-    if let index = jobs.firstIndex(where: { $0.id == job.id }) {
+    // A failed change is said under its sound; only a new sound keeps its row to try again.
+    if job.target != nil {
+      jobs.removeAll { $0.id == job.id }
+    } else if let index = jobs.firstIndex(where: { $0.id == job.id }) {
       jobs[index].phase = .failed(error, at: now())
     }
     problem = .generation(error)

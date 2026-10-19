@@ -31,6 +31,8 @@ public struct NotificationSoundFolder: NotificationSoundInstalling {
       return safe
     }
     let temporary = directory.appendingPathComponent(".\(UUID().uuidString).tmp")
+    // Whatever fails, no copy is left behind: the folder is the user's.
+    defer { try? fileManager.removeItem(at: temporary) }
     try fileManager.copyItem(at: source, to: temporary)
     if fileManager.fileExists(atPath: destination.path) {
       _ = try fileManager.replaceItemAt(destination, withItemAt: temporary)
@@ -52,10 +54,14 @@ public struct NotificationSoundFolder: NotificationSoundInstalling {
     }
   }
 
-  /// The sound's name, without what a file name cannot hold.
+  /// The sound's name, without what a file name cannot hold: separators, control or format
+  /// characters, and more bytes than APFS takes.
   func fileName(_ name: String, extension pathExtension: String) -> String {
     let cleaned = name.map { "/:\\".contains($0) || $0.isNewline ? "-" : $0 }
-    let base = String(String(cleaned).trimmingCharacters(in: .whitespaces).prefix(60))
+    let base = AlertSoundRules.prefix(
+      String(
+        AlertSoundRules.visible(String(cleaned)).trimmingCharacters(in: .whitespaces).prefix(60)),
+      bytes: AlertSoundRules.maximumNameBytes)
     let ext = pathExtension.isEmpty ? "wav" : pathExtension
     return "\(prefix)\(base.isEmpty ? "Sound" : base).\(ext)"
   }

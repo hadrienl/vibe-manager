@@ -329,3 +329,17 @@ struct ImportAlertSoundTests {
     }
   }
 }
+
+@Suite("The names of the sounds (#393)")
+struct AlertSoundNameTests {
+  @Test("One line, without what cannot be seen, held in characters and in bytes")
+  func names() {
+    #expect(AlertSoundRules.name("  Carillon\nsecond line") == "Carillon")
+    #expect(AlertSoundRules.name("Bip\u{202E}\u{0007}doux") == "Bipdoux")
+    #expect(AlertSoundRules.name("\u{200B}\u{202E}") == nil)
+    let coders = AlertSoundRules.name(String(repeating: "👩🏽‍💻", count: 60))
+    #expect(coders?.utf8.count ?? .max <= AlertSoundRules.maximumNameBytes)
+    #expect(coders?.allSatisfy { $0 == "👩🏽‍💻" } == true)
+    #expect(AlertSoundRules.name(String(repeating: "a", count: 80))?.count == 60)
+  }
+}

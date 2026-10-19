@@ -134,16 +134,44 @@ public enum AlertSoundRules {
   /// A list a user can still look through.
   public static let maximumCount = 50
   public static let maximumNameLength = 60
+  /// What a file name holds of a name: APFS takes 255 bytes, with room for the application's.
+  public static let maximumNameBytes = 120
   /// The longest a notification of macOS plays.
   public static let maximumImportedDuration: Double = 30
 
-  /// A name as the library keeps it: one line, trimmed, `maximumNameLength` characters at most.
-  /// `nil` when nothing is left.
+  /// A name as the library keeps it: one line, trimmed, without control or format characters,
+  /// `maximumNameLength` characters and `maximumNameBytes` bytes at most — an agent's name ends up
+  /// in a file name. `nil` when nothing is left.
   public static func name(_ proposed: String) -> String? {
     let line = proposed.split(whereSeparator: \.isNewline).first.map(String.init) ?? ""
-    let trimmed = line.trimmingCharacters(in: .whitespaces)
+    let trimmed = visible(line).trimmingCharacters(in: .whitespaces)
     guard !trimmed.isEmpty else { return nil }
-    return String(trimmed.prefix(maximumNameLength))
+    return prefix(String(trimmed.prefix(maximumNameLength)), bytes: maximumNameBytes)
+  }
+
+  /// `text` without control or format characters — a change of direction can make "Bip.exe.wav"
+  /// read as another — but with the joiner that makes one emoji of several.
+  public static func visible(_ text: String) -> String {
+    var scalars = String.UnicodeScalarView()
+    scalars.append(
+      contentsOf: text.unicodeScalars.filter {
+        $0 == "\u{200D}"
+          || ($0.properties.generalCategory != .control
+            && $0.properties.generalCategory != .format)
+      })
+    return String(scalars)
+  }
+
+  /// The longest start of `text` that holds in `bytes` bytes of UTF-8, cut between characters.
+  public static func prefix(_ text: String, bytes: Int) -> String {
+    var result = ""
+    var count = 0
+    for character in text {
+      count += character.utf8.count
+      guard count <= bytes else { break }
+      result.append(character)
+    }
+    return result
   }
 }
 

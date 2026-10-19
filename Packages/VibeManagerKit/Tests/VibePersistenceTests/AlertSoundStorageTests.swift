@@ -169,6 +169,27 @@ struct NotificationSoundFolderTests {
     #expect(names.contains(other.lastPathComponent))
     #expect(names.contains(foreign.lastPathComponent))
   }
+
+  @Test("A name of many bytes, or with what cannot be seen, still makes a file; no copy is left")
+  func longNames() throws {
+    let folder = temporaryFolder()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let source = folder.appendingPathComponent("source.wav")
+    try wave.write(to: source)
+    let sounds = NotificationSoundFolder(applicationName: "Vibe Manager", directory: folder)
+
+    let coders = String(repeating: "👩🏽‍💻", count: 60)
+    let installed = try sounds.install(source, name: coders)
+    #expect(installed.utf8.count <= 255)
+    #expect(installed.hasPrefix("Vibe Manager – 👩🏽‍💻"))
+    let marks = "e" + String(repeating: "\u{301}", count: 300)
+    #expect(try sounds.install(source, name: marks).utf8.count <= 255)
+    #expect(
+      try sounds.install(source, name: "Bip\u{202E}vaw.exe") == "Vibe Manager – Bipvaw.exe.wav")
+    let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    #expect(!names.contains { $0.hasSuffix(".tmp") })
+  }
 }
 
 @MainActor
