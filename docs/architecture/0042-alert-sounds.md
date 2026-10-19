@@ -48,8 +48,9 @@ without an error and without rewriting the choice.
 ### The user's own sounds: a library on the avatars' model
 
 `FileAlertSoundLibrary` keeps `Sounds/library.json` and one WAV per sound, 16-bit PCM, beside the
-avatars (#154): folder `0700`, files `0600`, the file written before the index names it, an index
-that cannot be read set aside rather than written over. 50 sounds at most. An import reads the file
+avatars (#154): folder `0700`, files `0600`, the file written before the index names it, a damaged
+index set aside rather than written over, one written by a later version left in place, read as
+empty and never written to. 50 sounds at most. An import reads the file
 with the system's decoders (`AudioFileAlertSoundDecoder`), refuses one longer than 30 seconds — the
 most a notification plays — before decoding it, mixes it to one channel and writes it as a WAV.
 Neither an import nor a composition puts a sound in use: "Use This Sound" does, as for an avatar.

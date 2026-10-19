@@ -12,7 +12,8 @@ import VibeApplication
 /// The folder is `0700`, the files `0600`. A sound's file is written before the index names it,
 /// and the index is replaced in one step: an interruption leaves at worst a file no index names.
 /// Only a sound deleted takes its file away: an index that cannot be read is set aside, never
-/// written over, and the sounds it named stay on disk beside it.
+/// written over, and the sounds it named stay on disk beside it. One written by a later version
+/// is left where it is: read as empty, and never written to, so that the later version finds it.
 public actor FileAlertSoundLibrary: AlertSoundLibrary {
   static let indexFileName = "library.json"
 
@@ -24,8 +25,14 @@ public actor FileAlertSoundLibrary: AlertSoundLibrary {
   }
 
   private struct Index: Codable {
-    var version = 1
+    static let version = 1
+    var version = Self.version
     var sounds: [AlertSoundEntry]
+  }
+
+  /// What any version of the index starts with.
+  private struct Header: Decodable {
+    var version: Int
   }
 
   private var indexURL: URL { directory.appendingPathComponent(Self.indexFileName) }
@@ -35,11 +42,11 @@ public actor FileAlertSoundLibrary: AlertSoundLibrary {
   }
 
   public func entries() async throws -> [AlertSoundEntry] {
-    try readIndex().sounds
+    try readIndex(toWrite: false).sounds
   }
 
   public func fileURL(of id: AlertSoundID) async throws -> URL {
-    guard try readIndex().sounds.contains(where: { $0.id == id }) else {
+    guard try readIndex(toWrite: false).sounds.contains(where: { $0.id == id }) else {
       throw AlertSoundLibraryError.notFound
     }
     let url = waveURL(id)
@@ -105,14 +112,23 @@ public actor FileAlertSoundLibrary: AlertSoundLibrary {
 
   // MARK: - Disk
 
-  private func readIndex() throws -> Index {
+  /// - Parameter toWrite: whether a change follows, refused on the index of a later version.
+  private func readIndex(toWrite: Bool = true) throws -> Index {
     guard fileManager.fileExists(atPath: indexURL.path) else { return Index(sounds: []) }
     // There, and not read now: nothing is written over it.
     guard let data = try? Data(contentsOf: indexURL) else { throw AlertSoundLibraryError.storage }
-    if let index = try? Self.decoder.decode(Index.self, from: data), index.version == 1 {
+    if let header = try? Self.decoder.decode(Header.self, from: data),
+      header.version > Index.version
+    {
+      // A later version's: left in place for it, and read as empty.
+      if toWrite { throw AlertSoundLibraryError.storage }
+      return Index(sounds: [])
+    }
+    if let index = try? Self.decoder.decode(Index.self, from: data), index.version == Index.version
+    {
       return index
     }
-    // Damaged, or written by a later version: set aside, never written over.
+    // Damaged: set aside, never written over.
     let aside = directory.appendingPathComponent(
       "library.unreadable-\(Int(Date().timeIntervalSince1970)).json")
     do {

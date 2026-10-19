@@ -100,6 +100,27 @@ struct FileAlertSoundLibraryTests {
   }
 }
 
+extension FileAlertSoundLibraryTests {
+  @Test("An index of a later version is read as empty, never moved nor written to")
+  func laterIndex() async throws {
+    let folder = temporaryFolder()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let index = folder.appendingPathComponent("library.json")
+    let later = Data(#"{"version":2,"sounds":[{"what":"comes later"}]}"#.utf8)
+    try later.write(to: index)
+    let library = FileAlertSoundLibrary(directory: folder)
+    #expect(try await library.entries().isEmpty)
+    await #expect(throws: AlertSoundLibraryError.storage) {
+      try await library.add(
+        AlertSoundEntry(name: "New", origin: .imported, addedAt: Date(), duration: 1), wave: wave)
+    }
+    #expect(try Data(contentsOf: index) == later)
+    let names = try FileManager.default.contentsOfDirectory(atPath: folder.path)
+    #expect(!names.contains { $0.hasPrefix("library.unreadable-") })
+  }
+}
+
 @Suite("Audio files read for an import (#393)")
 struct AudioFileAlertSoundDecoderTests {
   @Test("A WAV of two channels is read as one, at its rate")
