@@ -33,11 +33,18 @@ struct SignInNotice: View {
   @ViewBuilder
   private var actions: some View {
     switch signIn.state {
+    case .expired where signIn.route == .elsewhere, .failed where signIn.route == .elsewhere:
+      EmptyView()
     case .expired:
-      Button {
-        model.startSignIn?()
-      } label: {
-        Text("Sign In", bundle: .module, comment: "Signs an agent's CLI in again, in the browser.")
+      // For an account the browser does not sign in — Console, SSO —, as for one it did not.
+      signInInTerminal
+      if signIn.route == .browser {
+        Button {
+          model.startSignIn?()
+        } label: {
+          Text(
+            "Sign In", bundle: .module, comment: "Signs an agent's CLI in again, in the browser.")
+        }
       }
     case .signingIn:
       ProgressView().controlSize(.small)
@@ -47,17 +54,13 @@ struct SignInNotice: View {
         Text("Cancel", bundle: .module)
       }
     case .failed:
-      Button {
-        model.signInInTerminal?()
-      } label: {
-        Text(
-          "Sign In in the Terminal", bundle: .module,
-          comment: "Types the CLI's own /login into the session's terminal.")
-      }
-      Button {
-        model.startSignIn?()
-      } label: {
-        Text("Try Again", bundle: .module)
+      signInInTerminal
+      if signIn.route == .browser {
+        Button {
+          model.startSignIn?()
+        } label: {
+          Text("Try Again", bundle: .module)
+        }
       }
     case .signedIn(let canResume, _):
       if canResume {
@@ -71,6 +74,16 @@ struct SignInNotice: View {
       }
     case .resuming:
       ProgressView().controlSize(.small)
+    }
+  }
+
+  private var signInInTerminal: some View {
+    Button {
+      model.signInInTerminal?()
+    } label: {
+      Text(
+        "Sign In in the Terminal", bundle: .module,
+        comment: "Types the CLI's own /login into the session's terminal.")
     }
   }
 
@@ -101,13 +114,17 @@ struct SignInNotice: View {
         comment: "An agent's name.")
     case .resuming:
       String(
-        localized: "Signed in. The session resumes, and its last message is sent again.",
-        bundle: .module)
+        localized: "Signed in. The session resumes where it stopped.", bundle: .module)
     }
   }
 
   private var detail: String? {
     switch signIn.state {
+    case .expired where signIn.route == .elsewhere, .failed where signIn.route == .elsewhere:
+      String(
+        localized:
+          "Signing in again does not change the API key or the provider \(signIn.agentName) uses. Check them, then restart the session.",
+        bundle: .module, comment: "An agent's name.")
     case .failed(let detail): detail
     case .signedIn(_, let textWaiting):
       textWaiting
