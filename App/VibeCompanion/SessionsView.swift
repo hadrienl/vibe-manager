@@ -237,7 +237,9 @@ struct ConnectionBanner: View {
         return Banner(
           symbol: "desktopcomputer", tint: .secondary, title: "No Mac",
           detail: String(
-            localized: "Open Vibe Manager on your Mac, signed in to the same iCloud account."))
+            localized:
+              "On your Mac, turn on Vibe Manager › Settings › iPhone Companion, with the same iCloud account as this iPhone."
+          ))
       }
       if !model.isConnected {
         let seen = mac.lastSeen.formatted(.relative(presentation: .named))
@@ -248,7 +250,10 @@ struct ConnectionBanner: View {
           : Banner(
             symbol: "desktopcomputer.trianglebadge.exclamationmark", tint: .red,
             title: "\(name) Is Offline",
-            detail: String(localized: "Vibe Manager quit \(seen). Open it on the Mac."))
+            detail: String(
+              localized:
+                "Seen \(seen). Open Vibe Manager on the Mac, with Settings › iPhone Companion turned on."
+            ))
       }
       if case .failed(let reason) = channel.phase {
         return Banner(
