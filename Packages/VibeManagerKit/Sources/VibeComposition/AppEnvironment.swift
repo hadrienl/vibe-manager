@@ -518,6 +518,26 @@ public final class AppEnvironment {
       library: avatarLibrary, generators: AgentAvatarGenerators(agents: registry))
     appModel.avatars = avatars
     Task { await avatars.load() }
+    // The alert sound (#393): the user's own sounds beside the avatars, the one in use copied
+    // where the notifications find it — by the application alone, never by a test.
+    let alertSounds = AlertSoundLibraryModel(
+      library: FileAlertSoundLibrary(
+        directory: dataFolder.appendingPathComponent("Sounds", isDirectory: true)),
+      preferences: UserDefaultsAlertSoundPreferences(suiteName: data.defaultsSuite),
+      decoder: AudioFileAlertSoundDecoder(),
+      generators: AgentAlertSoundGenerators(agents: registry),
+      installer: Self.bundleName().map { NotificationSoundFolder(applicationName: $0) },
+      player: SystemAlertSoundPlayer(),
+      cacheDirectory: dataFolder.appendingPathComponent("Sounds/Shipped", isDirectory: true))
+    appModel.alertSounds = alertSounds
+    Task { await alertSounds.load() }
+    let backgroundWork = BackgroundWorkProbe(
+      agents: registry, hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) }
+    )
+    appModel.isWaitingOnBackgroundWork = { [weak appModel] session in
+      guard let start = await appModel?.agentProcessStart(session.id) else { return false }
+      return await backgroundWork.isWaiting(session, processStart: start)
+    }
     if let name = Self.bundleName() { appModel.applicationName = name }
     appModel.endpoints = EndpointsSettingsModel(
       repository: endpointCatalog.repository, secrets: endpointCatalog.secrets,

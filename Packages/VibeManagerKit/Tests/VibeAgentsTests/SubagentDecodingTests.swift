@@ -68,7 +68,10 @@ struct ClaudeCodeSubagentTests {
     let object: [String: Any] = [
       "type": "user", "uuid": "h", "isMeta": true,
       "origin": ["kind": "peer", "from": "a1", "body": body, "handback": true],
-      "message": ["role": "user", "content": "Another Claude session sent a message:\n<agent-message from=\"a1\">…"],
+      "message": [
+        "role": "user",
+        "content": "Another Claude session sent a message:\n<agent-message from=\"a1\">…",
+      ],
     ]
     let line = String(decoding: try! JSONSerialization.data(withJSONObject: object), as: UTF8.self)
     let entries = decode([
@@ -132,6 +135,28 @@ struct ClaudeCodeSubagentTests {
     ])
     #expect(call(resumed)?.state == .succeeded)
     #expect(call(resumed)?.subagent?.result == "Second.")
+  }
+
+  @Test("Work in the background is listed until its end is notified (#393)")
+  func backgroundWork() {
+    let command =
+      #"{"type":"assistant","uuid":"a4","timestamp":"2026-09-29T13:35:00.000Z","message":{"content":[{"type":"tool_use","id":"b2","name":"Bash","input":{"command":"sleep 30","run_in_background":true}}]}}"#
+    let started =
+      #"{"type":"user","uuid":"u4","timestamp":"2026-09-29T13:35:01.000Z","message":{"content":[{"type":"tool_result","tool_use_id":"b2","content":"Command running in background with ID: bg1."}]},"toolUseResult":{"stdout":"","stderr":"","interrupted":false,"backgroundTaskId":"bg1"}}"#
+    func work(_ lines: [String]) -> [Date] {
+      let decoder = ClaudeCodeConversationDecoder()
+      for line in lines { decoder.consume(Data(line.utf8)) }
+      return decoder.backgroundWork
+    }
+    #expect(work([launch, launched, command, started]).count == 2)
+    #expect(
+      work([launch, launched, command, started, notification("completed", result: "Done.")])
+        .count == 1)
+    #expect(
+      work([
+        launch, launched, command, started, notification("completed", result: "Done."),
+        notification("completed", result: "", agent: "bg1", call: "b2"),
+      ]).isEmpty)
   }
 
   @Test("Stopping the turn leaves a sub-agent in the background running")
@@ -212,8 +237,11 @@ struct ClaudeCodeSubagentTests {
     defer { try? FileManager.default.removeItem(at: folder) }
     try Data(#"{"agentType":"Explore","description":"One","toolUseId":"t1","spawnDepth":1}"#.utf8)
       .write(to: subagents.appendingPathComponent("agent-a1.meta.json"))
-    try Data(#"{"agentType":"general-purpose","description":"/code-review","name":"code-review","spawnDepth":1,"stoppedByUser":true}"#.utf8)
-      .write(to: subagents.appendingPathComponent("agent-a2.meta.json"))
+    try Data(
+      #"{"agentType":"general-purpose","description":"/code-review","name":"code-review","spawnDepth":1,"stoppedByUser":true}"#
+        .utf8
+    )
+    .write(to: subagents.appendingPathComponent("agent-a2.meta.json"))
     try Data(
       (#"{"type":"user","message":{"role":"user","content":"Old prompt"}}"# + "\n{}\n").utf8
     ).write(to: subagents.appendingPathComponent("agent-a3.jsonl"))
@@ -245,7 +273,9 @@ struct CodexSubagentTests {
     #expect(started[0].toolCall?.state == .running)
     #expect(started[0].toolCall?.parameter(.description) == "review relay")
     #expect(started[0].toolCall?.subagent?.agentID == "th-1")
-    let done = decode([activity("started", id: "c1"), activity("completed", id: "subagent-completed-x")])
+    let done = decode([
+      activity("started", id: "c1"), activity("completed", id: "subagent-completed-x"),
+    ])
     #expect(done.count == 1)
     #expect(done[0].toolCall?.state == .succeeded)
     #expect(done[0].toolCall?.subagent?.taskCount == 1)

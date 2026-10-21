@@ -16,6 +16,8 @@ public enum SettingsPage: Hashable, Sendable {
   case requests
   /// The avatars of the floating panel (#154), reached from the requests.
   case avatars
+  /// The alert sounds (#393), reached from the requests.
+  case alertSounds
   /// An agent whose activity can be tracked (#45).
   case agent(AgentProviderID)
   /// A model server a session can run on (#107).
@@ -42,7 +44,7 @@ public enum SettingsPage: Hashable, Sendable {
   /// The page this one is reached from, and goes back to; `nil` for a page of the sidebar.
   var parent: SettingsPage? {
     switch self {
-    case .avatars: .requests
+    case .avatars, .alertSounds: .requests
     case .ticketResolvers: .tickets
     default: nil
     }
@@ -61,6 +63,8 @@ public enum SettingsPage: Hashable, Sendable {
     case .conversation: 925
     // The library's list and the avatar's workshop.
     case .avatars: 900
+    // The list of the sounds and the preview of the one selected.
+    case .alertSounds: 900
     // The list of the resolvers, their editor, and the test under them.
     case .ticketResolvers: 860
     default: Self.standardDetailWidth
@@ -91,6 +95,10 @@ public enum SettingsPage: Hashable, Sendable {
       LocalizedStringResource(
         "Avatars", bundle: .module,
         comment: "A page of Settings › Requests: the avatars of the floating panel.")
+    case .alertSounds:
+      LocalizedStringResource(
+        "Sounds", bundle: .module,
+        comment: "A page of Settings › Notifications: the alert sounds.")
     case .agent:
       LocalizedStringResource(
         "Agent", bundle: .module, comment: "A page of the Settings window: an agent.")
@@ -132,7 +140,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .general: "gearshape.fill"
     case .conversation: "bubble.left.and.text.bubble.right.fill"
     case .sessionAppearance: "paintpalette.fill"
-    case .requests, .avatars: "bell.badge.fill"
+    case .requests, .avatars, .alertSounds: "bell.badge.fill"
     case .agent: "sparkles"
     case .endpoint: "server.rack"
     case .newEndpoint: "plus"
@@ -152,7 +160,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .general, .updates: .gray
     case .conversation: .blue
     case .sessionAppearance: .pink
-    case .requests, .avatars: .red
+    case .requests, .avatars, .alertSounds: .red
     case .agent: .orange
     case .endpoint: .indigo
     case .newEndpoint: .secondary
