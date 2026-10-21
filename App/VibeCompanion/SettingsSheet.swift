@@ -49,6 +49,7 @@ struct SettingsSheet: View {
         Section("Notifications") {
           Button("Notification Settings") {
             if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+              // Opens outside: iOS's own settings page for this app, a fixed system address.
               openURL(url)
             }
           }

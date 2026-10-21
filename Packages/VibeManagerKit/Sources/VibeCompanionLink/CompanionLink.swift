@@ -168,6 +168,7 @@ public actor CompanionLink: CompanionPublishing {
     // Through Launch Services rather than spawned: the agent is an application, the one that
     // receives CloudKit's pushes, and it is registered as such.
     do {
+      // Opens outside: the companion's agent embedded in this very bundle, never another app.
       _ = try await NSWorkspace.shared.openApplication(
         at: self.configuration.agentBundle, configuration: configuration)
       diagnostics.record(.lifecycle, .notice, "companion.agentLaunched")
