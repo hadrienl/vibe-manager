@@ -169,7 +169,8 @@ public struct ClaudeCodeSignalDecoder: AgentSignalDecoding {
         return .turnEnded
       }
       return .turnFailed(
-        AgentTerminalPrompt(kind: .account, message: event.string("last_assistant_message")))
+        AgentTerminalPrompt(
+          kind: .account, message: event.string("last_assistant_message"), error: error))
     case "SessionEnd":
       return .agentEnded
     default:

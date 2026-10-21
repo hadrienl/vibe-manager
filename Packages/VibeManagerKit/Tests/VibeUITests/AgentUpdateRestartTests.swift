@@ -89,7 +89,7 @@ struct AgentUpdateRestartTests {
     model.noteAgentUpdates([subject.id: update])
     _ = launcher.pane(for: subject.id)?.takePendingNotice()
 
-    await model.performUpdateRestart(subject.id, update: update)
+    await model.restartInPlace(subject.id, update: update)
 
     #expect(await supervisor.startCount == 2)
     #expect(await supervisor.lastSpec?.arguments == ["--resume", "kept-identifier"])

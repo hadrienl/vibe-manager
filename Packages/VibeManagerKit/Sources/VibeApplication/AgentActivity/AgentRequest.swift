@@ -173,10 +173,22 @@ public struct AgentTerminalPrompt: Hashable, Codable, Sendable {
   public let kind: Kind
   /// The CLI's own words, shown as they came: they may quote what the agent is working on.
   public let message: String?
+  /// The CLI's own name for what stopped it — Claude Code's `authentication_failed` — when it
+  /// gave one.
+  public let error: String?
 
-  public init(kind: Kind, message: String?) {
+  public init(kind: Kind, message: String?, error: String? = nil) {
     self.kind = kind
     self.message = message
+    self.error = error
+  }
+
+  /// The CLI's sign-in expired, and signing in again is all it needs (#410). A request kept from
+  /// before the error was recorded is known by what it says: `Please run /login`.
+  public var asksToSignIn: Bool {
+    guard kind == .account else { return false }
+    if let error { return error == "authentication_failed" }
+    return message?.contains("/login") == true
   }
 }
 

@@ -136,7 +136,9 @@ struct AnnouncedDialogDecodingTests {
         for: event(
           "StopFailure",
           #"{"error":"authentication_failed","last_assistant_message":"API Error: 401"}"#))
-        == .turnFailed(AgentTerminalPrompt(kind: .account, message: "API Error: 401")))
+        == .turnFailed(
+          AgentTerminalPrompt(
+            kind: .account, message: "API Error: 401", error: "authentication_failed")))
     #expect(decoder.signal(for: event("StopFailure", #"{"error":"rate_limit"}"#)) == .turnEnded)
     #expect(decoder.signal(for: event("StopFailure", nil)) == .turnEnded)
     #expect(ClaudeCodeActivityHooks.hooks.contains { $0.event == "PostToolBatch" })
