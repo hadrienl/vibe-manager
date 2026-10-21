@@ -10,7 +10,7 @@ public enum CompanionLinkWire {
   public static let protocolVersion = 1
   /// A snapshot of every active session fits many times over; a corrupt length cannot make either
   /// side allocate a gigabyte.
-  public static let maximumPayloadLength = 8 << 20
+  public static let maximumPayloadLength = 32 << 20
   static let headerLength = 5
   static let controlKind: UInt8 = 1
   /// In the private directory of the application's terminal host, which an isolated copy has of

@@ -1,5 +1,6 @@
 import CompanionCore
 import Foundation
+import ImageIO
 import Observation
 import VibeApplication
 import VibeConversationUI
@@ -32,16 +33,19 @@ final class CompanionRemoteServer {
   private weak var appModel: AppModel?
   private let send: @MainActor (String, RemoteMessage) -> Void
   private let macName: String
+  private let attachmentsFolder: URL
   private var peers: [String: Peer] = [:]
   private var sessionsObserved = false
   private var lastSessions: [RemoteSession] = []
   private var searchIndex: SessionSearchIndex?
 
   init(
-    appModel: AppModel, macName: String, send: @escaping @MainActor (String, RemoteMessage) -> Void
+    appModel: AppModel, macName: String, attachmentsFolder: URL,
+    send: @escaping @MainActor (String, RemoteMessage) -> Void
   ) {
     self.appModel = appModel
     self.macName = macName
+    self.attachmentsFolder = attachmentsFolder
     self.send = send
   }
 
@@ -63,6 +67,8 @@ final class CompanionRemoteServer {
       if let sessionID { follow(sessionID, for: peer) }
     case .send(let id, let text):
       Task { await self.type(text, into: id, for: peer) }
+    case .sendFiles(let id, let text, let files):
+      Task { await self.type(text, into: id, files: files, for: peer) }
     case .answer(let id, let requestID, let choiceIDs, let text):
       Task { await self.answer(id, requestID: requestID, choiceIDs: choiceIDs, text: text, for: peer) }
     case .setStatus(let id, let status):
@@ -76,11 +82,20 @@ final class CompanionRemoteServer {
       Task { await self.offerNewSession(to: peer) }
     case .createSession(let request):
       Task { await self.create(request, for: peer) }
+    case .icon(let id):
+      Task {
+        guard let png = await appModel?.companionIconPNG(id).flatMap({ Self.thumbnail($0) })
+        else { return }
+        send(peer, .iconData(id: id, png: png))
+      }
+    case .interrupt(let id):
+      guard let sessionID = Self.sessionID(id) else { return }
+      Task { await appModel?.companionInterrupt(sessionID) }
     case .listFolder(let path):
       let listing = Self.listing(of: path)
       send(peer, .folderListing(listing))
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
-      .folderListing:
+      .folderListing, .iconData:
       break
     }
   }
@@ -143,7 +158,8 @@ final class CompanionRemoteServer {
         status: RemoteTaskStatus(rawValue: session.taskStatus.rawValue) ?? .doing,
         activity: activity(of: session, state: state),
         appearance: RemoteAppearance(
-          symbol: session.appearance.symbolName, color: session.appearance.colorHex),
+          symbol: session.appearance.symbolName, color: session.appearance.colorHex,
+          iconID: session.appearance.iconID?.sha256),
         coordinatorID: coordinatorID, isCoordinator: isCoordinator,
         detail: state?.requests.first.map(detail(of:)), updatedAt: session.updatedAt,
         rank: session.rank)
@@ -275,14 +291,23 @@ final class CompanionRemoteServer {
 
   /// Through the conversation's composer, as if typed in the window: a working agent gets it
   /// queued, an answer to a question goes as one. What the user left in the composer stays.
-  private func type(_ text: String, into id: String, for peer: String) async {
+  private func type(
+    _ text: String, into id: String, files: [RemoteFile] = [], for peer: String
+  ) async {
     guard let appModel, let sessionID = Self.sessionID(id),
       let session = appModel.sessions.first(where: { $0.id == sessionID })
     else { return }
     let model = appModel.conversations.show(session)
     let kept = model.draft
+    // What the user left in the composer on the Mac is put aside, never sent with the phone's.
+    let keptFiles = model.attachments
+    keptFiles.forEach(model.removeAttachment)
+    let written = saved(files)
+    if !written.isEmpty { model.attach(written, focusing: false) }
     model.draft = text
     let sent = await model.send()
+    model.attachments.filter(written.contains).forEach(model.removeAttachment)
+    if !keptFiles.isEmpty { model.attach(keptFiles, focusing: false) }
     if model.draft == text || sent { model.draft = kept }
     if !sent { send(peer, .failure("Le message n’a pas pu être envoyé : l’agent ne tourne pas.")) }
   }
@@ -398,6 +423,43 @@ final class CompanionRemoteServer {
       return RemoteFolderListing(
         path: folder.path, folders: [], problem: "Ce dossier ne peut pas être lu sur le Mac.")
     }
+  }
+
+  /// The phone's files, written where the agent can read them: one folder per message, under the
+  /// companion's own folder of the data folder.
+  private func saved(_ files: [RemoteFile]) -> [URL] {
+    guard !files.isEmpty else { return [] }
+    let folder = attachmentsFolder.appendingPathComponent(UUID().uuidString, isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    } catch {
+      return []
+    }
+    return files.compactMap { file in
+      // The name alone: never a path the phone could point elsewhere with.
+      let name = (file.name as NSString).lastPathComponent
+      let url = folder.appendingPathComponent(name.isEmpty ? "fichier" : name)
+      return (try? file.data.write(to: url)) == nil ? nil : url
+    }
+  }
+
+  /// A project icon at the size the phone draws it, 96 pixels: the stored one can be 1024.
+  static func thumbnail(_ png: Data) -> Data? {
+    guard let source = CGImageSourceCreateWithData(png as CFData, nil),
+      let image = CGImageSourceCreateThumbnailAtIndex(
+        source, 0,
+        [
+          kCGImageSourceCreateThumbnailFromImageAlways: true,
+          kCGImageSourceThumbnailMaxPixelSize: 96,
+        ] as CFDictionary)
+    else { return nil }
+    let data = NSMutableData()
+    guard
+      let destination = CGImageDestinationCreateWithData(
+        data, "public.png" as CFString, 1, nil)
+    else { return nil }
+    CGImageDestinationAddImage(destination, image, nil)
+    return CGImageDestinationFinalize(destination) ? data as Data : nil
   }
 
   private static func sessionID(_ text: String) -> SessionID? {

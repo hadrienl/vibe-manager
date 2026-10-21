@@ -11,6 +11,18 @@ extension AppModel {
     offeredRecentFolders.map(\.path)
   }
 
+  /// A project icon's PNG, as the sessions wear it.
+  public func companionIconPNG(_ sha256: String) async -> Data? {
+    guard let id = SessionIconID(sha256: sha256) else { return nil }
+    return await iconStore.pngData(for: id)
+  }
+
+  /// Stops what the session's agent does, as Escape in its terminal.
+  public func companionInterrupt(_ id: SessionID) async {
+    guard let session = sessions.first(where: { $0.id == id }) else { return }
+    await conversations.show(session).interrupt()
+  }
+
   /// An agent's models, `[]` for one that offers no choice.
   public func companionModels(of providerID: String) async -> [AgentModel] {
     guard let provider = await agents?.provider(id: AgentProviderID(providerID)) else { return [] }

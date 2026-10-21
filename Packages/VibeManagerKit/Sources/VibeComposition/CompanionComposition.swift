@@ -55,6 +55,8 @@ final class CompanionComposition {
     let receive = ReceiveCompanionTest(publisher: link, alerts: AppKitCompanionTestAlert())
     let remote = CompanionRemoteServer(
       appModel: appModel, macName: Host.current().localizedName ?? "Mac",
+      attachmentsFolder: dataFolder.appendingPathComponent(
+        "Companion/Attachments", isDirectory: true),
       send: { peer, message in Task { await link.sendRemote(message, to: peer) } })
     composition.remote = remote
     Task {

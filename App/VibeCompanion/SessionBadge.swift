@@ -7,16 +7,11 @@ struct SessionBadge: View {
   let appearance: RemoteAppearance
   let activity: RemoteActivity
   var size: CGFloat = 34
+  @Environment(RemoteChannel.self) private var channel
 
   var body: some View {
-    RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
-      .fill(Color(hex: appearance.color) ?? .gray)
+    shape
       .frame(width: size, height: size)
-      .overlay {
-        Image(systemName: appearance.symbol)
-          .font(.system(size: size * 0.48, weight: .semibold))
-          .foregroundStyle(.white)
-      }
       .overlay(alignment: .bottomTrailing) {
         if let dot {
           Circle()
@@ -27,6 +22,25 @@ struct SessionBadge: View {
         }
       }
       .accessibilityHidden(true)
+  }
+
+  /// The project's icon when the session wears one and it is here; its symbol on its colour
+  /// otherwise.
+  @ViewBuilder private var shape: some View {
+    if let id = appearance.iconID, let image = channel.icon(id) {
+      Image(uiImage: image)
+        .resizable()
+        .interpolation(.high)
+        .scaledToFit()
+    } else {
+      RoundedRectangle(cornerRadius: size * 0.27, style: .continuous)
+        .fill(Color(hex: appearance.color) ?? .gray)
+        .overlay {
+          Image(systemName: appearance.symbol)
+            .font(.system(size: size * 0.48, weight: .semibold))
+            .foregroundStyle(.white)
+        }
+    }
   }
 
   private var dot: Color? {

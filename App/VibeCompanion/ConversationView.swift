@@ -1,5 +1,7 @@
 import CompanionCore
+import PhotosUI
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// A session's conversation, live (#400): the Mac sends it whole at each change while it is shown.
 /// What the agent waits for is answered in a card above the field; the field writes to the agent.
@@ -8,6 +10,12 @@ struct ConversationView: View {
   @Environment(RemoteChannel.self) private var channel
   @State private var draft = ""
   @FocusState private var fieldFocused: Bool
+  /// The files joined to the next message.
+  @State private var files: [RemoteFile] = []
+  @State private var photoItems: [PhotosPickerItem] = []
+  @State private var showsPhotos = false
+  @State private var showsCamera = false
+  @State private var showsFiles = false
 
   private var session: RemoteSession? { channel.sessions.first { $0.id == sessionID } }
   private var conversation: RemoteConversation? {
@@ -45,6 +53,16 @@ struct ConversationView: View {
     .navigationTitle(session?.name ?? "")
     .navigationSubtitle(subtitle)
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      ToolbarItem(placement: .topBarTrailing) {
+        Menu("Plus", systemImage: "ellipsis") {
+          Button("Arrêter l’agent", systemImage: "stop.circle", role: .destructive) {
+            channel.interrupt(sessionID)
+          }
+          .disabled(session?.activity != .working && session?.activity != .needsAttention)
+        }
+      }
+    }
     .onAppear { channel.show(sessionID) }
     .onDisappear { if channel.conversation?.sessionID == sessionID { channel.show(nil) } }
   }
@@ -59,32 +77,168 @@ struct ConversationView: View {
     }
   }
 
+  private var canSend: Bool {
+    !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty
+  }
+
   private var inputBar: some View {
-    HStack(alignment: .bottom, spacing: 8) {
-      TextField(
-        "Écrire à \(session?.agentName ?? "l’agent")…", text: $draft, axis: .vertical
-      )
-      .lineLimit(1...6)
-      .focused($fieldFocused)
-      .padding(.horizontal, 14)
-      .padding(.vertical, 10)
-      .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
-      Button {
-        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
-        channel.send(text, to: sessionID)
-        draft = ""
-      } label: {
-        Image(systemName: "arrow.up")
-          .font(.body.weight(.bold))
-          .frame(width: 30, height: 30)
+    VStack(spacing: 6) {
+      if !files.isEmpty {
+        ScrollView(.horizontal, showsIndicators: false) {
+          HStack(spacing: 6) {
+            ForEach(Array(files.enumerated()), id: \.offset) { index, file in
+              HStack(spacing: 4) {
+                Image(systemName: Self.isImage(file.name) ? "photo" : "doc")
+                Text(verbatim: file.name).lineLimit(1)
+                Button("Retirer", systemImage: "xmark.circle.fill") { files.remove(at: index) }
+                  .labelStyle(.iconOnly)
+                  .foregroundStyle(.secondary)
+              }
+              .font(.caption)
+              .padding(.horizontal, 10)
+              .padding(.vertical, 6)
+              .glassEffect(.regular, in: Capsule())
+            }
+          }
+          .padding(.horizontal, 12)
+        }
       }
-      .buttonStyle(.glassProminent)
-      .buttonBorderShape(.circle)
-      .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-      .accessibilityLabel("Envoyer")
+      HStack(alignment: .bottom, spacing: 8) {
+        Menu {
+          Button("Photos", systemImage: "photo.on.rectangle") { showsPhotos = true }
+          Button("Appareil photo", systemImage: "camera") { showsCamera = true }
+            .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
+          Button("Fichiers", systemImage: "folder") { showsFiles = true }
+        } label: {
+          Image(systemName: "plus")
+            .font(.body.weight(.semibold))
+            .frame(width: 30, height: 30)
+        }
+        .buttonStyle(.glass)
+        .buttonBorderShape(.circle)
+        .accessibilityLabel("Joindre une image ou un fichier")
+        TextField(
+          "Écrire à \(session?.agentName ?? "l’agent")…", text: $draft, axis: .vertical
+        )
+        .lineLimit(1...6)
+        .focused($fieldFocused)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
+        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
+        Button {
+          let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard canSend else { return }
+          channel.send(text, files: files, to: sessionID)
+          draft = ""
+          files = []
+        } label: {
+          Image(systemName: "arrow.up")
+            .font(.body.weight(.bold))
+            .frame(width: 30, height: 30)
+        }
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.circle)
+        .disabled(!canSend)
+        .accessibilityLabel("Envoyer")
+      }
+      .padding(.horizontal, 12)
     }
-    .padding(.horizontal, 12)
+    .photosPicker(
+      isPresented: $showsPhotos, selection: $photoItems, maxSelectionCount: 5, matching: .images)
+    .onChange(of: photoItems) { _, items in
+      guard !items.isEmpty else { return }
+      photoItems = []
+      Task {
+        for (index, item) in items.enumerated() {
+          guard let data = try? await item.loadTransferable(type: Data.self),
+            let jpeg = Self.jpeg(UIImage(data: data))
+          else { continue }
+          files.append(RemoteFile(name: "photo-\(Self.stamp())-\(index + 1).jpg", data: jpeg))
+        }
+      }
+    }
+    .fullScreenCover(isPresented: $showsCamera) {
+      CameraPicker { image in
+        if let jpeg = Self.jpeg(image) {
+          files.append(RemoteFile(name: "photo-\(Self.stamp()).jpg", data: jpeg))
+        }
+      }
+      .ignoresSafeArea()
+    }
+    .fileImporter(
+      isPresented: $showsFiles, allowedContentTypes: [.item], allowsMultipleSelection: true
+    ) { result in
+      guard case .success(let urls) = result else { return }
+      for url in urls {
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url), data.count < 6_000_000 else {
+          channel.failure = "« \(url.lastPathComponent) » est trop gros pour être envoyé (6 Mo au plus)."
+          continue
+        }
+        files.append(RemoteFile(name: url.lastPathComponent, data: data))
+      }
+    }
+  }
+
+  /// A photo as the agent reads it: 2048 pixels at most, in JPEG.
+  static func jpeg(_ image: UIImage?) -> Data? {
+    guard let image else { return nil }
+    let longest = max(image.size.width, image.size.height)
+    let scale = min(1, 2048 / max(longest, 1))
+    let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    let resized = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: size))
+    }
+    return resized.jpegData(compressionQuality: 0.8)
+  }
+
+  static func stamp() -> String {
+    let formatter = DateFormatter()
+    formatter.dateFormat = "yyyyMMdd-HHmmss"
+    return formatter.string(from: Date())
+  }
+
+  static func isImage(_ name: String) -> Bool {
+    UTType(filenameExtension: (name as NSString).pathExtension)?.conforms(to: .image) ?? false
+  }
+}
+
+/// The camera, as UIKit offers it.
+private struct CameraPicker: UIViewControllerRepresentable {
+  let take: (UIImage) -> Void
+  @Environment(\.dismiss) private var dismiss
+
+  func makeUIViewController(context: Context) -> UIImagePickerController {
+    let picker = UIImagePickerController()
+    picker.sourceType = .camera
+    picker.delegate = context.coordinator
+    return picker
+  }
+
+  func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+
+  func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+  final class Coordinator: NSObject, UIImagePickerControllerDelegate,
+    UINavigationControllerDelegate
+  {
+    let parent: CameraPicker
+    init(_ parent: CameraPicker) { self.parent = parent }
+
+    func imagePickerController(
+      _ picker: UIImagePickerController,
+      didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]
+    ) {
+      if let image = info[.originalImage] as? UIImage { parent.take(image) }
+      parent.dismiss()
+    }
+
+    func imagePickerControllerDidCancel(_ picker: UIImagePickerController) {
+      parent.dismiss()
+    }
   }
 }
 

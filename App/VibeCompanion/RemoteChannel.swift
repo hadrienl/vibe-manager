@@ -3,6 +3,7 @@ import Foundation
 import IrohLib
 import Observation
 import Security
+import UIKit
 
 /// The phone's end of the direct channel (#399, #400): the Mac's sessions, the conversation shown,
 /// and what the user does to them, over iroh while the application is in the foreground.
@@ -32,6 +33,9 @@ final class RemoteChannel {
   private(set) var folderListings: [String: RemoteFolderListing] = [:]
   /// The home folder's path, once listed.
   private(set) var homePath: String?
+  /// The project icons the sessions wear, by content: asked once, kept in the caches.
+  private(set) var icons: [String: UIImage] = [:]
+  @ObservationIgnored private var askedIcons: Set<String> = []
   /// The session just created from the phone, for the list to show it.
   var createdSessionID: String?
   /// The last thing the Mac could not do, for an alert.
@@ -111,6 +115,8 @@ final class RemoteChannel {
         "remote: connected, \(CompanionIroh.describe(connection.paths()), privacy: .public)")
       write(.hello(protocolVersion: CompanionRemote.protocolVersion, deviceName: deviceName))
       if let shownSessionID { write(.show(sessionID: shownSessionID)) }
+      // Icons asked while the channel was down are asked again.
+      for id in askedIcons where icons[id] == nil { write(.icon(id: id)) }
       tasks.append(Task.detached { [weak self] in await self?.receive(on: stream, attempt: attempt) })
       tasks.append(
         Task { [weak self] in
@@ -159,6 +165,12 @@ final class RemoteChannel {
       searchResults = results
     case .newSessionOffer(let options):
       newSessionOptions = options
+    case .iconData(let id, let png):
+      guard let image = UIImage(data: png) else { return }
+      icons[id] = image
+      try? FileManager.default.createDirectory(
+        at: Self.iconFolder, withIntermediateDirectories: true)
+      try? png.write(to: Self.iconFolder.appendingPathComponent("\(id).png"))
     case .folderListing(let listing):
       folderListings[listing.path] = listing
       if pendingHome {
@@ -169,7 +181,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder:
+    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt:
       break
     }
   }
@@ -195,8 +207,11 @@ final class RemoteChannel {
     write(.show(sessionID: sessionID))
   }
 
-  func send(_ text: String, to sessionID: String) {
-    write(.send(sessionID: sessionID, text: text))
+  func send(_ text: String, files: [RemoteFile] = [], to sessionID: String) {
+    write(
+      files.isEmpty
+        ? .send(sessionID: sessionID, text: text)
+        : .sendFiles(sessionID: sessionID, text: text, files: files))
   }
 
   func answer(_ request: RemoteRequest, in sessionID: String, choiceIDs: [String], text: String?) {
@@ -221,6 +236,31 @@ final class RemoteChannel {
   }
 
   private var pendingHome = false
+
+  /// A project icon: from memory, the caches, or asked of the Mac once.
+  func icon(_ id: String) -> UIImage? {
+    if let image = icons[id] { return image }
+    guard !askedIcons.contains(id) else { return nil }
+    askedIcons.insert(id)
+    let file = Self.iconFolder.appendingPathComponent("\(id).png")
+    if let data = try? Data(contentsOf: file), let image = UIImage(data: data) {
+      // Set after the view that asked has drawn: never during its body.
+      Task { @MainActor in self.icons[id] = image }
+      return nil
+    }
+    Task { @MainActor in self.write(.icon(id: id)) }
+    return nil
+  }
+
+  private static var iconFolder: URL {
+    FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+      .appendingPathComponent("ProjectIcons", isDirectory: true)
+  }
+
+  /// Stops what the agent does.
+  func interrupt(_ sessionID: String) {
+    write(.interrupt(sessionID: sessionID))
+  }
 
   /// Asks for a folder's subfolders; `nil` for the home folder.
   func list(_ path: String?) {

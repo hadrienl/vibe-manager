@@ -31,13 +31,14 @@ public struct RemoteAppearance: Codable, Hashable, Sendable {
   public var symbol: String
   /// `#RRGGBB`.
   public var color: String
-  /// The project's icon as PNG, small, when the session wears it.
-  public var projectIcon: Data?
+  /// The project's icon the session wears instead, named by its content: the phone asks for its
+  /// PNG once (`icon`) and keeps it.
+  public var iconID: String?
 
-  public init(symbol: String, color: String, projectIcon: Data? = nil) {
+  public init(symbol: String, color: String, iconID: String? = nil) {
     self.symbol = symbol
     self.color = color
-    self.projectIcon = projectIcon
+    self.iconID = iconID
   }
 }
 
@@ -258,6 +259,17 @@ public struct RemoteFolderListing: Codable, Hashable, Sendable {
   }
 }
 
+/// A file the phone joins to a message: a photo, a document.
+public struct RemoteFile: Codable, Hashable, Sendable {
+  public var name: String
+  public var data: Data
+
+  public init(name: String, data: Data) {
+    self.name = name
+    self.data = data
+  }
+}
+
 /// Everything either end of the channel says.
 public enum RemoteMessage: Codable, Equatable, Sendable {
   // The phone to the Mac.
@@ -267,6 +279,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   /// shown or `nil`.
   case show(sessionID: String?)
   case send(sessionID: String, text: String)
+  /// A message with files: they join the conversation's composer on the Mac, as dropped there.
+  case sendFiles(sessionID: String, text: String, files: [RemoteFile])
   case answer(sessionID: String, requestID: String, choiceIDs: [String], text: String?)
   case setStatus(sessionID: String, status: RemoteTaskStatus)
   case search(query: String, token: Int)
@@ -274,6 +288,10 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case createSession(RemoteNewSession)
   /// A folder's subfolders; `nil` for the user's home.
   case listFolder(path: String?)
+  /// A project icon's PNG.
+  case icon(id: String)
+  /// Stops what the agent does, as Escape in its terminal.
+  case interrupt(sessionID: String)
 
   // The Mac to the phone.
   case welcome(protocolVersion: Int, macName: String)
@@ -283,6 +301,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case searchResults(token: Int, [RemoteSearchResult])
   case newSessionOffer(RemoteNewSessionOptions)
   case folderListing(RemoteFolderListing)
+  case iconData(id: String, png: Data)
   /// The session asked for exists: the phone shows it.
   case created(sessionID: String)
   /// What the Mac could not do of what was asked, in words for the user.
@@ -294,7 +313,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
 public enum RemoteFrame {
   /// A conversation of a long session, whole, fits; a corrupt length cannot make an end allocate
   /// a gigabyte.
-  public static let maximumLength = 8 << 20
+  public static let maximumLength = 32 << 20
 
   public static func encode(_ message: RemoteMessage) -> Data {
     let payload = (try? JSONEncoder().encode(message)) ?? Data()
