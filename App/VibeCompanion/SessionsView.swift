@@ -170,7 +170,7 @@ struct SessionRow: View {
               .labelStyle(.iconOnly)
               .foregroundStyle(.tint)
           }
-          Text(session.updatedAt, format: .relative(presentation: .numeric, unitsStyle: .narrow))
+          Text(verbatim: ShortDate.text(session.updatedAt))
             .font(.caption)
             .foregroundStyle(.secondary)
         }
@@ -258,5 +258,26 @@ struct ConnectionBanner: View {
         symbol: "bolt.horizontal.circle", tint: .orange, title: "Pas encore de liaison",
         detail: "Le Mac n’a pas publié son adresse.")
     }
+  }
+}
+
+/// When a session last moved, as Mail and Messages say it in their lists: « à l’instant »,
+/// « 3 min », « 14:32 », « Hier », « lundi », « 12 oct. ».
+enum ShortDate {
+  static func text(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
+    let seconds = now.timeIntervalSince(date)
+    if seconds < 60 { return String(localized: "à l’instant") }
+    if seconds < 3600 { return String(localized: "\(Int(seconds / 60)) min") }
+    if calendar.isDate(date, inSameDayAs: now) {
+      return date.formatted(date: .omitted, time: .shortened)
+    }
+    if calendar.isDateInYesterday(date) { return String(localized: "Hier") }
+    if let days = calendar.dateComponents([.day], from: date, to: now).day, days < 7 {
+      return date.formatted(.dateTime.weekday(.wide))
+    }
+    if calendar.isDate(date, equalTo: now, toGranularity: .year) {
+      return date.formatted(.dateTime.day().month(.abbreviated))
+    }
+    return date.formatted(date: .numeric, time: .omitted)
   }
 }
