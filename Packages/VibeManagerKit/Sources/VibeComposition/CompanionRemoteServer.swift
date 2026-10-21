@@ -101,6 +101,18 @@ final class CompanionRemoteServer {
         else { return }
         await self.send(peer, .attachmentData(path: path, jpeg: jpeg))
       }
+    case .restart(let id):
+      guard let appModel, let sessionID = Self.sessionID(id) else { return }
+      Task {
+        await appModel.restart(sessionID)
+        if appModel.pendingRestart?.sessionID == sessionID {
+          send(
+            peer,
+            .failure(
+              "Le Mac ne peut pas reprendre cette conversation et demande quoi faire : réponds sur le Mac."
+            ))
+        }
+      }
     case .interrupt(let id):
       guard let sessionID = Self.sessionID(id) else { return }
       Task { await appModel?.companionInterrupt(sessionID) }
@@ -188,7 +200,7 @@ final class CompanionRemoteServer {
           iconID: session.appearance.iconID?.sha256),
         coordinatorID: coordinatorID, isCoordinator: isCoordinator,
         detail: state?.requests.first.map(detail(of:)), updatedAt: session.updatedAt,
-        rank: session.rank)
+        rank: session.rank, hasStarted: session.hasEverStarted)
     }
   }
 

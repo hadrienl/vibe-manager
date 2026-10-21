@@ -198,7 +198,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage:
+    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart:
       break
     }
   }
@@ -295,6 +295,10 @@ final class RemoteChannel {
       Task { @MainActor in self.write(.attachmentImage(path: path)) }
     }
     return nil
+  }
+
+  func restart(_ sessionID: String) {
+    write(.restart(sessionID: sessionID))
   }
 
   /// Stops what the agent does.

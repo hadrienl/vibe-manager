@@ -121,7 +121,18 @@ struct RootView: View {
   @Environment(\.scenePhase) private var scenePhase
 
   var body: some View {
+    @Bindable var remote = remote
     SessionsView()
+      // Here, above every screen: a failure is said wherever the user is.
+      .alert(
+        "Le Mac n’a pas pu le faire",
+        isPresented: Binding(
+          get: { remote.failure != nil }, set: { if !$0 { remote.failure = nil } })
+      ) {
+        Button("OK", role: .cancel) {}
+      } message: {
+        Text(verbatim: remote.failure ?? "")
+      }
       .task {
         while !Task.isCancelled {
           try? await Task.sleep(for: .seconds(10))

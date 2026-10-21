@@ -46,7 +46,11 @@ struct ConversationView: View {
           RequestCard(request: request, sessionID: sessionID)
             .padding(.horizontal, 12)
         }
-        inputBar
+        if let session, session.activity == .stopped {
+          closedBar(session)
+        } else {
+          inputBar
+        }
       }
       .padding(.bottom, 6)
     }
@@ -82,6 +86,32 @@ struct ConversationView: View {
     case .idle: return "\(session.agentName) · à toi de jouer"
     case .stopped: return "\(session.agentName) · arrêté"
     }
+  }
+
+  /// In place of the field for a session whose agent does not run: nothing typed there would
+  /// reach anyone, as on the Mac.
+  private func closedBar(_ session: RemoteSession) -> some View {
+    HStack(spacing: 12) {
+      VStack(alignment: .leading, spacing: 2) {
+        Text(session.hasStarted ? "Session fermée" : "Session jamais lancée")
+          .font(.subheadline.weight(.semibold))
+        Text(
+          session.hasStarted
+            ? "L’agent ne tourne plus. Relance-le pour lui écrire."
+            : "Démarre l’agent pour lui écrire."
+        )
+        .font(.footnote)
+        .foregroundStyle(.secondary)
+      }
+      Spacer(minLength: 0)
+      Button(session.hasStarted ? "Relancer" : "Démarrer", systemImage: "play.fill") {
+        channel.restart(sessionID)
+      }
+      .buttonStyle(.glassProminent)
+    }
+    .padding(14)
+    .glassEffect(.regular, in: .rect(cornerRadius: 22))
+    .padding(.horizontal, 12)
   }
 
   private var canSend: Bool {

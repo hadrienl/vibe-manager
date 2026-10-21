@@ -61,13 +61,16 @@ public struct RemoteSession: Codable, Hashable, Sendable, Identifiable {
   public var updatedAt: Date
   /// The Mac's manual order within its column, for the sort it shows.
   public var rank: Int
+  /// Whether its agent ever ran: a closed one is restarted, one never started is started.
+  public var hasStarted: Bool
 
   public init(
     id: String, name: String, folderPath: String, folderName: String, agentName: String,
     status: RemoteTaskStatus, activity: RemoteActivity, appearance: RemoteAppearance,
     coordinatorID: String? = nil, isCoordinator: Bool = false, detail: String? = nil,
-    updatedAt: Date, rank: Int = 0
+    updatedAt: Date, rank: Int = 0, hasStarted: Bool = true
   ) {
+    self.hasStarted = hasStarted
     self.id = id
     self.name = name
     self.folderPath = folderPath
@@ -394,6 +397,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case attachmentImage(path: String)
   /// Stops what the agent does, as Escape in its terminal.
   case interrupt(sessionID: String)
+  /// Starts a closed session's agent again, resuming its conversation, as the Mac's Restart does.
+  case restart(sessionID: String)
   /// Shows a session's web view, pictured as the Mac draws it, until `nil`.
   case showWeb(sessionID: String?)
   case web(sessionID: String, RemoteWebAction)
