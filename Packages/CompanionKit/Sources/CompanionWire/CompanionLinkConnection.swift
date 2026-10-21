@@ -123,7 +123,7 @@
       // Closed once nothing can write to it any more: a descriptor closed under a pending write
       // could be reused by the next socket and receive bytes meant for this one.
       source.setCancelHandler { [writeQueue] in
-        writeQueue.sync {}
+        writeQueue.sync { /* Waits for the pending writes. */ }
         Darwin.close(descriptor)
       }
       source.resume()

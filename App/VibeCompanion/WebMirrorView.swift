@@ -162,8 +162,8 @@ private struct SyncedWebView: UIViewRepresentable {
       decisionHandler(Self.allowedSchemes.contains(scheme) ? .allow : .cancel)
     }
 
-    var navigated: (URL) -> Void = { _ in }
-    var scrolled: (Double) -> Void = { _ in }
+    var navigated: (URL) -> Void = { _ in /* Set by the view. */ }
+    var scrolled: (Double) -> Void = { _ in /* Set by the view. */ }
     var reloads = 0
     private var observations: [NSKeyValueObservation] = []
     /// Until when a scroll is the Mac's, applied here, and not to be told back.

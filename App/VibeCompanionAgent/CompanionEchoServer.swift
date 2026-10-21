@@ -32,7 +32,7 @@ actor CompanionEchoServer {
   private var endpoint: Endpoint?
   /// Whether a phone's endpoint is one of the user's: asked at each connection.
   private var authorize: @Sendable (String) async -> Bool = { _ in false }
-  private var onRemote: @Sendable (RemoteEvent) -> Void = { _ in }
+  private var onRemote: @Sendable (RemoteEvent) -> Void = { _ in /* Set at start. */ }
   /// Each phone's way back, by peer.
   private var remotes: [String: SendStream] = [:]
   private var remoteConnections: [String: Connection] = [:]

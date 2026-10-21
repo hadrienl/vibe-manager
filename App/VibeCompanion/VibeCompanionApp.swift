@@ -130,7 +130,7 @@ struct RootView: View {
         isPresented: Binding(
           get: { remote.failure != nil }, set: { if !$0 { remote.failure = nil } })
       ) {
-        Button("OK", role: .cancel) {}
+        Button("OK", role: .cancel) { /* The alert dismisses itself. */ }
       } message: {
         Text(verbatim: remote.failure?.text ?? "")
       }

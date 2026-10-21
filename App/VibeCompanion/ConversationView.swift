@@ -304,7 +304,9 @@ private struct CameraPicker: UIViewControllerRepresentable {
     return picker
   }
 
-  func updateUIViewController(_ controller: UIImagePickerController, context: Context) {}
+  func updateUIViewController(_: UIImagePickerController, context _: Context) {
+    // The picker keeps no state of the view's to follow.
+  }
 
   func makeCoordinator() -> Coordinator { Coordinator(self) }
 

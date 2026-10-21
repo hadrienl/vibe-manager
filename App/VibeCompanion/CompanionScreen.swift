@@ -374,11 +374,11 @@ private final class PreviewCompanionSync: CompanionSyncing, @unchecked Sendable 
     onUpdate(CompanionSyncUpdate(records: records, status: CompanionSyncStatus(), journal: []))
   }
 
-  func fetchChanges() async {}
-  func sendChanges() async {}
-  func save(_ records: [CompanionRecord]) async {}
-  func delete(_ recordNames: [String]) async {}
-  func notePush() async {}
-  func note(_ text: String) async {}
-  func refreshAccountStatus() async {}
+  func fetchChanges() async { /* The preview has no iCloud: nothing to do. */ }
+  func sendChanges() async { /* The preview has no iCloud: nothing to do. */ }
+  func save(_: [CompanionRecord]) async { /* The preview has no iCloud: nothing to do. */ }
+  func delete(_: [String]) async { /* The preview has no iCloud: nothing to do. */ }
+  func notePush() async { /* The preview has no iCloud: nothing to do. */ }
+  func note(_: String) async { /* The preview has no iCloud: nothing to do. */ }
+  func refreshAccountStatus() async { /* The preview has no iCloud: nothing to do. */ }
 }

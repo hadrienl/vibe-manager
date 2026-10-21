@@ -77,8 +77,8 @@ public actor CompanionLink: CompanionPublishing {
   /// Listens, then starts the agent. `onTest` is given each test the agent hands over.
   public func start(
     onTest: @escaping @Sendable (CompanionTest) async -> Void,
-    onRemote: @escaping @Sendable (String, RemoteMessage?) async -> Void = { _, _ in },
-    onEvent: @escaping @Sendable (CompanionLinkEvent) async -> Void = { _ in }
+    onRemote: @escaping @Sendable (String, RemoteMessage?) async -> Void = { _, _ in /* None. */ },
+    onEvent: @escaping @Sendable (CompanionLinkEvent) async -> Void = { _ in /* No events. */ }
   ) async {
     self.onTest = onTest
     self.onRemote = onRemote
