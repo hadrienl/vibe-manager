@@ -698,6 +698,8 @@ public final class AppModel {
   public let appearancePalette: SessionAppearancePaletteModel
   /// Coordinators and their children (#352): settings, traces, wake-ups, who calls the user.
   public let coordination: CoordinationModel
+  /// The iPhone companion (#397), when this build carries it.
+  public var companion: MobileCompanionModel?
 
   // MARK: Identity (#183)
 

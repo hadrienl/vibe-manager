@@ -416,7 +416,21 @@ public final class ConversationModel {
   /// The snapshot most recently received, laid out or not.
   private var latestSnapshot: ConversationSnapshot { heldSnapshot ?? snapshot }
 
+  /// Whether the window shows it, as its view last said.
+  @ObservationIgnored private var isShownInWindow = true
+  /// The phones showing it (#400): shown for them, whatever the window does, so that what is read
+  /// is laid out and published at once rather than held for later.
+  @ObservationIgnored public var remoteViewers = 0 {
+    didSet { applyShown() }
+  }
+
   public func setShown(_ shown: Bool) {
+    isShownInWindow = shown
+    applyShown()
+  }
+
+  private func applyShown() {
+    let shown = isShownInWindow || remoteViewers > 0
     guard shown != isShown else { return }
     isShown = shown
     shownOrder = Self.nextShownOrder()
