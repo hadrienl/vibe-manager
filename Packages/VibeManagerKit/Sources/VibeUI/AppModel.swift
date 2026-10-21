@@ -124,6 +124,7 @@ public final class AppModel {
   /// from the palette.
   let answerRequest: AnswerAgentRequest?
   let requestPreferences: any RequestPreferences
+  let agentUpdatePreferences: any AgentUpdatePreferences
   /// Requests whose answer is being typed: their buttons wait.
   public internal(set) var answeringRequestIDs: Set<AgentRequestID> = []
   /// The last answer given from outside the terminal, said for a moment in the palette.
@@ -152,6 +153,12 @@ public final class AppModel {
   @ObservationIgnored public var showWorkspaceWindow: (@MainActor () -> Void)?
   /// The library of avatars: the one in use, and those being made (#41, #154).
   public var avatars: AvatarLibraryModel?
+  /// The alert sound, and the sounds it is chosen from (#393). Set by the composition: a
+  /// workspace assembled without it plays no sound of its own.
+  public var alertSounds: AlertSoundLibraryModel?
+  /// Whether a session's agent ended its turn with work still running in the background (#393):
+  /// it is not said yet. Set by the composition: without it, every turn that ends is said.
+  public var isWaitingOnBackgroundWork: ((WorkSession) async -> Bool)?
   /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
   public var endpoints: EndpointsSettingsModel?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
@@ -177,6 +184,9 @@ public final class AppModel {
   @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var postedRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var announcedRequestIDs: Set<AgentRequestID> = []
+  /// While the requests read back at launch, or replayed, are taken in: they were there before,
+  /// and make no alert sound (#393).
+  @ObservationIgnored var isReadingRestoredRequests = false
   /// How many requests wait in sessions other than the one on screen: what the toolbar and the
   /// menu need to know. Stored rather than counted when read (#254): the count reads every
   /// session's activity, and the window would be evaluated again at each of their transitions.
@@ -380,6 +390,35 @@ public final class AppModel {
   /// Held for this run of the application only. A lock left behind by a killed CLI is often gone
   /// by the next launch, and a session refused today deserves one more honest try tomorrow.
   public private(set) var resumeRefusals: Set<SessionID> = []
+
+  /// Sessions whose agent's CLI was updated on disk while it ran (#409), and what to.
+  public internal(set) var agentUpdates: [SessionID: AgentUpdate] = [:]
+  /// Sessions to restart onto their updated CLI as soon as nothing would be lost: asked by the
+  /// user, or by the agent's setting.
+  public internal(set) var pendingUpdateRestarts: Set<SessionID> = []
+  /// Sessions whose pending update restart the user cancelled: the setting does not queue them
+  /// again for the same update.
+  var declinedUpdateRestarts: [SessionID: AgentUpdate] = [:]
+  /// The automatic restart onto an updated CLI, per agent, as the settings show it.
+  public internal(set) var restartsOnAgentUpdate: [AgentProviderID: Bool] = [:]
+  /// The look at the CLIs on disk, every half minute while the application runs.
+  var agentUpdateWatch: Task<Void, Never>?
+  /// A detection the update asked for that a detection already under way kept from running.
+  var agentRefreshOwed = false
+  /// On the way out: no session is restarted onto an update any more.
+  var stoppedWatchingAgentUpdates = false
+  /// The agents whose CLI signs in again by itself (#410).
+  public internal(set) var signingInAgents: Set<AgentProviderID> = []
+  /// A sign-in under way, or the one that failed, per agent: one for all its sessions.
+  public internal(set) var signIns: [AgentProviderID: AgentSignInProgress] = [:]
+  /// When each agent was last signed in from here: a session stopped on its sign-in before that
+  /// only waits to be resumed.
+  var signedInAt: [AgentProviderID: Date] = [:]
+  var signInTasks: [AgentProviderID: Task<Void, Never>] = [:]
+  /// Sessions being restarted and handed their prompt back, once signed in.
+  public internal(set) var resumingAfterSignIn: Set<SessionID> = []
+  /// Sessions the sign-in left alone: text waited in their prompt, or work behind it.
+  var signInTextWaiting: Set<SessionID> = []
 
   /// When each resumed conversation was handed to its agent, kept only for as long as it takes
   /// to tell a refused resume from an ordinary exit.
@@ -756,6 +795,8 @@ public final class AppModel {
     /// Answers a request of a background session by typing into its terminal (#40).
     answerRequest: AnswerAgentRequest? = nil,
     requestPreferences: any RequestPreferences = InMemoryRequestPreferences(),
+    /// Whether an agent's sessions restart onto its updated CLI on their own (#409).
+    agentUpdatePreferences: any AgentUpdatePreferences = InMemoryAgentUpdatePreferences(),
     /// Every session's web view (#69). A workspace assembled without one offers none.
     browser: BrowserWorkspace? = nil,
     /// Every session's drawer of side terminals (#43). A workspace assembled without one offers
@@ -808,6 +849,7 @@ public final class AppModel {
     self.hookConsents = hookConsents
     self.answerRequest = answerRequest
     self.requestPreferences = requestPreferences
+    self.agentUpdatePreferences = agentUpdatePreferences
     notifiesRequests = requestPreferences.notifiesRequests
     requestNotificationContent = requestPreferences.notificationContent
     showsRequestDockBadge = requestPreferences.showsDockBadge
@@ -1940,7 +1982,12 @@ public final class AppModel {
     follows: Bool = true,
     /// One session of several (#77): nothing is asked, nothing is shown, the outcome is returned
     /// to the batch, and the batch reloads once for all of them.
-    inBatch: Bool = false
+    inBatch: Bool = false,
+    /// The session stays in its column: a restart nobody asked for as work is not going back to
+    /// work (#409).
+    keepsTaskStatus: Bool = false,
+    /// The update of its CLI the agent is restarted onto (#409), for the separator.
+    update: AgentUpdate? = nil
   ) async -> SessionBatchItemResult {
     guard let launcher, let restartSession else { return .skipped(.agentUnavailable) }
     // A question already asked about this session is not asked twice; answering it is what moves
@@ -1951,6 +1998,8 @@ public final class AppModel {
     // click, a shortcut pressed twice — a no-op rather than a second agent.
     guard restartingSessionIDs.insert(id).inserted else { return .skipped(.busy) }
     defer { restartingSessionIDs.remove(id) }
+    // Whatever restarts it, the next process runs the build installed now.
+    forgetAgentUpdate(id)
 
     if !inBatch { restartFailure = nil }
     var result = SessionBatchItemResult.done
@@ -1992,7 +2041,7 @@ public final class AppModel {
         resumeAttempts[id] = nil
       }
 
-      switch await launcher.restart(restart) {
+      switch await launcher.restart(restart, keepsTaskStatus: keepsTaskStatus, update: update) {
       case .started:
         switch restart.mode {
         case .firstLaunch, .freshWithContext, .freshWithoutContext:
@@ -2058,6 +2107,65 @@ public final class AppModel {
       reconcileSelection()
     }
     return result
+  }
+
+  /// Stops the agent as a switch does — the drawer's shells kept, nothing relaunched over a
+  /// process that would not stop — and restarts it, its conversation resumed: onto its updated
+  /// CLI (#409), or signed in again (#410). Whether the agent was started again.
+  @discardableResult
+  func restartInPlace(_ id: SessionID, update: AgentUpdate? = nil) async -> Bool {
+    guard let launcher, !stoppedWatchingAgentUpdates, !closingSessionIDs.contains(id),
+      restartingSessionIDs.insert(id).inserted
+    else { return false }
+    pendingUpdateRestarts.remove(id)
+    publishAgentUpdates()
+    let name = sessions.first { $0.id == id }?.name ?? Self.unnamedSession
+    let stopped: Bool
+    do {
+      // A close of the user's own, taken in the meantime, is theirs: the lock is not shared.
+      guard closingSessionIDs.insert(id).inserted else {
+        restartingSessionIDs.remove(id)
+        return false
+      }
+      defer { closingSessionIDs.remove(id) }
+      launcher.preserveSideTerminals(of: id)
+      defer { launcher.stopPreservingSideTerminals(of: id) }
+      let closure = try await closeSession(id: id)
+      if case .unreachable(let pid) = closure.detachment {
+        let refusal = AgentSwitchRefusal.stopUnconfirmed(processIdentifier: pid)
+        restartFailure = RestartFailure(
+          sessionName: name, message: refusal.errorDescription ?? "",
+          suggestion: refusal.recoverySuggestion, sessionID: id)
+        stopped = false
+      } else {
+        stopped = true
+      }
+    } catch {
+      restartFailure = RestartFailure(
+        sessionName: name, message: Self.message(for: error), suggestion: nil, sessionID: id)
+      stopped = false
+    }
+    // Released before the restart, which takes it again: nothing is awaited in between.
+    restartingSessionIDs.remove(id)
+    guard stopped else {
+      await reload()
+      return false
+    }
+    agentUpdates[id] = nil
+    declinedUpdateRestarts[id] = nil
+    publishAgentUpdates()
+    // As one of a batch: nothing is asked. A conversation that could no longer be resumed would
+    // open the summary over a restart nobody asked for as such — the session is left closed
+    // instead, with its Restart, and a failure is reported as any restart's.
+    let result = await performRestart(
+      id: id, follows: false, inBatch: true, keepsTaskStatus: true, update: update)
+    if case .failed(let message, let suggestion) = result {
+      restartFailure = RestartFailure(
+        sessionName: name, message: message, suggestion: suggestion, sessionID: id)
+    }
+    await reload()
+    reconcileSelection()
+    return result == .done
   }
 
   /// Tells a resumed conversation the agent refused from an ordinary end of work.
@@ -2204,6 +2312,7 @@ public final class AppModel {
     // The restart lock: a switch and a restart of one session must never cross.
     guard restartingSessionIDs.insert(id).inserted else { return }
     defer { restartingSessionIDs.remove(id) }
+    forgetAgentUpdate(id)
     switchFailure = nil
     switchBackOffers[id] = nil
     let name = sessions.first { $0.id == id }?.name ?? Self.unnamedSession
@@ -2661,6 +2770,7 @@ public final class AppModel {
     // Before any process is started or adopted: what the last launch left unread comes back with
     // the first list.
     await startFollowingActivity()
+    startWatchingAgentUpdates()
     await journal?.start()
     // Not awaited: which agents write a readable transcript asks the registry, and the list — and
     // the offer to resume after a crash — must not wait on it.
@@ -2761,6 +2871,9 @@ public final class AppModel {
     // A detection that just landed may have turned a session's agent from missing to ready, or
     // the other way round, and the sidebar says so.
     await refreshResolutions()
+    // The notices name the agent, and offer only what it can do.
+    publishSignIns()
+    publishAgentUpdates()
   }
 
   public func resolution(for session: WorkSession) async -> SessionAgentResolution {
@@ -3542,6 +3655,9 @@ extension AppModel {
 
   /// Stops every watch, for good. Called on the way out.
   public func stopWatchingRepositories() async {
+    // Before anything is stopped: a restart onto an update must not start an agent the quit
+    // is about to stop.
+    stopWatchingAgentUpdates()
     statusUpdates?.cancel()
     await repositoryStatus?.stop()
     // Summaries under way are called off; the turns they covered wait for the next launch.

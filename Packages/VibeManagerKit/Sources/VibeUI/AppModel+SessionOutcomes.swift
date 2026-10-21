@@ -32,10 +32,33 @@ extension AppModel {
   ) {
     coordinationActivityChanged(id, from: previous, to: state, isReplayed: isReplayed)
     effortActivityChanged(id, from: previous, to: state)
+    if !isReplayed { agentUpdateActivityChanged(id, to: state) }
     guard !isReplayed, let previous, previous.unreadSince == nil, state.unreadSince != nil,
       state.requests.isEmpty
     else { return }
-    sessionDidEnd(id, as: .running, activity: state)
+    guard let isWaitingOnBackgroundWork, let session = sessions.first(where: { $0.id == id })
+    else {
+      sessionDidEnd(id, as: .running, activity: state)
+      return
+    }
+    // A turn that leaves work running in the background is not the user's turn yet (#393): the
+    // agent goes on once it ends, and the turn that ends with nothing left running is said.
+    Task { [weak self] in
+      if await isWaitingOnBackgroundWork(session) { return }
+      // Read meanwhile, or answered with a question: nothing more to say.
+      guard let self, let now = self.activities[id], now.unreadSince != nil, now.requests.isEmpty
+      else { return }
+      self.sessionDidEnd(id, as: .running, activity: now)
+    }
+  }
+
+  /// When the process of the session's agent started, as the kernel says; `nil` when it is not
+  /// running.
+  public func agentProcessStart(_ id: SessionID) async -> Date? {
+    guard let terminal = pane(for: id)?.session,
+      case .running(let processIdentifier) = await terminal.state()
+    else { return nil }
+    return SystemProcessLivenessProbe().startTime(of: processIdentifier)
   }
 
   /// The process of a session ended on its own. One the application stops — Close, Archive, a
@@ -51,6 +74,7 @@ extension AppModel {
     case .starting, .running: return
     }
     coordinationProcessEnded(id)
+    forgetAgentUpdate(id)
     sessionDidEnd(id, as: status, activity: nil, launchFailed: launchFailed)
   }
 
@@ -69,18 +93,16 @@ extension AppModel {
     // cut.
     Announcer.announce(
       Self.announcement(state: state, sessionName: session.name), priority: .medium)
+    let agent = session.agent.map { agentNames[$0.providerID] ?? $0.providerID }
+    let title = DisplaySafeText.visible(
+      [session.name, agent].compactMap { $0 }.joined(separator: " — "))
+    soundAttention(title: title, body: state)
     // The floating panel replaces the notifications (#41), as the Settings say.
     let floats = floatingPanel?.isEnabled ?? false
     guard !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier else {
       return
     }
-    let agent = session.agent.map { agentNames[$0.providerID] ?? $0.providerID }
-    notifier.postOutcome(
-      SessionOutcomeNotification(
-        sessionID: id,
-        title: DisplaySafeText.visible(
-          [session.name, agent].compactMap { $0 }.joined(separator: " — ")),
-        body: state))
+    notifier.postOutcome(SessionOutcomeNotification(sessionID: id, title: title, body: state))
   }
 
   /// A notification about a session was clicked: the application shows it as Open Quickly does,

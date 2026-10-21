@@ -370,12 +370,20 @@ struct SettingsPageView: View {
       SessionAppearanceSettingsView(model: model.appearancePalette)
     case .requests:
       SignallingSettings(model: model)
-        // Each time the page appears: the avatars made or deleted meanwhile.
-        .task { await model.avatars?.refresh() }
+        // Each time the page appears: the avatars and the sounds made or deleted meanwhile.
+        .task {
+          await model.avatars?.refresh()
+          await model.alertSounds?.refresh()
+        }
     case .avatars:
       if let avatars = model.avatars {
         AvatarLibraryView(avatars: avatars)
           .task { await avatars.refresh() }
+      }
+    case .alertSounds:
+      if let sounds = model.alertSounds {
+        AlertSoundLibraryView(sounds: sounds)
+          .task { await sounds.refresh() }
       }
     case .agent(let id):
       if let agent = model.settingsAgents.first(where: { $0.id == id }) {
@@ -583,6 +591,27 @@ struct AgentSettingsPage: View {
         } header: {
           Text(
             "Activity", bundle: .module, comment: "A section of an agent's page of the Settings.")
+        }
+      }
+      // Only an agent whose conversation is resumed: a restart that starts another one is not
+      // done behind the user's back (#409).
+      if agent.capabilities.supportsResume {
+        Section {
+          Toggle(
+            isOn: Binding(
+              get: { model.restartsAutomaticallyOnUpdate(agent.id) },
+              set: { model.setRestartsAutomaticallyOnUpdate($0, for: agent.id) })
+          ) {
+            Text("Restart Sessions After an Update", bundle: .module)
+            Text(
+              """
+              When \(agent.displayName) is updated, its open sessions restart on the new version \
+              as soon as they are done, their conversation resumed.
+              """, bundle: .module, comment: "An agent's name.")
+          }
+        } header: {
+          Text(
+            "Updates", bundle: .module, comment: "A section of an agent's page of the Settings.")
         }
       }
     }

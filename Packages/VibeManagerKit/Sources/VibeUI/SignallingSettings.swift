@@ -16,6 +16,13 @@ struct SignallingSettings: View {
         }
       }
       notifications
+      if let sounds = model.alertSounds {
+        Section {
+          AlertSoundInUseRow(sounds: sounds) { model.settingsPage = .alertSounds }
+        } header: {
+          Text("Sound", bundle: .module, comment: "A section of the Settings window.")
+        }
+      }
       Section {
         Toggle(isOn: $model.showsRequestDockBadge) {
           Text("Show the number of requests on the Dock icon", bundle: .module)

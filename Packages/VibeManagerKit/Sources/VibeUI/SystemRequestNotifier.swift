@@ -80,7 +80,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       let content = UNMutableNotificationContent()
       content.title = notification.title
       content.body = notification.body
-      content.sound = notification.isSilent ? nil : .default
+      content.sound = notification.isSilent ? nil : alertSound
       content.threadIdentifier = notification.id.sessionID.rawValue.uuidString
       content.categoryIdentifier =
         notification.offersAllow
@@ -105,7 +105,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       let content = UNMutableNotificationContent()
       content.title = notification.title
       content.body = notification.body
-      content.sound = .default
+      content.sound = alertSound
       content.threadIdentifier = session
       content.userInfo = [Self.sessionKey: session, Self.outcomeKey: true]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
@@ -133,6 +133,56 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
       content.sound = .default
       content.userInfo = [Self.dictationKey: true]
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
+  public func postAlertSound(title: String, body: String) {
+    guard let sound = alertSound else { return }
+    let identifier = "alert-sound|\(UUID().uuidString)"
+    Task {
+      // Without notifications, the sound is still heard: a Focus cannot keep it quiet then.
+      guard await authorized() else {
+        model?.alertSounds?.playAlert()
+        return
+      }
+      let content = UNMutableNotificationContent()
+      content.title = title
+      content.body = body
+      content.sound = sound
+      deliverSoundOnly(
+        UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
+  /// Delivered, its sound is on its way: the banner goes, the floating panel stays. Added is not
+  /// delivered: taken away before macOS presents it, it never sounds — so it is looked for among
+  /// the delivered ones first, for a few seconds at most.
+  private func deliverSoundOnly(_ request: UNNotificationRequest) {
+    let identifier = request.identifier
+    center.add(request) { [weak self] _ in
+      Task { @MainActor in await self?.withdrawOnceDelivered(identifier) }
+    }
+  }
+
+  private func withdrawOnceDelivered(_ identifier: String) async {
+    for _ in 0..<30 {
+      if await isStillShown(identifier) { break }
+      try? await Task.sleep(for: .milliseconds(100))
+    }
+    center.removeDeliveredNotifications(withIdentifiers: [identifier])
+  }
+
+  /// The alert sound the user chose (#393): the system's until one is copied where the
+  /// notifications find it, and none when the user chose silence.
+  private var alertSound: UNNotificationSound? {
+    Self.sound(for: model?.alertSounds?.notificationSound ?? .systemDefault)
+  }
+
+  static func sound(for sound: NotificationAlertSound) -> UNNotificationSound? {
+    switch sound {
+    case .systemDefault: .default
+    case .none: nil
+    case .named(let name): UNNotificationSound(named: UNNotificationSoundName(name))
     }
   }
 

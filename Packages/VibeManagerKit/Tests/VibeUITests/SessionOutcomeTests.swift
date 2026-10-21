@@ -57,7 +57,8 @@ struct SessionOutcomeTests {
       ).label)
   }
 
-  @Test("An answer finished out of sight is said as its row says it, and notified in the background")
+  @Test(
+    "An answer finished out of sight is said as its row says it, and notified in the background")
   func replied() async {
     let first = session("First")
     let second = session("Second")
@@ -71,6 +72,31 @@ struct SessionOutcomeTests {
     #expect(recorder.outcomes.map(\.sessionID) == [first.id])
     #expect(recorder.outcomes.first?.body == state)
     #expect(recorder.outcomes.first?.title.hasPrefix("First") == true)
+  }
+
+  @Test("A turn that leaves work in the background is not said; the next one, with none, is (#393)")
+  func backgroundWork() async {
+    let first = session("First")
+    let second = session("Second")
+    let (model, recorder) = await makeModel([first, second])
+    model.select(second.id)
+    model.applicationWillResignActive()
+    var waiting = true
+    var asked = 0
+    model.isWaitingOnBackgroundWork = { _ in
+      asked += 1
+      return waiting
+    }
+    model.activities[first.id] = unread
+    model.activityDidChange(first.id, from: working, to: unread)
+    while asked < 1 { await Task.yield() }
+    for _ in 0..<10 { await Task.yield() }
+    #expect(recorder.outcomes.isEmpty)
+
+    waiting = false
+    model.activityDidChange(first.id, from: working, to: unread)
+    while recorder.outcomes.isEmpty { await Task.yield() }
+    #expect(recorder.outcomes.map(\.sessionID) == [first.id])
   }
 
   @Test("In front, an answer finished in another session is said, not notified")
@@ -123,7 +149,8 @@ struct SessionOutcomeTests {
     #expect(recorder.outcomes.isEmpty)
   }
 
-  @Test("A process that ends is said as its row says it: an error, a signal, a clean exit, a launch")
+  @Test(
+    "A process that ends is said as its row says it: an error, a signal, a clean exit, a launch")
   func processes() async {
     let first = session("First")
     let second = session("Second")

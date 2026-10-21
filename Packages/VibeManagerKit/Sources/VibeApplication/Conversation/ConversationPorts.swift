@@ -61,9 +61,14 @@ public protocol ConversationDecoding: AnyObject {
   func consume(_ record: TranscriptRecord)
   /// Everything read so far, in the order it happened.
   var entries: [ConversationEntry] { get }
+  /// When each piece of work the agent left running in the background started — a command, a
+  /// sub-agent — that has not said it ended (#393). Empty for an agent that tells nothing of it.
+  var backgroundWork: [Date] { get }
 }
 
 extension ConversationDecoding {
+  public var backgroundWork: [Date] { [] }
+
   /// One complete line, parsed here: for one-off readers and tests. A line that is not a JSON
   /// object is left out.
   public func consume(_ line: Data) {

@@ -29,6 +29,21 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   private var hasSeenMission = false
   /// Where the line being decoded is, for the images it holds (#209).
   private var location: TranscriptLineLocation?
+  /// The commands run in the background (`run_in_background`) whose end was not notified yet, by
+  /// their task's identifier, with when they started (#393).
+  private var backgroundCommands: [String: Date] = [:]
+
+  /// The commands and the sub-agents running in the background, not notified as ended.
+  public var backgroundWork: [Date] {
+    var started = Array(backgroundCommands.values)
+    for entry in entries {
+      guard case .tool(let call) = entry.content, let run = call.subagent,
+        run.mode == .background, !call.state.isFinished
+      else { continue }
+      started.append(run.startedAt ?? entry.date ?? .distantPast)
+    }
+    return started
+  }
 
   /// - Parameter isSubagent: a sub-agent's own transcript, written beside the conversation's under
   ///   `<session id>/subagents/`, rather than the conversation's.
@@ -132,6 +147,9 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     {
       hasSeenMission = true
       return
+    }
+    if let task = (object["toolUseResult"] as? [String: Any])?["backgroundTaskId"] as? String {
+      backgroundCommands[task] = date ?? .distantPast
     }
     readBlocks(content, in: ["message", "content"], uuid: uuid, date: date) { block in
       apply(result: block, extra: object["toolUseResult"], denial: object["toolDenialKind"])
@@ -465,6 +483,8 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
   /// same sub-agent notifies again when it is given more work: the last word stands. It is known by
   /// its identifier first: once resumed, the notification names the message that resumed it.
   private func readNotification(_ text: String) {
+    // A command's end is notified as a sub-agent's is, by its task's identifier.
+    if let task = Self.tag("task-id", in: text) { backgroundCommands[task] = nil }
     guard
       let index = Self.tag("task-id", in: text).flatMap({ indexByAgentID[$0] })
         ?? Self.tag("tool-use-id", in: text).flatMap({ indexByCallID[$0] }),

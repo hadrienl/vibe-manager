@@ -836,18 +836,19 @@ extension AppModel {
     let safe = DisplaySafeText.visible(message)
     Announcer.announce(
       Self.announcement(state: safe, sessionName: coordinator.name), priority: .medium)
+    // What the agent wrote only when the user asked for the details of requests (#40).
+    let body =
+      requestNotificationContent == .detail
+      ? safe
+      : String(
+        localized: "The coordinator needs you.", bundle: .module,
+        comment: "The notification of a coordinator session that calls the user.")
+    let title = DisplaySafeText.visible(coordinator.name)
+    soundAttention(title: title, body: body)
     let floats = floatingPanel?.isEnabled ?? false
     if !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier {
-      // What the agent wrote only when the user asked for the details of requests (#40).
-      let body =
-        requestNotificationContent == .detail
-        ? safe
-        : String(
-          localized: "The coordinator needs you.", bundle: .module,
-          comment: "The notification of a coordinator session that calls the user.")
       notifier.postOutcome(
-        SessionOutcomeNotification(
-          sessionID: coordinator.id, title: DisplaySafeText.visible(coordinator.name), body: body))
+        SessionOutcomeNotification(sessionID: coordinator.id, title: title, body: body))
     }
     return "The user was called."
   }

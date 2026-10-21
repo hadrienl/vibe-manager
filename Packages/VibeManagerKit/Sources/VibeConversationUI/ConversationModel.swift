@@ -64,7 +64,53 @@ public struct SubagentTrayItem: Hashable, Sendable, Identifiable {
   public var id: String { call.callID }
 }
 
+/// A session's agent runs a build of its CLI that is no longer the one installed (#409).
+public struct ConversationAgentUpdate: Equatable, Sendable {
+  public let agentName: String
+  public let runningVersion: String?
+  public let installedVersion: String?
+  /// The restart waits for the agent to be done.
+  public let isPending: Bool
+  /// The other open sessions a restart of every one would take too.
+  public let otherSessionCount: Int
+
+  public init(
+    agentName: String, runningVersion: String?, installedVersion: String?, isPending: Bool,
+    otherSessionCount: Int
+  ) {
+    self.agentName = agentName
+    self.runningVersion = runningVersion
+    self.installedVersion = installedVersion
+    self.isPending = isPending
+    self.otherSessionCount = otherSessionCount
+  }
+}
+
 /// A prompt sent from the composer, shown until the agent's transcript has it.
+/// The agent stopped because its CLI's sign-in expired (#410).
+public struct ConversationSignIn: Equatable, Sendable {
+  public enum State: Equatable, Sendable {
+    /// Nothing done yet: Sign In is offered.
+    case expired
+    /// The browser is open on the sign-in page.
+    case signingIn
+    case failed(detail: String?)
+    /// Signed in, and this session was not resumed by itself: text waited in its prompt, or work
+    /// behind it, or it could not be restarted.
+    case signedIn(canResume: Bool, textWaiting: Bool)
+    /// Restarted, its prompt about to be typed back.
+    case resuming
+  }
+
+  public let agentName: String
+  public let state: State
+
+  public init(agentName: String, state: State) {
+    self.agentName = agentName
+    self.state = state
+  }
+}
+
 /// The request the agent waits on, as the palette of #40 sees it: what may be answered from here.
 public struct ConversationRequest: Equatable, Sendable {
   public let request: AgentRequest
@@ -263,6 +309,19 @@ public final class ConversationModel {
   /// show a screen of its own — an update offer, a folder to trust — where the Return that sends a
   /// prompt would answer that screen instead: Codex installed an update and quit that way.
   public var isAgentReady = true
+  /// The update of its CLI this session's agent can be restarted onto (#409); `nil` when there
+  /// is none, or when the restart could not resume the conversation.
+  public var agentUpdate: ConversationAgentUpdate?
+  /// Restarts the agent onto its update: `true` for every open session that has one.
+  @ObservationIgnored public var restartForUpdate: ((Bool) -> Void)?
+  /// Drops the restart waiting for the agent to be done.
+  @ObservationIgnored public var cancelUpdateRestart: (() -> Void)?
+  /// The agent's sign-in expired, and where signing in again stands (#410).
+  public var signIn: ConversationSignIn?
+  @ObservationIgnored public var startSignIn: (() -> Void)?
+  @ObservationIgnored public var cancelSignIn: (() -> Void)?
+  @ObservationIgnored public var signInInTerminal: (() -> Void)?
+  @ObservationIgnored public var resumeAfterSignIn: (() -> Void)?
   /// Whether the session's process runs. Read through the terminal's own observable state, so
   /// that a view showing the composer follows it.
   @ObservationIgnored public var processRunning: () -> Bool = { false }

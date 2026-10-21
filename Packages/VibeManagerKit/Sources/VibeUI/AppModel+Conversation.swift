@@ -138,12 +138,7 @@ extension AppModel {
         ConversationStopReport.launchFailure(of: self?.pane(for: id))
       }
       // As the kernel says: the same whether the application was open when it started or not.
-      model.processStartDate = { [weak self] in
-        guard let terminal = self?.pane(for: id)?.session,
-          case .running(let processIdentifier) = await terminal.state()
-        else { return nil }
-        return SystemProcessLivenessProbe().startTime(of: processIdentifier)
-      }
+      model.processStartDate = { [weak self] in await self?.agentProcessStart(id) }
       model.showTerminal = { [weak self] in
         self?.setPresentation(.terminal, of: id)
       }
@@ -205,6 +200,18 @@ extension AppModel {
       model.answerRequest = { [weak self] answer, requestID in
         await self?.answer(answer, to: requestID) ?? false
       }
+      model.agentUpdate = self?.agentUpdateNotice(for: id)
+      model.restartForUpdate = { [weak self] everySession in
+        if everySession { self?.restartAllForUpdate() } else { self?.restartForUpdate(id) }
+      }
+      model.cancelUpdateRestart = { [weak self] in
+        self?.cancelUpdateRestart(id)
+      }
+      model.signIn = self?.signInNotice(for: id)
+      model.startSignIn = { [weak self] in self?.signIn(from: id) }
+      model.cancelSignIn = { [weak self] in self?.cancelSignIn(from: id) }
+      model.signInInTerminal = { [weak self] in self?.signInInTerminal(id) }
+      model.resumeAfterSignIn = { [weak self] in self?.resumeAfterSignIn(id) }
       model.activity = self?.activity(for: id)?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activity(for: id))
     }
