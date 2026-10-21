@@ -71,12 +71,6 @@ struct ConversationView: View {
       }
       ToolbarItem(placement: .topBarTrailing) {
         Menu("Plus", systemImage: "ellipsis") {
-          // Escape, as on the Mac: the turn stops, the agent waits for the next message.
-          // Whenever it runs: an agent without hooks is seen at rest while it works.
-          Button("Interrompre", systemImage: "stop.circle") {
-            channel.interrupt(sessionID)
-          }
-          .disabled(session == nil || session?.activity == .stopped)
           Button("Fermer la session", systemImage: "power", role: .destructive) {
             showsCloseConfirmation = true
           }
