@@ -28,6 +28,8 @@ struct NewSessionSheet: View {
   }
 
   private var options: RemoteNewSessionOptions? { channel.newSessionOptions }
+  /// The chosen folder's project icon, worn unless another is picked.
+  private var projectIcon: UIImage? { folder.flatMap { channel.folderIcons[$0] ?? nil } }
   private var agent: RemoteAgent? { options?.agents.first { $0.id == agentID } }
 
   var body: some View {
@@ -63,10 +65,17 @@ struct NewSessionSheet: View {
               Button {
                 showsIcons = true
               } label: {
-                SessionBadge(
-                  appearance: appearance
-                    ?? RemoteAppearance(symbol: "sparkles", color: "#8E8E93"),
-                  activity: .idle, size: 38)
+                if appearance == nil, let icon = projectIcon {
+                  Image(uiImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 38, height: 38)
+                } else {
+                  SessionBadge(
+                    appearance: appearance
+                      ?? RemoteAppearance(symbol: "sparkles", color: "#8E8E93"),
+                    activity: .idle, size: 38)
+                }
               }
               .buttonStyle(.plain)
               .accessibilityLabel("Changer l’icône")
@@ -136,7 +145,8 @@ struct NewSessionSheet: View {
       .onAppear { channel.askNewSessionOptions() }
       .sheet(isPresented: $showsIcons) {
         IconPicker(
-          symbols: options?.symbols ?? [], colors: options?.colors ?? [], appearance: $appearance
+          symbols: options?.symbols ?? [], colors: options?.colors ?? [], projectIcon: projectIcon,
+          appearance: $appearance
         )
         .presentationDetents([.medium, .large])
       }
@@ -149,6 +159,9 @@ struct NewSessionSheet: View {
         if agentID == nil { agentID = options.agents.first?.id }
       }
       .onChange(of: agentID) { _, _ in modelID = nil }
+      .onChange(of: folder, initial: true) { _, folder in
+        if let folder { channel.askFolderIcon(folder) }
+      }
       .onChange(of: channel.failure) { _, failure in
         if failure != nil { isCreating = false }
       }
@@ -249,6 +262,8 @@ extension Notification.Name {
 struct IconPicker: View {
   let symbols: [String]
   let colors: [String]
+  /// The folder's project icon, offered first: what `nil` stands for when there is one.
+  var projectIcon: UIImage?
   @Binding var appearance: RemoteAppearance?
   @Environment(\.dismiss) private var dismiss
 
@@ -259,6 +274,22 @@ struct IconPicker: View {
     NavigationStack {
       ScrollView {
         VStack(alignment: .leading, spacing: 18) {
+          if let projectIcon {
+            Button {
+              appearance = nil
+            } label: {
+              HStack(spacing: 12) {
+                Image(uiImage: projectIcon)
+                  .resizable()
+                  .scaledToFit()
+                  .frame(width: 44, height: 44)
+                Text("Icône du projet")
+                Spacer()
+                if appearance == nil { Image(systemName: "checkmark").foregroundStyle(.tint) }
+              }
+            }
+            .buttonStyle(.plain)
+          }
           LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 10)], spacing: 10) {
             ForEach(colors, id: \.self) { hex in
               Button {

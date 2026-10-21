@@ -92,6 +92,13 @@ final class CompanionRemoteServer {
         else { return }
         send(peer, .iconData(id: id, png: png))
       }
+    case .folderIcon(let path):
+      Task {
+        let png = await appModel?.companionProjectIcon(inFolder: path).flatMap {
+          Self.thumbnail($0)
+        }
+        send(peer, .folderIconData(path: path, png: png))
+      }
     case .attachmentImage(let path):
       // Only a file a conversation sent to a phone joins: never any path a phone names.
       guard servedAttachments.contains(path) else { return }
@@ -115,6 +122,7 @@ final class CompanionRemoteServer {
       }
     case .interrupt(let id):
       guard let sessionID = Self.sessionID(id) else { return }
+      Self.logger.notice("\(peer, privacy: .public): interrupt \(id, privacy: .public)")
       Task { await appModel?.companionInterrupt(sessionID) }
     case .showWeb(let id):
       peers[peer]?.web?.stop()
@@ -137,7 +145,7 @@ final class CompanionRemoteServer {
       let listing = Self.listing(of: path)
       send(peer, .folderListing(listing))
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
-      .folderListing, .iconData, .webState, .attachmentData, .httpResponse:
+      .folderListing, .iconData, .webState, .attachmentData, .httpResponse, .folderIconData:
       break
     }
   }

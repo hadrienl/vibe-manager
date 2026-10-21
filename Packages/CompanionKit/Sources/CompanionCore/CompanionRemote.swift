@@ -477,6 +477,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case listFolder(path: String?)
   /// A project icon's PNG.
   case icon(id: String)
+  /// A folder's project icon, which a new session there wears unless another is picked.
+  case folderIcon(path: String)
   /// The picture of an image joined to a message, by its path on the Mac.
   case attachmentImage(path: String)
   /// Stops what the agent does, as Escape in its terminal.
@@ -498,6 +500,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case folderListing(RemoteFolderListing)
   case iconData(id: String, png: Data)
   case attachmentData(path: String, jpeg: Data)
+  /// `nil` for a folder without one.
+  case folderIconData(path: String, png: Data?)
   case webState(RemoteWebState)
   case httpResponse(RemoteHTTPResponse)
   /// The session asked for exists: the phone shows it.

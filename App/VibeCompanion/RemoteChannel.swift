@@ -42,6 +42,8 @@ final class RemoteChannel {
     [:]
   @ObservationIgnored private var nextFetch = 0
   private var webSessionID: String?
+  /// The project icons of folders, by path: `.some(nil)` for a folder without one.
+  private(set) var folderIcons: [String: UIImage?] = [:]
   /// The pictures of the images joined to messages, by their path on the Mac.
   private(set) var attachmentImages: [String: UIImage] = [:]
   @ObservationIgnored private var askedAttachments: Set<String> = []
@@ -192,6 +194,8 @@ final class RemoteChannel {
       webState = state
     case .httpResponse(let response):
       fetches.removeValue(forKey: response.id)?.resume(returning: response)
+    case .folderIconData(let path, let png):
+      folderIcons[path] = png.flatMap(UIImage.init(data:)).map(Optional.some) ?? .some(nil)
     case .attachmentData(let path, let jpeg):
       attachmentImages[path] = UIImage(data: jpeg)
     case .iconData(let id, let png):
@@ -210,7 +214,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart, .httpRequest:
+    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart, .httpRequest, .folderIcon:
       break
     }
   }
@@ -323,6 +327,12 @@ final class RemoteChannel {
       Task { @MainActor in self.write(.attachmentImage(path: path)) }
     }
     return nil
+  }
+
+  /// Asks for a folder's project icon, once.
+  func askFolderIcon(_ path: String) {
+    guard folderIcons[path] == nil else { return }
+    write(.folderIcon(path: path))
   }
 
   func restart(_ sessionID: String) {

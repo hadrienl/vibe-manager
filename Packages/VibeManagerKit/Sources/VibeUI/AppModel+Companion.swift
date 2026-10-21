@@ -1,6 +1,10 @@
 import Foundation
 import VibeApplication
 import VibeDomain
+import os
+
+private let companionLogger = Logger(
+  subsystem: "eu.hadrien.VibeManager.companion", category: "remote")
 
 /// What the mobile companion asks of the model beyond what the window reads (#400): the choices
 /// of a new session, and its creation.
@@ -17,10 +21,19 @@ extension AppModel {
     return await iconStore.pngData(for: id)
   }
 
+  /// The project icon a folder offers, as the New Session sheet finds it.
+  public func companionProjectIcon(inFolder path: String) async -> Data? {
+    await projectIcons.icon(inFolder: (path as NSString).expandingTildeInPath)?.pngData
+  }
+
   /// Stops what the session's agent does, as Escape in its terminal.
   public func companionInterrupt(_ id: SessionID) async {
     guard let session = sessions.first(where: { $0.id == id }) else { return }
-    await conversations.show(session).interrupt()
+    let model = conversations.show(session)
+    companionLogger.notice(
+      "interrupt: pane \(self.pane(for: id) != nil, privacy: .public), status \(String(describing: self.pane(for: id)?.status), privacy: .public), write \(model.write != nil, privacy: .public), key \(model.promptFormat.interruptKey, privacy: .public)"
+    )
+    await model.interrupt()
   }
 
   /// The prompt templates, in the user's order.
@@ -60,9 +73,14 @@ extension AppModel {
     let create = CreateSession(
       repository: repository, agents: agents, ticketContext: readTicketContext,
       icons: iconStore, diagnostics: diagnostics)
+    var withIcon = draft
+    // As the sheet does: a session given no icon wears its project's.
+    if appearance == nil {
+      withIcon.projectIcon = await projectIcons.icon(inFolder: path)
+    }
     let creation: SessionCreation
     do {
-      creation = try await create(draft)
+      creation = try await create(withIcon)
     } catch let rejected as SessionCreationRejected {
       throw CompanionCreationError(
         rejected.issues.map { $0.errorDescription ?? "\($0)" }.joined(separator: " "))
