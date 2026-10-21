@@ -59,26 +59,39 @@ public enum AgentUpdateRestartReadiness {
   ) -> Bool {
     guard let activity, activity.activity == .idle, activity.requests.isEmpty, !runsSubagents
     else { return false }
-    guard let screen else { return false }
-    if let input = PromptInputRecognition.input(screen: screen),
-      PromptInputRecognition.holdsText(input)
-    {
-      return false
-    }
+    guard let screen, promptIsEmpty(screen: screen) else { return false }
     return !runsInBackground(screen: screen)
   }
 
-  /// Whether the footer under Claude Code's prompt counts work going on behind it —
+  /// Whether the agent's prompt is drawn, and empty. A prompt that cannot be read is not taken
+  /// for an empty one: what the user typed into it would go with the process.
+  public static func promptIsEmpty(screen: String) -> Bool {
+    if let input = PromptInputRecognition.input(screen: screen) {
+      return !PromptInputRecognition.holdsText(input)
+    }
+    // Codex draws no rules: its prompt is the last line opening on `›`, and shows one of its
+    // hints while empty.
+    let lines = screen.components(separatedBy: "\n").map {
+      $0.trimmingCharacters(in: .whitespaces)
+    }
+    guard let prompt = lines.last(where: { $0.hasPrefix("›") }) else { return false }
+    let text = prompt.dropFirst().trimmingCharacters(in: .whitespaces)
+    return text.isEmpty || codexHints.contains(text)
+  }
+
+  /// What Codex 0.162 shows in its empty prompt: before the first turn, and after one.
+  static let codexHints: Set<String> = ["Ask Codex to do anything", "Ask a follow-up question"]
+
+  /// Whether the footer under the prompt counts work going on behind it — Claude Code's
   /// `▶▶ auto mode on · 2 shells · ← 1 agent`. Only below the prompt's last rule: the same words
-  /// in what an agent wrote above it are not a footer.
+  /// in what an agent wrote above it are not a footer. Without a rule — Codex — its last lines.
   public static func runsInBackground(screen: String) -> Bool {
     let lines = screen.components(separatedBy: "\n")
-    let footer = lines.lastIndex(where: PromptInputRecognition.isRule).map {
-      lines[($0 + 1)...]
-    }
-    guard let footer else { return false }
+    let footer =
+      lines.lastIndex(where: PromptInputRecognition.isRule).map { lines[($0 + 1)...] }
+      ?? lines.suffix(3)
     return footer.contains { line in
-      line.contains(/\b\d+ (shells?|agents?|background tasks?|tasks?)\b/)
+      line.contains(/\b\d+ (shells?|agents?|(background )?(tasks?|terminals?))\b/)
     }
   }
 }

@@ -297,13 +297,37 @@ public struct SystemProcessLivenessProbe: ProcessLivenessProbe {
 
   /// The file a process runs, as the kernel loaded it: links resolved, and the build it was
   /// started from even when the file its command named has since been replaced (#409).
+  ///
+  /// An updater may delete the build a process still runs — Claude Code keeps a few versions —
+  /// and `proc_pidpath` then answers nothing. The mapping of the image keeps its path: the first
+  /// region backed by a file is the executable's own text, which is what `lsof` reads as `txt`.
   public func imagePath(of processIdentifier: Int32) -> String? {
     guard processIdentifier > 0 else { return nil }
     // PROC_PIDPATHINFO_MAXSIZE, which Swift does not import: four times MAXPATHLEN.
     var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
     let length = proc_pidpath(processIdentifier, &buffer, UInt32(buffer.count))
-    guard length > 0 else { return nil }
-    return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    if length > 0 {
+      return String(
+        decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+    }
+    return mappedImagePath(of: processIdentifier)
+  }
+
+  private func mappedImagePath(of processIdentifier: Int32) -> String? {
+    var info = proc_regionwithpathinfo()
+    let size = Int32(MemoryLayout<proc_regionwithpathinfo>.size)
+    var address: UInt64 = 0
+    // The regions before the image are few: the page at zero, and nothing else.
+    for _ in 0..<8 {
+      guard proc_pidinfo(processIdentifier, PROC_PIDREGIONPATHINFO, address, &info, size) == size
+      else { return nil }
+      let path = withUnsafeBytes(of: &info.prp_vip.vip_path) { bytes in
+        String(decoding: bytes.prefix { $0 != 0 }, as: UTF8.self)
+      }
+      if !path.isEmpty { return path }
+      address = info.prp_prinfo.pri_address + info.prp_prinfo.pri_size
+    }
+    return nil
   }
 
   @discardableResult

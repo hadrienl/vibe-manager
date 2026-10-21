@@ -206,7 +206,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     session: WorkSession,
     plan: AgentLaunchPlan,
     notice: String?,
-    run: UsageRunContext
+    run: UsageRunContext,
+    keepsTaskStatus: Bool = false
   ) async -> SessionStartOutcome {
     // An archived session is out of reach by design. Refusing here, rather than only hiding the
     // command, is what lets #10's Restart and #11's restore walk the whole store without having
@@ -294,8 +295,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       }
     }
     // Starting a planned task, or restarting a finished one, is going back to work on it (#80).
-    // A restoration after a relaunch is not: it brings back what was running, where it was.
-    if !run.afterRelaunch {
+    // A restoration after a relaunch is not: it brings back what was running, where it was. Nor
+    // is a restart onto an updated CLI (#409): the agent was idle, and stays where it was.
+    if !run.afterRelaunch, !keepsTaskStatus {
       _ = try? await changeTaskStatus.beginWork(id: session.id)
     }
     // The run is recorded before the exit is watched: a process that ends at once — a resume the
@@ -487,13 +489,15 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// of an agent share one buffer and yesterday's output reads as today's.
   /// A session that turns out to be running already answers `alreadyRunning`, not a failure: the
   /// agent the user asked for is up, and reporting that as an error put a banner over it.
-  @discardableResult
   ///
-  /// - Parameter update: the update of its CLI the agent is restarted onto (#409), named in the
-  ///   separator when its conversation is resumed.
+  /// - Parameters:
+  ///   - keepsTaskStatus: the session stays in its column (#409).
+  ///   - update: the update of its CLI the agent is restarted onto (#409), named in the
+  ///     separator when its conversation is resumed.
+  @discardableResult
   public func restart(
     _ restart: SessionRestart, at date: Date = Date(), afterRelaunch: Bool = false,
-    update: AgentUpdate? = nil
+    keepsTaskStatus: Bool = false, update: AgentUpdate? = nil
   ) async -> SessionStartOutcome {
     let notice: String
     if let update, case .native = restart.mode {
@@ -505,7 +509,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       session: restart.session,
       plan: restart.plan,
       notice: notice,
-      run: UsageRunContext(kind: Self.usageKind(for: restart.mode), afterRelaunch: afterRelaunch)
+      run: UsageRunContext(kind: Self.usageKind(for: restart.mode), afterRelaunch: afterRelaunch),
+      keepsTaskStatus: keepsTaskStatus
     )
   }
 

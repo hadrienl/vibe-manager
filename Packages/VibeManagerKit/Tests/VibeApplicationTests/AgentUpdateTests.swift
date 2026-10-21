@@ -98,6 +98,27 @@ struct AgentUpdateTests {
     #expect(!AgentUpdateRestartReadiness.runsInBackground(screen: screen))
   }
 
+  /// Codex draws no rules: its prompt shows a hint while empty, and the text typed otherwise.
+  @Test func codexPromptIsReadToo() {
+    let empty = """
+      • Done.
+
+      › Ask a follow-up question
+
+        gpt-5.5 high · ~/project
+      """
+    #expect(AgentUpdateRestartReadiness.isReady(activity: idle, screen: empty, runsSubagents: false))
+    let typed = empty.replacingOccurrences(of: "Ask a follow-up question", with: "fix the tests")
+    #expect(!AgentUpdateRestartReadiness.isReady(activity: idle, screen: typed, runsSubagents: false))
+  }
+
+  /// A prompt that cannot be read may hold what the user typed: it is not taken for empty.
+  @Test func anUnrecognisedPromptIsNotReady() {
+    #expect(
+      !AgentUpdateRestartReadiness.isReady(
+        activity: idle, screen: "Some panel\nwith no prompt", runsSubagents: false))
+  }
+
   @Test func anUnreadableScreenIsNotReady() {
     #expect(!AgentUpdateRestartReadiness.isReady(activity: idle, screen: nil, runsSubagents: false))
   }

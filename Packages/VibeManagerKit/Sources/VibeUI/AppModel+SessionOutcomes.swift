@@ -73,6 +73,7 @@ extension AppModel {
     case .starting, .running: return
     }
     coordinationProcessEnded(id)
+    forgetAgentUpdate(id)
     sessionDidEnd(id, as: status, activity: nil, launchFailed: launchFailed)
   }
 

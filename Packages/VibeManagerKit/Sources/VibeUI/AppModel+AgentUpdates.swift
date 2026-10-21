@@ -26,25 +26,51 @@ extension AppModel {
 
   /// Looks at the build each running agent runs, and restarts those waiting for it that can be.
   func checkAgentUpdates() async {
-    guard let launcher else { return }
-    let probe = SystemProcessLivenessProbe()
+    guard let launcher, !stoppedWatchingAgentUpdates else { return }
     var found: [SessionID: AgentUpdate] = [:]
-    var newlyUpdated: Set<AgentProviderID> = []
     for (id, processIdentifier) in await launcher.runningProcessIdentifiers() {
-      guard let provider = agentProvider(of: id),
-        let executable = agentDiagnostics.first(where: { $0.providerID == provider })?
-          .installation?.executablePath,
-        let running = probe.imagePath(of: processIdentifier),
-        let update = AgentUpdate.between(running: running, installed: Self.resolved(executable))
-      else { continue }
+      guard let update = agentUpdate(of: id, processIdentifier: processIdentifier) else {
+        continue
+      }
       found[id] = update
-      if agentUpdates[id] != update { newlyUpdated.insert(provider) }
+      if agentUpdates[id] != update { agentRefreshOwed = true }
     }
     noteAgentUpdates(found)
     // The detection that knew the previous build is done again: the settings say the version
-    // installed, and the next start is planned with it.
-    if !newlyUpdated.isEmpty { await refreshAgents(forceRefresh: true) }
+    // installed, and the next start is planned with it. One already under way would turn it
+    // away, and it is owed until it runs.
+    if agentRefreshOwed, !isRefreshingAgents {
+      agentRefreshOwed = false
+      await refreshAgents(forceRefresh: true)
+    }
     await restartPendingUpdates()
+  }
+
+  /// The update between the build a process runs and the one its agent's executable resolves to.
+  func agentUpdate(of id: SessionID, processIdentifier: Int32) -> AgentUpdate? {
+    guard let provider = agentProvider(of: id),
+      let executable = agentDiagnostics.first(where: { $0.providerID == provider })?
+        .installation?.executablePath,
+      let running = SystemProcessLivenessProbe().imagePath(of: processIdentifier)
+    else { return nil }
+    return AgentUpdate.between(running: running, installed: Self.resolved(executable))
+  }
+
+  /// The session's process ended or was replaced: what was found of the previous one is gone.
+  func forgetAgentUpdate(_ id: SessionID) {
+    guard agentUpdates[id] != nil || pendingUpdateRestarts.contains(id) else { return }
+    agentUpdates[id] = nil
+    pendingUpdateRestarts.remove(id)
+    declinedUpdateRestarts[id] = nil
+    publishAgentUpdates()
+  }
+
+  /// On the way out, for good.
+  func stopWatchingAgentUpdates() {
+    stoppedWatchingAgentUpdates = true
+    agentUpdateWatch?.cancel()
+    agentUpdateWatch = nil
+    pendingUpdateRestarts = []
   }
 
   /// Records what was found: a session no longer on an old build is forgotten, and one an
@@ -54,7 +80,7 @@ extension AppModel {
     let pending = pendingUpdateRestarts.filter { found[$0] != nil }
     declinedUpdateRestarts = declinedUpdateRestarts.filter { found[$0.key] == $0.value }
     var queued = pending
-    for (id, update) in found where declinedUpdateRestarts[id] != update {
+    for (id, update) in found where declinedUpdateRestarts[id] != update && canRestartInPlace(id) {
       if let provider = agentProvider(of: id), restartsAutomaticallyOnUpdate(provider) {
         queued.insert(id)
       }
@@ -77,7 +103,8 @@ extension AppModel {
 
   /// The same, for every open session whose agent's CLI was updated.
   public func restartAllForUpdate() {
-    for id in agentUpdates.keys {
+    // Only those the notice counts: a session that could not resume is not restarted at all.
+    for id in agentUpdates.keys where canRestartInPlace(id) {
       declinedUpdateRestarts[id] = nil
       pendingUpdateRestarts.insert(id)
     }
@@ -127,27 +154,34 @@ extension AppModel {
   }
 
   func restartForUpdateIfReady(_ id: SessionID) async {
-    guard pendingUpdateRestarts.contains(id), let update = agentUpdates[id],
-      await isReadyForUpdateRestart(id),
-      // Asked again after the screen was read: the user may have cancelled in the meantime.
-      pendingUpdateRestarts.contains(id)
+    guard let launcher, pendingUpdateRestarts.contains(id), isFreeForUpdateRestart(id) else {
+      return
+    }
+    let screen = await launcher.screen(of: id)
+    // Everything asked again after the screen was read: the user may have cancelled, closed the
+    // session or started another command in the meantime, and the process may be another one.
+    guard pendingUpdateRestarts.contains(id), isFreeForUpdateRestart(id),
+      let processIdentifier = await launcher.runningProcessIdentifiers()[id],
+      let update = agentUpdate(of: id, processIdentifier: processIdentifier)
+    else { return }
+    guard isFreeForUpdateRestart(id) else { return }
+    let runsSubagents =
+      conversations.existingModel(for: id)?.trayItems.contains { !$0.hasEnded } ?? false
+    guard
+      AgentUpdateRestartReadiness.isReady(
+        activity: activity(for: id), screen: screen, runsSubagents: runsSubagents)
     else { return }
     await performUpdateRestart(id, update: update)
   }
 
-  /// Nothing would be lost: the agent is idle and asks nothing, nothing runs behind its prompt,
-  /// nothing is typed into it, and no other command is at work on the session.
-  func isReadyForUpdateRestart(_ id: SessionID) async -> Bool {
-    guard let launcher, launcher.isRunning(id), restoration == nil,
-      !restartingSessionIDs.contains(id), !closingSessionIDs.contains(id),
-      pendingRestart?.sessionID != id, pendingSwitch?.sessionID != id,
-      canRestartInPlace(id)
+  /// No other command is at work on the session, and the restart would resume its conversation.
+  /// What the agent is doing is `AgentUpdateRestartReadiness`'s to say.
+  func isFreeForUpdateRestart(_ id: SessionID) -> Bool {
+    guard let launcher, !stoppedWatchingAgentUpdates, launcher.isRunning(id), restoration == nil
     else { return false }
-    let runsSubagents =
-      conversations.existingModel(for: id)?.trayItems.contains { !$0.hasEnded } ?? false
-    return AgentUpdateRestartReadiness.isReady(
-      activity: activity(for: id), screen: await launcher.screen(of: id),
-      runsSubagents: runsSubagents)
+    return !restartingSessionIDs.contains(id) && !closingSessionIDs.contains(id)
+      && pendingRestart?.sessionID != id && pendingSwitch?.sessionID != id
+      && canRestartInPlace(id)
   }
 
   /// Whether the restart would resume the agent's own conversation: never offered otherwise, as

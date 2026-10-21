@@ -398,6 +398,10 @@ public final class AppModel {
   public internal(set) var restartsOnAgentUpdate: [AgentProviderID: Bool] = [:]
   /// The look at the CLIs on disk, every half minute while the application runs.
   var agentUpdateWatch: Task<Void, Never>?
+  /// A detection the update asked for that a detection already under way kept from running.
+  var agentRefreshOwed = false
+  /// On the way out: no session is restarted onto an update any more.
+  var stoppedWatchingAgentUpdates = false
 
   /// When each resumed conversation was handed to its agent, kept only for as long as it takes
   /// to tell a refused resume from an ordinary exit.
@@ -1960,6 +1964,9 @@ public final class AppModel {
     /// One session of several (#77): nothing is asked, nothing is shown, the outcome is returned
     /// to the batch, and the batch reloads once for all of them.
     inBatch: Bool = false,
+    /// The session stays in its column: a restart nobody asked for as work is not going back to
+    /// work (#409).
+    keepsTaskStatus: Bool = false,
     /// The update of its CLI the agent is restarted onto (#409), for the separator.
     update: AgentUpdate? = nil
   ) async -> SessionBatchItemResult {
@@ -1972,6 +1979,8 @@ public final class AppModel {
     // click, a shortcut pressed twice — a no-op rather than a second agent.
     guard restartingSessionIDs.insert(id).inserted else { return .skipped(.busy) }
     defer { restartingSessionIDs.remove(id) }
+    // Whatever restarts it, the next process runs the build installed now.
+    forgetAgentUpdate(id)
 
     if !inBatch { restartFailure = nil }
     var result = SessionBatchItemResult.done
@@ -2013,7 +2022,7 @@ public final class AppModel {
         resumeAttempts[id] = nil
       }
 
-      switch await launcher.restart(restart, update: update) {
+      switch await launcher.restart(restart, keepsTaskStatus: keepsTaskStatus, update: update) {
       case .started:
         switch restart.mode {
         case .firstLaunch, .freshWithContext, .freshWithoutContext:
@@ -2084,13 +2093,19 @@ public final class AppModel {
   /// Stops the agent as a switch does — the drawer's shells kept, nothing relaunched over a
   /// process that would not stop — and restarts it, its conversation resumed.
   func performUpdateRestart(_ id: SessionID, update: AgentUpdate) async {
-    guard let launcher, restartingSessionIDs.insert(id).inserted else { return }
+    guard let launcher, !stoppedWatchingAgentUpdates, !closingSessionIDs.contains(id),
+      restartingSessionIDs.insert(id).inserted
+    else { return }
     pendingUpdateRestarts.remove(id)
     publishAgentUpdates()
     let name = sessions.first { $0.id == id }?.name ?? Self.unnamedSession
     let stopped: Bool
     do {
-      closingSessionIDs.insert(id)
+      // A close of the user's own, taken in the meantime, is theirs: the lock is not shared.
+      guard closingSessionIDs.insert(id).inserted else {
+        restartingSessionIDs.remove(id)
+        return
+      }
       defer { closingSessionIDs.remove(id) }
       launcher.preserveSideTerminals(of: id)
       defer { launcher.stopPreservingSideTerminals(of: id) }
@@ -2118,7 +2133,7 @@ public final class AppModel {
     agentUpdates[id] = nil
     declinedUpdateRestarts[id] = nil
     publishAgentUpdates()
-    await performRestart(id: id, follows: false, update: update)
+    await performRestart(id: id, follows: false, keepsTaskStatus: true, update: update)
   }
 
   /// Tells a resumed conversation the agent refused from an ordinary end of work.
@@ -2265,6 +2280,7 @@ public final class AppModel {
     // The restart lock: a switch and a restart of one session must never cross.
     guard restartingSessionIDs.insert(id).inserted else { return }
     defer { restartingSessionIDs.remove(id) }
+    forgetAgentUpdate(id)
     switchFailure = nil
     switchBackOffers[id] = nil
     let name = sessions.first { $0.id == id }?.name ?? Self.unnamedSession
@@ -3594,6 +3610,9 @@ extension AppModel {
 
   /// Stops every watch, for good. Called on the way out.
   public func stopWatchingRepositories() async {
+    // Before anything is stopped: a restart onto an update must not start an agent the quit
+    // is about to stop.
+    stopWatchingAgentUpdates()
     statusUpdates?.cancel()
     await repositoryStatus?.stop()
     // Summaries under way are called off; the turns they covered wait for the next launch.
