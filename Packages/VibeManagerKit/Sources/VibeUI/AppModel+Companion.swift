@@ -23,6 +23,11 @@ extension AppModel {
     await conversations.show(session).interrupt()
   }
 
+  /// The prompt templates, in the user's order.
+  public var companionTemplates: [PromptTemplate] {
+    templates.library.templates
+  }
+
   /// An agent's models, `[]` for one that offers no choice.
   public func companionModels(of providerID: String) async -> [AgentModel] {
     guard let provider = await agents?.provider(id: AgentProviderID(providerID)) else { return [] }
@@ -33,7 +38,7 @@ extension AppModel {
   /// in À faire. A name left empty is taken from the first line of the message, else the folder.
   public func createCompanionSession(
     name: String, folder: String, providerID: String, modelID: String?, prompt: String,
-    start: Bool, coordinates: Bool
+    start: Bool, coordinates: Bool, appearance: SessionAppearance? = nil
   ) async throws -> SessionID {
     guard let agents else { throw CompanionCreationError("Aucun agent n’est connu du Mac.") }
     let path = (folder as NSString).expandingTildeInPath
@@ -49,7 +54,7 @@ extension AppModel {
       name: given.isEmpty
         ? String((firstLine.isEmpty ? (path as NSString).lastPathComponent : firstLine).prefix(60))
         : given,
-      initialPrompt: prompt, providerID: providerID, modelID: modelID,
+      initialPrompt: prompt, providerID: providerID, modelID: modelID, appearance: appearance,
       workingDirectoryPath: path, palette: appearancePalette.offered,
       coordination: coordinates ? .coordinator : nil)
     let create = CreateSession(

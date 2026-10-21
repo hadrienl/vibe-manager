@@ -55,6 +55,13 @@ struct ConversationView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
+        NavigationLink {
+          WebMirrorView(sessionID: sessionID)
+        } label: {
+          Label("Vue web", systemImage: "globe")
+        }
+      }
+      ToolbarItem(placement: .topBarTrailing) {
         Menu("Plus", systemImage: "ellipsis") {
           Button("Arrêter l’agent", systemImage: "stop.circle", role: .destructive) {
             channel.interrupt(sessionID)

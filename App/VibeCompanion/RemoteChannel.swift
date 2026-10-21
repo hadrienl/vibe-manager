@@ -33,6 +33,10 @@ final class RemoteChannel {
   private(set) var folderListings: [String: RemoteFolderListing] = [:]
   /// The home folder's path, once listed.
   private(set) var homePath: String?
+  /// The web view shown, and the latest picture of its page.
+  private(set) var webState: RemoteWebState?
+  private(set) var webFrame: UIImage?
+  private var webSessionID: String?
   /// The project icons the sessions wear, by content: asked once, kept in the caches.
   private(set) var icons: [String: UIImage] = [:]
   @ObservationIgnored private var askedIcons: Set<String> = []
@@ -115,6 +119,7 @@ final class RemoteChannel {
         "remote: connected, \(CompanionIroh.describe(connection.paths()), privacy: .public)")
       write(.hello(protocolVersion: CompanionRemote.protocolVersion, deviceName: deviceName))
       if let shownSessionID { write(.show(sessionID: shownSessionID)) }
+      if let webSessionID { write(.showWeb(sessionID: webSessionID)) }
       // Icons asked while the channel was down are asked again.
       for id in askedIcons where icons[id] == nil { write(.icon(id: id)) }
       tasks.append(Task.detached { [weak self] in await self?.receive(on: stream, attempt: attempt) })
@@ -165,6 +170,10 @@ final class RemoteChannel {
       searchResults = results
     case .newSessionOffer(let options):
       newSessionOptions = options
+    case .webState(let state):
+      guard state.sessionID == webSessionID else { return }
+      webState = state
+      if let data = state.frame, let image = UIImage(data: data) { webFrame = image }
     case .iconData(let id, let png):
       guard let image = UIImage(data: png) else { return }
       icons[id] = image
@@ -181,7 +190,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt:
+    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web:
       break
     }
   }
@@ -255,6 +264,20 @@ final class RemoteChannel {
   private static var iconFolder: URL {
     FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
       .appendingPathComponent("ProjectIcons", isDirectory: true)
+  }
+
+  /// Shows a session's web view, mirrored; `nil` when the phone leaves it.
+  func showWeb(_ sessionID: String?) {
+    webSessionID = sessionID
+    if webState?.sessionID != sessionID {
+      webState = nil
+      webFrame = nil
+    }
+    write(.showWeb(sessionID: sessionID))
+  }
+
+  func web(_ action: RemoteWebAction, in sessionID: String) {
+    write(.web(sessionID: sessionID, action))
   }
 
   /// Stops what the agent does.

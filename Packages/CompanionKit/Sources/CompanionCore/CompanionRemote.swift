@@ -208,14 +208,43 @@ public struct RemoteModel: Codable, Hashable, Sendable, Identifiable {
   }
 }
 
-/// What the New Session sheet offers: the recent folders, the agents.
+/// A prompt template of the Mac: what picking it fills in.
+public struct RemoteTemplate: Codable, Hashable, Sendable, Identifiable {
+  public var id: String
+  public var name: String
+  public var body: String
+  public var folder: String?
+  public var appearance: RemoteAppearance?
+
+  public init(
+    id: String, name: String, body: String, folder: String?, appearance: RemoteAppearance?
+  ) {
+    self.id = id
+    self.name = name
+    self.body = body
+    self.folder = folder
+    self.appearance = appearance
+  }
+}
+
+/// What the New Session sheet offers: the recent folders, the agents, the icons' symbols and
+/// colours of the Settings, the prompt templates.
 public struct RemoteNewSessionOptions: Codable, Hashable, Sendable {
   public var folders: [String]
   public var agents: [RemoteAgent]
+  public var symbols: [String]
+  public var colors: [String]
+  public var templates: [RemoteTemplate]
 
-  public init(folders: [String], agents: [RemoteAgent]) {
+  public init(
+    folders: [String], agents: [RemoteAgent], symbols: [String] = [], colors: [String] = [],
+    templates: [RemoteTemplate] = []
+  ) {
     self.folders = folders
     self.agents = agents
+    self.symbols = symbols
+    self.colors = colors
+    self.templates = templates
   }
 }
 
@@ -229,11 +258,14 @@ public struct RemoteNewSession: Codable, Hashable, Sendable {
   /// Started at once, in En cours; or left to wait in À faire.
   public var start: Bool
   public var coordinates: Bool
+  /// The icon picked; `nil` leaves it to the Mac, as for a name left empty.
+  public var appearance: RemoteAppearance?
 
   public init(
     name: String, folder: String, agentID: String, modelID: String?, prompt: String, start: Bool,
-    coordinates: Bool
+    coordinates: Bool, appearance: RemoteAppearance? = nil
   ) {
+    self.appearance = appearance
     self.name = name
     self.folder = folder
     self.agentID = agentID
@@ -270,6 +302,57 @@ public struct RemoteFile: Codable, Hashable, Sendable {
   }
 }
 
+/// A tab of a session's web view.
+public struct RemoteWebTab: Codable, Hashable, Sendable, Identifiable {
+  public var id: String
+  public var title: String
+  public var url: String
+  public var isLoading: Bool
+
+  public init(id: String, title: String, url: String, isLoading: Bool) {
+    self.id = id
+    self.title = title
+    self.url = url
+    self.isLoading = isLoading
+  }
+}
+
+/// A session's web view as the Mac shows it (#400): its tabs, and the active page's picture.
+public struct RemoteWebState: Codable, Hashable, Sendable {
+  public var sessionID: String
+  public var tabs: [RemoteWebTab]
+  public var activeTabID: String?
+  public var canGoBack: Bool
+  public var canGoForward: Bool
+  /// The visible part of the page, in JPEG; `nil` when it has not changed since the last one.
+  public var frame: Data?
+
+  public init(
+    sessionID: String, tabs: [RemoteWebTab], activeTabID: String?, canGoBack: Bool,
+    canGoForward: Bool, frame: Data?
+  ) {
+    self.sessionID = sessionID
+    self.tabs = tabs
+    self.activeTabID = activeTabID
+    self.canGoBack = canGoBack
+    self.canGoForward = canGoForward
+    self.frame = frame
+  }
+}
+
+/// What the phone does to the web view; the Mac's page does it.
+public enum RemoteWebAction: Codable, Hashable, Sendable {
+  /// A touch, in fractions of the visible page: 0…1 from its top left corner.
+  case tap(x: Double, y: Double)
+  /// A scroll, in fractions of the visible height.
+  case scroll(dy: Double)
+  /// Text typed into what has the focus; Return as `\n`.
+  case type(String)
+  case navigate(String)
+  case back, forward, reload
+  case selectTab(String)
+}
+
 /// Everything either end of the channel says.
 public enum RemoteMessage: Codable, Equatable, Sendable {
   // The phone to the Mac.
@@ -292,6 +375,9 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case icon(id: String)
   /// Stops what the agent does, as Escape in its terminal.
   case interrupt(sessionID: String)
+  /// Shows a session's web view, pictured as the Mac draws it, until `nil`.
+  case showWeb(sessionID: String?)
+  case web(sessionID: String, RemoteWebAction)
 
   // The Mac to the phone.
   case welcome(protocolVersion: Int, macName: String)
@@ -302,6 +388,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case newSessionOffer(RemoteNewSessionOptions)
   case folderListing(RemoteFolderListing)
   case iconData(id: String, png: Data)
+  case webState(RemoteWebState)
   /// The session asked for exists: the phone shows it.
   case created(sessionID: String)
   /// What the Mac could not do of what was asked, in words for the user.

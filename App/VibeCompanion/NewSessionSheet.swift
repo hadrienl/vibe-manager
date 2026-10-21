@@ -14,6 +14,9 @@ struct NewSessionSheet: View {
   @State private var coordinates = false
   @State private var prompt = ""
   @State private var isCreating = false
+  /// The icon picked; `nil` leaves it to the Mac.
+  @State private var appearance: RemoteAppearance?
+  @State private var showsIcons = false
   /// Folders picked in the browser, shown first among the recent ones.
   @State private var extraFolders: [String] = []
   /// The browser's way down, emptied when a folder is chosen.
@@ -56,7 +59,19 @@ struct NewSessionSheet: View {
             NavigationLink("Autres dossiers du Mac…", value: FolderBrowser.home)
           }
           Section("Session") {
-            TextField("Nom (tiré du message si vide)", text: $name)
+            HStack(spacing: 12) {
+              Button {
+                showsIcons = true
+              } label: {
+                SessionBadge(
+                  appearance: appearance
+                    ?? RemoteAppearance(symbol: "sparkles", color: "#8E8E93"),
+                  activity: .idle, size: 38)
+              }
+              .buttonStyle(.plain)
+              .accessibilityLabel("Changer l’icône")
+              TextField("Nom (tiré du message si vide)", text: $name)
+            }
             Picker("Agent", selection: $agentID) {
               ForEach(options.agents) { agent in
                 Text(verbatim: agent.name).tag(Optional(agent.id))
@@ -79,9 +94,23 @@ struct NewSessionSheet: View {
             .pickerStyle(.menu)
             Toggle("Coordonner d’autres sessions", isOn: $coordinates)
           }
-          Section("Premier message") {
+          Section {
             TextField("Ce que l’agent doit faire…", text: $prompt, axis: .vertical)
               .lineLimit(4...10)
+          } header: {
+            HStack {
+              Text("Premier message")
+              Spacer()
+              if !options.templates.isEmpty {
+                Menu("Modèles de prompt") {
+                  ForEach(options.templates) { template in
+                    Button(template.name) { apply(template) }
+                  }
+                }
+                .font(.footnote)
+                .textCase(nil)
+              }
+            }
           }
         } else {
           ProgressView().frame(maxWidth: .infinity)
@@ -105,6 +134,12 @@ struct NewSessionSheet: View {
         }
       }
       .onAppear { channel.askNewSessionOptions() }
+      .sheet(isPresented: $showsIcons) {
+        IconPicker(
+          symbols: options?.symbols ?? [], colors: options?.colors ?? [], appearance: $appearance
+        )
+        .presentationDetents([.medium, .large])
+      }
       .onReceive(NotificationCenter.default.publisher(for: .folderChosen)) { _ in
         browsing = []
       }
@@ -126,7 +161,20 @@ struct NewSessionSheet: View {
     channel.create(
       RemoteNewSession(
         name: name, folder: folder, agentID: agentID, modelID: modelID, prompt: prompt,
-        start: start, coordinates: coordinates))
+        start: start, coordinates: coordinates, appearance: appearance))
+  }
+
+  /// A template fills in the message, and its folder and icon when it has them; its `{{fields}}`
+  /// are left in the text to be written over.
+  private func apply(_ template: RemoteTemplate) {
+    prompt = template.body
+    if let folder = template.folder {
+      self.folder = folder
+      if !extraFolders.contains(folder), options?.folders.contains(folder) != true {
+        extraFolders.insert(folder, at: 0)
+      }
+    }
+    if let templateAppearance = template.appearance { appearance = templateAppearance }
   }
 
   /// `/Users/me/Documents` as `~/Documents`.
@@ -195,4 +243,72 @@ struct FolderBrowser: View {
 
 extension Notification.Name {
   static let folderChosen = Notification.Name("eu.hadrien.VibeManager.Companion.folderChosen")
+}
+
+/// The symbols and colours the Mac's Settings offer, as its icon popover lays them out.
+struct IconPicker: View {
+  let symbols: [String]
+  let colors: [String]
+  @Binding var appearance: RemoteAppearance?
+  @Environment(\.dismiss) private var dismiss
+
+  private var symbol: String { appearance?.symbol ?? symbols.first ?? "terminal" }
+  private var color: String { appearance?.color ?? colors.first ?? "#5E5CE6" }
+
+  var body: some View {
+    NavigationStack {
+      ScrollView {
+        VStack(alignment: .leading, spacing: 18) {
+          LazyVGrid(columns: [GridItem(.adaptive(minimum: 40), spacing: 10)], spacing: 10) {
+            ForEach(colors, id: \.self) { hex in
+              Button {
+                appearance = RemoteAppearance(symbol: symbol, color: hex)
+              } label: {
+                Circle()
+                  .fill(Color(hex: hex) ?? .gray)
+                  .frame(width: 34, height: 34)
+                  .overlay {
+                    if hex == color {
+                      Image(systemName: "checkmark").font(.caption.weight(.bold))
+                        .foregroundStyle(.white)
+                    }
+                  }
+              }
+              .accessibilityLabel(hex)
+            }
+          }
+          LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 10)], spacing: 10) {
+            ForEach(symbols, id: \.self) { name in
+              Button {
+                appearance = RemoteAppearance(symbol: name, color: color)
+              } label: {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                  .fill(name == symbol ? (Color(hex: color) ?? .gray) : Color(.tertiarySystemFill))
+                  .frame(width: 44, height: 44)
+                  .overlay {
+                    Image(systemName: name)
+                      .foregroundStyle(name == symbol ? Color.white : .primary)
+                  }
+              }
+              .accessibilityLabel(name)
+            }
+          }
+        }
+        .padding(16)
+      }
+      .navigationTitle("Icône")
+      .navigationBarTitleDisplayMode(.inline)
+      .toolbar {
+        ToolbarItem(placement: .confirmationAction) {
+          Button("OK", systemImage: "checkmark") { dismiss() }
+        }
+        ToolbarItem(placement: .cancellationAction) {
+          Button("Par défaut") {
+            appearance = nil
+            dismiss()
+          }
+        }
+      }
+    }
+  }
 }

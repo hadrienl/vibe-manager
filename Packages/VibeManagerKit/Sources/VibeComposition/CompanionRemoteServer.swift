@@ -27,6 +27,8 @@ final class CompanionRemoteServer {
     var shown: SessionID?
     /// The conversation it counts as a viewer of.
     var viewed: ConversationModel?
+    /// The web view it shows, mirrored.
+    var web: CompanionWebMirror?
     var conversationRevision = 0
   }
 
@@ -91,17 +93,30 @@ final class CompanionRemoteServer {
     case .interrupt(let id):
       guard let sessionID = Self.sessionID(id) else { return }
       Task { await appModel?.companionInterrupt(sessionID) }
+    case .showWeb(let id):
+      peers[peer]?.web?.stop()
+      peers[peer]?.web = nil
+      guard let appModel, let sessionID = id.flatMap(Self.sessionID) else { return }
+      let mirror = CompanionWebMirror(
+        sessionID: sessionID, appModel: appModel,
+        send: { [weak self] message in self?.send(peer, message) })
+      peers[peer]?.web = mirror
+      mirror.start()
+    case .web(let id, let action):
+      guard let mirror = peers[peer]?.web, mirror.sessionID.rawValue.uuidString == id else { return }
+      Task { await mirror.perform(action) }
     case .listFolder(let path):
       let listing = Self.listing(of: path)
       send(peer, .folderListing(listing))
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
-      .folderListing, .iconData:
+      .folderListing, .iconData, .webState:
       break
     }
   }
 
   func closed(_ peer: String) {
     release(peer)
+    peers[peer]?.web?.stop()
     peers[peer] = nil
     Self.logger.notice("\(peer, privacy: .public): gone")
   }
@@ -384,10 +399,21 @@ final class CompanionRemoteServer {
             RemoteModel(id: $0.id, name: $0.displayName, isDefault: $0.isDefault)
           }))
     }
+    let palette = appModel.appearancePalette.offered
     send(
       peer,
       .newSessionOffer(
-        RemoteNewSessionOptions(folders: appModel.companionRecentFolders, agents: agents)))
+        RemoteNewSessionOptions(
+          folders: appModel.companionRecentFolders, agents: agents, symbols: palette.symbols,
+          colors: palette.swatches.map(\.hex),
+          templates: appModel.companionTemplates.map { template in
+            RemoteTemplate(
+              id: template.id.rawValue.uuidString, name: template.name, body: template.body,
+              folder: template.workingDirectoryPath.map { ($0 as NSString).expandingTildeInPath },
+              appearance: template.appearance.map {
+                RemoteAppearance(symbol: $0.symbolName, color: $0.colorHex)
+              })
+          })))
   }
 
   private func create(_ request: RemoteNewSession, for peer: String) async {
@@ -396,7 +422,10 @@ final class CompanionRemoteServer {
       let id = try await appModel.createCompanionSession(
         name: request.name, folder: request.folder, providerID: request.agentID,
         modelID: request.modelID, prompt: request.prompt, start: request.start,
-        coordinates: request.coordinates)
+        coordinates: request.coordinates,
+        appearance: request.appearance.map {
+          SessionAppearance(symbolName: $0.symbol, colorHex: $0.color)
+        })
       send(peer, .created(sessionID: id.rawValue.uuidString))
     } catch {
       send(peer, .failure(error.localizedDescription))
