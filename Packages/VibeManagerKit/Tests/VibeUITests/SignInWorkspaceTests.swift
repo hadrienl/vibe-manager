@@ -72,11 +72,25 @@ struct SignInWorkspaceTests {
     await model.signInEnded(AgentProviderID("stub"), outcome: .notSignedIn(detail: "No browser"))
     #expect(model.signInNotice(for: subject.id)?.state == .failed(detail: "No browser"))
 
-    // Signed in: this session's screen cannot be read here, so it is not resumed by itself —
-    // it waits, Resume offered.
+    // Signed in: this session's screen shows no prompt that can be read, which may hold text —
+    // so it is not resumed by itself. It waits, Resume offered.
     await model.signInEnded(AgentProviderID("stub"), outcome: .signedIn)
-    #expect(model.signInNotice(for: subject.id)?.state == .signedIn(canResume: true))
+    #expect(
+      model.signInNotice(for: subject.id)?.state == .signedIn(canResume: true, textWaiting: true))
     #expect(model.resumingAfterSignIn.isEmpty)
+  }
+
+  @Test("A failure is not shown over a sign-in that expired after it")
+  func oldFailureIsForgotten() async throws {
+    let (model, subject) = try await running()
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+    await model.signInEnded(AgentProviderID("stub"), outcome: .notSignedIn(detail: nil))
+    #expect(model.signInNotice(for: subject.id)?.state == .failed(detail: nil))
+
+    try await Task.sleep(for: .milliseconds(20))
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+
+    #expect(model.signInNotice(for: subject.id)?.state == .expired)
   }
 
   @Test("A cancelled sign-in goes back to offering it")

@@ -59,7 +59,7 @@ struct SignInNotice: View {
       } label: {
         Text("Try Again", bundle: .module)
       }
-    case .signedIn(let canResume):
+    case .signedIn(let canResume, _):
       if canResume {
         Button {
           model.resumeAfterSignIn?()
@@ -109,11 +109,11 @@ struct SignInNotice: View {
   private var detail: String? {
     switch signIn.state {
     case .failed(let detail): detail
-    case .signedIn(let canResume):
-      canResume
+    case .signedIn(_, let textWaiting):
+      textWaiting
         ? String(
           localized:
-            "Text is waiting in this session’s prompt. Resume once it is sent or cleared.",
+            "Text or work is waiting in this session’s prompt. Resume once it is done.",
           bundle: .module) : nil
     default: nil
     }

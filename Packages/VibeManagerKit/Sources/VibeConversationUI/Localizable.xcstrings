@@ -31634,102 +31634,102 @@
         }
       }
     },
-    "Text is waiting in this session’s prompt. Resume once it is sent or cleared." : {
+    "Text or work is waiting in this session’s prompt. Resume once it is done." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يوجد نص ينتظر في موجّه هذه الجلسة. استأنفها بعد إرساله أو مسحه."
+            "value" : "يوجد نص أو عمل ينتظر في موجّه هذه الجلسة. استأنفها عند انتهائه."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "In der Eingabe dieser Sitzung wartet Text. Setzen Sie sie fort, sobald er gesendet oder gelöscht ist."
+            "value" : "In der Eingabe dieser Sitzung wartet Text oder Arbeit. Setzen Sie sie fort, sobald das erledigt ist."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Hay texto esperando en el campo de esta sesión. Reanúdela cuando lo haya enviado o borrado."
+            "value" : "Hay texto o trabajo esperando en el campo de esta sesión. Reanúdela cuando termine."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Du texte attend dans l’invite de cette session. Reprenez-la une fois ce texte envoyé ou effacé."
+            "value" : "Du texte ou du travail attend dans l’invite de cette session. Reprenez-la une fois terminé."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "इस सेशन के प्रॉम्प्ट में टेक्स्ट प्रतीक्षा कर रहा है। उसे भेजने या मिटाने के बाद फिर से शुरू करें।"
+            "value" : "इस सेशन के प्रॉम्प्ट में टेक्स्ट या काम प्रतीक्षा कर रहा है। उसके पूरा होने पर फिर से शुरू करें।"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Nel prompt di questa sessione c’è del testo in attesa. Riprendila dopo averlo inviato o cancellato."
+            "value" : "Nel prompt di questa sessione c’è del testo o del lavoro in attesa. Riprendila quando è finito."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "このセッションのプロンプトにテキストが残っています。送信または消去してから再開してください。"
+            "value" : "このセッションのプロンプトにテキストまたは処理が残っています。終わってから再開してください。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "이 세션의 프롬프트에 텍스트가 남아 있습니다. 보내거나 지운 뒤 재개하세요."
+            "value" : "이 세션의 프롬프트에 텍스트나 작업이 남아 있습니다. 끝난 뒤 재개하세요."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Er staat tekst in de invoer van deze sessie. Hervat de sessie zodra die verstuurd of gewist is."
+            "value" : "Er wacht tekst of werk in de invoer van deze sessie. Hervat de sessie zodra dat klaar is."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "W polu tej sesji czeka tekst. Wznów ją, gdy zostanie wysłany lub usunięty."
+            "value" : "W polu tej sesji czeka tekst lub praca. Wznów ją, gdy się zakończy."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Há texto aguardando no prompt desta sessão. Retome-a depois de enviá-lo ou apagá-lo."
+            "value" : "Há texto ou trabalho aguardando no prompt desta sessão. Retome-a quando terminar."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "В строке ввода этой сессии остался текст. Продолжите её, когда он будет отправлен или удалён."
+            "value" : "В строке ввода этой сессии остался текст или идёт работа. Продолжите её, когда всё завершится."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Bu oturumun giriş satırında bekleyen metin var. Metin gönderildikten veya silindikten sonra sürdürün."
+            "value" : "Bu oturumun giriş satırında bekleyen metin veya iş var. Bittiğinde sürdürün."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "У рядку введення цього сеансу лишився текст. Продовжте його, коли текст буде надіслано або видалено."
+            "value" : "У рядку введення цього сеансу лишився текст або триває робота. Продовжте його, коли все завершиться."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此会话的输入框中还有文本。发送或清除后再继续。"
+            "value" : "此会话的输入框中还有文本或正在进行的工作。完成后再继续。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此工作階段的輸入框中仍有文字。傳送或清除後再繼續。"
+            "value" : "此工作階段的輸入框中仍有文字或進行中的工作。完成後再繼續。"
           }
         }
       }

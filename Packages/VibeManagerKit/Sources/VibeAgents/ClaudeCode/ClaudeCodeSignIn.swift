@@ -25,10 +25,14 @@ extension ClaudeCodeAgentProvider: AgentSigningIn {
     } catch {
       return .notSignedIn(detail: nil)
     }
-    // Asked of the CLI, not read off its exit: the account is what every session needs.
-    if await availability(forceRefresh: true).state == .available { return .signedIn }
     let said = String(decoding: result.standardError + result.standardOutput, as: UTF8.self)
       .trimmingCharacters(in: .whitespacesAndNewlines)
-    return .notSignedIn(detail: said.isEmpty ? nil : String(said.suffix(300)))
+    let detail = said.isEmpty ? nil : String(said.suffix(300))
+    // Its exit says whether it signed in: `auth status` still answers `loggedIn` with a token
+    // that has expired, which is how the sessions came to fail.
+    guard result.termination == .exited(0) else { return .notSignedIn(detail: detail) }
+    // And the detection is told: it is what the settings, and the next launch, read.
+    let state = await availability(forceRefresh: true).state
+    return state == .unauthenticated ? .notSignedIn(detail: detail) : .signedIn
   }
 }

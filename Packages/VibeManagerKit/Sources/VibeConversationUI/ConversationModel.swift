@@ -95,8 +95,9 @@ public struct ConversationSignIn: Equatable, Sendable {
     /// The browser is open on the sign-in page.
     case signingIn
     case failed(detail: String?)
-    /// Signed in, and this session was not resumed by itself: text waited in its prompt.
-    case signedIn(canResume: Bool)
+    /// Signed in, and this session was not resumed by itself: text waited in its prompt, or work
+    /// behind it, or it could not be restarted.
+    case signedIn(canResume: Bool, textWaiting: Bool)
     /// Restarted, its prompt about to be typed back.
     case resuming
   }

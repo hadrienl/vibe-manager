@@ -412,6 +412,8 @@ public final class AppModel {
   var signInTasks: [AgentProviderID: Task<Void, Never>] = [:]
   /// Sessions being restarted and handed their prompt back, once signed in.
   public internal(set) var resumingAfterSignIn: Set<SessionID> = []
+  /// Sessions the sign-in left alone: text waited in their prompt, or work behind it.
+  var signInTextWaiting: Set<SessionID> = []
 
   /// When each resumed conversation was handed to its agent, kept only for as long as it takes
   /// to tell a refused resume from an ordinary exit.
@@ -2862,6 +2864,9 @@ public final class AppModel {
     // A detection that just landed may have turned a session's agent from missing to ready, or
     // the other way round, and the sidebar says so.
     await refreshResolutions()
+    // The notices name the agent, and offer only what it can do.
+    publishSignIns()
+    publishAgentUpdates()
   }
 
   public func resolution(for session: WorkSession) async -> SessionAgentResolution {
