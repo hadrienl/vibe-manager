@@ -214,7 +214,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart, .httpRequest, .folderIcon:
+    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart, .httpRequest, .folderIcon, .close:
       break
     }
   }
@@ -333,6 +333,10 @@ final class RemoteChannel {
   func askFolderIcon(_ path: String) {
     guard folderIcons[path] == nil else { return }
     write(.folderIcon(path: path))
+  }
+
+  func close(_ sessionID: String) {
+    write(.close(sessionID: sessionID))
   }
 
   func restart(_ sessionID: String) {

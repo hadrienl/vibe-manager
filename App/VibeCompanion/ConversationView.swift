@@ -16,6 +16,7 @@ struct ConversationView: View {
   @State private var showsPhotos = false
   @State private var showsCamera = false
   @State private var showsFiles = false
+  @State private var showsCloseConfirmation = false
 
   private var session: RemoteSession? { channel.sessions.first { $0.id == sessionID } }
   private var conversation: RemoteConversation? {
@@ -67,14 +68,25 @@ struct ConversationView: View {
       }
       ToolbarItem(placement: .topBarTrailing) {
         Menu("Plus", systemImage: "ellipsis") {
-          Button("Arrêter l’agent", systemImage: "stop.circle", role: .destructive) {
+          // Escape, as on the Mac: the turn stops, the agent waits for the next message.
+          // Whenever it runs: an agent without hooks is seen at rest while it works.
+          Button("Interrompre", systemImage: "stop.circle") {
             channel.interrupt(sessionID)
           }
-          // Whenever its agent runs: an agent without hooks says nothing of its work, and is
-          // seen at rest while it works. Escape to one at rest does nothing.
+          .disabled(session == nil || session?.activity == .stopped)
+          Button("Fermer la session", systemImage: "power", role: .destructive) {
+            showsCloseConfirmation = true
+          }
           .disabled(session == nil || session?.activity == .stopped)
         }
       }
+    }
+    .confirmationDialog(
+      "Fermer la session ?", isPresented: $showsCloseConfirmation, titleVisibility: .visible
+    ) {
+      Button("Fermer la session", role: .destructive) { channel.close(sessionID) }
+    } message: {
+      Text("L’agent s’arrête. La session garde sa conversation et peut être relancée.")
     }
     .onAppear { channel.show(sessionID) }
     .onDisappear { if channel.conversation?.sessionID == sessionID { channel.show(nil) } }
@@ -114,6 +126,15 @@ struct ConversationView: View {
     .padding(14)
     .glassEffect(.regular, in: .rect(cornerRadius: 22))
     .padding(.horizontal, 12)
+  }
+
+  /// The agent at work: said by its activity, or by a tool still running — an agent without
+  /// hooks says nothing of its work.
+  private var isWorking: Bool {
+    if session?.activity == .working { return true }
+    guard session?.activity != .stopped, case .tool(_, _, _, true, _) = conversation?.entries.last?.kind
+    else { return false }
+    return true
   }
 
   private var canSend: Bool {
@@ -164,21 +185,35 @@ struct ConversationView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
-        Button {
-          let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-          guard canSend else { return }
-          channel.send(text, files: files, to: sessionID)
-          draft = ""
-          files = []
-        } label: {
-          Image(systemName: "arrow.up")
-            .font(.body.weight(.bold))
-            .frame(width: 30, height: 30)
+        if isWorking && !canSend {
+          // While the agent works and nothing is written: its turn stopped, as Escape on the Mac.
+          Button {
+            channel.interrupt(sessionID)
+          } label: {
+            Image(systemName: "stop.fill")
+              .font(.body.weight(.bold))
+              .frame(width: 30, height: 30)
+          }
+          .buttonStyle(.glassProminent)
+          .buttonBorderShape(.circle)
+          .accessibilityLabel("Interrompre l’agent")
+        } else {
+          Button {
+            let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard canSend else { return }
+            channel.send(text, files: files, to: sessionID)
+            draft = ""
+            files = []
+          } label: {
+            Image(systemName: "arrow.up")
+              .font(.body.weight(.bold))
+              .frame(width: 30, height: 30)
+          }
+          .buttonStyle(.glassProminent)
+          .buttonBorderShape(.circle)
+          .disabled(!canSend)
+          .accessibilityLabel("Envoyer")
         }
-        .buttonStyle(.glassProminent)
-        .buttonBorderShape(.circle)
-        .disabled(!canSend)
-        .accessibilityLabel("Envoyer")
       }
       .padding(.horizontal, 12)
     }

@@ -108,6 +108,9 @@ final class CompanionRemoteServer {
         else { return }
         await self.send(peer, .attachmentData(path: path, jpeg: jpeg))
       }
+    case .close(let id):
+      guard let appModel, let sessionID = Self.sessionID(id) else { return }
+      Task { await appModel.close(sessionID) }
     case .restart(let id):
       guard let appModel, let sessionID = Self.sessionID(id) else { return }
       Task {

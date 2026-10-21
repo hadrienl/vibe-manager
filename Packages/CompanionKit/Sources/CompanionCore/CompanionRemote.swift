@@ -483,6 +483,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case attachmentImage(path: String)
   /// Stops what the agent does, as Escape in its terminal.
   case interrupt(sessionID: String)
+  /// Stops the session's agent and keeps the rest, as the Mac's Close Session.
+  case close(sessionID: String)
   /// Starts a closed session's agent again, resuming its conversation, as the Mac's Restart does.
   case restart(sessionID: String)
   /// Shows a session's web view, pictured as the Mac draws it, until `nil`.
