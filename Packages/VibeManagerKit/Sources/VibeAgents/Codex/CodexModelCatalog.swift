@@ -3,6 +3,12 @@ import VibeApplication
 
 public protocol CodexModelCatalogSource: Sendable {
   func models() async -> [AgentModel]
+  /// The reasoning levels a model takes, as the cache lists them (#411); empty when it does not.
+  func effortLevels(modelID: String) async -> [String]
+}
+
+extension CodexModelCatalogSource {
+  public func effortLevels(modelID: String) async -> [String] { [] }
 }
 
 /// Reads the model list the Codex CLI already cached for itself.
@@ -67,6 +73,20 @@ public struct CodexModelCatalog: CodexModelCatalogSource {
     return models
   }
 
+  public func effortLevels(modelID: String) async -> [String] {
+    guard let data = readCache(),
+      let cache = try? JSONDecoder().decode(Cache.self, from: data),
+      let entry = cache.models.first(where: { $0.slug == modelID })
+    else { return [] }
+    var seen: Set<String> = []
+    return (entry.reasoningLevels ?? []).compactMap { level in
+      guard let effort = level.effort.flatMap(AgentEffortLevel.argument),
+        seen.insert(effort).inserted
+      else { return nil }
+      return effort
+    }
+  }
+
   private func readCache() -> Data? {
     guard let attributes = try? FileManager.default.attributesOfItem(atPath: cacheURL.path),
       let size = attributes[.size] as? NSNumber,
@@ -104,11 +124,25 @@ public struct CodexModelCatalog: CodexModelCatalogSource {
     struct Entry: Decodable {
       let slug: String
       let displayName: String?
+      let reasoningLevels: [ReasoningLevel]?
 
       private enum CodingKeys: String, CodingKey {
         case slug
         case displayName = "display_name"
+        case reasoningLevels = "supported_reasoning_levels"
       }
+
+      init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        slug = try container.decode(String.self, forKey: .slug)
+        displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+        // Reshaped levels must not cost the model its place in the list.
+        reasoningLevels = try? container.decodeIfPresent([ReasoningLevel].self, forKey: .reasoningLevels)
+      }
+    }
+
+    struct ReasoningLevel: Decodable {
+      let effort: String?
     }
   }
 }

@@ -97,6 +97,31 @@ struct RestartSessionTests {
     #expect(await repository.writes == 0)
   }
 
+  @Test("A resumed conversation is given back the effort it was given (#411)")
+  func resumeKeepsTheEffort() async throws {
+    var stored = session()
+    stored.agent?.effort = "high"
+    let (restart, repository) = makeSubject(session: stored)
+
+    let outcome = try await restart(id: repository.stored[0].id)
+
+    #expect(
+      outcome.plan.arguments == [
+        "--resume", "0f7e6d5c-4b3a-2190-8765-43210fedcba9", "--model", "fast", "--effort", "high",
+      ])
+  }
+
+  @Test("A fresh start keeps the effort too, with its summary (#411)")
+  func freshStartKeepsTheEffort() async throws {
+    var stored = session(resumeIdentifier: nil)
+    stored.agent?.effort = "low"
+    let (restart, repository) = makeSubject(session: stored)
+
+    let outcome = try await restart(id: repository.stored[0].id)
+
+    #expect(outcome.plan.arguments.starts(with: ["--model", "fast", "--effort", "low", "--"]))
+  }
+
   @Test("A session that never ran gets the launch it never had, prompt and all")
   func firstLaunchKeepsTheInitialPrompt() async throws {
     let (restart, repository) = makeSubject(session: neverStartedSession())

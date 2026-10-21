@@ -93,6 +93,36 @@ struct AgentSwitchTests {
     #expect(planned.nextConfiguration.resumeIdentifier == "8c1d0b7e-1111-4222-8333-444455556666")
   }
 
+  @Test("Another model of the same agent goes on with the effort it was given (#411)")
+  func sameAgentKeepsItsEffort() async throws {
+    var stored = session()
+    stored.agent?.effort = "xhigh"
+    let (plan, _) = subject(stored)
+
+    let planned = try await plan(
+      id: stored.id, to: AgentTarget(providerID: "claude-code", modelID: "sonnet"))
+
+    #expect(
+      planned.plan.arguments == [
+        "--resume", "8c1d0b7e-1111-4222-8333-444455556666", "--model", "sonnet", "--effort",
+        "xhigh",
+      ])
+    #expect(planned.nextConfiguration.effort == "xhigh")
+  }
+
+  @Test("Another agent starts on its own default effort: its levels are not the same (#411)")
+  func anotherAgentDropsTheEffort() async throws {
+    var stored = session()
+    stored.agent?.effort = "max"
+    let (plan, _) = subject(stored)
+
+    let planned = try await plan(
+      id: stored.id, to: AgentTarget(providerID: "codex", modelID: "gpt-5.5"))
+
+    #expect(!planned.plan.arguments.contains("--effort"))
+    #expect(planned.nextConfiguration.effort == nil)
+  }
+
   @Test("Another model without a conversation to resume is a handover")
   func sameAgentWithoutIdentifierHandsOver() async throws {
     let stored = session(resumeIdentifier: nil)

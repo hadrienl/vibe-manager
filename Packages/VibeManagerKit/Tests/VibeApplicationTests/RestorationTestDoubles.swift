@@ -189,6 +189,9 @@ struct RestorationProvider: AgentProvider {
     if let modelID = request.modelID {
       arguments.append(contentsOf: ["--model", modelID])
     }
+    if let effort = request.effort {
+      arguments.append(contentsOf: ["--effort", effort])
+    }
     if let prompt = request.initialPrompt {
       arguments.append(contentsOf: ["--", prompt])
     }
