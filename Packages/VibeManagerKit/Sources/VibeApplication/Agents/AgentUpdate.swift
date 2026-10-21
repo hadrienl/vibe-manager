@@ -25,7 +25,7 @@ public struct AgentUpdate: Hashable, Sendable {
   /// versions: `…/claude/versions/2.1.299` and `…/claude/versions/2.1.303`, Codex's
   /// `…/releases/0.162.1-aarch64-apple-darwin/bin/codex`, Homebrew's `…/Cellar/codex/0.162.1/…`.
   /// A process that runs another file altogether — `node`, for a CLI installed by npm — tells
-  /// nothing, and is never taken for an update.
+  /// nothing here, and is never taken for an update: see `replaced(changedAt:startedAt:…)`.
   public static func between(running: String, installed: String) -> AgentUpdate? {
     let old = running.split(separator: "/", omittingEmptySubsequences: true)
     let new = installed.split(separator: "/", omittingEmptySubsequences: true)
@@ -37,6 +37,27 @@ public struct AgentUpdate: Hashable, Sendable {
     guard let first = changed.first else { return nil }
     return AgentUpdate(runningVersion: version(in: first.0), installedVersion: version(in: first.1))
   }
+
+  /// The update of a CLI replaced where it stands: npm's `cli.js`, which `node` runs, keeps its
+  /// path from one version to the next. Its inode changed after the process started — when the
+  /// file was written, not when it says it was modified: npm dates every file of a package 1985.
+  ///
+  /// - Parameters:
+  ///   - changedAt: the `ctime` of the file the executable resolves to.
+  ///   - startedAt: when the process started, as the kernel says.
+  ///   - runningVersion: what the detection said before the file changed, when known.
+  ///   - installedVersion: what it says now, once it has been run again.
+  public static func replaced(
+    changedAt: Date, startedAt: Date, runningVersion: String?, installedVersion: String?
+  ) -> AgentUpdate? {
+    // A file written as the process starts — the install that launched it — is its own build.
+    guard changedAt > startedAt.addingTimeInterval(replacementMargin) else { return nil }
+    return AgentUpdate(
+      runningVersion: runningVersion,
+      installedVersion: installedVersion == runningVersion ? nil : installedVersion)
+  }
+
+  static let replacementMargin: TimeInterval = 5
 
   /// The version a path component opens on: `0.162.1` of `0.162.1-aarch64-apple-darwin`.
   static func version(in component: Substring) -> String? {

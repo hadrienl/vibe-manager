@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 
 @testable import VibeApplication
@@ -39,6 +40,37 @@ struct AgentUpdateTests {
     #expect(
       AgentUpdate.between(
         running: "/Users/me/old/bin/claude", installed: "/Users/me/new/bin/claude") == nil)
+  }
+
+  // MARK: - Replaced where it stands (npm)
+
+  private let started = Date(timeIntervalSince1970: 1_800_000_000)
+
+  @Test func aFileWrittenAfterTheProcessStartedIsAnUpdate() {
+    let update = AgentUpdate.replaced(
+      changedAt: started.addingTimeInterval(3_600), startedAt: started,
+      runningVersion: "2.1.299", installedVersion: "2.1.303")
+    #expect(update == AgentUpdate(runningVersion: "2.1.299", installedVersion: "2.1.303"))
+  }
+
+  /// The install that launched the process writes its file as it starts.
+  @Test func aFileWrittenAsTheProcessStartedIsItsOwnBuild() {
+    #expect(
+      AgentUpdate.replaced(
+        changedAt: started.addingTimeInterval(2), startedAt: started, runningVersion: nil,
+        installedVersion: nil) == nil)
+    #expect(
+      AgentUpdate.replaced(
+        changedAt: started.addingTimeInterval(-60), startedAt: started, runningVersion: nil,
+        installedVersion: nil) == nil)
+  }
+
+  /// Until the detection is run again, the version installed is not known: it is not the old one.
+  @Test func theVersionInstalledIsNotTheOneThatRuns() {
+    let update = AgentUpdate.replaced(
+      changedAt: started.addingTimeInterval(3_600), startedAt: started,
+      runningVersion: "2.1.299", installedVersion: "2.1.299")
+    #expect(update == AgentUpdate(runningVersion: "2.1.299", installedVersion: nil))
   }
 
   // MARK: - Readiness

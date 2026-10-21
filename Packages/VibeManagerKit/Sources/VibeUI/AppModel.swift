@@ -2133,7 +2133,17 @@ public final class AppModel {
     agentUpdates[id] = nil
     declinedUpdateRestarts[id] = nil
     publishAgentUpdates()
-    await performRestart(id: id, follows: false, keepsTaskStatus: true, update: update)
+    // As one of a batch: nothing is asked. A conversation that could no longer be resumed would
+    // open the summary over a restart nobody asked for as such — the session is left closed
+    // instead, with its Restart, and a failure is reported as any restart's.
+    let result = await performRestart(
+      id: id, follows: false, inBatch: true, keepsTaskStatus: true, update: update)
+    if case .failed(let message, let suggestion) = result {
+      restartFailure = RestartFailure(
+        sessionName: name, message: message, suggestion: suggestion, sessionID: id)
+    }
+    await reload()
+    reconcileSelection()
   }
 
   /// Tells a resumed conversation the agent refused from an ordinary end of work.

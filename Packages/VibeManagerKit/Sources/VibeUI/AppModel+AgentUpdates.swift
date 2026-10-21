@@ -48,12 +48,37 @@ extension AppModel {
 
   /// The update between the build a process runs and the one its agent's executable resolves to.
   func agentUpdate(of id: SessionID, processIdentifier: Int32) -> AgentUpdate? {
+    let probe = SystemProcessLivenessProbe()
     guard let provider = agentProvider(of: id),
-      let executable = agentDiagnostics.first(where: { $0.providerID == provider })?
-        .installation?.executablePath,
-      let running = SystemProcessLivenessProbe().imagePath(of: processIdentifier)
+      let diagnostic = agentDiagnostics.first(where: { $0.providerID == provider }),
+      let installation = diagnostic.installation,
+      let running = probe.imagePath(of: processIdentifier)
     else { return nil }
-    return AgentUpdate.between(running: running, installed: Self.resolved(executable))
+    let installed = Self.resolved(installation.executablePath)
+    if let update = AgentUpdate.between(running: running, installed: installed) { return update }
+    // Another file altogether — `node` running npm's `cli.js` — is replaced where it stands, if
+    // at all. Not the very file the process runs: an attribute Gatekeeper writes on it changes
+    // its inode too, and would be taken for an update.
+    guard running != installed, let changedAt = Self.inodeChange(of: installed),
+      let startedAt = probe.startTime(of: processIdentifier)
+    else { return nil }
+    let version = installation.version.map(String.init(describing:))
+    // What the detection said of a file it read before it changed is the build that runs.
+    let runningVersion =
+      agentUpdates[id]?.runningVersion ?? (diagnostic.probedAt < changedAt ? version : nil)
+    return AgentUpdate.replaced(
+      changedAt: changedAt, startedAt: startedAt, runningVersion: runningVersion,
+      installedVersion: diagnostic.probedAt > changedAt ? version : nil)
+  }
+
+  /// When the file's inode last changed: when it was written, whatever date it says it was
+  /// modified.
+  nonisolated static func inodeChange(of path: String) -> Date? {
+    var info = stat()
+    guard stat(path, &info) == 0 else { return nil }
+    let change = info.st_ctimespec
+    return Date(
+      timeIntervalSince1970: Double(change.tv_sec) + Double(change.tv_nsec) / 1_000_000_000)
   }
 
   /// The session's process ended or was replaced: what was found of the previous one is gone.
