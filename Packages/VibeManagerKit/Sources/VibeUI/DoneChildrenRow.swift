@@ -49,8 +49,10 @@ struct DoneChildrenRow: View {
   var body: some View {
     Button(action: toggle) {
       HStack(spacing: 6) {
-        Image(systemName: done.isShown ? "chevron.up" : "chevron.down")
+        // Turned rather than swapped, as the coordinator's: a new symbol would only fade in.
+        Image(systemName: "chevron.down")
           .font(.caption2.weight(.semibold))
+          .rotationEffect(.degrees(done.isShown ? 180 : 0))
         if done.isShown {
           Text("Hide Done Sessions", bundle: .module)
         } else {

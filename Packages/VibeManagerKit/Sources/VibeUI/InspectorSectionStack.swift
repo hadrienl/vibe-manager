@@ -354,7 +354,7 @@ struct InspectorSectionHeader: View {
             .font(.caption2.weight(.semibold))
             .foregroundStyle(.secondary)
             .rotationEffect(.degrees(isCollapsed ? 0 : 90))
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: isCollapsed)
+            .animation(reduceMotion ? nil : .fold, value: isCollapsed)
             .frame(width: 12)
           Image(systemName: section.systemImage)
             .font(.caption)

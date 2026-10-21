@@ -33,7 +33,7 @@ struct CoordinatorRowSummary: View {
       : Text(
         "Show Children", bundle: .module, comment: "Unfolds a coordinator session's children.")
     return Button {
-      withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.15)) {
+      withAnimation(reduceMotion ? nil : .fold) {
         model.setExpanded(!isExpanded, coordinator: sessionID)
       }
     } label: {

@@ -19,7 +19,7 @@ struct ToolBlockView: View {
     let state = block.toolState ?? .succeeded
     VStack(alignment: .leading, spacing: 0) {
       Button {
-        withAnimation(reduceMotion ? nil : .easeOut(duration: 0.15)) {
+        withAnimation(reduceMotion ? nil : .fold) {
           model.setExpanded(!isExpanded, for: block.id)
         }
       } label: {
