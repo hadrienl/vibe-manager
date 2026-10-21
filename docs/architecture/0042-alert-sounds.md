@@ -30,6 +30,13 @@ a second sound once. With the notifications turned off and no floating panel, th
 silence: nothing plays, in front either. "None" keeps the notification and drops its sound. The
 dictation's "model ready" sound (#340) is not an attention signal and keeps Glass.
 
+A turn that ends with work still running in the background — a command started with
+`run_in_background`, a sub-agent — is not the user's turn yet: neither notified nor sounded. The
+agent goes on once that work ends, and the turn that ends with nothing left running is said.
+`BackgroundWorkProbe` reads the session's transcript to its end when a turn ends, away from the
+main actor; work started before the agent's process, which will never end, does not count. Only
+Claude Code tells it; for Codex every turn that ends is still said.
+
 A sound played directly does not know about Focus: reading it needs the Communication Notifications
 capability, and so a provisioning profile the application does not carry (ADR 0021). In front, the
 user is at the application; in the background, only the panel with the notifications turned off

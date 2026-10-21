@@ -34,7 +34,29 @@ extension AppModel {
     guard !isReplayed, let previous, previous.unreadSince == nil, state.unreadSince != nil,
       state.requests.isEmpty
     else { return }
-    sessionDidEnd(id, as: .running, activity: state)
+    guard let isWaitingOnBackgroundWork, let session = sessions.first(where: { $0.id == id })
+    else {
+      sessionDidEnd(id, as: .running, activity: state)
+      return
+    }
+    // A turn that leaves work running in the background is not the user's turn yet (#393): the
+    // agent goes on once it ends, and the turn that ends with nothing left running is said.
+    Task { [weak self] in
+      if await isWaitingOnBackgroundWork(session) { return }
+      // Read meanwhile, or answered with a question: nothing more to say.
+      guard let self, let now = self.activities[id], now.unreadSince != nil, now.requests.isEmpty
+      else { return }
+      self.sessionDidEnd(id, as: .running, activity: now)
+    }
+  }
+
+  /// When the process of the session's agent started, as the kernel says; `nil` when it is not
+  /// running.
+  public func agentProcessStart(_ id: SessionID) async -> Date? {
+    guard let terminal = pane(for: id)?.session,
+      case .running(let processIdentifier) = await terminal.state()
+    else { return nil }
+    return SystemProcessLivenessProbe().startTime(of: processIdentifier)
   }
 
   /// The process of a session ended on its own. One the application stops — Close, Archive, a

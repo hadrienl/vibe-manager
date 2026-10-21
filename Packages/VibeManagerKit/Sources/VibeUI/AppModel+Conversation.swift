@@ -138,12 +138,7 @@ extension AppModel {
         ConversationStopReport.launchFailure(of: self?.pane(for: id))
       }
       // As the kernel says: the same whether the application was open when it started or not.
-      model.processStartDate = { [weak self] in
-        guard let terminal = self?.pane(for: id)?.session,
-          case .running(let processIdentifier) = await terminal.state()
-        else { return nil }
-        return SystemProcessLivenessProbe().startTime(of: processIdentifier)
-      }
+      model.processStartDate = { [weak self] in await self?.agentProcessStart(id) }
       model.showTerminal = { [weak self] in
         self?.setPresentation(.terminal, of: id)
       }

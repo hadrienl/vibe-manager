@@ -150,6 +150,9 @@ public final class AppModel {
   /// The alert sound, and the sounds it is chosen from (#393). Set by the composition: a
   /// workspace assembled without it plays no sound of its own.
   public var alertSounds: AlertSoundLibraryModel?
+  /// Whether a session's agent ended its turn with work still running in the background (#393):
+  /// it is not said yet. Set by the composition: without it, every turn that ends is said.
+  public var isWaitingOnBackgroundWork: ((WorkSession) async -> Bool)?
   /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
   public var endpoints: EndpointsSettingsModel?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a

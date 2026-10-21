@@ -531,6 +531,13 @@ public final class AppEnvironment {
       cacheDirectory: dataFolder.appendingPathComponent("Sounds/Shipped", isDirectory: true))
     appModel.alertSounds = alertSounds
     Task { await alertSounds.load() }
+    let backgroundWork = BackgroundWorkProbe(
+      agents: registry, hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) }
+    )
+    appModel.isWaitingOnBackgroundWork = { [weak appModel] session in
+      guard let start = await appModel?.agentProcessStart(session.id) else { return false }
+      return await backgroundWork.isWaiting(session, processStart: start)
+    }
     if let name = Self.bundleName() { appModel.applicationName = name }
     appModel.endpoints = EndpointsSettingsModel(
       repository: endpointCatalog.repository, secrets: endpointCatalog.secrets,
