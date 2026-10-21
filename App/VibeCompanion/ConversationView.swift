@@ -70,7 +70,9 @@ struct ConversationView: View {
           Button("Arrêter l’agent", systemImage: "stop.circle", role: .destructive) {
             channel.interrupt(sessionID)
           }
-          .disabled(session?.activity != .working && session?.activity != .needsAttention)
+          // Whenever its agent runs: an agent without hooks says nothing of its work, and is
+          // seen at rest while it works. Escape to one at rest does nothing.
+          .disabled(session == nil || session?.activity == .stopped)
         }
       }
     }
