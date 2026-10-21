@@ -341,7 +341,9 @@ public struct ConversationView: View {
       if let update = model.agentUpdate, model.composerState != .stopped {
         AgentUpdateNotice(model: model, update: update).modifier(StatusGlass())
       }
-      if let request = model.standaloneRequest {
+      if let signIn = model.signIn, model.composerState != .stopped {
+        SignInNotice(model: model, signIn: signIn).modifier(StatusGlass())
+      } else if let request = model.standaloneRequest {
         StandaloneRequestCard(model: model, request: request)
           .modifier(StatusGlass())
       }

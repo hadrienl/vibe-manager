@@ -38,6 +38,7 @@ extension AppModel {
         self.isReadingRestoredRequests = update.isReplayed
         self.requestsDidChange()
         self.isReadingRestoredRequests = false
+        self.publishSignIn(for: update.sessionID)
         Signposts.end("ui.activityApplied", signpost)
       }
     }
@@ -50,6 +51,7 @@ extension AppModel {
     requestsDidChange()
     isReadingRestoredRequests = false
     await loadHookTrustingAgents()
+    await loadSigningInAgents()
     updateVisibleSession()
   }
 

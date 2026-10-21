@@ -196,7 +196,7 @@ extension AppModel {
       AgentUpdateRestartReadiness.isReady(
         activity: activity(for: id), screen: screen, runsSubagents: runsSubagents)
     else { return }
-    await performUpdateRestart(id, update: update)
+    await restartInPlace(id, update: update)
   }
 
   /// No other command is at work on the session, and the restart would resume its conversation.
@@ -248,7 +248,7 @@ extension AppModel {
 
   // MARK: - Helpers
 
-  private func agentProvider(of id: SessionID) -> AgentProviderID? {
+  func agentProvider(of id: SessionID) -> AgentProviderID? {
     sessions.first { $0.id == id }?.agent.map { AgentProviderID($0.providerID) }
   }
 

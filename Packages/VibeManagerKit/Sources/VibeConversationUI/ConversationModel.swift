@@ -87,6 +87,29 @@ public struct ConversationAgentUpdate: Equatable, Sendable {
 }
 
 /// A prompt sent from the composer, shown until the agent's transcript has it.
+/// The agent stopped because its CLI's sign-in expired (#410).
+public struct ConversationSignIn: Equatable, Sendable {
+  public enum State: Equatable, Sendable {
+    /// Nothing done yet: Sign In is offered.
+    case expired
+    /// The browser is open on the sign-in page.
+    case signingIn
+    case failed(detail: String?)
+    /// Signed in, and this session was not resumed by itself: text waited in its prompt.
+    case signedIn(canResume: Bool)
+    /// Restarted, its prompt about to be typed back.
+    case resuming
+  }
+
+  public let agentName: String
+  public let state: State
+
+  public init(agentName: String, state: State) {
+    self.agentName = agentName
+    self.state = state
+  }
+}
+
 /// The request the agent waits on, as the palette of #40 sees it: what may be answered from here.
 public struct ConversationRequest: Equatable, Sendable {
   public let request: AgentRequest
@@ -292,6 +315,12 @@ public final class ConversationModel {
   @ObservationIgnored public var restartForUpdate: ((Bool) -> Void)?
   /// Drops the restart waiting for the agent to be done.
   @ObservationIgnored public var cancelUpdateRestart: (() -> Void)?
+  /// The agent's sign-in expired, and where signing in again stands (#410).
+  public var signIn: ConversationSignIn?
+  @ObservationIgnored public var startSignIn: (() -> Void)?
+  @ObservationIgnored public var cancelSignIn: (() -> Void)?
+  @ObservationIgnored public var signInInTerminal: (() -> Void)?
+  @ObservationIgnored public var resumeAfterSignIn: (() -> Void)?
   /// Whether the session's process runs. Read through the terminal's own observable state, so
   /// that a view showing the composer follows it.
   @ObservationIgnored public var processRunning: () -> Bool = { false }

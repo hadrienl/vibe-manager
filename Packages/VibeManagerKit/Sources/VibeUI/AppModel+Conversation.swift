@@ -207,6 +207,11 @@ extension AppModel {
       model.cancelUpdateRestart = { [weak self] in
         self?.cancelUpdateRestart(id)
       }
+      model.signIn = self?.signInNotice(for: id)
+      model.startSignIn = { [weak self] in self?.signIn(from: id) }
+      model.cancelSignIn = { [weak self] in self?.cancelSignIn(from: id) }
+      model.signInInTerminal = { [weak self] in self?.signInInTerminal(id) }
+      model.resumeAfterSignIn = { [weak self] in self?.resumeAfterSignIn(id) }
       model.activity = self?.activity(for: id)?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activity(for: id))
     }

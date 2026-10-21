@@ -402,6 +402,16 @@ public final class AppModel {
   var agentRefreshOwed = false
   /// On the way out: no session is restarted onto an update any more.
   var stoppedWatchingAgentUpdates = false
+  /// The agents whose CLI signs in again by itself (#410).
+  public internal(set) var signingInAgents: Set<AgentProviderID> = []
+  /// A sign-in under way, or the one that failed, per agent: one for all its sessions.
+  public internal(set) var signIns: [AgentProviderID: AgentSignInProgress] = [:]
+  /// When each agent was last signed in from here: a session stopped on its sign-in before that
+  /// only waits to be resumed.
+  var signedInAt: [AgentProviderID: Date] = [:]
+  var signInTasks: [AgentProviderID: Task<Void, Never>] = [:]
+  /// Sessions being restarted and handed their prompt back, once signed in.
+  public internal(set) var resumingAfterSignIn: Set<SessionID> = []
 
   /// When each resumed conversation was handed to its agent, kept only for as long as it takes
   /// to tell a refused resume from an ordinary exit.
@@ -2091,11 +2101,13 @@ public final class AppModel {
   }
 
   /// Stops the agent as a switch does — the drawer's shells kept, nothing relaunched over a
-  /// process that would not stop — and restarts it, its conversation resumed.
-  func performUpdateRestart(_ id: SessionID, update: AgentUpdate) async {
+  /// process that would not stop — and restarts it, its conversation resumed: onto its updated
+  /// CLI (#409), or signed in again (#410). Whether the agent was started again.
+  @discardableResult
+  func restartInPlace(_ id: SessionID, update: AgentUpdate? = nil) async -> Bool {
     guard let launcher, !stoppedWatchingAgentUpdates, !closingSessionIDs.contains(id),
       restartingSessionIDs.insert(id).inserted
-    else { return }
+    else { return false }
     pendingUpdateRestarts.remove(id)
     publishAgentUpdates()
     let name = sessions.first { $0.id == id }?.name ?? Self.unnamedSession
@@ -2104,7 +2116,7 @@ public final class AppModel {
       // A close of the user's own, taken in the meantime, is theirs: the lock is not shared.
       guard closingSessionIDs.insert(id).inserted else {
         restartingSessionIDs.remove(id)
-        return
+        return false
       }
       defer { closingSessionIDs.remove(id) }
       launcher.preserveSideTerminals(of: id)
@@ -2128,7 +2140,7 @@ public final class AppModel {
     restartingSessionIDs.remove(id)
     guard stopped else {
       await reload()
-      return
+      return false
     }
     agentUpdates[id] = nil
     declinedUpdateRestarts[id] = nil
@@ -2144,6 +2156,7 @@ public final class AppModel {
     }
     await reload()
     reconcileSelection()
+    return result == .done
   }
 
   /// Tells a resumed conversation the agent refused from an ordinary end of work.
