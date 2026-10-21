@@ -200,6 +200,13 @@ extension AppModel {
       model.answerRequest = { [weak self] answer, requestID in
         await self?.answer(answer, to: requestID) ?? false
       }
+      model.agentUpdate = self?.agentUpdateNotice(for: id)
+      model.restartForUpdate = { [weak self] everySession in
+        if everySession { self?.restartAllForUpdate() } else { self?.restartForUpdate(id) }
+      }
+      model.cancelUpdateRestart = { [weak self] in
+        self?.cancelUpdateRestart(id)
+      }
       model.activity = self?.activity(for: id)?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activity(for: id))
     }

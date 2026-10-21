@@ -31,6 +31,7 @@ extension AppModel {
     isReplayed: Bool = false
   ) {
     coordinationActivityChanged(id, from: previous, to: state, isReplayed: isReplayed)
+    if !isReplayed { agentUpdateActivityChanged(id, to: state) }
     guard !isReplayed, let previous, previous.unreadSince == nil, state.unreadSince != nil,
       state.requests.isEmpty
     else { return }
@@ -72,6 +73,7 @@ extension AppModel {
     case .starting, .running: return
     }
     coordinationProcessEnded(id)
+    forgetAgentUpdate(id)
     sessionDidEnd(id, as: status, activity: nil, launchFailed: launchFailed)
   }
 

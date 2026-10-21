@@ -115372,6 +115372,106 @@
         }
       }
     },
+    "Restart Sessions After an Update" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إعادة تشغيل الجلسات بعد التحديث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sitzungen nach einem Update neu starten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reiniciar las sesiones tras una actualización"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer les sessions après une mise à jour"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट के बाद सेशन फिर से शुरू करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riavvia le sessioni dopo un aggiornamento"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデート後にセッションを再起動"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트 후 세션 재시작"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessies herstarten na een update"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Uruchamiaj sesje ponownie po aktualizacji"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reiniciar as sessões após uma atualização"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапускать сессии после обновления"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncellemeden sonra oturumları yeniden başlat"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Перезапускати сеанси після оновлення"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新后重新启动会话"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新後重新啟動工作階段"
+          }
+        }
+      }
+    },
     "Restart When Idle" : {
       "localizations" : {
         "ar" : {
@@ -168422,6 +168522,107 @@
         }
       }
     },
+    "When %@ is updated, its open sessions restart on the new version as soon as they are done, their conversation resumed." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عند تحديث %@، تُعاد تشغيل جلساته المفتوحة على الإصدار الجديد فور انتهائها، مع استئناف محادثتها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wenn %@ aktualisiert wird, starten seine offenen Sitzungen mit der neuen Version neu, sobald sie fertig sind, und setzen ihre Unterhaltung fort."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando %@ se actualiza, sus sesiones abiertas se reinician con la nueva versión en cuanto terminan, y retoman su conversación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand %@ est mis à jour, ses sessions ouvertes sont relancées sur la nouvelle version dès qu’elles ont fini, leur conversation reprise."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "जब %@ अपडेट होता है, तो उसके खुले सेशन काम पूरा होते ही नए संस्करण पर फिर से शुरू होते हैं, और उनकी बातचीत जारी रहती है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando %@ viene aggiornato, le sue sessioni aperte si riavviano con la nuova versione appena hanno finito, riprendendo la conversazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ がアップデートされると、開いているセッションは作業が終わりしだい新しいバージョンで再起動し、会話を再開します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@이(가) 업데이트되면 열린 세션은 작업이 끝나는 대로 새 버전으로 재시작되고 대화가 이어집니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wanneer %@ wordt bijgewerkt, herstarten de open sessies op de nieuwe versie zodra ze klaar zijn, met hun gesprek hervat."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gdy %@ zostanie zaktualizowany, jego otwarte sesje uruchomią się ponownie w nowej wersji, gdy tylko skończą, wznawiając rozmowę."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando %@ é atualizado, as sessões abertas reiniciam na nova versão assim que terminam, retomando a conversa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Когда %@ обновляется, его открытые сессии перезапускаются на новой версии, как только закончат, и продолжают свой разговор."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ güncellendiğinde, açık oturumları işleri biter bitmez yeni sürümle yeniden başlar ve konuşmalarını sürdürür."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Коли %@ оновлюється, його відкриті сеанси перезапускаються на новій версії, щойно завершать роботу, і продовжують свою розмову."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 更新后，其打开的会话会在完成当前工作后立即以新版本重新启动，并继续原来的对话。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 更新後，其開啟的工作階段會在完成目前工作後立即以新版本重新啟動，並繼續原本的對話。"
+          }
+        }
+      }
+    },
     "When Vibe Manager is not in front, an avatar presents the requests in a bubble. Notifications are then not needed." : {
       "localizations" : {
         "ar" : {
@@ -181766,6 +181967,114 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新啟動"
+          }
+        }
+      }
+    },
+    "separator.update" : {
+      "comment" : "The title of the line a terminal shows above an agent restarted onto its updated CLI: a noun.",
+      "extractionState" : "extracted_with_value",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تحديث"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualisierung"
+          }
+        },
+        "en" : {
+          "stringUnit" : {
+            "state" : "new",
+            "value" : "Update"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Actualización"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mise à jour"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपडेट"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiornamento"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アップデート"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "업데이트"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Update"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aktualizacja"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Atualização"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновление"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Güncelleme"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновлення"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "更新"
           }
         }
       }

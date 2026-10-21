@@ -593,6 +593,27 @@ struct AgentSettingsPage: View {
             "Activity", bundle: .module, comment: "A section of an agent's page of the Settings.")
         }
       }
+      // Only an agent whose conversation is resumed: a restart that starts another one is not
+      // done behind the user's back (#409).
+      if agent.capabilities.supportsResume {
+        Section {
+          Toggle(
+            isOn: Binding(
+              get: { model.restartsAutomaticallyOnUpdate(agent.id) },
+              set: { model.setRestartsAutomaticallyOnUpdate($0, for: agent.id) })
+          ) {
+            Text("Restart Sessions After an Update", bundle: .module)
+            Text(
+              """
+              When \(agent.displayName) is updated, its open sessions restart on the new version \
+              as soon as they are done, their conversation resumed.
+              """, bundle: .module, comment: "An agent's name.")
+          }
+        } header: {
+          Text(
+            "Updates", bundle: .module, comment: "A section of an agent's page of the Settings.")
+        }
+      }
     }
     .formStyle(.grouped)
   }

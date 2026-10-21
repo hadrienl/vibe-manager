@@ -446,6 +446,7 @@ public final class AppEnvironment {
         screen: { [weak launcher] id in await launcher?.screen(of: id) },
         diagnostics: diagnostics),
       requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
+      agentUpdatePreferences: UserDefaultsAgentUpdatePreferences(suiteName: data.defaultsSuite),
       browser: browser,
       terminals: terminals,
       ticketContext: ReadTicketContext(
