@@ -36,7 +36,8 @@ struct SegmentView: NSViewRepresentable {
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
   @Environment(\.openURL) private var openURL
-  @Environment(\.messageSelection) private var selection
+  @Environment(\.conversationSelection) private var selection
+  @Environment(\.selectionBlock) private var block
   @Environment(\.conversationLinks) private var links
 
   struct Input: Equatable {
@@ -81,6 +82,7 @@ struct SegmentView: NSViewRepresentable {
     context.coordinator.links = links
     view.links = links
     view.markdown = markdown
+    view.selectionBlock = block ?? ""
     if view.selection !== selection { view.selection = selection }
     let size = appearance.textSize.pointSize
     let input = Input(
@@ -97,17 +99,23 @@ struct SegmentView: NSViewRepresentable {
       .cursor: NSCursor.pointingHand,
     ]
     view.selectedTextAttributes = [.backgroundColor: NSColor.selectedTextBackgroundColor]
+    view.show(Self.text(of: content, theme: theme, size: size, spacing: input.spacing))
+  }
+
+  /// What a segment shows: also what a copy takes of a message no longer on screen (#381).
+  static func text(of content: Content, theme: ConversationTheme, size: Double, spacing: Double)
+    -> NSAttributedString
+  {
     switch content {
     case .prose(let blocks, let secondary):
-      view.show(
-        MarkdownProse.attributedString(
-          blocks, theme: theme, size: size, spacing: input.spacing, secondary: secondary))
+      MarkdownProse.attributedString(
+        blocks, theme: theme, size: size, spacing: spacing, secondary: secondary)
     case .code(let code, let language):
-      view.show(MarkdownProse.code(code, language: language, theme: theme, size: size * 0.88))
+      MarkdownProse.code(code, language: language, theme: theme, size: size * 0.88)
     case .table(let header, let rows):
-      view.show(MarkdownProse.table(header: header, rows: rows, theme: theme, size: size * 0.92))
+      MarkdownProse.table(header: header, rows: rows, theme: theme, size: size * 0.92)
     case .plain(let text, let color):
-      view.show(MarkdownProse.plain(text, theme: theme, size: size, color: color))
+      MarkdownProse.plain(text, theme: theme, size: size, color: color)
     }
   }
 
@@ -130,7 +138,7 @@ struct SegmentView: NSViewRepresentable {
 
 /// A text view that reads and selects, never edits, sized by SwiftUI rather than by a scroll view.
 ///
-/// Its message's selection (`MessageSelection`) follows a click and a drag across the message's
+/// The conversation's selection (`ConversationSelection`) follows a click and a drag across the
 /// segments; a double or triple click, the keyboard and the menus stay the text view's own.
 final class SegmentTextView: NSTextView {
   nonisolated static let quoteBarWidth: CGFloat = 3
@@ -146,7 +154,10 @@ final class SegmentTextView: NSTextView {
   /// Where Copy writes; a test gives its own, and leaves the user's clipboard alone.
   var pasteboard = NSPasteboard.general
 
-  weak var selection: MessageSelection? {
+  /// The block of the conversation it draws part of, for the selection; empty outside one.
+  var selectionBlock = ""
+
+  weak var selection: ConversationSelection? {
     didSet {
       guard oldValue !== selection else { return }
       oldValue?.unregister(self)
@@ -186,6 +197,7 @@ final class SegmentTextView: NSTextView {
     defer { showing = false }
     textStorage?.setAttributedString(text)
     measured.removeAll()
+    selection?.setNeedsRefresh()
   }
 
   /// While new text replaces the old — a streamed token, another theme —, which moves the
@@ -301,7 +313,7 @@ final class SegmentTextView: NSTextView {
 
   override func selectAll(_ sender: Any?) {
     guard let selection else { return super.selectAll(sender) }
-    selection.selectAll()
+    selection.selectAll(in: self)
     window?.makeFirstResponder(self)
   }
 
@@ -342,7 +354,11 @@ final class SegmentTextView: NSTextView {
       self, name: NSWindow.didBecomeKeyNotification, object: nil)
     NotificationCenter.default.removeObserver(
       self, name: NSWindow.didResignKeyNotification, object: nil)
-    guard let newWindow else { return }
+    guard let newWindow else {
+      // Scrolled away with the keyboard: another segment on screen takes it, for Copy (#381).
+      if window?.firstResponder === self { selection?.keyboardLeft() }
+      return
+    }
     // The segments without the keyboard turn grey, or back, with the window.
     for name in [NSWindow.didBecomeKeyNotification, NSWindow.didResignKeyNotification] {
       NotificationCenter.default.addObserver(
@@ -356,7 +372,12 @@ final class SegmentTextView: NSTextView {
 
   override func viewDidMoveToWindow() {
     super.viewDidMoveToWindow()
-    if window == nil { FocusedMarkdown.shared.release(ObjectIdentifier(self)) }
+    if window == nil {
+      FocusedMarkdown.shared.release(ObjectIdentifier(self))
+    } else {
+      // Back on screen: its part of the selection again (#381).
+      selection?.setNeedsRefresh()
+    }
   }
 
   private func claimFocus() {

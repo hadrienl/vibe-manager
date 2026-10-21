@@ -1,38 +1,44 @@
 import AppKit
+import SwiftUI
 import Testing
 import VibeApplication
 
 @testable import VibeConversationUI
 
-@Suite("A message's selection, from one segment to the next (#189)")
+@Suite("The conversation's selection, from one segment and one message to the next (#189, #381)")
 @MainActor
-struct MessageSelectionTests {
+struct ConversationSelectionTests {
   // MARK: Ranges and geometry
 
-  @Test("Everything between two positions is selected, the two ends partly, in either order")
+  @Test("Everything between two places is selected, the two ends partly, across messages")
   func ranges() {
-    let lengths = [10, 20, 5, 8]
-    let forward = MessageSelection.ranges(
-      from: SelectionPosition(segment: 0, offset: 4), to: SelectionPosition(segment: 2, offset: 3),
-      lengths: lengths)
+    func ranges(from low: SelectionKey, to high: SelectionKey) -> [NSRange] {
+      // Two messages: two segments, then one.
+      [(0, 0, 10), (0, 1, 20), (1, 0, 8)].map { block, segment, length in
+        ConversationSelection.range(
+          block: block, segment: segment, length: length, from: low, to: high)
+      }
+    }
     #expect(
-      forward == [
-        NSRange(location: 4, length: 6), NSRange(location: 0, length: 20),
-        NSRange(location: 0, length: 3), NSRange(location: 0, length: 0),
+      ranges(
+        from: SelectionKey(block: 0, segment: 0, offset: 4),
+        to: SelectionKey(block: 1, segment: 0, offset: 3))
+        == [
+          NSRange(location: 4, length: 6), NSRange(location: 0, length: 20),
+          NSRange(location: 0, length: 3),
+        ])
+    let within = ranges(
+      from: SelectionKey(block: 0, segment: 1, offset: 2),
+      to: SelectionKey(block: 0, segment: 1, offset: 12))
+    #expect(
+      within == [
+        NSRange(location: 0, length: 0), NSRange(location: 2, length: 10),
+        NSRange(location: 0, length: 0),
       ])
-    let backward = MessageSelection.ranges(
-      from: SelectionPosition(segment: 2, offset: 3), to: SelectionPosition(segment: 0, offset: 4),
-      lengths: lengths)
-    #expect(backward == forward)
-    let within = MessageSelection.ranges(
-      from: SelectionPosition(segment: 1, offset: 12), to: SelectionPosition(segment: 1, offset: 2),
-      lengths: lengths)
-    #expect(within[1] == NSRange(location: 2, length: 10))
-    #expect(within.enumerated().allSatisfy { $0.offset == 1 || $0.element.length == 0 })
-    let caret = MessageSelection.ranges(
-      from: SelectionPosition(segment: 3, offset: 5), to: SelectionPosition(segment: 3, offset: 5),
-      lengths: lengths)
-    #expect(caret[3] == NSRange(location: 5, length: 0))
+    let caret = ranges(
+      from: SelectionKey(block: 1, segment: 0, offset: 5),
+      to: SelectionKey(block: 1, segment: 0, offset: 5))
+    #expect(caret[2] == NSRange(location: 5, length: 0))
   }
 
   @Test("Between two segments — a rule, a margin, a code block's header — is the next one's start")
@@ -41,11 +47,11 @@ struct MessageSelectionTests {
     let frames = [
       CGRect(x: 0, y: 300, width: 100, height: 50), CGRect(x: 0, y: 200, width: 100, height: 60),
     ]
-    #expect(MessageSelection.hit(y: 400, frames: frames) == .start(0))
-    #expect(MessageSelection.hit(y: 320, frames: frames) == .inside(0))
-    #expect(MessageSelection.hit(y: 280, frames: frames) == .start(1))
-    #expect(MessageSelection.hit(y: 230, frames: frames) == .inside(1))
-    #expect(MessageSelection.hit(y: 100, frames: frames) == .end(1))
+    #expect(ConversationSelection.hit(y: 400, frames: frames) == .start(0))
+    #expect(ConversationSelection.hit(y: 320, frames: frames) == .inside(0))
+    #expect(ConversationSelection.hit(y: 280, frames: frames) == .start(1))
+    #expect(ConversationSelection.hit(y: 230, frames: frames) == .inside(1))
+    #expect(ConversationSelection.hit(y: 100, frames: frames) == .end(1))
   }
 
   // MARK: What is copied
@@ -277,6 +283,105 @@ struct MessageSelectionTests {
     let inactive = try harness.colour(of: message.spaces)
     #expect(inactive != other)
   }
+
+  // MARK: From one message to the next (#381)
+
+  @Test("A drag from one message to the next selects both, and copies them in order")
+  func dragAcrossMessages() throws {
+    let harness = Harness(shared: true)
+    let (first, second) = (harness.messages[0], harness.messages[1])
+    harness.drag(from: (first.code, NSPoint(x: 5, y: 5)), to: (second.code, NSPoint(x: 20, y: 5)))
+    #expect(first.first.selectedRange().length == 0)
+    #expect(NSMaxRange(first.code.selectedRange()) == first.code.textLength)
+    #expect(first.last.selectedRange().length == first.last.textLength)
+    #expect(second.first.selectedRange().length == second.first.textLength)
+    #expect(second.code.selectedRange().length > 0)
+    #expect(second.last.selectedRange().length == 0)
+    #expect(first.selection.copy(to: harness.pasteboard))
+    let copied = try #require(harness.pasteboard.string(forType: .string))
+    #expect(copied.contains("Name\tSize\na.txt\t12 KB\n\nLast paragraph.\n\nFirst of message 1."))
+    // Starting again in the first message clears the second's part.
+    harness.drag(from: (first.first, NSPoint(x: 5, y: 8)), to: (first.first, NSPoint(x: 60, y: 8)))
+    #expect(second.code.selectedRange().length == 0)
+  }
+
+  @Test("A message scrolled away is copied from the conversation, whole")
+  func copyWithoutViews() throws {
+    let harness = Harness(messages: 3, shared: true)
+    let (first, middle, last) = (harness.messages[0], harness.messages[1], harness.messages[2])
+    harness.drag(from: (first.last, NSPoint(x: 5, y: 8)), to: (last.first, NSPoint(x: 60, y: 8)))
+    #expect(middle.code.selectedRange().length == middle.code.textLength)
+    // The lazy stack lets the middle message go.
+    for view in middle.segments { view.removeFromSuperview() }
+    #expect(first.selection.segments.count == 14)
+    #expect(first.selection.copy(to: harness.pasteboard))
+    let copied = try #require(harness.pasteboard.string(forType: .string))
+    #expect(copied.hasPrefix("ast paragraph.\n\nFirst of message 1.\n\nlink"))
+    #expect(
+      copied.contains(
+        "if ok {\n    run()\n}\n\nName\tSize\na.txt\t12 KB\n\nLast paragraph.\n\nFirst"))
+  }
+
+  @Test("A segment made again, scrolled back on screen, takes back its part of the selection")
+  func segmentMadeAgain() async throws {
+    let harness = Harness(shared: true)
+    let (first, second) = (harness.messages[0], harness.messages[1])
+    harness.drag(from: (first.code, NSPoint(x: 5, y: 5)), to: (second.last, NSPoint(x: 40, y: 8)))
+    let old = second.code
+    let frame = old.frame
+    let superview = try #require(old.superview)
+    old.removeFromSuperview()
+    old.selection = nil
+    let again = SegmentTextView()
+    again.kind = .code
+    again.show(NSAttributedString(attributedString: try #require(old.textStorage)))
+    again.frame = frame
+    again.selectionBlock = "m1"
+    again.selection = first.selection
+    superview.addSubview(again)
+    #expect(again.selectedRange().length == 0)
+    for _ in 0..<50 where again.selectedRange().length == 0 {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(again.selectedRange() == NSRange(location: 0, length: again.textLength))
+    #expect(second.last.selectedRange().length > 0)
+  }
+
+  @Test(
+    "Paragraph, code and table of answers drawn by SwiftUI are one selection, message to message")
+  func swiftUI() throws {
+    let harness = Harness(messages: 0)
+    let selection = ConversationSelection()
+    let first =
+      "First paragraph.\n\n```swift\nlet a = 1\n```\n\n| Name | Size |\n| --- | --- |\n| a.txt | 12 KB |\n\nAfter the table."
+    let second = "- one\n- two\n\n> quoted\n\nLast."
+    harness.window.contentView = NSHostingView(
+      rootView: VStack(alignment: .leading, spacing: 20) {
+        AgentTextView(text: first).environment(\.selectionBlock, "a")
+        AgentTextView(text: second).environment(\.selectionBlock, "b")
+        // Outside the conversation's prompts and answers: a selection of its own.
+        MarkdownView(text: "A plan.")
+      }
+      .environment(\.conversationSelection, selection)
+      .frame(width: 400, height: 800, alignment: .top))
+    harness.window.layoutIfNeeded()
+    let shown = selection.shown
+    #expect(shown.map(\.block) == ["a", "a", "a", "a", "b"])
+    #expect(shown.map(\.view.kind) == [.prose, .code, .table, .prose, .prose])
+    // What a copy reads of a message scrolled away is what its views show.
+    let theme = ConversationTheme.systemLight
+    for (block, text) in [("a", first), ("b", second)] {
+      let model = MarkdownBlocksView.contents(MarkdownCache.shared.blocks(for: text)).map {
+        SegmentView.text(of: $0, theme: theme, size: 14, spacing: 8).string
+      }
+      #expect(model == shown.filter { $0.block == block }.map { $0.view.string })
+    }
+    let views = shown.map(\.view)
+    harness.drag(from: (views[0], NSPoint(x: 2, y: 4)), to: (views[4], NSPoint(x: 10, y: 4)))
+    #expect(views[0..<4].allSatisfy { $0.selectedRange().length == $0.textLength })
+    #expect(views[4].selectedRange().length > 0)
+    #expect(!selection.segments.contains { $0.string == "A plan." })
+  }
 }
 
 /// Two messages, each a paragraph with a link, one of blanks, a code block, a table and a last
@@ -293,7 +398,7 @@ private final class Harness {
   }
 
   struct Message {
-    let selection: MessageSelection
+    let selection: ConversationSelection
     let segments: [SegmentTextView]
     var first: SegmentTextView { segments[0] }
     var link: SegmentTextView { segments[1] }
@@ -312,20 +417,33 @@ private final class Harness {
   /// `NSApp.run` ends the test process, silently.
   private var queue: [NSEvent] = []
 
-  init() {
+  /// `shared`: one selection for all the messages, as in a conversation, which knows their text.
+  init(messages count: Int = 2, shared: Bool = false) {
     _ = NSApplication.shared
-    let content = Flipped(frame: NSRect(x: 0, y: 0, width: 420, height: 900))
+    let height = CGFloat(max(count, 2)) * 450
+    window.setContentSize(NSSize(width: 420, height: height))
+    let content = Flipped(frame: NSRect(x: 0, y: 0, width: 420, height: height))
     window.contentView = content
+    let conversation = ConversationSelection()
+    var texts: [String: [SelectionText.Piece]] = [:]
+    if shared {
+      conversation.source = ConversationSelection.Source(
+        blocks: { (0..<count).map { "m\($0)" } }, pieces: { texts[$0] ?? [] })
+    }
     let theme = ConversationTheme.systemLight
     let font = NSFont.systemFont(ofSize: 14)
     func prose(_ text: String) -> NSAttributedString {
       NSAttributedString(string: text, attributes: [.font: font])
     }
     var y: CGFloat = 10
-    for _ in 0..<2 {
-      let selection = MessageSelection()
-      let texts: [(NSAttributedString, SegmentKind)] = [
-        (prose("First paragraph of the message."), .prose),
+    for index in 0..<count {
+      let selection = shared ? conversation : ConversationSelection()
+      let block = shared ? "m\(index)" : ""
+      let pieces: [(NSAttributedString, SegmentKind)] = [
+        (
+          prose(index == 0 ? "First paragraph of the message." : "First of message \(index)."),
+          .prose
+        ),
         (
           NSAttributedString(
             string: "link", attributes: [.font: font, .link: URL(string: "https://example.com")!]),
@@ -346,7 +464,8 @@ private final class Harness {
         (prose("Last paragraph."), .prose),
       ]
       var segments: [SegmentTextView] = []
-      for (text, kind) in texts {
+      texts[block] = pieces.map { SelectionText.Piece(kind: $0.1, text: $0.0) }
+      for (text, kind) in pieces {
         let view = SegmentTextView()
         view.kind = kind
         view.show(text)
@@ -354,6 +473,7 @@ private final class Harness {
         let height = view.height(forWidth: 400)
         view.frame = NSRect(x: 10, y: y, width: 400, height: height)
         content.addSubview(view)
+        view.selectionBlock = block
         view.selection = selection
         segments.append(view)
         y += height + 12
@@ -366,7 +486,9 @@ private final class Harness {
   deinit {
     MainActor.assumeIsolated {
       pasteboard.releaseGlobally()
-      MessageSelection.nextEvent = { $0.nextEvent(matching: [.leftMouseDragged, .leftMouseUp]) }
+      ConversationSelection.nextEvent = {
+        $0.nextEvent(matching: [.leftMouseDragged, .leftMouseUp])
+      }
     }
   }
 
@@ -394,7 +516,7 @@ private final class Harness {
     on view: SegmentTextView, at location: NSPoint, count: Int = 1,
     flags: NSEvent.ModifierFlags = []
   ) {
-    MessageSelection.nextEvent = { [unowned self] _ in
+    ConversationSelection.nextEvent = { [unowned self] _ in
       queue.isEmpty ? nil : queue.removeFirst()
     }
     let hit = window.contentView?.superview?.hitTest(location)

@@ -211,20 +211,30 @@ last release whose manifest the Swift 6.1 of CI's Xcode 16.4 reads, and confined
 `VibeConversationUI`. Code is coloured by a lexical highlighter of our own for a dozen languages,
 which never changes the text.
 
-### One selection per message
+### One selection for the conversation
 
 A message is drawn by several read-only text views (TextKit 1): one per run of prose, one per
 code block, one per table (an `NSTextTable`), rules being plain views between them. AppKit keeps a
-selection per view, so the message keeps its own (#189): a click and a drag are followed by the
-message, which gives each view the part it draws, and a copy puts the passage together in the
-message's order — code as it is, a table as tab-separated lines, rich text without the theme's
-colours. Starting a selection clears any other, in this message or another; the views without the
-keyboard draw the selection in the active colour while their message has it. A double or triple
-click, the keyboard and the menus stay the text view's own, within one view. ⌘A selects the
-message, and its context menu copies its Markdown.
+selection per view, so the conversation keeps its own (#189, #381): a click and a drag are followed
+by the conversation, which gives each view the part it draws, and a copy puts the passage together
+in the conversation's order — code as it is, a table as tab-separated lines, a blank line between
+segments and between messages, rich text without the theme's colours. Starting a selection clears
+any other in the window; the views without the keyboard draw the selection in the active colour
+while their conversation has it. A double or triple click, the keyboard and the menus stay the text
+view's own, within one view. ⌘A selects the message, and its context menu copies its Markdown.
 
-A selection does not go from one message to the next: the list is lazy, and a message scrolled far
-away no longer has its views.
+The stack of messages is lazy: a message scrolled far away no longer has its views. The selection is
+therefore kept as two places in the text — a block of the conversation, the rank of a segment in
+its message, an offset — rather than as the views' ranges (`ConversationSelection`). A view that
+comes on screen is given its part again; a copy takes the text of a message without views from the
+conversation, made by the same functions as its views (`MarkdownBlocksView.contents`,
+`SegmentView.text`). On screen, the views are put in reading order by their frames: the stack lays
+the messages out in the conversation's order, and a message's views are all there together.
+
+The prompts, the answers and the unfolded reasoning are part of it. Tool calls, shell commands and
+sub-agents are drawn by SwiftUI text: a drag goes across them without taking them (#391). A message
+outside the conversation's list — a plan, a sub-agent's prompt or answer, a prompt on its way — has
+a selection of its own.
 
 ## Consequences
 
