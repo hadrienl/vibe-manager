@@ -808,6 +808,14 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// When a session's terminal last wrote something, for an answer typed in several keystrokes to
   /// wait until the interface has redrawn between two (#40). Asked of the terminal, which notes it
   /// as the output arrives: nothing here watches the output for it (#248).
+  /// When this run of the application started the session's process, or took it back (#411).
+  public func launchDate(of id: SessionID) -> Date? {
+    guard let started = startedAt[id] else { return nil }
+    let elapsed = (ContinuousClock.now - started).components
+    return Date().addingTimeInterval(
+      -(Double(elapsed.seconds) + Double(elapsed.attoseconds) / 1e18))
+  }
+
   public func lastOutput(of id: SessionID) async -> ContinuousClock.Instant? {
     await panes[id]?.session?.lastOutputAt()
   }
@@ -825,6 +833,18 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     return await Task.detached(priority: .userInitiated) {
       TerminalText.screen(replaying: history.bytes, size: size)
     }.value
+  }
+
+  /// The screen, as `screen(of:)` reads it, by a follower that replays only what is new: for a
+  /// screen read again and again (#411).
+  public func screen(of id: SessionID, following follower: TerminalScreenFollower) async -> String?
+  {
+    guard let pane = panes[id], pane.status == .running, let terminal = pane.session else {
+      return nil
+    }
+    let history = await terminal.history()
+    let size = pane.viewportSize ?? TerminalSize(columns: 300, rows: 120)
+    return await follower.screen(of: history, size: size)
   }
 
   public func failure(for id: SessionID) -> TerminalPaneModel.Failure? {

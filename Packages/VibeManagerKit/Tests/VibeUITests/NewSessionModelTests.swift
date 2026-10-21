@@ -9,7 +9,7 @@ import VibeDomain
 @Suite("The new session sheet")
 struct NewSessionModelTests {
   private func makeModel(
-    providers: [StubProvider] = [StubProvider(id: "claude-code", state: .available)],
+    providers: [any AgentProvider] = [StubProvider(id: "claude-code", state: .available)],
     folder: WorkingDirectoryStatus = .usable,
     repository: SpyRepository = SpyRepository(),
     folders: (any WorkingDirectoryProbe)? = nil,
@@ -447,6 +447,51 @@ struct NewSessionModelTests {
 
     #expect(model.draft.modelID == nil)
   }
+
+  @Test("The effort offers the levels of the agent and its model, and none for an agent without")
+  func effortLevels() async {
+    let model = makeModel(providers: [
+      EffortStubProvider(
+        base: StubProvider(id: "codex", state: .available),
+        levels: ["deep": ["low", "max"], "": ["low", "high"]]),
+      StubProvider(id: "endpoint", state: .available),
+    ])
+    await model.load()
+    #expect(model.effortLevels == ["low", "high"])
+    model.draft.effort = "high"
+
+    model.draft.modelID = "deep"
+    await model.loadEffortLevels()
+    #expect(model.effortLevels == ["low", "max"])
+    #expect(model.draft.effort == nil)
+
+    model.draft.effort = "max"
+    await model.select(agent: "endpoint")
+    #expect(model.effortLevels.isEmpty)
+    #expect(model.draft.effort == nil)
+  }
+}
+
+/// An agent whose effort is set from here (#411): its levels, by model, `""` for none chosen.
+private struct EffortStubProvider: AgentProvider, AgentEffortControlling {
+  let base: StubProvider
+  let levels: [String: [String]]
+
+  var descriptor: AgentDescriptor { base.descriptor }
+  func availability(forceRefresh: Bool) async -> AgentAvailability {
+    await base.availability(forceRefresh: forceRefresh)
+  }
+  func models() async -> [AgentModel] { [AgentModel(id: "deep", displayName: "Deep")] }
+  func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
+    try await base.launchPlan(for: request)
+  }
+
+  func effortLevels(modelID: String?) async -> [String] { levels[modelID ?? ""] ?? [] }
+  var offersDefaultEffort: Bool { false }
+  func effortReport(resumeIdentifier: String?, since: Date) async -> AgentEffortReport {
+    AgentEffortReport()
+  }
+  func effortChange(to level: String?) -> AgentEffortChange? { nil }
 }
 
 private struct StubFolders: WorkingDirectoryProbe {
@@ -545,7 +590,7 @@ private struct StubProvider: AgentProvider {
 }
 
 private struct StubRegistry: AgentProviderResolving {
-  let providers: [StubProvider]
+  let providers: [any AgentProvider]
 
   func descriptors() async -> [AgentDescriptor] { providers.map(\.descriptor) }
 

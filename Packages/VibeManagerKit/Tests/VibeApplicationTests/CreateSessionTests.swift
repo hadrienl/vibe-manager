@@ -102,6 +102,19 @@ struct CreateSessionTests {
     #expect(await repository.savedSessions.count == 1)
   }
 
+  @Test("The effort chosen in the draft is launched with, and kept on the session (#411)")
+  func draftEffortIsLaunched() async throws {
+    let (create, _) = makeSubject()
+    var withEffort = draft()
+    withEffort.effort = "high"
+
+    let creation = try await create(withEffort)
+
+    #expect(creation.plan.arguments == ["--effort", "high"])
+    #expect(creation.session.agent?.effort == "high")
+    #expect(try await create(draft()).plan.arguments.isEmpty)
+  }
+
   @Test("A session made from a template keeps the rendered prompt and where it came from")
   func templateSessionKeepsRenderedPrompt() async throws {
     let (create, repository) = makeSubject()
@@ -415,7 +428,8 @@ private struct StubProvider: AgentProvider {
     return AgentLaunchPlan(
       providerID: descriptor.id,
       executablePath: "/usr/bin/true",
-      arguments: [],
+      // As the real agents do: the level is an argument of the launch (#411).
+      arguments: request.effort.map { ["--effort", $0] } ?? [],
       environment: [:],
       workingDirectoryPath: request.workingDirectoryPath,
       promptDelivery: request.initialPrompt == nil ? .none : .argument

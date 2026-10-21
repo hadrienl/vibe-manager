@@ -303,6 +303,7 @@ public struct RestartSession: Sendable {
           for: AgentLaunchRequest(
             workingDirectoryPath: path,
             modelID: configuration.modelID,
+            effort: configuration.effort,
             initialPrompt: nil,
             resume: .identifier(identifier),
             harnessID: configuration.harnessID
@@ -361,6 +362,7 @@ public struct RestartSession: Sendable {
       request: AgentLaunchRequest(
         workingDirectoryPath: path,
         modelID: session.agent?.modelID,
+        effort: session.agent?.effort,
         initialPrompt: prompt.isEmpty ? nil : session.initialPrompt,
         resume: .none
       )
@@ -382,6 +384,7 @@ public struct RestartSession: Sendable {
         request: AgentLaunchRequest(
           workingDirectoryPath: path,
           modelID: session.agent?.modelID,
+          effort: session.agent?.effort,
           initialPrompt: nil,
           resume: .none
         )
@@ -403,6 +406,7 @@ public struct RestartSession: Sendable {
         request: AgentLaunchRequest(
           workingDirectoryPath: path,
           modelID: session.agent?.modelID,
+          effort: session.agent?.effort,
           initialPrompt: nil,
           resume: .none
         )
@@ -440,6 +444,7 @@ public struct RestartSession: Sendable {
       request: AgentLaunchRequest(
         workingDirectoryPath: path,
         modelID: session.agent?.modelID,
+        effort: session.agent?.effort,
         initialPrompt: summary.text,
         resume: .none
       )

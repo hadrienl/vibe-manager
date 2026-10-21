@@ -98,6 +98,11 @@ public final class AppModel {
   /// What each session's agent is doing, as the tracker last said (#45), one cell per session
   /// (#254): a view reading one session's activity is not woken by another's.
   @ObservationIgnored let activityCells = ObservedCells<SessionID, AgentActivityState>()
+  /// What each session's menu of reasoning effort shows (#411), one cell per session.
+  @ObservationIgnored let effortCells = ObservedCells<SessionID, SessionEffortMenu>()
+  /// When each session's agent was last given a level from the menu: what its transcript said
+  /// before is out of date.
+  @ObservationIgnored var effortGivenAt: [SessionID: Date] = [:]
   /// Every session's activity at once. Never from a view, which would depend on them all: a view
   /// reads `activity(for:)`.
   public internal(set) var activities: [SessionID: AgentActivityState] {
@@ -695,6 +700,7 @@ public final class AppModel {
   /// How the previous run ended, as this launch found it: for the export.
   public private(set) var previousShutdownVerdict: DiagnosticToken?
   private let restoreSession: RestoreSession
+  let recordAgentEffort: RecordAgentEffort
   let changeTaskStatus: ChangeTaskStatus
   private let reorderSessions: ReorderSessions
   private let restartSession: RestartSession?
@@ -899,6 +905,7 @@ public final class AppModel {
     closeSession = CloseSession(repository: repository, runtime: runtime)
     archiveSession = ArchiveSession(repository: repository, runtime: runtime)
     restoreSession = RestoreSession(repository: repository)
+    recordAgentEffort = RecordAgentEffort(repository: repository)
     changeTaskStatus = ChangeTaskStatus(repository: repository)
     reorderSessions = ReorderSessions(repository: repository)
     // A workspace without agents cannot build a launch plan, so it cannot restart anything —
@@ -3208,6 +3215,16 @@ public final class AppModel {
     current[index].name = identity.name
     current[index].appearance = identity.appearance
     current[index].conversationTheme = identity.conversationTheme
+    state = .loaded(current)
+  }
+
+  /// Shows a session with the effort its agent was given (#411), as the store now holds it.
+  func showAgentEffort(_ effort: String?, providerID: String, of id: SessionID) {
+    guard case .loaded(var current) = state,
+      let index = current.firstIndex(where: { $0.id == id }),
+      current[index].agent?.providerID == providerID, current[index].agent?.effort != effort
+    else { return }
+    current[index].agent?.effort = effort
     state = .loaded(current)
   }
 

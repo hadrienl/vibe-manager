@@ -28,6 +28,11 @@ public struct CodexArgumentBuilder: CommandLineAgentArgumentBuilder {
       arguments.append(contentsOf: ["-m", try Self.validatedModelID(modelID)])
     }
 
+    if let effort = request.effort.flatMap(AgentEffortLevel.argument) {
+      // The setting of `config.toml`, for this process only: Codex has no option of its own.
+      arguments.append(contentsOf: ["-c", "model_reasoning_effort=\(effort)"])
+    }
+
     // Passed explicitly even though the terminal already starts the process there: `codex`
     // derives its workspace root and filters resumable sessions from this directory.
     arguments.append(contentsOf: ["-C", request.workingDirectoryPath])

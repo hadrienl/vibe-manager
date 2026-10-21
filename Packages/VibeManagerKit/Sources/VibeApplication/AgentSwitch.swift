@@ -232,8 +232,18 @@ public struct AgentSwitchPlan: Sendable {
       providerID: target.providerID,
       modelID: target.modelID,
       resumeIdentifier: identifier,
-      harnessID: harness
+      harnessID: harness,
+      effort: Self.carriedEffort(from: session.agent, to: target)
     )
+  }
+
+  /// The effort the session goes on with (#411): the same agent takes the same levels, another
+  /// one has its own, and starts on its default.
+  static func carriedEffort(
+    from current: SessionAgentConfiguration?, to target: AgentTarget
+  ) -> String? {
+    guard let current, current.providerID == target.providerID else { return nil }
+    return current.effort
   }
 }
 
@@ -351,6 +361,7 @@ public struct PlanAgentSwitch: Sendable {
           for: AgentLaunchRequest(
             workingDirectoryPath: path,
             modelID: target.modelID,
+            effort: AgentSwitchPlan.carriedEffort(from: current, to: target),
             initialPrompt: prompt,
             resume: resume
           )
@@ -388,6 +399,7 @@ public struct PlanAgentSwitch: Sendable {
           for: AgentLaunchRequest(
             workingDirectoryPath: path,
             modelID: target.modelID,
+            effort: AgentSwitchPlan.carriedEffort(from: current, to: target),
             initialPrompt: nil,
             resume: .identifier(identifier),
             harnessID: current.harnessID
