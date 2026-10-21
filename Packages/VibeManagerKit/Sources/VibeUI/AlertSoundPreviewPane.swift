@@ -245,6 +245,7 @@ struct AlertSoundPreviewPane: View {
             }
             .buttonStyle(.borderless)
             .accessibilityLabel(Text("Play this version", bundle: .module))
+            .accessibilityValue(Text(verbatim: DisplaySafeText.visible(version.request)))
             Text(verbatim: DisplaySafeText.visible(version.request))
               .font(.caption)
               .lineLimit(1)
@@ -260,6 +261,7 @@ struct AlertSoundPreviewPane: View {
               } label: {
                 Text("Put Back", bundle: .module, comment: "Makes a sound play an earlier version.")
               }
+              .accessibilityValue(Text(verbatim: DisplaySafeText.visible(version.request)))
               .controlSize(.small)
               .disabled(!sounds.isIdle)
             }

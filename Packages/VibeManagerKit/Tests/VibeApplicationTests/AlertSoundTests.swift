@@ -99,6 +99,9 @@ struct AlertSoundRecipeTests {
     var unnamed = recipe()
     unnamed.name = "  "
     #expect(unnamed.problems.contains("name is empty"))
+    var silent = recipe()
+    silent.voices[0].gain = 0
+    #expect(silent.problems.contains { $0.hasPrefix("every voice has gain 0") })
   }
 
   @Test("An answer is read, or says why not")

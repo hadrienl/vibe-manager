@@ -88,32 +88,24 @@ public struct ClaudeCodeAlertSoundCommand: AlertSoundCommand {
   }
 
   public func arguments(for request: AlertSoundGenerationRequest, in _: URL) throws -> [String] {
-    [
-      "-p", "--model", Self.model, "--tools", "", "--strict-mcp-config",
-      "--no-session-persistence", "--setting-sources", "",
-      "--settings", #"{"disableAllHooks":true}"#,
-      "--system-prompt", AlertSoundInstructions.systemPrompt(language: request.language),
-      "--output-format", "json",
-      "--json-schema", AlertSoundSchema.forAgent(),
-    ]
+    StructuredAnswerCommand.claude(
+      model: Self.model,
+      systemPrompt: AlertSoundInstructions.systemPrompt(language: request.language),
+      schema: AlertSoundSchema.forAgent())
   }
 
-  public var additionalEnvironment: [String: String] { ["CLAUDE_CODE_DISABLE_AUTO_MEMORY": "1"] }
+  public var additionalEnvironment: [String: String] { StructuredAnswerCommand.claudeEnvironment }
 
   public func input(for request: AlertSoundGenerationRequest) -> Data {
     Data(AlertSoundInstructions.input(for: request).utf8)
   }
 
   public func answer(from result: BoundedProcessResult, in _: URL) throws -> Data {
-    let answer = (try? JSONSerialization.jsonObject(with: result.standardOutput)) as? [String: Any]
-    guard result.exitCode == 0, let answer, answer["is_error"] as? Bool != true else {
-      throw CommandLineAlertSoundGenerator.failure(of: result)
+    switch StructuredAnswerCommand.claudeAnswer(from: result) {
+    case .failed: throw CommandLineAlertSoundGenerator.failure(of: result)
+    case .unstructured: throw AlertSoundGenerationError.failed("no structured output")
+    case .structured(let data): return data
     }
-    guard let structured = answer["structured_output"],
-      JSONSerialization.isValidJSONObject(structured),
-      let data = try? JSONSerialization.data(withJSONObject: structured)
-    else { throw AlertSoundGenerationError.failed("no structured output") }
-    return data
   }
 }
 
@@ -137,14 +129,8 @@ public struct CodexAlertSoundCommand: AlertSoundCommand {
     } catch {
       throw AlertSoundGenerationError.failed("no schema file")
     }
-    return [
-      "exec", "--ephemeral", "--skip-git-repo-check", "--ignore-user-config", "--ignore-rules",
-      "-s", "read-only",
-      "--disable", "hooks", "--disable", "apps", "--disable", "plugins",
-      "-c", "mcp_servers={}", "-c", "tools.web_search=false",
-      "--output-schema", schema.path, "-o", workspace.appendingPathComponent(Self.answerFile).path,
-      "-",
-    ]
+    return StructuredAnswerCommand.codex(
+      schema: schema, answer: workspace.appendingPathComponent(Self.answerFile))
   }
 
   public var additionalEnvironment: [String: String] { [:] }
@@ -157,13 +143,10 @@ public struct CodexAlertSoundCommand: AlertSoundCommand {
 
   public func answer(from result: BoundedProcessResult, in workspace: URL) throws -> Data {
     guard result.exitCode == 0 else { throw CommandLineAlertSoundGenerator.failure(of: result) }
-    let url = workspace.appendingPathComponent(Self.answerFile)
-    guard let handle = try? FileHandle(forReadingFrom: url) else {
-      throw AlertSoundGenerationError.failed("no answer")
-    }
-    defer { try? handle.close() }
-    let data = (try? handle.read(upToCount: AlertSoundRecipe.maximumSize + 1)) ?? Data()
-    guard !data.isEmpty else { throw AlertSoundGenerationError.failed("no answer") }
+    guard
+      let data = StructuredAnswerCommand.codexAnswer(
+        in: workspace.appendingPathComponent(Self.answerFile), limit: AlertSoundRecipe.maximumSize)
+    else { throw AlertSoundGenerationError.failed("no answer") }
     return data
   }
 }

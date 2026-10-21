@@ -73,6 +73,9 @@ public final class AlertSoundLibraryModel {
     /// What was asked to make it: the description, then each change.
     public let request: String
     public let recipe: AlertSoundRecipe
+    /// Every request that led to it, its own last: what the agent is told when it is changed
+    /// again after being put back.
+    public let requests: [String]
   }
 
   // MARK: - State
@@ -125,6 +128,8 @@ public final class AlertSoundLibraryModel {
   @ObservationIgnored private(set) var installTask: Task<Void, Never>?
   /// The reading of the shapes under way: the tests wait for it.
   @ObservationIgnored private(set) var outlineTask: Task<Void, Never>?
+  /// Grows each time a sound changes: a shape read before is not shown.
+  @ObservationIgnored private var outlineGenerations: [AlertSoundChoice: Int] = [:]
   /// Says a sentence to VoiceOver. The tests listen in its place.
   @ObservationIgnored var announce: @MainActor (LocalizedStringResource) -> Void = {
     Announcer.announce($0)
@@ -298,7 +303,10 @@ public final class AlertSoundLibraryModel {
 
   private func loadOutlines() async {
     for choice in choices where outlines[choice] == nil {
+      let generation = outlineGenerations[choice, default: 0]
       guard let sound = await decoded(choice) else { continue }
+      // Changed while it was read: the shape of what it was is not shown.
+      guard outlineGenerations[choice, default: 0] == generation else { continue }
       outlines[choice] = AlertSoundWave.outline(of: sound.samples, count: Self.outlineCount)
       durations[choice] = sound.duration
     }
@@ -306,8 +314,14 @@ public final class AlertSoundLibraryModel {
 
   /// Reads a sound again after it changed.
   private func forgetOutline(_ choice: AlertSoundChoice) {
+    outlineGenerations[choice, default: 0] += 1
     outlines[choice] = nil
     durations[choice] = nil
+  }
+
+  /// A recipe played, away from the main actor: a few hundred thousand samples.
+  private static func render(_ recipe: AlertSoundRecipe) async -> [Float] {
+    await Task.detached(priority: .userInitiated) { AlertSoundSynthesizer.render(recipe) }.value
   }
 
   private func decoded(_ choice: AlertSoundChoice) async -> DecodedAlertSound? {
@@ -317,8 +331,7 @@ public final class AlertSoundLibraryModel {
     case .bundled(let key):
       guard let sound = BundledAlertSound(rawValue: key) else { return nil }
       return DecodedAlertSound(
-        samples: AlertSoundSynthesizer.render(sound.recipe),
-        sampleRate: AlertSoundSynthesizer.sampleRate)
+        samples: await Self.render(sound.recipe), sampleRate: AlertSoundSynthesizer.sampleRate)
     case .custom, .macOS:
       guard let url = await fileURL(of: choice) else { return nil }
       let decoder = decoder
@@ -352,17 +365,21 @@ public final class AlertSoundLibraryModel {
   public func play(_ version: Version) {
     // Played from the temporary folder, one file at a time: a version is kept only by the sound
     // it is put back in.
-    if let versionPreview { try? FileManager.default.removeItem(at: versionPreview) }
+    let previous = versionPreview
     let url = FileManager.default.temporaryDirectory.appendingPathComponent(
       "VibeManager-sound-version-\(version.id.uuidString).wav")
-    do {
-      try AlertSoundWave.encode(AlertSoundSynthesizer.render(version.recipe)).write(
-        to: url, options: .atomic)
-    } catch {
-      return
-    }
     versionPreview = url
-    player?.play(url)
+    let recipe = version.recipe
+    Task {
+      let written = await Task.detached(priority: .userInitiated) {
+        if let previous, previous != url { try? FileManager.default.removeItem(at: previous) }
+        let wave = AlertSoundWave.encode(AlertSoundSynthesizer.render(recipe))
+        return (try? wave.write(to: url, options: .atomic)) != nil
+      }.value
+      // Another version asked for meanwhile is the one heard.
+      guard written, versionPreview == url else { return }
+      player?.play(url)
+    }
   }
 
   /// A session out of sight needs the user, and no notification says it with a sound: the sound
@@ -503,7 +520,7 @@ public final class AlertSoundLibraryModel {
   /// The file of a sound of the user's own, to export.
   public func exportData(_ id: AlertSoundID) async -> Data? {
     guard let url = try? await library.fileURL(of: id) else { return nil }
-    return try? Data(contentsOf: url)
+    return await Task.detached { try? Data(contentsOf: url) }.value
   }
 
   // MARK: - Agents
@@ -638,7 +655,7 @@ public final class AlertSoundLibraryModel {
       jobs.removeAll { $0.id == job.id }
       return
     }
-    let samples = AlertSoundSynthesizer.render(recipe)
+    let samples = await Self.render(recipe)
     let wave = AlertSoundWave.encode(samples)
     let duration = Double(samples.count) / Double(AlertSoundSynthesizer.sampleRate)
     let written: AlertSoundEntry
@@ -665,7 +682,8 @@ public final class AlertSoundLibraryModel {
       return
     }
     jobs.removeAll { $0.id == job.id }
-    let version = Version(id: UUID(), request: job.request, recipe: recipe)
+    let version = Version(
+      id: UUID(), request: job.request, recipe: recipe, requests: written.requests)
     versions[written.id, default: []].append(version)
     currentVersion[written.id] = version.id
     let choice = AlertSoundChoice.custom(written.id)
@@ -700,14 +718,14 @@ public final class AlertSoundLibraryModel {
   /// Puts back a version made during this run: the sound plays it from now on.
   public func restore(_ version: Version, of id: AlertSoundID) async {
     guard isIdle, let original = entry(id), currentVersion[id] != version.id else { return }
-    let samples = AlertSoundSynthesizer.render(version.recipe)
+    let samples = await Self.render(version.recipe)
     do {
       _ = try await library.replace(
         id,
         with: AlertSoundEntry(
           id: id, name: original.name, origin: original.origin, addedAt: original.addedAt,
           duration: Double(samples.count) / Double(AlertSoundSynthesizer.sampleRate),
-          recipe: version.recipe, requests: original.requests),
+          recipe: version.recipe, requests: version.requests),
         wave: AlertSoundWave.encode(samples))
     } catch {
       problem = .writing

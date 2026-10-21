@@ -286,6 +286,8 @@ struct AlertSoundLibraryModelTests {
     #expect(sounds.entry(id)?.recipe == BundledAlertSound.chime.recipe)
     #expect(sounds.currentVersion[id] == versions[0].id)
     #expect(sounds.entries.count == 1)
+    // Changed again, the agent hears what led to the version put back, not the one left.
+    #expect(sounds.entry(id)?.requests == ["un carillon"])
   }
 
   @Test("A failure stays listed with why, to try again or remove")

@@ -114,6 +114,9 @@ public struct AlertSoundRecipe: Hashable, Sendable, Codable {
     if voices.count > Self.maximumVoices {
       problems.append("\(voices.count) voices: \(Self.maximumVoices) at most")
     }
+    if !voices.isEmpty, !voices.contains(where: { $0.gain > 0 }) {
+      problems.append("every voice has gain 0: nothing would be heard")
+    }
     for (index, voice) in voices.enumerated() {
       let at = "voices[\(index)]"
       Self.check(voice.gain, in: Self.unitRange, "\(at).gain", into: &problems)
