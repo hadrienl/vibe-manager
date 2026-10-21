@@ -244,8 +244,9 @@ struct AgentEffortKeystrokeTests {
   func moreReasoning() {
     let panel = CodexEffortPanel(level: "max")
     #expect(panel.step(on: Self.levelPanel(cursor: 5)) == .press("\r"))
+    // Its title, as codex-cli 0.163 names it.
     let more = """
-        Select Reasoning Level for GPT-6.1-Sol
+        Advanced Reasoning
       › 1. Max     Maximum reasoning depth
         2. Ultra   The deepest reasoning
         enter default · s session · esc back

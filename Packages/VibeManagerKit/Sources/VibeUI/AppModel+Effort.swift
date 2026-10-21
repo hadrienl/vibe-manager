@@ -112,8 +112,11 @@ extension AppModel {
     case .command(let command):
       applied = await typeEffortCommand(command, into: id, begun: begun)
     case .panel(let opening, let driver):
+      // The history is replayed while the panel opens: the first read waits for it.
+      let follower = TerminalScreenFollower()
+      if let launcher { Task { _ = await launcher.screen(of: id, following: follower) } }
       let opened = await typeEffortCommand(opening, into: id, begun: begun)
-      applied = opened ? await drive(driver, in: id, begun: begun) : false
+      applied = opened ? await drive(driver, in: id, begun: begun, following: follower) : false
     }
     guard applied else { return false }
     effortGivenAt[id] = Date()
@@ -173,6 +176,8 @@ extension AppModel {
 
   static let effortCommandSettle = Duration.milliseconds(300)
 
+  static let effortPanelPoll = Duration.milliseconds(40)
+
   /// How long a panel is driven before it is given up and closed.
   static let effortPanelLimit = Duration.seconds(8)
 
@@ -181,7 +186,8 @@ extension AppModel {
   /// it cannot finish — or that the user types into — is closed with Escape, the way the user
   /// would leave it.
   private func drive(
-    _ driver: any AgentEffortPanelDriving, in id: SessionID, begun: ContinuousClock.Instant
+    _ driver: any AgentEffortPanelDriving, in id: SessionID, begun: ContinuousClock.Instant,
+    following follower: TerminalScreenFollower
   ) async -> Bool {
     guard let launcher, let pane = pane(for: id), let terminal = pane.session else { return false }
     let clock = ContinuousClock()
@@ -190,8 +196,10 @@ extension AppModel {
     while clock.now < deadline, !Task.isCancelled, pane.session === terminal,
       !Self.typed(in: pane, since: begun)
     {
-      try? await Task.sleep(for: .milliseconds(250))
-      guard let screen = await launcher.screen(of: id) else { return false }
+      // Read often: each step waits only for the screen to be drawn again, and the panel is on
+      // screen, in the user's way, the whole time.
+      try? await Task.sleep(for: Self.effortPanelPoll)
+      guard let screen = await launcher.screen(of: id, following: follower) else { return false }
       if screen == actedOn { continue }
       switch driver.step(on: screen) {
       case .press(let keys):
@@ -207,7 +215,8 @@ extension AppModel {
     }
     // Escape only where a panel is drawn: at the prompt, Codex reads it as going back in history.
     for _ in 0..<3 {
-      guard pane.session === terminal, let screen = await launcher.screen(of: id),
+      guard pane.session === terminal,
+        let screen = await launcher.screen(of: id, following: follower),
         AgentPanelRecognition.showsPanel(screen: screen)
       else { break }
       await pane.write([0x1B])

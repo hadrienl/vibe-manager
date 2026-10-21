@@ -17,6 +17,8 @@ import VibeApplication
 ///       5. More reasoning…          Max and Ultra consume usage limits faster
 ///       enter default · s session · esc back
 ///
+/// Max and Ultra are on a panel of their own, behind the last row, titled "Advanced Reasoning".
+///
 /// The model in use is kept: its row is chosen again. The level is then chosen with `s`, which
 /// applies it to this session; Return would also write it in `config.toml`, for every session, and
 /// is never pressed on that panel.
@@ -29,7 +31,7 @@ public struct CodexEffortPanel: AgentEffortPanelDriving {
   }
 
   static let modelTitle = "Select Model and Effort"
-  static let levelTitle = "Select Reasoning Level"
+  static let levelTitles = ["Select Reasoning Level", "Advanced Reasoning"]
   static let moreRow = "More reasoning"
   static let down = "\u{1B}[B"
   static let up = "\u{1B}[A"
@@ -46,7 +48,7 @@ public struct CodexEffortPanel: AgentEffortPanelDriving {
     let lines = screen.components(separatedBy: "\n")
     // The panel drawn last is the one in front: its title is the lowest of the two.
     let modelTitle = lines.lastIndex { $0.contains(Self.modelTitle) }
-    let levelTitle = lines.lastIndex { $0.contains(Self.levelTitle) }
+    let levelTitle = lines.lastIndex { line in Self.levelTitles.contains { line.contains($0) } }
     if let levelTitle, levelTitle > (modelTitle ?? -1) {
       return levelStep(Array(lines[levelTitle...]))
     }
