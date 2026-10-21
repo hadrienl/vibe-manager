@@ -101870,7 +101870,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Seuls les iPhone de votre compte iCloud peuvent se connecter. Retirez celui que vous avez donné ou perdu : il ne pourra plus accéder à ce Mac."
+            "value" : "Seuls les iPhone de votre compte iCloud peuvent se connecter. Retirez celui que vous avez donné ou perdu : il ne pourra plus accéder à ce Mac."
           }
         },
         "ar" : {
@@ -102875,7 +102875,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ouvrez Vibe Companion sur un iPhone connecté au même compte iCloud : il apparaît ici."
+            "value" : "Ouvrez Vibe Companion sur un iPhone connecté au même compte iCloud : il apparaît ici."
           }
         },
         "ar" : {
@@ -110209,7 +110209,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Prêt : vos iPhone peuvent se connecter"
+            "value" : "Prêt : vos iPhone peuvent se connecter"
           }
         },
         "ar" : {
@@ -112727,7 +112727,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Retirer « %@ » ?"
+            "value" : "Retirer « %@ » ?"
           }
         },
         "ar" : {

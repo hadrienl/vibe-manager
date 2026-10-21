@@ -225,7 +225,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "« %1$@ » a envoyé un test à %2$@.\nReçu à %3$@, %4$@ plus tard."
+            "value" : "« %1$@ » a envoyé un test à %2$@.\nReçu à %3$@, %4$@ plus tard."
           }
         },
         "hi" : {

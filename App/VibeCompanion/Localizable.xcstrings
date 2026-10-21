@@ -1926,7 +1926,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Accusé de réception : aller-retour %@"
+            "value" : "Accusé de réception : aller-retour %@"
           }
         },
         "ar" : {
@@ -2532,7 +2532,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Autoriser cette commande ?"
+            "value" : "Autoriser cette commande ?"
           }
         },
         "ar" : {
@@ -4061,7 +4061,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Choisir « %@ »"
+            "value" : "Choisir « %@ »"
           }
         },
         "ar" : {
@@ -4364,7 +4364,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Fermer la session ?"
+            "value" : "Fermer la session ?"
           }
         },
         "ar" : {
@@ -10323,7 +10323,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Rien dans « %@ »"
+            "value" : "Rien dans « %@ »"
           }
         },
         "ar" : {
@@ -10929,7 +10929,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Un écho par seconde, app au premier plan ; RTT sur les %lld derniers. Relais publics n0 en repli, CloudKit si le canal échoue."
+            "value" : "Un écho par seconde, app au premier plan ; RTT sur les %lld derniers. Relais publics n0 en repli, CloudKit si le canal échoue."
           }
         },
         "ar" : {
@@ -11636,7 +11636,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Permission : %@"
+            "value" : "Permission : %@"
           }
         },
         "ar" : {
@@ -12141,7 +12141,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Question : %@"
+            "value" : "Question : %@"
           }
         },
         "ar" : {
@@ -15373,7 +15373,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le Mac ne peut pas reprendre cette conversation et demande quoi faire : réponds sur le Mac."
+            "value" : "Le Mac ne peut pas reprendre cette conversation et demande quoi faire : réponds sur le Mac."
           }
         },
         "ar" : {
@@ -16181,7 +16181,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La réponse n’a pas pu être donnée : réponds sur le Mac."
+            "value" : "La réponse n’a pas pu être donnée : réponds sur le Mac."
           }
         },
         "ar" : {
@@ -16383,7 +16383,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Le message n’a pas pu être envoyé : l’agent ne tourne pas."
+            "value" : "Le message n’a pas pu être envoyé : l’agent ne tourne pas."
           }
         },
         "ar" : {
@@ -19514,7 +19514,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "échec : %@"
+            "value" : "échec : %@"
           }
         },
         "ar" : {
@@ -21837,7 +21837,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "« %@ » est trop gros pour être envoyé (6 Mo au plus)."
+            "value" : "« %@ » est trop gros pour être envoyé (6 Mo au plus)."
           }
         },
         "ar" : {
