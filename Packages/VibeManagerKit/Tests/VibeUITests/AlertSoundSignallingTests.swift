@@ -8,8 +8,10 @@ import VibeDomain
 @MainActor
 private final class PostingNotifier: RequestNotifying {
   private(set) var posted: [RequestNotification] = []
+  private(set) var alertSounds: [String] = []
 
   func post(_ notification: RequestNotification) { posted.append(notification) }
+  func postAlertSound(title: String, body _: String) { alertSounds.append(title) }
   func remove(_: [AgentRequestID]) {
     // Only what is posted counts here.
   }
@@ -103,7 +105,7 @@ struct AlertSoundSignallingTests {
     #expect(player.count == 0)
   }
 
-  @Test("In the background with the floating panel, no notification: the sound plays here")
+  @Test("In the background with the floating panel, a notification only carries the sound")
   func floating() async {
     let first = session("First")
     let (model, player, notifier) = await makeModel([first], floating: true)
@@ -111,6 +113,21 @@ struct AlertSoundSignallingTests {
     model.applicationWillResignActive()
     ask("ls", in: first, model: model)
     #expect(notifier.posted.isEmpty)
+    #expect(notifier.alertSounds.count == 1)
+    #expect(notifier.alertSounds.first?.hasPrefix("First") == true)
+    #expect(player.count == 0)
+  }
+
+  @Test("With the floating panel and the notifications turned off, the sound plays here")
+  func floatingWithoutNotifications() async {
+    let first = session("First")
+    let (model, player, notifier) = await makeModel([first], floating: true)
+    model.notifiesRequests = false
+    model.select(nil)
+    model.applicationWillResignActive()
+    ask("ls", in: first, model: model)
+    #expect(notifier.posted.isEmpty)
+    #expect(notifier.alertSounds.isEmpty)
     #expect(player.systemAlerts == 1)
   }
 

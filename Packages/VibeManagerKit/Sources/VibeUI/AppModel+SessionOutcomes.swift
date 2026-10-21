@@ -68,19 +68,16 @@ extension AppModel {
     // cut.
     Announcer.announce(
       Self.announcement(state: state, sessionName: session.name), priority: .medium)
-    soundAttention()
+    let agent = session.agent.map { agentNames[$0.providerID] ?? $0.providerID }
+    let title = DisplaySafeText.visible(
+      [session.name, agent].compactMap { $0 }.joined(separator: " — "))
+    soundAttention(title: title, body: state)
     // The floating panel replaces the notifications (#41), as the Settings say.
     let floats = floatingPanel?.isEnabled ?? false
     guard !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier else {
       return
     }
-    let agent = session.agent.map { agentNames[$0.providerID] ?? $0.providerID }
-    notifier.postOutcome(
-      SessionOutcomeNotification(
-        sessionID: id,
-        title: DisplaySafeText.visible(
-          [session.name, agent].compactMap { $0 }.joined(separator: " — ")),
-        body: state))
+    notifier.postOutcome(SessionOutcomeNotification(sessionID: id, title: title, body: state))
   }
 
   /// A notification about a session was clicked: the application shows it as Open Quickly does,

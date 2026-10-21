@@ -136,6 +136,33 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
     }
   }
 
+  public func postAlertSound(title: String, body: String) {
+    guard let sound = alertSound else { return }
+    let identifier = "alert-sound|\(UUID().uuidString)"
+    Task {
+      // Without notifications, the sound is still heard: a Focus cannot keep it quiet then.
+      guard await authorized() else {
+        model?.alertSounds?.playAlert()
+        return
+      }
+      let content = UNMutableNotificationContent()
+      content.title = title
+      content.body = body
+      content.sound = sound
+      deliverSoundOnly(
+        UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
+  /// Delivered, its sound is on its way: the banner goes, the floating panel stays.
+  private func deliverSoundOnly(_ request: UNNotificationRequest) {
+    let identifier = request.identifier
+    center.add(request) { [weak self] _ in
+      Task { @MainActor in self?.center.removeDeliveredNotifications(withIdentifiers: [identifier])
+      }
+    }
+  }
+
   /// The alert sound the user chose (#393): the system's until one is copied where the
   /// notifications find it, and none when the user chose silence.
   private var alertSound: UNNotificationSound? {

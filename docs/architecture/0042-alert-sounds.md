@@ -19,16 +19,20 @@ composed by an agent from a description.
 
 The sound marks "a session out of sight needs you", whatever the reason: one sound for all, no
 sound per kind of request. When a notification is posted, it carries the sound, so that Focus and
-the "Play sound for notifications" switch of System Settings apply without anything of ours. When
-none is posted — the application in front, or the floating panel in place of the notifications —
-`AppModel.soundAttention()` plays it directly; the session on screen never sounds, the requests
-read back at launch or replayed do not either, and several signals within a second sound once. With the notifications turned off and no floating panel, the
-user asked for silence: nothing plays, in front either. "None" keeps the notification and drops its sound. The
+the "Play sound for notifications" switch of System Settings apply without anything of ours. With
+the floating panel in place of the notifications, in the background, a notification is still posted
+to carry the sound, and taken away as soon as it is delivered: the panel says what happened, macOS
+plays the sound — or keeps it quiet during a Focus. In front, or with the panel while the system
+may not notify, `AppModel.soundAttention(title:body:)` plays it directly; the session on screen
+never sounds, the requests read back at launch or replayed do not either, and several signals within
+a second sound once. With the notifications turned off and no floating panel, the user asked for
+silence: nothing plays, in front either. "None" keeps the notification and drops its sound. The
 dictation's "model ready" sound (#340) is not an attention signal and keeps Glass.
 
-A sound played directly does not know about Focus: reading it needs the Focus Status permission,
-which #393 does not ask for. In front, the user is at the application; with the floating panel in
-the background, the sound plays during a Focus.
+A sound played directly does not know about Focus: reading it needs the Communication Notifications
+capability, and so a provisioning profile the application does not carry (ADR 0021). In front, the
+user is at the application; in the background, only the panel with the notifications turned off
+plays the sound during a Focus.
 
 ### The sound in use is copied to `~/Library/Sounds`
 

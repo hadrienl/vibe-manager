@@ -29,11 +29,16 @@ public protocol RequestNotifying: AnyObject {
   /// The dictation's speech model is ready (#340): a notification when `notifies`, a sound
   /// otherwise.
   func postDictationReady(notifies: Bool)
+  /// The alert sound, carried by a notification taken away as soon as it is delivered (#393): the
+  /// floating panel already says what happened, and macOS keeps the sound quiet during a Focus.
+  /// Played here when the system may not notify.
+  func postAlertSound(title: String, body: String)
 }
 
 extension RequestNotifying {
   public func postOutcome(_ notification: SessionOutcomeNotification) {}
   public func postDictationReady(notifies: Bool) {}
+  public func postAlertSound(title: String, body: String) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.
@@ -244,7 +249,10 @@ extension AppModel {
     // In front, a request of the session on screen is answered there, without a sound; those
     // read back at launch, or replayed, were there before, and sound neither.
     let unseen = isApplicationActive ? unknown.filter { !isOnScreen($0.session.id) } : unknown
-    if !unseen.isEmpty, !isReadingRestoredRequests { soundAttention() }
+    if let first = unseen.first, !isReadingRestoredRequests {
+      let notification = notification(for: first)
+      soundAttention(title: notification.title, body: notification.body)
+    }
     guard !isApplicationActive, notifiesRequests, !floats, let notifier = requestNotifier else {
       return
     }
@@ -254,14 +262,23 @@ extension AppModel {
     }
   }
 
-  /// A session out of sight needs the user (#393). A notification carries the alert sound when
-  /// one is posted; with none — the application in front, or the floating panel in its place —
-  /// the sound plays here. With the notifications turned off and no floating panel, the user asked
-  /// for silence, in front as well.
-  func soundAttention() {
+  /// A session out of sight needs the user (#393): `title` and `body` say why. In the background
+  /// a notification carries the alert sound, so that a Focus keeps it quiet: the one posted, or,
+  /// with the floating panel in its place, one taken away as soon as it is delivered. In front, or
+  /// with the panel and the notifications turned off, the sound plays here. With the notifications
+  /// turned off and no floating panel, the user asked for silence, in front as well.
+  func soundAttention(title: String, body: String) {
     let floats = floatingPanel?.isEnabled ?? false
-    guard notifiesRequests || floats, isApplicationActive || floats else { return }
-    alertSounds?.playAlert()
+    guard notifiesRequests || floats else { return }
+    if isApplicationActive {
+      alertSounds?.playAlert()
+    } else if floats {
+      if notifiesRequests, let requestNotifier {
+        requestNotifier.postAlertSound(title: title, body: body)
+      } else {
+        alertSounds?.playAlert()
+      }
+    }
   }
 
   func notification(for pending: PendingRequest) -> RequestNotification {
