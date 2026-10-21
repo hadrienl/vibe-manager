@@ -279,7 +279,7 @@ actor WorkspaceRepository: SessionRepository {
   /// store to disagree with the value a caller is holding.
   func archive(_ id: SessionID) {
     guard let index = stored.firstIndex(where: { $0.id == id }) else { return }
-    try? stored[index].archive(at: stored[index].updatedAt)
+    try? stored[index].archive(at: stored[index].updatedAt, cause: .user)
   }
 
   func mutate(

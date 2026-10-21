@@ -19,10 +19,13 @@ struct SessionStoreCodec {
   /// v5 adds the ticket a session works on (#69), and v6 each session's task status (#80), for
   /// the same reason: an older build would erase them. v7 adds the project icon of a session's
   /// appearance (#27), again for that reason. v8 adds each session's place in the order arranged
-  /// by hand (#44), v9 the conversation theme chosen for a session (#274), and v10 whether a
-  /// session coordinates others or is one of their children (#352). Each shape is the one before
-  /// with one more optional field, so all seven are read by the same structure.
-  static let currentSchemaVersion = 10
+  /// by hand (#44), v9 the conversation theme chosen for a session (#274), v10 whether a
+  /// session coordinates others or is one of their children (#352), and v11 the history of its
+  /// statuses (#406). Each shape is the one before with one more optional field, so all eight are
+  /// read by the same structure.
+  static let currentSchemaVersion = 11
+  /// v10 is v11 without the history of statuses, which is rebuilt from the lifecycle.
+  static let historylessSchemaVersion = 10
   /// v9 is v10 without coordination: every session is an ordinary one.
   static let uncoordinatedSchemaVersion = 9
   /// v8 is v9 without the themes: every session follows the settings.
@@ -78,7 +81,7 @@ struct SessionStoreCodec {
         sessions = previous.sessions.map { $0.workSession(recordsStart: false) }
         requiresRewrite = true
       case Self.iconlessSchemaVersion, Self.ranklessSchemaVersion, Self.themelessSchemaVersion,
-        Self.uncoordinatedSchemaVersion:
+        Self.uncoordinatedSchemaVersion, Self.historylessSchemaVersion:
         let previous = try Self.makeDecoder().decode(StoreEnvelopeV9.self, from: data)
         sessions = previous.sessions.map { $0.workSession(recordsStart: true) }
         requiresRewrite = true
@@ -244,7 +247,8 @@ private struct StoreVersionProbe: Decodable {
   let schemaVersion: Int
 }
 
-/// Reads v4 to v9 as well: a v9 session is a v10 one without coordination, a v8 one has no theme, a v7 one has no rank either,
+/// Reads v4 to v10 as well: a v10 session is a v11 one without its history of statuses, a v9 one
+/// has no coordination either, a v8 one has no theme, a v7 one has no rank either,
 /// a v6 one no icon, a v5 one no `taskStatus`, and a v4 one no `ticket`.
 private struct StoreEnvelopeV9: Codable {
   let schemaVersion: Int
@@ -253,8 +257,8 @@ private struct StoreEnvelopeV9: Codable {
 }
 
 /// A v2 session, the history of its agent switches (v4), its ticket (v5), its task status (v6) and
-/// its project icon (v7), its rank (v8), its conversation theme (v9) and its part in a coordination
-/// (v10).
+/// its project icon (v7), its rank (v8), its conversation theme (v9), its part in a coordination
+/// (v10) and the history of its statuses (v11).
 private struct StoredSessionV9: Codable {
   let id: UUID
   let name: String
@@ -276,6 +280,8 @@ private struct StoredSessionV9: Codable {
   let conversationTheme: String?
   /// Absent before v10, and for an ordinary session.
   let coordination: StoredCoordinationV10?
+  /// Absent before v11, where it is rebuilt from the lifecycle.
+  let statusHistory: [StoredStatusChangeV11]?
 
   init(_ session: WorkSession) {
     id = session.id.rawValue
@@ -293,6 +299,7 @@ private struct StoredSessionV9: Codable {
     rank = session.rank
     conversationTheme = session.conversationTheme
     coordination = session.coordination.map(StoredCoordinationV10.init)
+    statusHistory = session.statusHistory.entries.map(StoredStatusChangeV11.init)
   }
 
   /// - Parameter recordsStart: the document was written by a build that records the start of
@@ -322,8 +329,21 @@ private struct StoredSessionV9: Codable {
       // An empty one, which no build writes, follows the settings rather than failing the store.
       conversationTheme: conversationTheme.flatMap { $0.isEmpty ? nil : $0 },
       coordination: coordination?.domainValue(for: id),
+      statusHistory: storedStatusHistory,
       infersStartedAt: !recordsStart
     )
+  }
+
+  /// One entry this build cannot read — a status or a cause written by a later one — and the
+  /// whole history is rebuilt from the lifecycle: half a history would tell a wrong story.
+  private var storedStatusHistory: SessionStatusHistory? {
+    guard let statusHistory else { return nil }
+    var entries: [SessionStatusChange] = []
+    for stored in statusHistory {
+      guard let entry = stored.domainValue else { return nil }
+      entries.append(entry)
+    }
+    return SessionStatusHistory(entries: entries)
   }
 
   /// A status that contradicts the lifecycle is dropped the same way: archived is the one status
@@ -361,6 +381,71 @@ private struct StoredCoordinationV10: Codable {
     default:
       return nil
     }
+  }
+}
+
+/// A change of status, field by field, so that a status or a cause written by a later build is
+/// noticed rather than taking the store down.
+private struct StoredStatusChangeV11: Codable {
+  let date: Date
+  let from: String?
+  let to: String
+  let cause: String
+  let coordinator: UUID?
+  let rule: UUID?
+  let ruleName: String?
+
+  init(_ change: SessionStatusChange) {
+    date = change.date
+    from = change.from?.rawValue
+    to = change.to.rawValue
+    var coordinator: UUID?
+    var rule: UUID?
+    var ruleName: String?
+    switch change.cause {
+    case .created: cause = "created"
+    case .user: cause = "user"
+    case .launch: cause = "launch"
+    case .coordinator(let id):
+      cause = "coordinator"
+      coordinator = id.rawValue
+    case .unarchive: cause = "unarchive"
+    case .undo: cause = "undo"
+    case .rule(let id, let name):
+      cause = "rule"
+      rule = id
+      ruleName = name
+    case .reconstructed: cause = "reconstructed"
+    }
+    self.coordinator = coordinator
+    self.rule = rule
+    self.ruleName = ruleName
+  }
+
+  var domainValue: SessionStatusChange? {
+    guard let to = SessionTaskStatus(rawValue: to) else { return nil }
+    var origin: SessionTaskStatus?
+    if let from {
+      guard let status = SessionTaskStatus(rawValue: from) else { return nil }
+      origin = status
+    }
+    let cause: SessionStatusChange.Cause
+    switch self.cause {
+    case "created": cause = .created
+    case "user": cause = .user
+    case "launch": cause = .launch
+    case "coordinator":
+      guard let coordinator else { return nil }
+      cause = .coordinator(SessionID(rawValue: coordinator))
+    case "unarchive": cause = .unarchive
+    case "undo": cause = .undo
+    case "rule":
+      guard let rule, let ruleName else { return nil }
+      cause = .rule(id: rule, name: ruleName)
+    case "reconstructed": cause = .reconstructed
+    default: return nil
+    }
+    return SessionStatusChange(date: date, from: origin, to: to, cause: cause)
   }
 }
 

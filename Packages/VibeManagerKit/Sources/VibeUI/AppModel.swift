@@ -1454,7 +1454,7 @@ public final class AppModel {
     }
     guard session.taskStatus != status else { return .skipped(.alreadyInStatus) }
     do {
-      try await changeTaskStatus(id: id, to: status)
+      try await changeTaskStatus(id: id, to: status, cause: .user)
       diagnostics.record(
         .session, .info, "session.taskStatusChanged",
         ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
@@ -1628,9 +1628,9 @@ public final class AppModel {
     guard !back.isEmpty else { return beep() }
     for archive in back {
       do {
-        _ = try await restoreSession(id: archive.id)
+        _ = try await restoreSession(id: archive.id, cause: .undo)
         if archive.taskStatus != .done, archive.taskStatus != .archived {
-          try await changeTaskStatus(id: archive.id, to: archive.taskStatus)
+          try await changeTaskStatus(id: archive.id, to: archive.taskStatus, cause: .undo)
         }
         diagnostics.record(
           .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(archive.id)])
@@ -1674,8 +1674,10 @@ public final class AppModel {
   /// To Do and Waiting ask whether to close a session whose agent runs (#353).
   ///
   /// `restarting: false` writes the status and nothing else: the move ⌘Z takes back.
+  /// `cause` is what the session's history says made the move (#406).
   public func setTaskStatus(
-    _ status: SessionTaskStatus, for id: SessionID, restarting: Bool = true
+    _ status: SessionTaskStatus, for id: SessionID, restarting: Bool = true,
+    cause: SessionStatusChange.Cause = .user
   ) async {
     guard let session = sessions.first(where: { $0.id == id }), session.taskStatus != status
     else { return }
@@ -1708,7 +1710,8 @@ public final class AppModel {
         closing = true
       }
     }
-    await writeTaskStatus(status, of: session, restarting: restarting, closing: closing)
+    await writeTaskStatus(
+      status, of: session, restarting: restarting, closing: closing, cause: cause)
   }
 
   /// The move, once nothing is left to ask: the status, then the close or the restart it makes.
@@ -1716,13 +1719,13 @@ public final class AppModel {
   /// its grace period to stop.
   private func writeTaskStatus(
     _ status: SessionTaskStatus, of session: WorkSession, restarting: Bool = true,
-    closing: Bool
+    closing: Bool, cause: SessionStatusChange.Cause = .user
   ) async {
     let id = session.id
     let visible = orderedSessions
     let wasSelected = selectedSessionID == id
     do {
-      try await changeTaskStatus(id: id, to: status)
+      try await changeTaskStatus(id: id, to: status, cause: cause)
       diagnostics.record(
         .session, .info, "session.taskStatusChanged",
         ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
@@ -1735,7 +1738,7 @@ public final class AppModel {
       coordinationStatusChangedByUser(id, to: status)
     } catch {
       reportAction(error, .moveStatus, on: id) { [weak self] in
-        await self?.setTaskStatus(status, for: id, restarting: restarting)
+        await self?.setTaskStatus(status, for: id, restarting: restarting, cause: cause)
       }
       return
     }
@@ -1852,7 +1855,7 @@ public final class AppModel {
     guard sessions.first(where: { $0.id == undo.id })?.taskStatus == undo.to else {
       return beep()
     }
-    await setTaskStatus(undo.from, for: undo.id, restarting: false)
+    await setTaskStatus(undo.from, for: undo.id, restarting: false, cause: .undo)
     if undo.wasSelected { select(undo.id) }
   }
 

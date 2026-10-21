@@ -300,6 +300,9 @@ struct SessionHistoryTests {
     let restored = await repository.session(id: waiting.id)
     #expect(restored?.status == .closed)
     #expect(restored?.taskStatus == .waiting)
+    // The history says the archive was the user's, and both moves back were ⌘Z's (#406).
+    #expect(
+      restored?.statusHistory.entries.suffix(3).map(\.cause) == [.user, .undo, .undo])
     #expect(model.selectedSessionID == waiting.id)
     #expect(!model.canUndoSidebarChange)
     #expect(!model.canRedoSidebarChange)

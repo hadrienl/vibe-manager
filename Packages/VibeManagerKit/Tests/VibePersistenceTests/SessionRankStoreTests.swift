@@ -31,7 +31,7 @@ struct SessionRankStoreTests {
       session("Middle", updatedAt: 200),
     ]
     let v7 = String(decoding: try codec.encode(sessions: sessions), as: UTF8.self)
-      .replacingOccurrences(of: #""schemaVersion" : 10"#, with: #""schemaVersion" : 7"#)
+      .replacingOccurrences(of: #""schemaVersion" : 11"#, with: #""schemaVersion" : 7"#)
 
     let decoded = try codec.decode(Data(v7.utf8))
 
@@ -95,7 +95,7 @@ struct SessionRankStoreTests {
     ])
     let id = try #require(await repository.sessions().first?.id)
 
-    _ = try await ChangeTaskStatus(repository: repository)(id: id, to: .waiting)
+    _ = try await ChangeTaskStatus(repository: repository)(id: id, to: .waiting, cause: .user)
     _ = try await CloseSession(repository: repository)(id: id)
     _ = try await ArchiveSession(repository: repository)(id: id)
     _ = try await RestoreSession(repository: repository)(id: id)

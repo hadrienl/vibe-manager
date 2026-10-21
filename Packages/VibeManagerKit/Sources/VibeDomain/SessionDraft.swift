@@ -217,7 +217,9 @@ public struct SessionDraft: Hashable, Sendable {
       template: templateFill?.reference,
       ticket: ticket(repository: repository),
       conversationTheme: conversationTheme,
-      coordination: coordination
+      coordination: coordination,
+      // Never started: it waits in To Do until it is.
+      statusHistory: .created(in: .todo, at: createdAt)
     )
   }
 

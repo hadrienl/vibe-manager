@@ -143,7 +143,7 @@ func legacyStoreMigration() async throws {
   let migratedData = try Data(contentsOf: storeURL)
   let rawObject = try JSONSerialization.jsonObject(with: migratedData)
   let object = try #require(rawObject as? [String: Any])
-  #expect(object["schemaVersion"] as? Int == 10)
+  #expect(object["schemaVersion"] as? Int == 11)
 }
 
 @Test("A future schema is rejected without modifying the store")
@@ -517,10 +517,10 @@ func cacheMatchesTheFile() async throws {
   }
   _ = try await repository.mutate(id: sessions[1].id) { session in
     try session.close(at: Date())
-    try session.archive(at: Date())
+    try session.archive(at: Date(), cause: .user)
   }
   _ = try await repository.mutate(id: sessions[2].id) {
-    try $0.setTaskStatus(.waiting, at: Date())
+    try $0.setTaskStatus(.waiting, at: Date(), cause: .user)
   }
   try await repository.reorder([sessions[3].id: 40, sessions[4].id: -40])
 

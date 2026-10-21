@@ -766,7 +766,7 @@ private actor RacingRepository: SessionRepository {
     defer {
       reads += 1
       if reads == archiveAfterReads {
-        try? stored.archive(at: stored.updatedAt)
+        try? stored.archive(at: stored.updatedAt, cause: .user)
       }
     }
     return stored

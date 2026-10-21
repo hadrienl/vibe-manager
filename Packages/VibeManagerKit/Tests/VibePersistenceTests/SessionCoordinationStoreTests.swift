@@ -36,8 +36,8 @@ struct SessionCoordinationStoreTests {
     let codec = SessionStoreCodec()
     let v10 = String(
       decoding: try codec.encode(sessions: [session("A"), session("B")]), as: UTF8.self)
-    #expect(v10.contains(#""schemaVersion" : 10"#))
-    let v9 = v10.replacingOccurrences(of: #""schemaVersion" : 10"#, with: #""schemaVersion" : 9"#)
+    #expect(v10.contains(#""schemaVersion" : 11"#))
+    let v9 = v10.replacingOccurrences(of: #""schemaVersion" : 11"#, with: #""schemaVersion" : 9"#)
 
     let decoded = try codec.decode(Data(v9.utf8))
 
