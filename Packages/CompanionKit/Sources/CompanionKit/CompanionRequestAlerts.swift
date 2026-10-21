@@ -57,14 +57,17 @@ public enum CompanionRequestAlerts {
     return subscription
   }
 
-  /// What the extension writes in the alert: the session as its title, the agent and what it waits
-  /// for as its text. `nil` for a request with no text to show — the generic alert says more.
-  public static func alert(for request: CompanionRequest) -> (title: String, body: String)? {
+  /// What the extension writes in the alert: the session as its title, what the agent waits for
+  /// as its text, in the phone's language — `phrase` makes it of the agent's name and the request's
+  /// code (`CompanionRequests.waitingText`, `testText`). `nil` for a request with nothing to show:
+  /// the generic alert says more.
+  public static func alert(
+    for request: CompanionRequest, phrase: (_ agent: String, _ code: String) -> String
+  ) -> (title: String, body: String)? {
     let title = request.sessionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-    let body = [request.agent, request.text]
-      .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-      .filter { !$0.isEmpty }
-      .joined(separator: " ")
+    let body = phrase(
+      request.agent.trimmingCharacters(in: .whitespacesAndNewlines),
+      request.text.trimmingCharacters(in: .whitespacesAndNewlines))
     guard !title.isEmpty || !body.isEmpty else { return nil }
     return (title, body)
   }

@@ -12,7 +12,7 @@ struct SearchSheet: View {
     NavigationStack {
       List {
         if query.isEmpty {
-          Section("Récentes") {
+          Section("Recent") {
             ForEach(recent) { session in
               row(session, reason: session.folderName, isArchived: false)
             }
@@ -26,20 +26,20 @@ struct SearchSheet: View {
             }
           } footer: {
             if channel.searchResults.isEmpty {
-              Text("Aucune session ne correspond à « \(query) ».")
+              Text("No session matches “\(query)”.")
             } else {
               Text(
-                "Tape un ticket (#36, owner/repo#36), l’adresse d’une pull ou merge request, une branche, un dossier ou un titre."
+                "Type a ticket (#36, owner/repo#36), a pull or merge request URL, a branch, a folder or a title."
               )
             }
           }
         }
       }
-      .navigationTitle("Ouvrir une session")
+      .navigationTitle("Open Quickly")
       .navigationBarTitleDisplayMode(.inline)
       .searchable(
         text: $query, placement: .navigationBarDrawer(displayMode: .always),
-        prompt: "Ticket, PR, branche, dossier, titre")
+        prompt: "Ticket, PR, branch, folder, title")
       .onChange(of: query) { _, text in
         guard !text.isEmpty else { return }
         channel.search(text)
@@ -64,7 +64,7 @@ struct SearchSheet: View {
           HStack {
             Text(verbatim: session.name).font(.body.weight(.semibold)).lineLimit(1)
             if isArchived {
-              Text("Archivée")
+              Text("Archived")
                 .font(.caption2.weight(.semibold))
                 .padding(.horizontal, 6)
                 .padding(.vertical, 2)

@@ -52,11 +52,11 @@
 		A00000000000000000000023 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000010 /* IrohLib */; };
 		A00000000000000000000024 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000011 /* IrohLib */; };
 		A00000000000000000000025 /* CompanionNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* CompanionNotifications.swift */; };
-		A00000000000000000000026 /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Localizable.strings */; };
+		A00000000000000000000026 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Localizable.xcstrings */; };
 		A00000000000000000000027 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000024 /* NotificationService.swift */; };
 		A00000000000000000000028 /* CompanionCore in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000012 /* CompanionCore */; };
 		A00000000000000000000029 /* CompanionKit in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000013 /* CompanionKit */; };
-		A0000000000000000000002A /* Localizable.strings in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Localizable.strings */; };
+		A0000000000000000000002A /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000023 /* Localizable.xcstrings */; };
 		A0000000000000000000002B /* VibeCompanionNotificationService.appex in Embed the notification service */ = {isa = PBXBuildFile; fileRef = B00000000000000000000027 /* VibeCompanionNotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
@@ -101,8 +101,7 @@
 		B0000000000000000000001E /* CompanionChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionChannel.swift; sourceTree = "<group>"; };
 		B0000000000000000000001F /* ChannelSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSection.swift; sourceTree = "<group>"; };
 		B00000000000000000000020 /* CompanionNotifications.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionNotifications.swift; sourceTree = "<group>"; };
-		B00000000000000000000021 /* en */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = en; path = en.lproj/Localizable.strings; sourceTree = "<group>"; };
-		B00000000000000000000022 /* fr */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = fr; path = fr.lproj/Localizable.strings; sourceTree = "<group>"; };
+		B00000000000000000000023 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		B00000000000000000000024 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		B00000000000000000000025 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		B00000000000000000000026 /* VibeCompanionNotificationService.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = VibeCompanionNotificationService.entitlements; sourceTree = "<group>"; };
@@ -324,7 +323,7 @@
 				B0000000000000000000001F /* ChannelSection.swift */,
 				B00000000000000000000020 /* CompanionNotifications.swift */,
 				B0000000000000000000001B /* Assets.xcassets */,
-				B00000000000000000000023 /* Localizable.strings */,
+				B00000000000000000000023 /* Localizable.xcstrings */,
 				B00000000000000000000015 /* Info.plist */,
 				B00000000000000000000016 /* VibeCompanion.entitlements */,
 			);
@@ -556,7 +555,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A0000000000000000000001D /* Assets.xcassets in Resources */,
-				A00000000000000000000026 /* Localizable.strings in Resources */,
+				A00000000000000000000026 /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -564,7 +563,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A0000000000000000000002A /* Localizable.strings in Resources */,
+				A0000000000000000000002A /* Localizable.xcstrings in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -653,18 +652,6 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
-
-/* Begin PBXVariantGroup section */
-		B00000000000000000000023 /* Localizable.strings */ = {
-			isa = PBXVariantGroup;
-			children = (
-				B00000000000000000000021 /* en */,
-				B00000000000000000000022 /* fr */,
-			);
-			name = Localizable.strings;
-			sourceTree = "<group>";
-		};
-/* End PBXVariantGroup section */
 
 /* Begin PBXTargetDependency section */
 		K00000000000000000000001 /* PBXTargetDependency */ = {

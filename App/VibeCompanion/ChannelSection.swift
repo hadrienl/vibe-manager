@@ -11,7 +11,7 @@ struct ChannelSection: View {
 
   var body: some View {
     Section {
-      LabeledContent("État") {
+      LabeledContent("State") {
         HStack(spacing: 6) {
           Circle().fill(tint).frame(width: 10, height: 10).accessibilityHidden(true)
           Text(verbatim: state).multilineTextAlignment(.trailing)
@@ -20,8 +20,8 @@ struct ChannelSection: View {
       LabeledContent("Mac") {
         Text(verbatim: channel.remote ?? "–").font(.footnote.monospaced())
       }
-      LabeledContent("Établissement", value: Self.milliseconds(channel.setup))
-      LabeledContent("Chemin") {
+      LabeledContent("Setup", value: Self.milliseconds(channel.setup))
+      LabeledContent("Path") {
         VStack(alignment: .trailing, spacing: 2) {
           Text(verbatim: pathLabel)
           if let address = channel.pathAddress {
@@ -29,39 +29,41 @@ struct ChannelSection: View {
           }
         }
       }
-      LabeledContent("RTT dernier", value: Self.milliseconds(channel.roundTrips.last))
+      LabeledContent("Last RTT", value: Self.milliseconds(channel.roundTrips.last))
       LabeledContent(
         "RTT p50 / p95",
         value:
           "\(Self.milliseconds(channel.roundTrips.p50)) / \(Self.milliseconds(channel.roundTrips.p95))"
       )
-      LabeledContent("Temps en relais", value: share)
-      LabeledContent("Bascules", value: "\(channel.ledger.switches)")
-      LabeledContent("Échantillons", value: "\(channel.samples.count)")
-      Button("Reconnecter") { channel.open(to: model.selectedMac) }
+      LabeledContent("Time Through Relay", value: share)
+      LabeledContent("Switches", value: "\(channel.ledger.switches)")
+      LabeledContent("Samples", value: "\(channel.samples.count)")
+      Button("Reconnect") { channel.open(to: model.selectedMac) }
       ShareLink(
         item: EchoExport(text: channel.csv),
-        preview: SharePreview("Échos iroh (\(channel.samples.count))")
+        preview: SharePreview(Text("iroh Echoes (\(channel.samples.count))"))
       ) {
-        Label("Exporter les échantillons (CSV)", systemImage: "square.and.arrow.up")
+        Label("Export Samples (CSV)", systemImage: "square.and.arrow.up")
       }
       .disabled(channel.samples.isEmpty)
     } header: {
-      Text("Canal direct · iroh")
+      Text("Direct Channel · iroh")
     } footer: {
       Text(
-        "Un écho par seconde, app au premier plan ; RTT sur les \(CompanionEcho.window) derniers. Relais publics n0 en repli, CloudKit si le canal échoue."
+        "One echo a second while the app is open; RTT over the last \(CompanionEcho.window). n0’s public relays as a fallback, CloudKit if the channel fails."
       )
     }
   }
 
   private var state: String {
     switch channel.phase {
-    case .closed: "fermé"
-    case .noEndpoint: "le Mac ne publie pas d’endpoint"
-    case .connecting: "connexion…"
-    case .connected: channel.path == .relay ? "connecté, relais" : "connecté, direct"
-    case .failed(let reason): "échec → CloudKit (\(reason))"
+    case .closed: String(localized: "closed")
+    case .noEndpoint: String(localized: "the Mac publishes no endpoint")
+    case .connecting: String(localized: "connecting…")
+    case .connected:
+      channel.path == .relay
+        ? String(localized: "connected, relay") : String(localized: "connected, direct")
+    case .failed(let reason): String(localized: "failed → CloudKit (\(reason))")
     }
   }
 
@@ -77,9 +79,9 @@ struct ChannelSection: View {
   private var pathLabel: String {
     guard channel.phase == .connected else { return "–" }
     switch channel.path {
-    case .direct: return "direct"
-    case .relay: return "relais"
-    case .unknown: return "inconnu"
+    case .direct: return String(localized: "direct")
+    case .relay: return String(localized: "relay")
+    case .unknown: return String(localized: "unknown")
     }
   }
 

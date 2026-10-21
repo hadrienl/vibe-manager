@@ -53,7 +53,7 @@ final class RemoteChannel {
   /// The session just created from the phone, for the list to show it.
   var createdSessionID: String?
   /// The last thing the Mac could not do, for an alert.
-  var failure: String?
+  var failure: RemoteFailure?
   /// This phone's endpoint, once bound: what pairing writes.
   private(set) var endpointID: String?
   private(set) var path = CompanionPathKind.unknown
@@ -91,7 +91,7 @@ final class RemoteChannel {
     for (id, continuation) in fetches {
       continuation.resume(
         returning: RemoteHTTPResponse(
-          id: id, status: 0, headers: [:], body: Data(), failure: "Liaison coupée"))
+          id: id, status: 0, headers: [:], body: Data(), failure: String(localized: "Connection lost")))
     }
     fetches = [:]
     attempt += 1
@@ -212,8 +212,8 @@ final class RemoteChannel {
       }
     case .created(let id):
       createdSessionID = id
-    case .failure(let text):
-      failure = text
+    case .failure(let reason):
+      failure = reason
     case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart, .httpRequest, .folderIcon, .close:
       break
     }
@@ -309,7 +309,7 @@ final class RemoteChannel {
     let id = nextFetch
     guard sending != nil else {
       return RemoteHTTPResponse(
-        id: id, status: 0, headers: [:], body: Data(), failure: "Pas de liaison avec le Mac")
+        id: id, status: 0, headers: [:], body: Data(), failure: String(localized: "Not connected to the Mac"))
     }
     return await withCheckedContinuation { continuation in
       fetches[id] = continuation

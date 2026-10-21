@@ -23,6 +23,16 @@ struct ConversationView: View {
     channel.conversation?.sessionID == sessionID ? channel.conversation : nil
   }
 
+  @Environment(\.colorScheme) private var colorScheme
+
+  /// The session's theme, as the Mac draws its conversation (#274), in the phone's appearance.
+  private var palette: ConversationPalette {
+    guard let theme = conversation?.theme ?? lastTheme else { return .system }
+    return ConversationPalette(colorScheme == .dark ? theme.dark : theme.light, font: theme.fontStyle)
+  }
+  /// Kept while a conversation reloads, so that the colours do not flash.
+  @State private var lastTheme: RemoteTheme?
+
   var body: some View {
     ScrollView {
       LazyVStack(alignment: .leading, spacing: 10) {
@@ -38,12 +48,18 @@ struct ConversationView: View {
       .padding(.vertical, 12)
     }
     .defaultScrollAnchor(.bottom)
+    .background(palette.background.ignoresSafeArea())
+    .foregroundStyle(palette.text)
+    .fontDesign(palette.fontDesign)
+    .tint(palette.accent)
+    .environment(\.conversationPalette, palette)
+    .onChange(of: conversation?.theme) { _, theme in if let theme { lastTheme = theme } }
     .scrollDismissesKeyboard(.interactively)
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 8) {
         if isWorking, conversation?.request == nil {
           WorkingLine(
-            agent: session?.agentName ?? "L’agent", tool: runningTool,
+            agent: session?.agentName ?? String(localized: "The agent"), tool: runningTool,
             interrupt: { channel.interrupt(sessionID) })
         }
         if let request = conversation?.request {
@@ -66,12 +82,12 @@ struct ConversationView: View {
         NavigationLink {
           WebMirrorView(sessionID: sessionID)
         } label: {
-          Label("Vue web", systemImage: "globe")
+          Label("Web View", systemImage: "globe")
         }
       }
       ToolbarItem(placement: .topBarTrailing) {
-        Menu("Plus", systemImage: "ellipsis") {
-          Button("Fermer la session", systemImage: "power", role: .destructive) {
+        Menu("More", systemImage: "ellipsis") {
+          Button("Close Session", systemImage: "power", role: .destructive) {
             showsCloseConfirmation = true
           }
           .disabled(session == nil || session?.activity == .stopped)
@@ -79,11 +95,11 @@ struct ConversationView: View {
       }
     }
     .confirmationDialog(
-      "Fermer la session ?", isPresented: $showsCloseConfirmation, titleVisibility: .visible
+      "Close the session?", isPresented: $showsCloseConfirmation, titleVisibility: .visible
     ) {
-      Button("Fermer la session", role: .destructive) { channel.close(sessionID) }
+      Button("Close Session", role: .destructive) { channel.close(sessionID) }
     } message: {
-      Text("L’agent s’arrête. La session garde sa conversation et peut être relancée.")
+      Text("The agent stops. The session keeps its conversation and can be restarted.")
     }
     .onAppear { channel.show(sessionID) }
     .onDisappear { if channel.conversation?.sessionID == sessionID { channel.show(nil) } }
@@ -92,10 +108,10 @@ struct ConversationView: View {
   private var subtitle: String {
     guard let session else { return "" }
     switch session.activity {
-    case .working: return "\(session.agentName) au travail"
-    case .needsAttention: return "\(session.agentName) attend ta réponse"
-    case .idle: return "\(session.agentName) · à toi de jouer"
-    case .stopped: return "\(session.agentName) · arrêté"
+    case .working: return String(localized: "\(session.agentName) is working")
+    case .needsAttention: return String(localized: "\(session.agentName) is waiting for you")
+    case .idle: return String(localized: "\(session.agentName) · your turn")
+    case .stopped: return String(localized: "\(session.agentName) · stopped")
     }
   }
 
@@ -104,18 +120,18 @@ struct ConversationView: View {
   private func closedBar(_ session: RemoteSession) -> some View {
     HStack(spacing: 12) {
       VStack(alignment: .leading, spacing: 2) {
-        Text(session.hasStarted ? "Session fermée" : "Session jamais lancée")
+        Text(session.hasStarted ? "Session Closed" : "Session Never Started")
           .font(.subheadline.weight(.semibold))
         Text(
           session.hasStarted
-            ? "L’agent ne tourne plus. Relance-le pour lui écrire."
-            : "Démarre l’agent pour lui écrire."
+            ? "Its agent no longer runs. Restart it to write to it."
+            : "Start its agent to write to it."
         )
         .font(.footnote)
         .foregroundStyle(.secondary)
       }
       Spacer(minLength: 0)
-      Button(session.hasStarted ? "Relancer" : "Démarrer", systemImage: "play.fill") {
+      Button(session.hasStarted ? "Restart" : "Start", systemImage: "play.fill") {
         channel.restart(sessionID)
       }
       .buttonStyle(.glassProminent)
@@ -153,7 +169,7 @@ struct ConversationView: View {
               HStack(spacing: 4) {
                 Image(systemName: Self.isImage(file.name) ? "photo" : "doc")
                 Text(verbatim: file.name).lineLimit(1)
-                Button("Retirer", systemImage: "xmark.circle.fill") { files.remove(at: index) }
+                Button("Remove", systemImage: "xmark.circle.fill") { files.remove(at: index) }
                   .labelStyle(.iconOnly)
                   .foregroundStyle(.secondary)
               }
@@ -169,9 +185,9 @@ struct ConversationView: View {
       HStack(alignment: .bottom, spacing: 8) {
         Menu {
           Button("Photos", systemImage: "photo.on.rectangle") { showsPhotos = true }
-          Button("Appareil photo", systemImage: "camera") { showsCamera = true }
+          Button("Camera", systemImage: "camera") { showsCamera = true }
             .disabled(!UIImagePickerController.isSourceTypeAvailable(.camera))
-          Button("Fichiers", systemImage: "folder") { showsFiles = true }
+          Button("Files", systemImage: "folder") { showsFiles = true }
         } label: {
           Image(systemName: "plus")
             .font(.body.weight(.semibold))
@@ -179,9 +195,9 @@ struct ConversationView: View {
         }
         .buttonStyle(.glass)
         .buttonBorderShape(.circle)
-        .accessibilityLabel("Joindre une image ou un fichier")
+        .accessibilityLabel("Attach a Photo or a File")
         TextField(
-          "Écrire à \(session?.agentName ?? "l’agent")…", text: $draft, axis: .vertical
+          "Message \(session?.agentName ?? String(localized: "the agent"))…", text: $draft, axis: .vertical
         )
         .lineLimit(1...6)
         .focused($fieldFocused)
@@ -202,7 +218,7 @@ struct ConversationView: View {
         .buttonStyle(.glassProminent)
         .buttonBorderShape(.circle)
         .disabled(!canSend)
-        .accessibilityLabel("Envoyer")
+        .accessibilityLabel("Send")
       }
       .padding(.horizontal, 12)
     }
@@ -236,7 +252,8 @@ struct ConversationView: View {
         let scoped = url.startAccessingSecurityScopedResource()
         defer { if scoped { url.stopAccessingSecurityScopedResource() } }
         guard let data = try? Data(contentsOf: url), data.count < 6_000_000 else {
-          channel.failure = "« \(url.lastPathComponent) » est trop gros pour être envoyé (6 Mo au plus)."
+          channel.failure = .other(
+            String(localized: "“\(url.lastPathComponent)” is too large to send (6 MB at most)."))
           continue
         }
         files.append(RemoteFile(name: url.lastPathComponent, data: data))
@@ -307,6 +324,7 @@ private struct CameraPicker: UIViewControllerRepresentable {
 
 private struct EntryView: View {
   let entry: RemoteEntry
+  @Environment(\.conversationPalette) private var palette
 
   var body: some View {
     switch entry.kind {
@@ -319,8 +337,8 @@ private struct EntryView: View {
           Text(verbatim: text)
             .padding(.horizontal, 13)
             .padding(.vertical, 9)
-            .foregroundStyle(.white)
-            .background(Color.accentColor, in: .rect(cornerRadius: 18))
+            .foregroundStyle(palette.bubbleText)
+            .background(palette.bubble, in: .rect(cornerRadius: 18))
             .textSelection(.enabled)
         }
       }
@@ -333,11 +351,11 @@ private struct EntryView: View {
     case .tool(let symbol, let title, let detail, let running, let failed):
       HStack(spacing: 8) {
         Image(systemName: symbol)
-          .foregroundStyle(failed ? Color.red : .secondary)
+          .foregroundStyle(failed ? palette.failure : palette.secondaryText)
           .frame(width: 18)
         Text(verbatim: title).lineLimit(1)
         if let detail {
-          Text(verbatim: detail).foregroundStyle(.secondary).lineLimit(1)
+          Text(verbatim: detail).foregroundStyle(palette.secondaryText).lineLimit(1)
         }
         Spacer(minLength: 0)
         if running { ProgressView().controlSize(.mini) }
@@ -345,11 +363,18 @@ private struct EntryView: View {
       .font(.footnote)
       .padding(.horizontal, 10)
       .padding(.vertical, 7)
-      .background(Color(.secondarySystemBackground), in: .rect(cornerRadius: 10))
-    case .notice(let text):
-      Text(verbatim: text)
+      .background(palette.raised, in: .rect(cornerRadius: 10))
+    case .notice(let notice):
+      Group {
+        switch notice {
+        case .interrupted: Text("Interrupted")
+        case .compacted: Text("Conversation summarized")
+        case .shell(let command): Text(verbatim: "$ \(command)")
+        case .error(let text): Text(verbatim: text)
+        }
+      }
         .font(.caption)
-        .foregroundStyle(.secondary)
+        .foregroundStyle(palette.secondaryText)
         .frame(maxWidth: .infinity)
     }
   }
@@ -418,7 +443,7 @@ private struct ZoomedImage: View {
       .background(.black)
       .onTapGesture { dismiss() }
       .accessibilityAddTraits(.isButton)
-      .accessibilityLabel("Fermer l’image")
+      .accessibilityLabel("Close the Image")
   }
 }
 
@@ -445,7 +470,14 @@ private struct RequestCard: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Label {
-        Text(verbatim: request.title).font(.subheadline.weight(.semibold))
+        Group {
+          if request.title.isEmpty {
+            Text(request.kind == .permission ? "Allow this command?" : "The agent asks you")
+          } else {
+            Text(verbatim: request.title)
+          }
+        }
+        .font(.subheadline.weight(.semibold))
       } icon: {
         Image(systemName: request.kind == .permission ? "checkmark.shield" : "questionmark.bubble")
       }
@@ -462,7 +494,7 @@ private struct RequestCard: View {
           Button(role: choice.isDestructive ? .destructive : nil) {
             channel.answer(request, in: sessionID, choiceIDs: [choice.id], text: nil)
           } label: {
-            Text(verbatim: choice.label).frame(maxWidth: .infinity, minHeight: 30)
+            Text(Self.label(of: choice)).frame(maxWidth: .infinity, minHeight: 30)
           }
           .buttonStyle(choice.id == "allowOnce" ? AnyButtonStyle(.glassProminent) : AnyButtonStyle(.glass))
         }
@@ -487,7 +519,7 @@ private struct RequestCard: View {
           .buttonStyle(.plain)
         }
         if request.allowsText {
-          TextField("Autre réponse…", text: $text)
+          TextField("Another answer…", text: $text)
             .textFieldStyle(.roundedBorder)
         }
         Button {
@@ -495,7 +527,7 @@ private struct RequestCard: View {
             request, in: sessionID, choiceIDs: Array(selection),
             text: text.isEmpty ? nil : text)
         } label: {
-          Text("Répondre").frame(maxWidth: .infinity, minHeight: 30)
+          Text("Answer").frame(maxWidth: .infinity, minHeight: 30)
         }
         .buttonStyle(.glassProminent)
         .disabled(selection.isEmpty && text.isEmpty)
@@ -506,6 +538,16 @@ private struct RequestCard: View {
     .onChange(of: request.id) { _, _ in
       selection = []
       text = ""
+    }
+  }
+
+  /// A permission's choices come unlabelled: said here, in the phone's language.
+  static func label(of choice: RemoteChoice) -> String {
+    switch choice.id {
+    case "allowOnce": String(localized: "Allow")
+    case "allowAlways": String(localized: "Always Allow")
+    case "deny": String(localized: "Deny")
+    default: choice.label
     }
   }
 
@@ -541,21 +583,21 @@ private struct WorkingLine: View {
       ProgressView().controlSize(.small)
       Group {
         if let tool {
-          Text("\(agent) exécute \(tool)…")
+          Text("\(agent) is running \(tool)…")
         } else {
-          Text("\(agent) écrit…")
+          Text("\(agent) is writing…")
         }
       }
       .lineLimit(1)
       .truncationMode(.middle)
       Spacer()
       Button(action: interrupt) {
-        Label("Interrompre", systemImage: "stop.fill")
+        Label("Interrupt", systemImage: "stop.fill")
           .labelStyle(.titleAndIcon)
           .font(.footnote.weight(.semibold))
       }
       .buttonStyle(.glass)
-      .accessibilityLabel("Interrompre l’agent")
+      .accessibilityLabel("Interrupt the Agent")
     }
     .font(.footnote)
     .foregroundStyle(.secondary)
@@ -573,6 +615,54 @@ private struct TypingDots: View {
           .opacity(1 - Double(index) * 0.3)
       }
     }
-    .accessibilityLabel("L’agent travaille")
+    .accessibilityLabel("The agent is working")
   }
+}
+
+/// The colours of a conversation, from its theme or the system's.
+struct ConversationPalette {
+  var background: Color
+  var raised: Color
+  var text: Color
+  var secondaryText: Color
+  var accent: Color
+  var bubble: Color
+  var bubbleText: Color
+  var failure: Color
+  var fontDesign: Font.Design
+
+  static let system = ConversationPalette(
+    background: Color(.systemBackground), raised: Color(.secondarySystemBackground),
+    text: .primary, secondaryText: .secondary, accent: .accentColor, bubble: .accentColor,
+    bubbleText: .white, failure: .red, fontDesign: .default)
+
+  init(
+    background: Color, raised: Color, text: Color, secondaryText: Color, accent: Color,
+    bubble: Color, bubbleText: Color, failure: Color, fontDesign: Font.Design
+  ) {
+    self.background = background
+    self.raised = raised
+    self.text = text
+    self.secondaryText = secondaryText
+    self.accent = accent
+    self.bubble = bubble
+    self.bubbleText = bubbleText
+    self.failure = failure
+    self.fontDesign = fontDesign
+  }
+
+  init(_ theme: RemotePalette, font: String) {
+    func color(_ hex: String, _ fallback: Color) -> Color { Color(hex: hex) ?? fallback }
+    self.init(
+      background: color(theme.background, Color(.systemBackground)),
+      raised: color(theme.raised, Color(.secondarySystemBackground)),
+      text: color(theme.text, .primary), secondaryText: color(theme.secondaryText, .secondary),
+      accent: color(theme.accent, .accentColor), bubble: color(theme.bubble, .accentColor),
+      bubbleText: color(theme.bubbleText, .white), failure: color(theme.failure, .red),
+      fontDesign: font == "serif" ? .serif : font == "monospaced" ? .monospaced : .default)
+  }
+}
+
+extension EnvironmentValues {
+  @Entry var conversationPalette = ConversationPalette.system
 }

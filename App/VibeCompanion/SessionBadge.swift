@@ -61,24 +61,28 @@ extension Color {
       })
   }
 
-  /// `#RRGGBB`, as the Mac stores a session's colour.
+  /// `#RRGGBB`, as the Mac stores a session's colour, or `#RRGGBBAA`.
   init?(hex: String) {
     let digits = hex.trimmingCharacters(in: CharacterSet(charactersIn: "# "))
-    guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return nil }
+    guard digits.count == 6 || digits.count == 8, let value = UInt32(digits, radix: 16) else {
+      return nil
+    }
+    let rgb = digits.count == 8 ? value >> 8 : value
+    let alpha = digits.count == 8 ? Double(value & 0xFF) / 255 : 1
     self.init(
-      red: Double((value >> 16) & 0xFF) / 255, green: Double((value >> 8) & 0xFF) / 255,
-      blue: Double(value & 0xFF) / 255)
+      red: Double((rgb >> 16) & 0xFF) / 255, green: Double((rgb >> 8) & 0xFF) / 255,
+      blue: Double(rgb & 0xFF) / 255, opacity: alpha)
   }
 }
 
 extension RemoteTaskStatus {
   var label: LocalizedStringKey {
     switch self {
-    case .todo: "À faire"
-    case .doing: "En cours"
-    case .waiting: "En attente"
-    case .done: "Terminé"
-    case .archived: "Archivée"
+    case .todo: "To Do"
+    case .doing: "In Progress"
+    case .waiting: "Waiting"
+    case .done: "Done"
+    case .archived: "Archived"
     }
   }
 
@@ -105,9 +109,9 @@ extension RemoteTaskStatus {
     }
   }
 
-  /// What its swipe button says: Archiver rather than Archivée.
+  /// What its swipe button says: Archive rather than Archived.
   var buttonTitle: LocalizedStringKey {
-    self == .archived ? "Archiver" : label
+    self == .archived ? "Archive" : label
   }
 
   /// The four columns of the Mac's sidebar.
@@ -129,12 +133,24 @@ extension RemoteTaskStatus {
 extension RemoteSession {
   /// The second line of its row: what it waits for, or who it is.
   var subtitle: String {
-    if let detail, activity == .needsAttention { return detail }
+    if let waitingFor, activity == .needsAttention { return waitingFor.text }
     switch activity {
-    case .working: return "\(agentName) · au travail"
-    case .needsAttention: return "\(agentName) · attend ta réponse"
-    case .idle: return "\(agentName) · à toi de jouer"
+    case .working: return String(localized: "\(agentName) · working")
+    case .needsAttention: return String(localized: "\(agentName) · waiting for you")
+    case .idle: return String(localized: "\(agentName) · your turn")
     case .stopped: return agentName
+    }
+  }
+}
+
+extension RemoteWait {
+  /// On one line, as the Mac's sidebar says it.
+  var text: String {
+    switch self {
+    case .permission(let subject): String(localized: "Permission: \(subject)")
+    case .question(let question): String(localized: "Question: \(question)")
+    case .plan: String(localized: "Plan to approve")
+    case .other: String(localized: "Waiting for your answer")
     }
   }
 }

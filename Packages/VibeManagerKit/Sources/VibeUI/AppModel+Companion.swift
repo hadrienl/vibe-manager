@@ -53,12 +53,12 @@ extension AppModel {
     name: String, folder: String, providerID: String, modelID: String?, prompt: String,
     start: Bool, coordinates: Bool, appearance: SessionAppearance? = nil
   ) async throws -> SessionID {
-    guard let agents else { throw CompanionCreationError("Aucun agent n’est connu du Mac.") }
+    guard let agents else { throw CompanionCreationError.noAgent }
     let path = (folder as NSString).expandingTildeInPath
     var isDirectory: ObjCBool = false
     guard FileManager.default.fileExists(atPath: path, isDirectory: &isDirectory),
       isDirectory.boolValue
-    else { throw CompanionCreationError("Ce dossier n’existe pas sur le Mac.") }
+    else { throw CompanionCreationError.folderMissing }
     let given = name.trimmingCharacters(in: .whitespacesAndNewlines)
     let firstLine =
       prompt.split(whereSeparator: \.isNewline).first.map(String.init)?
@@ -82,7 +82,7 @@ extension AppModel {
     do {
       creation = try await create(withIcon)
     } catch let rejected as SessionCreationRejected {
-      throw CompanionCreationError(
+      throw CompanionCreationError.rejected(
         rejected.issues.map { $0.errorDescription ?? "\($0)" }.joined(separator: " "))
     }
     await publish(creation, launching: start, tracked: false, follows: false)
@@ -90,11 +90,10 @@ extension AppModel {
   }
 }
 
-/// Why the companion's session was not created, in words for the user.
-public struct CompanionCreationError: LocalizedError {
-  public let errorDescription: String?
-
-  init(_ text: String) {
-    errorDescription = text
-  }
+/// Why the companion's session was not created: the phone says the first two in its language;
+/// the Mac's sheet already words a rejected draft, in the Mac's.
+public enum CompanionCreationError: Error {
+  case noAgent
+  case folderMissing
+  case rejected(String)
 }

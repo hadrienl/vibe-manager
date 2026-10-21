@@ -30,7 +30,7 @@ final class NotificationService: UNNotificationServiceExtension {
     pending.begin(generic: generic, handler: contentHandler)
     guard let recordID = CompanionRequestAlerts.recordID(fromPush: request.content.userInfo) else {
       Self.logger.notice("push: not a request's, delivered as it came")
-      pending.deliver(nil, diagnostic: "pas une demande")
+      pending.deliver(nil, diagnostic: "not a request")
       return
     }
     Self.logger.notice("push: request \(recordID.recordName, privacy: .public), fetching")
@@ -38,10 +38,10 @@ final class NotificationService: UNNotificationServiceExtension {
     Task {
       do {
         guard let companionRequest = try await CompanionRequestAlerts.fetchRequest(recordID),
-          let alert = CompanionRequestAlerts.alert(for: companionRequest)
+          let alert = CompanionRequestAlerts.alert(for: companionRequest, phrase: Self.phrase)
         else {
           Self.logger.error("fetch: no request to read, generic alert")
-          pending.deliver(nil, diagnostic: "demande illisible")
+          pending.deliver(nil, diagnostic: "unreadable request")
           return
         }
         Self.logger.notice("fetch: request read, alert written")
@@ -54,10 +54,18 @@ final class NotificationService: UNNotificationServiceExtension {
     }
   }
 
+  /// What the agent waits for, in the phone's language.
+  static func phrase(agent: String, code: String) -> String {
+    let name = agent.isEmpty ? String(localized: "The agent") : agent
+    return code == CompanionRequests.testText
+      ? String(localized: "\(name) sends you a test notification")
+      : String(localized: "\(name) is waiting for your answer")
+  }
+
   /// iOS's time is up: the generic alert, unless the fetch delivered just before.
   override func serviceExtensionTimeWillExpire() {
     Self.logger.error("fetch: out of time, generic alert")
-    pending.deliver(nil, diagnostic: "délai dépassé")
+    pending.deliver(nil, diagnostic: "out of time")
   }
 }
 

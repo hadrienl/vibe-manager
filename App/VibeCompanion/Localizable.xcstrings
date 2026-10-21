@@ -1,0 +1,2407 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "%@ %lld" : {
+      "comment" : "A column of the session list and how many sessions it holds: “In Progress 3”.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ %2$lld"
+          }
+        }
+      }
+    },
+    "%@ ago" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "il y a %@"
+          }
+        }
+      }
+    },
+    "%@ Is Asleep" : {
+      "comment" : "Banner: the Mac (its name) is asleep.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ en veille"
+          }
+        }
+      }
+    },
+    "%@ Is Offline" : {
+      "comment" : "Banner: the Mac (its name) is offline.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ hors ligne"
+          }
+        }
+      }
+    },
+    "%@ is running %@…" : {
+      "comment" : "Line over the field: the agent runs a tool (its title).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ exécute %2$@…"
+          }
+        }
+      }
+    },
+    "%@ is waiting for you" : {
+      "comment" : "Conversation subtitle.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ attend ta réponse"
+          }
+        }
+      }
+    },
+    "%@ is waiting for your answer" : {
+      "comment" : "Notification body: the agent (its name) waits for the user.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ attend votre réponse"
+          }
+        }
+      }
+    },
+    "%@ is working" : {
+      "comment" : "Conversation subtitle: the agent's name, then what it does.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ au travail"
+          }
+        }
+      }
+    },
+    "%@ is writing…" : {
+      "comment" : "Line over the field: the agent writes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ écrit…"
+          }
+        }
+      }
+    },
+    "%@ sends you a test notification" : {
+      "comment" : "Notification body of the test notification; the argument is the Mac's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ vous envoie une notification de test"
+          }
+        }
+      }
+    },
+    "%@ · stopped" : {
+      "comment" : "Conversation subtitle: the agent does not run.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · arrêté"
+          }
+        }
+      }
+    },
+    "%@ · waiting for you" : {
+      "comment" : "Second line of a session's row: the agent waits for the user.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · attend ta réponse"
+          }
+        }
+      }
+    },
+    "%@ · working" : {
+      "comment" : "Second line of a session's row: the agent's name, then what it does.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · au travail"
+          }
+        }
+      }
+    },
+    "%@ · your turn" : {
+      "comment" : "Second line of a session's row: the agent waits for an instruction.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ · à toi de jouer"
+          }
+        }
+      }
+    },
+    "%lld min" : {
+      "comment" : "When a session last moved: this many minutes ago.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%lld min"
+          }
+        }
+      }
+    },
+    "%lld of %lld" : {
+      "comment" : "Web view: which tab is shown, among how many.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$lld sur %2$lld"
+          }
+        }
+      }
+    },
+    "About" : {
+      "comment" : "Settings section.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À propos"
+          }
+        }
+      }
+    },
+    "Account" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte"
+          }
+        }
+      }
+    },
+    "Acknowledged: round trip %@" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accusé de réception : aller-retour %@"
+          }
+        }
+      }
+    },
+    "Active Sessions on the Mac · %lld" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sessions actives sur le Mac · %lld"
+          }
+        }
+      }
+    },
+    "Address" : {
+      "comment" : "Web view: address field placeholder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adresse"
+          }
+        }
+      }
+    },
+    "Agent" : {
+      "comment" : "New session: the agent picker.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent"
+          }
+        }
+      }
+    },
+    "Agent’s Default" : {
+      "comment" : "New session: no model chosen, the agent decides.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par défaut de l’agent"
+          }
+        }
+      }
+    },
+    "Allow" : {
+      "comment" : "Answers a permission request: allow once.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser"
+          }
+        }
+      }
+    },
+    "Allow this command?" : {
+      "comment" : "Title of a permission request when the agent gives no reason.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autoriser cette commande ?"
+          }
+        }
+      }
+    },
+    "Always Allow" : {
+      "comment" : "Answers a permission request: allow from now on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toujours autoriser"
+          }
+        }
+      }
+    },
+    "Another answer…" : {
+      "comment" : "Free answer to an agent's question.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autre réponse…"
+          }
+        }
+      }
+    },
+    "Answer" : {
+      "comment" : "Sends the answer to an agent's question.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Répondre"
+          }
+        }
+      }
+    },
+    "APNs Registration" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Enregistrement APNs"
+          }
+        }
+      }
+    },
+    "Archive" : {
+      "comment" : "Swipe button that archives a session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archiver"
+          }
+        }
+      }
+    },
+    "Archived" : {
+      "comment" : "A session's status: archived.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Archivée"
+          }
+        }
+      }
+    },
+    "Asleep · seen %@" : {
+      "comment" : "Settings: a Mac's state and when it was last seen.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En veille · vu %@"
+          }
+        }
+      }
+    },
+    "Attach a Photo or a File" : {
+      "comment" : "VoiceOver label of the + button.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Joindre une image ou un fichier"
+          }
+        }
+      }
+    },
+    "available" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "disponible"
+          }
+        }
+      }
+    },
+    "Back" : {
+      "comment" : "Web view: previous page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page précédente"
+          }
+        }
+      }
+    },
+    "Camera" : {
+      "comment" : "Attachment menu: take a photo.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Appareil photo"
+          }
+        }
+      }
+    },
+    "Cancel" : {
+      "comment" : "Closes a sheet without doing anything.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Annuler"
+          }
+        }
+      }
+    },
+    "Can’t Reach the Mac" : {
+      "comment" : "Banner: the direct channel failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liaison impossible"
+          }
+        }
+      }
+    },
+    "Change the Icon" : {
+      "comment" : "VoiceOver label of the icon button.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changer l’icône"
+          }
+        }
+      }
+    },
+    "Choose “%@”" : {
+      "comment" : "Folder browser: picks this folder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Choisir « %@ »"
+          }
+        }
+      }
+    },
+    "Close Session" : {
+      "comment" : "Stops the session's agent (the Mac's Close Session).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la session"
+          }
+        }
+      }
+    },
+    "Close the Image" : {
+      "comment" : "VoiceOver label of a full-screen image.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer l’image"
+          }
+        }
+      }
+    },
+    "Close the session?" : {
+      "comment" : "Confirmation title.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fermer la session ?"
+          }
+        }
+      }
+    },
+    "closed" : {
+      "comment" : "Diagnostic: channel state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "fermé"
+          }
+        }
+      }
+    },
+    "CloudKit Subscription" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abonnement CloudKit"
+          }
+        }
+      }
+    },
+    "COMPANION_REQUEST_ALERT_BODY" : {
+      "comment" : "Text of the generic notification CloudKit pushes when the phone can't read the request.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "An agent is waiting for your answer"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un agent attend votre réponse"
+          }
+        }
+      }
+    },
+    "COMPANION_REQUEST_ALERT_TITLE" : {
+      "comment" : "Title of the generic notification CloudKit pushes when the phone can't read the request. Not translated.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        }
+      }
+    },
+    "Connected" : {
+      "comment" : "Settings: state of the selected Mac's link.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecté"
+          }
+        }
+      }
+    },
+    "Connected · direct" : {
+      "comment" : "Settings: state of the selected Mac's link.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecté · direct"
+          }
+        }
+      }
+    },
+    "Connected · through a relay" : {
+      "comment" : "Settings: state of the selected Mac's link.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecté · par relais"
+          }
+        }
+      }
+    },
+    "connected, direct" : {
+      "comment" : "Diagnostic: channel state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "connecté, direct"
+          }
+        }
+      }
+    },
+    "connected, relay" : {
+      "comment" : "Diagnostic: channel state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "connecté, relais"
+          }
+        }
+      }
+    },
+    "Connecting to %@…" : {
+      "comment" : "Banner: the phone is connecting to this Mac.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion à %@…"
+          }
+        }
+      }
+    },
+    "connecting…" : {
+      "comment" : "Diagnostic: channel state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "connexion…"
+          }
+        }
+      }
+    },
+    "Connection Diagnostic" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diagnostic de la connexion"
+          }
+        }
+      }
+    },
+    "Connection lost" : {
+      "comment" : "A page of the web view failed: the link to the Mac broke.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Liaison coupée"
+          }
+        }
+      }
+    },
+    "Container" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conteneur"
+          }
+        }
+      }
+    },
+    "Conversation summarized" : {
+      "comment" : "Line of a conversation: the agent compacted its context.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conversation résumée"
+          }
+        }
+      }
+    },
+    "Coordinate Other Sessions" : {
+      "comment" : "New session: makes it a coordinator.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordonner d’autres sessions"
+          }
+        }
+      }
+    },
+    "Coordinator" : {
+      "comment" : "VoiceOver label of the mark of a session that coordinates others.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Coordinatrice"
+          }
+        }
+      }
+    },
+    "Copy Journal" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Copier le journal"
+          }
+        }
+      }
+    },
+    "could not be determined" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "indéterminé"
+          }
+        }
+      }
+    },
+    "Create" : {
+      "comment" : "Creates the session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Créer"
+          }
+        }
+      }
+    },
+    "Default" : {
+      "comment" : "Icon picker: leaves the icon to the Mac.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Par défaut"
+          }
+        }
+      }
+    },
+    "denied" : {
+      "comment" : "Diagnostic: notification permission.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "refusée"
+          }
+        }
+      }
+    },
+    "Deny" : {
+      "comment" : "Answers a permission request: refuse.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Refuser"
+          }
+        }
+      }
+    },
+    "direct" : {
+      "comment" : "Diagnostic: path kind.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "direct"
+          }
+        }
+      }
+    },
+    "Direct Channel · iroh" : {
+      "comment" : "Diagnostic: section header.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Canal direct · iroh"
+          }
+        }
+      }
+    },
+    "Done" : {
+      "comment" : "A session's status: finished (the Mac's column).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terminé"
+          }
+        }
+      }
+    },
+    "Environment" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Environnement"
+          }
+        }
+      }
+    },
+    "ephemeral" : {
+      "comment" : "Diagnostic: notification permission.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "éphémère"
+          }
+        }
+      }
+    },
+    "Export Samples (CSV)" : {
+      "comment" : "Diagnostic: shares the echo samples.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Exporter les échantillons (CSV)"
+          }
+        }
+      }
+    },
+    "failed → CloudKit (%@)" : {
+      "comment" : "Diagnostic: channel state, with the reason.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "échec → CloudKit (%@)"
+          }
+        }
+      }
+    },
+    "failed: %@" : {
+      "comment" : "Diagnostic: a failure, with its reason.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "échec : %@"
+          }
+        }
+      }
+    },
+    "Files" : {
+      "comment" : "Attachment menu: the Files app.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fichiers"
+          }
+        }
+      }
+    },
+    "First Message" : {
+      "comment" : "New session: section header.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Premier message"
+          }
+        }
+      }
+    },
+    "Folder" : {
+      "comment" : "New session: section of the folder it works in.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossier"
+          }
+        }
+      }
+    },
+    "Folders" : {
+      "comment" : "Folder browser title before the home folder is known.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossiers"
+          }
+        }
+      }
+    },
+    "Forward" : {
+      "comment" : "Web view: next page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Page suivante"
+          }
+        }
+      }
+    },
+    "granted" : {
+      "comment" : "Diagnostic: notification permission.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "accordée"
+          }
+        }
+      }
+    },
+    "iCloud" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud"
+          }
+        }
+      }
+    },
+    "Icon" : {
+      "comment" : "Icon picker title.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icône"
+          }
+        }
+      }
+    },
+    "In Progress" : {
+      "comment" : "A session's status: being worked on (the Mac's column).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En cours"
+          }
+        }
+      }
+    },
+    "In sync with the Mac" : {
+      "comment" : "Web view subtitle.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisée avec le Mac"
+          }
+        }
+      }
+    },
+    "Interrupt" : {
+      "comment" : "Interrupts the agent's turn, as Escape on the Mac.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompre"
+          }
+        }
+      }
+    },
+    "Interrupt the Agent" : {
+      "comment" : "VoiceOver label of the interrupt button.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompre l’agent"
+          }
+        }
+      }
+    },
+    "Interrupted" : {
+      "comment" : "Line of a conversation: the user interrupted the agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Interrompu"
+          }
+        }
+      }
+    },
+    "iroh Echoes (%lld)" : {
+      "comment" : "Diagnostic: title of the shared CSV of echo samples.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échos iroh (%lld)"
+          }
+        }
+      }
+    },
+    "Its agent no longer runs. Restart it to write to it." : {
+      "comment" : "Detail of the closed-session bar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent ne tourne plus. Relance-le pour lui écrire."
+          }
+        }
+      }
+    },
+    "Journal" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Journal"
+          }
+        }
+      }
+    },
+    "Last Error" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière erreur"
+          }
+        }
+      }
+    },
+    "Last Fetch" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière récupération"
+          }
+        }
+      }
+    },
+    "Last Notification Shown" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière notification affichée"
+          }
+        }
+      }
+    },
+    "Last Push Received" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernier push reçu"
+          }
+        }
+      }
+    },
+    "Last Request from the Mac" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dernière demande du Mac"
+          }
+        }
+      }
+    },
+    "Last RTT" : {
+      "comment" : "Diagnostic: the last round trip time.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RTT dernier"
+          }
+        }
+      }
+    },
+    "Mac" : {
+      "comment" : "Diagnostic: the Mac the channel dials.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac"
+          }
+        }
+      }
+    },
+    "Mac connected" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac connecté"
+          }
+        }
+      }
+    },
+    "Mac offline" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac hors ligne"
+          }
+        }
+      }
+    },
+    "Mac Seen" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac vu"
+          }
+        }
+      }
+    },
+    "Message %@…" : {
+      "comment" : "Message field placeholder; the argument is the agent's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Écrire à %@…"
+          }
+        }
+      }
+    },
+    "Model" : {
+      "comment" : "New session: the model picker.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèle"
+          }
+        }
+      }
+    },
+    "More" : {
+      "comment" : "Menu of a conversation's other actions.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plus"
+          }
+        }
+      }
+    },
+    "Name (from the message if empty)" : {
+      "comment" : "New session: name field placeholder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nom (tiré du message si vide)"
+          }
+        }
+      }
+    },
+    "Needs Attention" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Besoin d’attention"
+          }
+        }
+      }
+    },
+    "never" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jamais"
+          }
+        }
+      }
+    },
+    "New Session" : {
+      "comment" : "Button and sheet title that create a session on the Mac.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle session"
+          }
+        }
+      }
+    },
+    "no account" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucun compte"
+          }
+        }
+      }
+    },
+    "No active session" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune session active"
+          }
+        }
+      }
+    },
+    "no connection in %lld s" : {
+      "comment" : "Diagnostic: the test channel gave up after this many seconds.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pas de connexion en %lld s"
+          }
+        }
+      }
+    },
+    "No Mac" : {
+      "comment" : "Banner: no Mac has published itself.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun Mac"
+          }
+        }
+      }
+    },
+    "No Mac has published itself yet." : {
+      "comment" : "Settings: no Mac known.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun Mac n’a encore publié."
+          }
+        }
+      }
+    },
+    "No Mac has published yet" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun Mac n’a encore publié"
+          }
+        }
+      }
+    },
+    "No Page" : {
+      "comment" : "Web view: no tab open.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune page"
+          }
+        }
+      }
+    },
+    "No recent folder on the Mac." : {
+      "comment" : "New session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun dossier récent sur le Mac."
+          }
+        }
+      }
+    },
+    "No session matches “%@”." : {
+      "comment" : "Search found nothing for what was typed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucune session ne correspond à « %@ »."
+          }
+        }
+      }
+    },
+    "No subfolder." : {
+      "comment" : "Folder browser.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun sous-dossier."
+          }
+        }
+      }
+    },
+    "none" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "aucune"
+          }
+        }
+      }
+    },
+    "not asked yet" : {
+      "comment" : "Diagnostic: notification permission.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pas encore demandée"
+          }
+        }
+      }
+    },
+    "Not connected to the Mac" : {
+      "comment" : "A page of the web view failed: no link to the Mac.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas de liaison avec le Mac"
+          }
+        }
+      }
+    },
+    "Not Connected Yet" : {
+      "comment" : "Banner: no channel yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pas encore de liaison"
+          }
+        }
+      }
+    },
+    "not known" : {
+      "comment" : "Diagnostic: notification permission whose state iOS does not name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "inconnue"
+          }
+        }
+      }
+    },
+    "not yet" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "pas encore"
+          }
+        }
+      }
+    },
+    "Nothing in %@" : {
+      "comment" : "The session list's column is empty; the argument is the column's name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rien dans « %@ »"
+          }
+        }
+      }
+    },
+    "Notification Settings" : {
+      "comment" : "Settings: opens the iOS notification settings of the app.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages iOS des notifications"
+          }
+        }
+      }
+    },
+    "Notifications" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notifications"
+          }
+        }
+      }
+    },
+    "now" : {
+      "comment" : "When a session last moved: less than a minute ago.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "à l’instant"
+          }
+        }
+      }
+    },
+    "Offline · seen %@" : {
+      "comment" : "Settings: a Mac's state and when it was last seen.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hors ligne · vu %@"
+          }
+        }
+      }
+    },
+    "OK" : {
+      "comment" : "Closes a sheet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "OK"
+          }
+        }
+      }
+    },
+    "One echo a second while the app is open; RTT over the last %lld. n0’s public relays as a fallback, CloudKit if the channel fails." : {
+      "comment" : "Diagnostic: section footer.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Un écho par seconde, app au premier plan ; RTT sur les %lld derniers. Relais publics n0 en repli, CloudKit si le canal échoue."
+          }
+        }
+      }
+    },
+    "Online · seen %@" : {
+      "comment" : "Settings: a Mac's state and when it was last seen (“2 minutes ago”).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En ligne · vu %@"
+          }
+        }
+      }
+    },
+    "Open Quickly" : {
+      "comment" : "Search sheet title, as the Mac's ⌘P palette.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrir une session"
+          }
+        }
+      }
+    },
+    "Open Vibe Manager on your Mac, signed in to the same iCloud account." : {
+      "comment" : "Banner detail when no Mac is known.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvre Vibe Manager sur ton Mac, avec le même compte iCloud."
+          }
+        }
+      }
+    },
+    "Other Folders on the Mac…" : {
+      "comment" : "New session: browse the Mac's folders.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autres dossiers du Mac…"
+          }
+        }
+      }
+    },
+    "Path" : {
+      "comment" : "Diagnostic: the network path the channel takes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Chemin"
+          }
+        }
+      }
+    },
+    "pending" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "en attente"
+          }
+        }
+      }
+    },
+    "Pending Changes" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Changements en attente"
+          }
+        }
+      }
+    },
+    "Permission" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Autorisation"
+          }
+        }
+      }
+    },
+    "Permission: %@" : {
+      "comment" : "Second line of a session's row: the agent asks to run this command or tool.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Permission : %@"
+          }
+        }
+      }
+    },
+    "Photos" : {
+      "comment" : "Attachment menu: the photo library.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Photos"
+          }
+        }
+      }
+    },
+    "Plan to approve" : {
+      "comment" : "Second line of a session's row: the agent waits for its plan to be approved.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Plan à valider"
+          }
+        }
+      }
+    },
+    "Project Icon" : {
+      "comment" : "Icon picker: the folder's own icon.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Icône du projet"
+          }
+        }
+      }
+    },
+    "Prompt Templates" : {
+      "comment" : "New session: menu of the Mac's prompt templates.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Modèles de prompt"
+          }
+        }
+      }
+    },
+    "provisional" : {
+      "comment" : "Diagnostic: notification permission.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "provisoire"
+          }
+        }
+      }
+    },
+    "Question: %@" : {
+      "comment" : "Second line of a session's row: the agent's question.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Question : %@"
+          }
+        }
+      }
+    },
+    "Read only. Updated through CloudKit." : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Lecture seule. Mis à jour par CloudKit."
+          }
+        }
+      }
+    },
+    "Received by the Mac at %@ (%@)" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reçu par le Mac à %1$@ (%2$@)"
+          }
+        }
+      }
+    },
+    "Recent" : {
+      "comment" : "Search: the recent sessions, before anything is typed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Récentes"
+          }
+        }
+      }
+    },
+    "Reconnect" : {
+      "comment" : "Diagnostic: reopens the direct channel.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reconnecter"
+          }
+        }
+      }
+    },
+    "relay" : {
+      "comment" : "Diagnostic: path kind.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "relais"
+          }
+        }
+      }
+    },
+    "Reload" : {
+      "comment" : "Web view: reloads the page.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Recharger"
+          }
+        }
+      }
+    },
+    "Remove" : {
+      "comment" : "Removes a file joined to the next message.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer"
+          }
+        }
+      }
+    },
+    "Restart" : {
+      "comment" : "Restarts a closed session's agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relancer"
+          }
+        }
+      }
+    },
+    "restricted" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "restreint"
+          }
+        }
+      }
+    },
+    "RTT p50 / p95" : {
+      "comment" : "Diagnostic: round trip percentiles.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "RTT p50 / p95"
+          }
+        }
+      }
+    },
+    "Samples" : {
+      "comment" : "Diagnostic: number of echo samples.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Échantillons"
+          }
+        }
+      }
+    },
+    "saved (%@)" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "enregistré (%@)"
+          }
+        }
+      }
+    },
+    "saving…" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "enregistrement…"
+          }
+        }
+      }
+    },
+    "Search the Sessions" : {
+      "comment" : "VoiceOver label of the search button.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rechercher dans les sessions"
+          }
+        }
+      }
+    },
+    "Seen %@. The sessions go on when it wakes up." : {
+      "comment" : "Banner detail: when the Mac was last seen (“5 minutes ago”).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vu %@. Les sessions reprendront à son réveil."
+          }
+        }
+      }
+    },
+    "Send" : {
+      "comment" : "VoiceOver label of the send button.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyer"
+          }
+        }
+      }
+    },
+    "Sending… (written at %@)" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoi… (écrit à %@)"
+          }
+        }
+      }
+    },
+    "Sent at %@" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Envoyé à %@"
+          }
+        }
+      }
+    },
+    "Session" : {
+      "comment" : "New session: section header.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session"
+          }
+        }
+      }
+    },
+    "Session Closed" : {
+      "comment" : "Bar in place of the message field.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session fermée"
+          }
+        }
+      }
+    },
+    "Session Never Started" : {
+      "comment" : "Bar in place of the message field.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Session jamais lancée"
+          }
+        }
+      }
+    },
+    "Settings" : {
+      "comment" : "Button that opens the settings.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réglages"
+          }
+        }
+      }
+    },
+    "Setup" : {
+      "comment" : "Diagnostic: how long the channel took to open.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Établissement"
+          }
+        }
+      }
+    },
+    "Start" : {
+      "comment" : "Starts a session that never ran.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarrer"
+          }
+        }
+      }
+    },
+    "Start its agent to write to it." : {
+      "comment" : "Detail of the never-started bar.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Démarre l’agent pour lui écrire."
+          }
+        }
+      }
+    },
+    "State" : {
+      "comment" : "Diagnostic: the direct channel's state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "État"
+          }
+        }
+      }
+    },
+    "Status" : {
+      "comment" : "Picker of the session list's four columns.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Statut"
+          }
+        }
+      }
+    },
+    "Switches" : {
+      "comment" : "Diagnostic: how many times the path changed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bascules"
+          }
+        }
+      }
+    },
+    "Sync" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Synchronisation"
+          }
+        }
+      }
+    },
+    "Tabs" : {
+      "comment" : "Web view: menu of the tabs.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Onglets"
+          }
+        }
+      }
+    },
+    "temporarily unavailable" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "temporairement indisponible"
+          }
+        }
+      }
+    },
+    "Test" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test"
+          }
+        }
+      }
+    },
+    "Test Asked At" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Test demandé à"
+          }
+        }
+      }
+    },
+    "Test Notification in 10 s" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Notification de test dans 10 s"
+          }
+        }
+      }
+    },
+    "The agent" : {
+      "comment" : "Stands for an agent without a name, at the start of a sentence.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent"
+          }
+        }
+      }
+    },
+    "the agent" : {
+      "comment" : "Stands for an agent without a name, inside a sentence.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "l’agent"
+          }
+        }
+      }
+    },
+    "The agent asks you" : {
+      "comment" : "Title of a question when the agent gives none.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent te pose une question"
+          }
+        }
+      }
+    },
+    "The agent is working" : {
+      "comment" : "VoiceOver label of the typing dots.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent travaille"
+          }
+        }
+      }
+    },
+    "The agent stops. The session keeps its conversation and can be restarted." : {
+      "comment" : "Confirmation message for closing a session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent s’arrête. La session garde sa conversation et peut être relancée."
+          }
+        }
+      }
+    },
+    "The answer couldn’t be given. Answer on the Mac." : {
+      "comment" : "Failure.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La réponse n’a pas pu être donnée : réponds sur le Mac."
+          }
+        }
+      }
+    },
+    "The list stays as it was." : {
+      "comment" : "Banner detail while connecting.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La liste reste visible telle qu’elle était."
+          }
+        }
+      }
+    },
+    "The Mac can’t resume this conversation and asks what to do. Answer on the Mac." : {
+      "comment" : "Failure when restarting a session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Mac ne peut pas reprendre cette conversation et demande quoi faire : réponds sur le Mac."
+          }
+        }
+      }
+    },
+    "The Mac Couldn’t Do It" : {
+      "comment" : "Alert title: something asked of the Mac failed.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Mac n’a pas pu le faire"
+          }
+        }
+      }
+    },
+    "The Mac hasn’t published its address." : {
+      "comment" : "Banner detail.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le Mac n’a pas publié son adresse."
+          }
+        }
+      }
+    },
+    "The Mac knows no agent." : {
+      "comment" : "Failure when creating a session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aucun agent n’est connu du Mac."
+          }
+        }
+      }
+    },
+    "the Mac publishes no endpoint" : {
+      "comment" : "Diagnostic: channel state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "le Mac ne publie pas d’endpoint"
+          }
+        }
+      }
+    },
+    "The Macs of your iCloud account where Vibe Manager runs the companion. There’s nothing else to pair." : {
+      "comment" : "Settings: footer of the Mac section.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les Macs de ton compte iCloud où Vibe Manager a activé le compagnon. Rien d’autre à appairer."
+          }
+        }
+      }
+    },
+    "The message couldn’t be sent: the agent isn’t running." : {
+      "comment" : "Failure.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le message n’a pas pu être envoyé : l’agent ne tourne pas."
+          }
+        }
+      }
+    },
+    "The subscription fails until the container’s schema has the Envelope type. It is tried again every 30 s while this screen is open." : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’abonnement échoue tant que le schéma du conteneur n’a pas le type Envelope. Il est réessayé toutes les 30 s, écran ouvert."
+          }
+        }
+      }
+    },
+    "This folder can’t be read on the Mac." : {
+      "comment" : "Folder browser.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dossier ne peut pas être lu sur le Mac."
+          }
+        }
+      }
+    },
+    "This folder doesn’t exist on the Mac." : {
+      "comment" : "Failure when creating a session.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dossier n’existe pas sur le Mac."
+          }
+        }
+      }
+    },
+    "This request no longer waits for an answer." : {
+      "comment" : "Failure: a permission or question was already answered.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette demande n’attend plus de réponse."
+          }
+        }
+      }
+    },
+    "This session no longer exists on the Mac." : {
+      "comment" : "Failure.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette session n’existe plus sur le Mac."
+          }
+        }
+      }
+    },
+    "Ticket, PR, branch, folder, title" : {
+      "comment" : "Search field placeholder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ticket, PR, branche, dossier, titre"
+          }
+        }
+      }
+    },
+    "Time Through Relay" : {
+      "comment" : "Diagnostic: share of time spent through a relay.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Temps en relais"
+          }
+        }
+      }
+    },
+    "To Do" : {
+      "comment" : "A session's status: planned, not started (the Mac's column).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "À faire"
+          }
+        }
+      }
+    },
+    "token received" : {
+      "comment" : "Diagnostic: push registration succeeded.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "jeton reçu"
+          }
+        }
+      }
+    },
+    "Try Again" : {
+      "comment" : "Reconnects to the Mac.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Réessayer"
+          }
+        }
+      }
+    },
+    "Type a ticket (#36, owner/repo#36), a pull or merge request URL, a branch, a folder or a title." : {
+      "comment" : "Search help. Keep the examples as they are.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tape un ticket (#36, owner/repo#36), l’adresse d’une pull ou merge request, une branche, un dossier ou un titre."
+          }
+        }
+      }
+    },
+    "Type an address to open a page, here and on the Mac." : {
+      "comment" : "Web view: no tab open.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tape une adresse pour ouvrir une page, ici et sur le Mac."
+          }
+        }
+      }
+    },
+    "unknown" : {
+      "comment" : "Diagnostic: path kind.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "inconnu"
+          }
+        }
+      }
+    },
+    "Version" : {
+      "comment" : "Settings: the app's version.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Version"
+          }
+        }
+      }
+    },
+    "Vibe Companion · Diagnostic" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Companion · diagnostic"
+          }
+        }
+      }
+    },
+    "Vibe Manager" : {
+      "comment" : "The app's name, title of the session list. Not translated.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager"
+          }
+        }
+      }
+    },
+    "Vibe Manager quit %@. Open it on the Mac." : {
+      "comment" : "Banner detail: when Vibe Manager quit (“yesterday”).",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager a été quitté %@. Ouvre-le sur le Mac."
+          }
+        }
+      }
+    },
+    "Waiting" : {
+      "comment" : "A session's status: waits on something else (the Mac's column). Also a diagnostic state.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "En attente"
+          }
+        }
+      }
+    },
+    "Waiting for your answer" : {
+      "comment" : "Second line of a session's row: the agent waits for the user.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Attend ta réponse"
+          }
+        }
+      }
+    },
+    "Web View" : {
+      "comment" : "Button that shows the session's web view.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vue web"
+          }
+        }
+      }
+    },
+    "What the agent should do…" : {
+      "comment" : "New session: first message placeholder.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce que l’agent doit faire…"
+          }
+        }
+      }
+    },
+    "Working" : {
+      "comment" : "Diagnostic screen: label or value.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Au travail"
+          }
+        }
+      }
+    },
+    "Yesterday" : {
+      "comment" : "When a session last moved.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hier"
+          }
+        }
+      }
+    },
+    "“%@” is too large to send (6 MB at most)." : {
+      "comment" : "A file picked to send is too large.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "« %@ » est trop gros pour être envoyé (6 Mo au plus)."
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

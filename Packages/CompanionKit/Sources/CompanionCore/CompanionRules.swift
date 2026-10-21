@@ -55,10 +55,12 @@ public enum CompanionInbox {
 /// hour so that the zone does not grow with them.
 public enum CompanionRequests {
   public static let maximumAge: TimeInterval = 60 * 60
-  /// Said after the agent's name in the notification.
-  public static let waitingText = "attend votre réponse"
-  /// What the agent of a session without one is called.
-  public static let unnamedAgent = "L’agent"
+  /// What the request is, which the phone says in its language: the agent waits for the user.
+  public static let waitingText = "waiting"
+  /// The trials' test notification.
+  public static let testText = "test"
+  /// A session without an agent's name: the phone names it in its language.
+  public static let unnamedAgent = ""
 
   /// The sessions that started waiting for the user between two snapshots: once per entry, however
   /// many snapshots it lasts. The first snapshot an agent receives is where it starts from, not a

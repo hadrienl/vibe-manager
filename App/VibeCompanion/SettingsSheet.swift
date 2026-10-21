@@ -16,7 +16,7 @@ struct SettingsSheet: View {
       Form {
         Section {
           if model.macs.isEmpty {
-            Text("Aucun Mac n’a encore publié.").foregroundStyle(.secondary)
+            Text("No Mac has published itself yet.").foregroundStyle(.secondary)
           }
           ForEach(model.macs, id: \.installationID) { mac in
             Button {
@@ -43,24 +43,24 @@ struct SettingsSheet: View {
           Text("Mac")
         } footer: {
           Text(
-            "Les Macs de ton compte iCloud où Vibe Manager a activé le compagnon. Rien d’autre à appairer."
+            "The Macs of your iCloud account where Vibe Manager runs the companion. There’s nothing else to pair."
           )
         }
         Section("Notifications") {
-          Button("Réglages iOS des notifications") {
+          Button("Notification Settings") {
             if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
               openURL(url)
             }
           }
         }
-        Section("À propos") {
+        Section("About") {
           LabeledContent("Version", value: Self.version)
-          NavigationLink("Diagnostic de la connexion") {
+          NavigationLink("Connection Diagnostic") {
             CompanionScreen()
           }
         }
       }
-      .navigationTitle("Réglages")
+      .navigationTitle("Settings")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
@@ -74,14 +74,17 @@ struct SettingsSheet: View {
     let isSelected = model.selectedMac?.installationID == mac.installationID
     if isSelected, channel.phase == .connected {
       switch channel.path {
-      case .direct: return "Connecté · direct"
-      case .relay: return "Connecté · par relais"
-      default: return "Connecté"
+      case .direct: return String(localized: "Connected · direct")
+      case .relay: return String(localized: "Connected · through a relay")
+      default: return String(localized: "Connected")
       }
     }
     let seen = mac.lastSeen.formatted(.relative(presentation: .named))
-    if Date().timeIntervalSince(mac.lastSeen) < 120, mac.online { return "En ligne · vu \(seen)" }
-    return mac.online ? "En veille · vu \(seen)" : "Hors ligne · vu \(seen)"
+    if Date().timeIntervalSince(mac.lastSeen) < 120, mac.online {
+      return String(localized: "Online · seen \(seen)")
+    }
+    return mac.online
+      ? String(localized: "Asleep · seen \(seen)") : String(localized: "Offline · seen \(seen)")
   }
 
   private static var version: String {

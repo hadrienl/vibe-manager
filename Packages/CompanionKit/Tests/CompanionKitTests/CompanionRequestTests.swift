@@ -113,23 +113,27 @@ func requestSubscription() {
   #expect(info?.shouldSendContentAvailable == false)
 }
 
-@Test("The extension's alert names the session, then the agent and what it waits for")
+@Test("The extension's alert names the session, then says what the agent waits for")
 func requestAlertText() throws {
   func request(_ title: String, _ agent: String, _ text: String) -> CompanionRequest {
     CompanionRequest(
       id: "R", macID: "A", sessionTitle: title, agent: agent, text: text, createdAt: now)
   }
+  let phrase: (String, String) -> String = { agent, code in
+    code.isEmpty ? "" : "\(agent.isEmpty ? "Agent" : agent) [\(code)]"
+  }
   let alert = try #require(
     CompanionRequestAlerts.alert(
-      for: request("#368 Notifications", "Codex", "attend votre réponse")))
+      for: request("#368 Notifications", " Codex ", CompanionRequests.waitingText),
+      phrase: phrase))
   #expect(alert.title == "#368 Notifications")
-  #expect(alert.body == "Codex attend votre réponse")
+  #expect(alert.body == "Codex [waiting]")
 
-  let untitled = try #require(CompanionRequestAlerts.alert(for: request(" ", "Codex", "attend")))
+  let untitled = try #require(
+    CompanionRequestAlerts.alert(for: request(" ", "", "waiting"), phrase: phrase))
   #expect(untitled.title.isEmpty)
-  #expect(untitled.body == "Codex attend")
-  #expect(CompanionRequestAlerts.alert(for: request("Session", "", "attend"))?.body == "attend")
-  #expect(CompanionRequestAlerts.alert(for: request("", "", "")) == nil)
+  #expect(untitled.body == "Agent [waiting]")
+  #expect(CompanionRequestAlerts.alert(for: request("", "", ""), phrase: phrase) == nil)
 }
 
 @Test("Only a push of the subscription, about the companion's zone, names a request")

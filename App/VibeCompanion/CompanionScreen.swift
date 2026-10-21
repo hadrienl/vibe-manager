@@ -25,7 +25,7 @@ struct CompanionScreen: View {
         journalSection
       }
       .listStyle(.insetGrouped)
-      .navigationTitle("Connexion au Mac")
+      .navigationTitle("Connection Diagnostic")
       .refreshable { await model.refresh() }
       // Every ten seconds while the screen is up: a fetch without changes costs one request and
       // sends no push to anyone.
@@ -78,32 +78,32 @@ struct CompanionScreen: View {
 
   private var cloudSection: some View {
     Section("iCloud") {
-      LabeledContent("Compte", value: model.status.account.label)
-      LabeledContent("Conteneur") {
+      LabeledContent("Account", value: Self.label(of: model.status.account))
+      LabeledContent("Container") {
         Text(verbatim: CompanionCloud.containerIdentifier)
           .font(.footnote.monospaced())
       }
       LabeledContent(
-        "Environnement",
+        "Environment",
         value: Bundle.main.object(forInfoDictionaryKey: "VibeCloudKitEnvironment") as? String
           ?? "?")
     }
   }
 
   private var syncSection: some View {
-    Section("Synchronisation") {
-      LabeledContent("Mac vu") {
+    Section("Sync") {
+      LabeledContent("Mac Seen") {
         if let mac = model.selectedMac {
-          Text("il y a \(Text(mac.lastSeen, style: .relative))")
+          Text("\(Text(mac.lastSeen, style: .relative)) ago")
         } else {
-          Text("jamais")
+          Text("never")
         }
       }
-      LabeledContent("Dernière récupération", value: Self.time(model.status.lastFetch))
-      LabeledContent("Dernier push reçu", value: Self.time(model.status.lastPush))
-      LabeledContent("Changements en attente", value: "\(model.status.pendingChanges)")
-      LabeledContent("Dernière erreur") {
-        Text(verbatim: model.status.lastError ?? "aucune")
+      LabeledContent("Last Fetch", value: Self.time(model.status.lastFetch))
+      LabeledContent("Last Push Received", value: Self.time(model.status.lastPush))
+      LabeledContent("Pending Changes", value: "\(model.status.pendingChanges)")
+      LabeledContent("Last Error") {
+        Text(verbatim: model.status.lastError ?? String(localized: "none"))
           .multilineTextAlignment(.trailing)
           .textSelection(.enabled)
       }
@@ -113,15 +113,15 @@ struct CompanionScreen: View {
   private var sessionsSection: some View {
     Section {
       if model.visibleSessions.isEmpty {
-        Text("Aucune session active").foregroundStyle(.secondary)
+        Text("No active session").foregroundStyle(.secondary)
       }
       ForEach(model.visibleSessions, id: \.id) { session in
         CloudSessionRow(session: session)
       }
     } header: {
-      Text("Sessions actives sur le Mac · \(model.visibleSessions.count)")
+      Text("Active Sessions on the Mac · \(model.visibleSessions.count)")
     } footer: {
-      Text("Lecture seule. Mis à jour par CloudKit.")
+      Text("Read only. Updated through CloudKit.")
     }
   }
 
@@ -131,7 +131,7 @@ struct CompanionScreen: View {
         .font(.caption2.monospaced())
         .textSelection(.enabled)
         .frame(maxWidth: .infinity, alignment: .leading)
-      Button("Copier le journal") {
+      Button("Copy Journal") {
         UIPasteboard.general.string = CompanionJournal.text(model.journal)
       }
     } header: {
@@ -139,8 +139,19 @@ struct CompanionScreen: View {
     }
   }
 
+  static func label(of account: CompanionAccountState) -> String {
+    switch account {
+    case .unknown: String(localized: "unknown")
+    case .available: String(localized: "available")
+    case .noAccount: String(localized: "no account")
+    case .restricted: String(localized: "restricted")
+    case .couldNotDetermine: String(localized: "could not be determined")
+    case .temporarilyUnavailable: String(localized: "temporarily unavailable")
+    }
+  }
+
   static func time(_ date: Date?) -> String {
-    date?.formatted(date: .omitted, time: .standard) ?? "jamais"
+    date?.formatted(date: .omitted, time: .standard) ?? String(localized: "never")
   }
 }
 
@@ -156,14 +167,14 @@ private struct StatusSection: View {
           .frame(width: 12, height: 12)
           .accessibilityHidden(true)
         VStack(alignment: .leading, spacing: 2) {
-          Text(model.isConnected ? "Mac connecté" : "Mac hors ligne")
+          Text(model.isConnected ? "Mac connected" : "Mac offline")
             .font(.headline)
           if let mac = model.selectedMac {
             Text(verbatim: Self.subtitle(of: mac))
               .font(.subheadline)
               .foregroundStyle(.secondary)
           } else {
-            Text("Aucun Mac n’a encore publié")
+            Text("No Mac has published yet")
               .font(.subheadline)
               .foregroundStyle(.secondary)
           }
@@ -171,7 +182,7 @@ private struct StatusSection: View {
       }
       .accessibilityElement(children: .combine)
     } header: {
-      Text("Vibe Companion · debug")
+      Text("Vibe Companion · Diagnostic")
     }
   }
 
@@ -203,9 +214,9 @@ private struct CloudSessionRow: View {
 
   private var label: LocalizedStringKey {
     switch session.state {
-    case .needsAttention: "Besoin d’attention"
-    case .working: "Au travail"
-    case .waiting: "En attente"
+    case .needsAttention: "Needs Attention"
+    case .working: "Working"
+    case .waiting: "Waiting"
     }
   }
 
@@ -235,7 +246,7 @@ private struct TestSection: View {
       Button {
         Task { await model.sendNotificationTest() }
       } label: {
-        Text("Notification de test dans 10 s")
+        Text("Test Notification in 10 s")
           .frame(maxWidth: .infinity, minHeight: 44)
       }
       .buttonStyle(.bordered)
@@ -244,11 +255,10 @@ private struct TestSection: View {
           Text(verbatim: sentLine(run))
           if let received = run.receivedAt, let oneWay = run.oneWay {
             Text(
-              verbatim:
-                "Reçu par le Mac à \(CompanionScreen.time(received)) (\(Self.seconds(oneWay)))")
+              "Received by the Mac at \(CompanionScreen.time(received)) (\(Self.seconds(oneWay)))")
           }
           if let roundTrip = run.roundTrip {
-            Text(verbatim: "Accusé de réception : aller-retour \(Self.seconds(roundTrip))")
+            Text("Acknowledged: round trip \(Self.seconds(roundTrip))")
               .fontWeight(.semibold)
           }
         }
@@ -260,8 +270,8 @@ private struct TestSection: View {
   private func sentLine(_ run: CompanionTestRun) -> String {
     let time = CompanionScreen.time(run.sentAt)
     switch run.stage {
-    case .sending: return "Envoi… (écrit à \(time))"
-    case .sent, .acknowledged: return "Envoyé à \(time)"
+    case .sending: return String(localized: "Sending… (written at \(time))")
+    case .sent, .acknowledged: return String(localized: "Sent at \(time)")
     }
   }
 
@@ -278,17 +288,18 @@ private struct NotificationsSection: View {
 
   var body: some View {
     Section {
-      LabeledContent("Autorisation", value: notifications.permission.label)
-      LabeledContent("Enregistrement APNs", value: notifications.registration ?? "en attente")
-      LabeledContent("Abonnement CloudKit") {
+      LabeledContent("Permission", value: notifications.permission.label)
+      LabeledContent(
+        "APNs Registration", value: notifications.registration ?? String(localized: "pending"))
+      LabeledContent("CloudKit Subscription") {
         Text(verbatim: subscriptionLabel)
           .multilineTextAlignment(.trailing)
           .textSelection(.enabled)
       }
       if let sent = model.notificationTestSentAt {
-        LabeledContent("Test demandé à", value: CompanionScreen.time(sent))
+        LabeledContent("Test Asked At", value: CompanionScreen.time(sent))
       }
-      LabeledContent("Dernière demande du Mac") {
+      LabeledContent("Last Request from the Mac") {
         if let request = model.latestRequest {
           VStack(alignment: .trailing, spacing: 2) {
             Text(verbatim: request.sessionTitle)
@@ -300,10 +311,10 @@ private struct NotificationsSection: View {
               .foregroundStyle(.secondary)
           }
         } else {
-          Text("aucune")
+          Text("none")
         }
       }
-      LabeledContent("Dernière notification affichée") {
+      LabeledContent("Last Notification Shown") {
         if let delivery = notifications.lastDelivery {
           VStack(alignment: .trailing, spacing: 2) {
             Text(verbatim: delivery.title)
@@ -313,24 +324,24 @@ private struct NotificationsSection: View {
               .foregroundStyle(.secondary)
           }
         } else {
-          Text("aucune")
+          Text("none")
         }
       }
     } header: {
       Text("Notifications")
     } footer: {
       Text(
-        "L’abonnement échoue tant que le schéma du conteneur n’a pas le type Envelope. Il est réessayé toutes les 30 s, écran ouvert."
+        "The subscription fails until the container’s schema has the Envelope type. It is tried again every 30 s while this screen is open."
       )
     }
   }
 
   private var subscriptionLabel: String {
     switch notifications.subscription {
-    case .notSaved: "pas encore"
-    case .saving: "enregistrement…"
-    case .saved: "enregistré (\(CompanionRequestAlerts.subscriptionID))"
-    case .failed(let error): "échec : \(error)"
+    case .notSaved: String(localized: "not yet")
+    case .saving: String(localized: "saving…")
+    case .saved: String(localized: "saved (\(CompanionRequestAlerts.subscriptionID))")
+    case .failed(let error): String(localized: "failed: \(error)")
     }
   }
 }

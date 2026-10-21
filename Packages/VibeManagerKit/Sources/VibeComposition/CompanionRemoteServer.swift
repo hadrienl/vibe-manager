@@ -116,11 +116,7 @@ final class CompanionRemoteServer {
       Task {
         await appModel.restart(sessionID)
         if appModel.pendingRestart?.sessionID == sessionID {
-          send(
-            peer,
-            .failure(
-              "Le Mac ne peut pas reprendre cette conversation et demande quoi faire : réponds sur le Mac."
-            ))
+          send(peer, .failure(.restartNeedsMac))
         }
       }
     case .interrupt(let id):
@@ -215,7 +211,7 @@ final class CompanionRemoteServer {
           symbol: session.appearance.symbolName, color: session.appearance.colorHex,
           iconID: session.appearance.iconID?.sha256),
         coordinatorID: coordinatorID, isCoordinator: isCoordinator,
-        detail: state?.requests.first.map(detail(of:)), updatedAt: session.updatedAt,
+        waitingFor: state?.requests.first.map(wait(of:)), updatedAt: session.updatedAt,
         rank: session.rank, hasStarted: session.hasEverStarted)
     }
   }
@@ -231,17 +227,13 @@ final class CompanionRemoteServer {
     }
   }
 
-  /// The request on one line, as the sidebar's row says it.
-  private static func detail(of request: AgentRequest) -> String {
+  /// What the request waits on, for the phone to say.
+  private static func wait(of request: AgentRequest) -> RemoteWait {
     switch request.content {
-    case .permission(let permission):
-      return "Permission : \(permission.subject ?? permission.toolName)"
-    case .questions(let questions):
-      return "Question : \(questions.first?.text ?? "")"
-    case .plan:
-      return "Plan à valider"
-    default:
-      return "Attend ta réponse"
+    case .permission(let permission): .permission(permission.subject ?? permission.toolName)
+    case .questions(let questions): .question(questions.first?.text ?? "")
+    case .plan: .plan
+    default: .other
     }
   }
 
@@ -250,7 +242,7 @@ final class CompanionRemoteServer {
   /// Sends the conversation now and at each change, while the phone shows it.
   private func follow(_ id: SessionID, for peer: String) {
     guard let appModel, let session = appModel.sessions.first(where: { $0.id == id }) else {
-      send(peer, .failure("Cette session n’existe plus sur le Mac."))
+      send(peer, .failure(.sessionGone))
       return
     }
     let model = appModel.conversations.show(session)
@@ -270,7 +262,8 @@ final class CompanionRemoteServer {
       RemoteConversation(
         sessionID: id.rawValue.uuidString,
         entries: Self.entries(model.snapshot.entries.suffix(Self.entryLimit)),
-        request: appModel.activity(for: id)?.requests.first.flatMap(Self.request(of:)))
+        request: appModel.activity(for: id)?.requests.first.flatMap(Self.request(of:)),
+        theme: Self.theme(of: appModel.sessions.first { $0.id == id }, in: appModel))
     } onChange: { [weak self] in
       Task { @MainActor in
         // Coalesced: a generating agent changes the snapshot many times a second.
@@ -284,6 +277,35 @@ final class CompanionRemoteServer {
       }
     }
     send(peer, .conversation(conversation))
+  }
+
+  /// The session's theme as the Mac draws it, in both appearances.
+  static func theme(of session: WorkSession?, in appModel: AppModel) -> RemoteTheme {
+    let themes = appModel.conversations.themes
+    let appearance = appModel.conversations.appearance
+    func palette(dark: Bool) -> (RemotePalette, ConversationTheme) {
+      let theme = themes.displayed(
+        appearance, session: session?.conversationTheme, isDark: dark, increasedContrast: false,
+        reducedTransparency: false)
+      func hex(_ color: ThemeColor) -> String {
+        color.opacity < 1
+          ? color.hex + String(format: "%02X", Int((color.opacity * 255).rounded())) : color.hex
+      }
+      return (
+        RemotePalette(
+          background: hex(theme.background), surface: hex(theme.surface),
+          raised: hex(theme.raised), text: hex(theme.text),
+          secondaryText: hex(theme.secondaryText), border: hex(theme.border),
+          accent: hex(theme.accent), onAccent: hex(theme.onAccent), bubble: hex(theme.bubble),
+          bubbleText: hex(theme.bubbleText), codeBackground: hex(theme.codeBackground),
+          codeText: hex(theme.codeText), success: hex(theme.success), failure: hex(theme.failure),
+          warning: hex(theme.warning), warningBackground: hex(theme.warningBackground)),
+        theme
+      )
+    }
+    let (light, lightTheme) = palette(dark: false)
+    let (dark, _) = palette(dark: true)
+    return RemoteTheme(light: light, dark: dark, fontStyle: lightTheme.fontStyle.rawValue)
   }
 
   static func entries(_ entries: some Sequence<ConversationEntry>) -> [RemoteEntry] {
@@ -321,10 +343,10 @@ final class CompanionRemoteServer {
           running: running, failed: failed)
       case .notice(let notice):
         switch notice {
-        case .error(let text): kind = .notice(text)
-        case .interrupted: kind = .notice("Interrompu")
-        case .compacted: kind = .notice("Conversation résumée")
-        case .shell(let run): kind = .notice("$ \(run.command)")
+        case .error(let text): kind = .notice(.error(text))
+        case .interrupted: kind = .notice(.interrupted)
+        case .compacted: kind = .notice(.compacted)
+        case .shell(let run): kind = .notice(.shell(run.command))
         default: return nil
         }
       case .reasoning:
@@ -338,14 +360,13 @@ final class CompanionRemoteServer {
     let id = request.id.key
     switch request.content {
     case .permission(let permission):
-      var choices = [RemoteChoice(id: "allowOnce", label: "Autoriser")]
-      if permission.alwaysAllow != nil {
-        choices.append(RemoteChoice(id: "allowAlways", label: "Toujours autoriser"))
-      }
-      choices.append(RemoteChoice(id: "deny", label: "Refuser", isDestructive: true))
+      // Labelled by the phone, in its language.
+      var choices = [RemoteChoice(id: "allowOnce", label: "")]
+      if permission.alwaysAllow != nil { choices.append(RemoteChoice(id: "allowAlways", label: "")) }
+      choices.append(RemoteChoice(id: "deny", label: "", isDestructive: true))
       return RemoteRequest(
-        id: id, kind: .permission, title: permission.purpose ?? "Autoriser \(permission.toolName) ?",
-        subject: permission.subject, choices: choices)
+        id: id, kind: .permission, title: permission.purpose ?? "",
+        subject: permission.subject ?? permission.toolName, choices: choices)
     case .questions(let questions):
       guard let question = questions.first else { return nil }
       return RemoteRequest(
@@ -381,7 +402,7 @@ final class CompanionRemoteServer {
     model.attachments.filter(written.contains).forEach(model.removeAttachment)
     if !keptFiles.isEmpty { model.attach(keptFiles, focusing: false) }
     if model.draft == text || sent { model.draft = kept }
-    if !sent { send(peer, .failure("Le message n’a pas pu être envoyé : l’agent ne tourne pas.")) }
+    if !sent { send(peer, .failure(.messageNotSent)) }
   }
 
   private func answer(
@@ -392,7 +413,7 @@ final class CompanionRemoteServer {
         $0.id.key == requestID
       })
     else {
-      send(peer, .failure("Cette demande n’attend plus de réponse."))
+      send(peer, .failure(.requestGone))
       return
     }
     let answer: AgentAnswer
@@ -418,7 +439,7 @@ final class CompanionRemoteServer {
       return
     }
     if !(await appModel.answer(answer, to: request.id)) {
-      send(peer, .failure("La réponse n’a pas pu être donnée : réponds sur le Mac."))
+      send(peer, .failure(.answerNotGiven))
     }
   }
 
@@ -484,8 +505,14 @@ final class CompanionRemoteServer {
           SessionAppearance(symbolName: $0.symbol, colorHex: $0.color)
         })
       send(peer, .created(sessionID: id.rawValue.uuidString))
+    } catch CompanionCreationError.noAgent {
+      send(peer, .failure(.noAgent))
+    } catch CompanionCreationError.folderMissing {
+      send(peer, .failure(.folderMissing))
+    } catch CompanionCreationError.rejected(let words) {
+      send(peer, .failure(.other(words)))
     } catch {
-      send(peer, .failure(error.localizedDescription))
+      send(peer, .failure(.other(error.localizedDescription)))
     }
   }
 
@@ -506,8 +533,7 @@ final class CompanionRemoteServer {
       }.map(\.lastPathComponent).sorted { $0.localizedStandardCompare($1) == .orderedAscending }
       return RemoteFolderListing(path: folder.path, folders: names)
     } catch {
-      return RemoteFolderListing(
-        path: folder.path, folders: [], problem: "Ce dossier ne peut pas être lu sur le Mac.")
+      return RemoteFolderListing(path: folder.path, folders: [], isUnreadable: true)
     }
   }
 

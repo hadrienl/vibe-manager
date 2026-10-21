@@ -25,6 +25,30 @@ public enum RemoteActivity: String, Codable, Hashable, Sendable {
   case stopped
 }
 
+/// What an agent waits for the user on, for the phone to say in its language.
+public enum RemoteWait: Codable, Hashable, Sendable {
+  /// A tool to allow: the command, the file — the agent's words, never translated.
+  case permission(String)
+  /// A question, in the agent's words.
+  case question(String)
+  case plan
+  case other
+}
+
+/// What the Mac could not do of what the phone asked, for the phone to say in its language.
+public enum RemoteFailure: Codable, Hashable, Sendable {
+  case sessionGone
+  case messageNotSent
+  case requestGone
+  case answerNotGiven
+  /// The Mac cannot resume the conversation and asks the user what to do.
+  case restartNeedsMac
+  case folderMissing
+  case noAgent
+  /// The Mac's own words, already in its language: a draft it refused, a request that failed.
+  case other(String)
+}
+
 /// The session's badge: a symbol on a colour, or the project's icon.
 public struct RemoteAppearance: Codable, Hashable, Sendable {
   /// An SF Symbol name, the same on both platforms.
@@ -56,8 +80,8 @@ public struct RemoteSession: Codable, Hashable, Sendable, Identifiable {
   /// The coordinator this session works for, when one created it.
   public var coordinatorID: String?
   public var isCoordinator: Bool
-  /// The last thing it did or asked, on one line: "Permission : lancer xcodebuild".
-  public var detail: String?
+  /// What it waits for the user on, when it does.
+  public var waitingFor: RemoteWait?
   public var updatedAt: Date
   /// The Mac's manual order within its column, for the sort it shows.
   public var rank: Int
@@ -67,7 +91,7 @@ public struct RemoteSession: Codable, Hashable, Sendable, Identifiable {
   public init(
     id: String, name: String, folderPath: String, folderName: String, agentName: String,
     status: RemoteTaskStatus, activity: RemoteActivity, appearance: RemoteAppearance,
-    coordinatorID: String? = nil, isCoordinator: Bool = false, detail: String? = nil,
+    coordinatorID: String? = nil, isCoordinator: Bool = false, waitingFor: RemoteWait? = nil,
     updatedAt: Date, rank: Int = 0, hasStarted: Bool = true
   ) {
     self.hasStarted = hasStarted
@@ -81,13 +105,14 @@ public struct RemoteSession: Codable, Hashable, Sendable, Identifiable {
     self.appearance = appearance
     self.coordinatorID = coordinatorID
     self.isCoordinator = isCoordinator
-    self.detail = detail
+    self.waitingFor = waitingFor
     self.updatedAt = updatedAt
     self.rank = rank
   }
 }
 
-/// One choice of a permission or a question.
+/// One choice of a permission or a question. A permission's choices are `allowOnce`,
+/// `allowAlways` and `deny`, labelled by the phone; a question's carry the agent's words.
 public struct RemoteChoice: Codable, Hashable, Sendable, Identifiable {
   public var id: String
   public var label: String
@@ -111,7 +136,8 @@ public struct RemoteRequest: Codable, Hashable, Sendable {
 
   public var id: String
   public var kind: Kind
-  /// "Autoriser cette commande ?", or the agent's question.
+  /// The agent's question, or why it asks a permission; empty when it says nothing, and the phone
+  /// asks in its own words.
   public var title: String
   /// The command, the file, the URL: shown in monospace.
   public var subject: String?
@@ -133,6 +159,16 @@ public struct RemoteRequest: Codable, Hashable, Sendable {
     self.allowsSeveral = allowsSeveral
     self.allowsText = allowsText
   }
+}
+
+/// A line of a session itself, between its messages.
+public enum RemoteNotice: Codable, Hashable, Sendable {
+  case interrupted
+  case compacted
+  /// A shell command the user ran in the session.
+  case shell(String)
+  /// The agent's or the CLI's own words.
+  case error(String)
 }
 
 /// A file that came with a message: an image the phone asks a picture of (`attachmentImage`).
@@ -161,8 +197,8 @@ public struct RemoteEntry: Codable, Hashable, Sendable, Identifiable {
     /// A tool the agent ran, as its compact row reads: an SF Symbol, "Read Session.swift", the
     /// secondary words, and whether it still runs or failed.
     case tool(symbol: String, title: String, detail: String?, running: Bool, failed: Bool)
-    /// A line of the session itself: started, stopped, an error.
-    case notice(String)
+    /// A line of the session itself: an error, an interruption.
+    case notice(RemoteNotice)
   }
 
   public var id: String
@@ -176,16 +212,82 @@ public struct RemoteEntry: Codable, Hashable, Sendable, Identifiable {
   }
 }
 
-/// A conversation as the phone holds it: its entries, and what the agent waits for, if anything.
+/// The colours a conversation is drawn with on the Mac (#274): `#RRGGBB`, or `#RRGGBBAA` when
+/// translucent.
+public struct RemotePalette: Codable, Hashable, Sendable {
+  public var background: String
+  public var surface: String
+  public var raised: String
+  public var text: String
+  public var secondaryText: String
+  public var border: String
+  public var accent: String
+  public var onAccent: String
+  public var bubble: String
+  public var bubbleText: String
+  public var codeBackground: String
+  public var codeText: String
+  public var success: String
+  public var failure: String
+  public var warning: String
+  public var warningBackground: String
+
+  public init(
+    background: String, surface: String, raised: String, text: String, secondaryText: String,
+    border: String, accent: String, onAccent: String, bubble: String, bubbleText: String,
+    codeBackground: String, codeText: String, success: String, failure: String, warning: String,
+    warningBackground: String
+  ) {
+    self.background = background
+    self.surface = surface
+    self.raised = raised
+    self.text = text
+    self.secondaryText = secondaryText
+    self.border = border
+    self.accent = accent
+    self.onAccent = onAccent
+    self.bubble = bubble
+    self.bubbleText = bubbleText
+    self.codeBackground = codeBackground
+    self.codeText = codeText
+    self.success = success
+    self.failure = failure
+    self.warning = warning
+    self.warningBackground = warningBackground
+  }
+}
+
+/// A conversation's theme, in the light and the dark appearance: the phone draws the one its own
+/// appearance asks for.
+public struct RemoteTheme: Codable, Hashable, Sendable {
+  public var light: RemotePalette
+  public var dark: RemotePalette
+  /// `system`, `serif` or `monospaced`.
+  public var fontStyle: String
+
+  public init(light: RemotePalette, dark: RemotePalette, fontStyle: String) {
+    self.light = light
+    self.dark = dark
+    self.fontStyle = fontStyle
+  }
+}
+
+/// A conversation as the phone holds it: its entries, what the agent waits for, if anything, and
+/// the theme it is drawn with.
 public struct RemoteConversation: Codable, Hashable, Sendable {
   public var sessionID: String
   public var entries: [RemoteEntry]
   public var request: RemoteRequest?
+  public var theme: RemoteTheme?
 
-  public init(sessionID: String, entries: [RemoteEntry], request: RemoteRequest? = nil) {
+  public init(
+    sessionID: String, entries: [RemoteEntry], request: RemoteRequest? = nil,
+    theme: RemoteTheme? = nil
+  ) {
     self.sessionID = sessionID
     self.entries = entries
     self.request = request
+    self.theme = theme
   }
 }
 
@@ -301,13 +403,13 @@ public struct RemoteFolderListing: Codable, Hashable, Sendable {
   public var path: String
   /// Names, sorted as the Finder sorts them.
   public var folders: [String]
-  /// Why it could not be read, in words for the user.
-  public var problem: String?
+  /// It could not be read: macOS's privacy protection, or it went.
+  public var isUnreadable: Bool
 
-  public init(path: String, folders: [String], problem: String? = nil) {
+  public init(path: String, folders: [String], isUnreadable: Bool = false) {
     self.path = path
     self.folders = folders
-    self.problem = problem
+    self.isUnreadable = isUnreadable
   }
 }
 
@@ -509,7 +611,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   /// The session asked for exists: the phone shows it.
   case created(sessionID: String)
   /// What the Mac could not do of what was asked, in words for the user.
-  case failure(String)
+  case failure(RemoteFailure)
 }
 
 /// The channel's frames: a big-endian `u32` length and the message as JSON — the application's link

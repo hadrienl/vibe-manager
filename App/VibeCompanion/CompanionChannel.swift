@@ -67,7 +67,9 @@ final class CompanionChannel {
       Task {
         try? await Task.sleep(for: Self.connectLimit)
         guard self.session == session, phase == .connecting else { return }
-        fail("pas de connexion en \(Self.connectLimit.components.seconds) s", session: session)
+        fail(
+          String(localized: "no connection in \(Self.connectLimit.components.seconds) s"),
+          session: session)
       })
   }
 

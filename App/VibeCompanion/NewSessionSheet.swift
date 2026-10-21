@@ -36,9 +36,9 @@ struct NewSessionSheet: View {
     NavigationStack(path: $browsing) {
       Form {
         if let options {
-          Section("Dossier") {
+          Section("Folder") {
             if options.folders.isEmpty {
-              Text("Aucun dossier récent sur le Mac.").foregroundStyle(.secondary)
+              Text("No recent folder on the Mac.").foregroundStyle(.secondary)
             }
             ForEach(shownFolders, id: \.self) { path in
               Button {
@@ -58,7 +58,7 @@ struct NewSessionSheet: View {
             }
           }
           Section {
-            NavigationLink("Autres dossiers du Mac…", value: FolderBrowser.home)
+            NavigationLink("Other Folders on the Mac…", value: FolderBrowser.home)
           }
           Section("Session") {
             HStack(spacing: 12) {
@@ -78,8 +78,8 @@ struct NewSessionSheet: View {
                 }
               }
               .buttonStyle(.plain)
-              .accessibilityLabel("Changer l’icône")
-              TextField("Nom (tiré du message si vide)", text: $name)
+              .accessibilityLabel("Change the Icon")
+              TextField("Name (from the message if empty)", text: $name)
             }
             Picker("Agent", selection: $agentID) {
               ForEach(options.agents) { agent in
@@ -88,30 +88,30 @@ struct NewSessionSheet: View {
             }
             .pickerStyle(.menu)
             if let agent, !agent.models.isEmpty {
-              Picker("Modèle", selection: $modelID) {
-                Text("Par défaut de l’agent").tag(String?.none)
+              Picker("Model", selection: $modelID) {
+                Text("Agent’s Default").tag(String?.none)
                 ForEach(agent.models) { model in
                   Text(verbatim: model.name).tag(Optional(model.id))
                 }
               }
               .pickerStyle(.menu)
             }
-            Picker("Statut", selection: $start) {
-              Text("En cours").tag(true)
-              Text("À faire").tag(false)
+            Picker("Status", selection: $start) {
+              Text("In Progress").tag(true)
+              Text("To Do").tag(false)
             }
             .pickerStyle(.menu)
-            Toggle("Coordonner d’autres sessions", isOn: $coordinates)
+            Toggle("Coordinate Other Sessions", isOn: $coordinates)
           }
           Section {
-            TextField("Ce que l’agent doit faire…", text: $prompt, axis: .vertical)
+            TextField("What the agent should do…", text: $prompt, axis: .vertical)
               .lineLimit(4...10)
           } header: {
             HStack {
-              Text("Premier message")
+              Text("First Message")
               Spacer()
               if !options.templates.isEmpty {
-                Menu("Modèles de prompt") {
+                Menu("Prompt Templates") {
                   ForEach(options.templates) { template in
                     Button(template.name) { apply(template) }
                   }
@@ -125,14 +125,14 @@ struct NewSessionSheet: View {
           ProgressView().frame(maxWidth: .infinity)
         }
       }
-      .navigationTitle("Nouvelle session")
+      .navigationTitle("New Session")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .cancellationAction) {
-          Button("Annuler", systemImage: "xmark") { dismiss() }
+          Button("Cancel", systemImage: "xmark") { dismiss() }
         }
         ToolbarItem(placement: .confirmationAction) {
-          Button("Créer", systemImage: "checkmark") { create() }
+          Button("Create", systemImage: "checkmark") { create() }
             .disabled(folder == nil || agentID == nil || isCreating)
         }
       }
@@ -215,10 +215,10 @@ struct FolderBrowser: View {
   var body: some View {
     List {
       if let listing {
-        if let problem = listing.problem {
-          Text(verbatim: problem).foregroundStyle(.secondary)
+        if listing.isUnreadable {
+          Text("This folder can’t be read on the Mac.").foregroundStyle(.secondary)
         } else if listing.folders.isEmpty {
-          Text("Aucun sous-dossier.").foregroundStyle(.secondary)
+          Text("No subfolder.").foregroundStyle(.secondary)
         }
         ForEach(listing.folders, id: \.self) { name in
           NavigationLink(value: (listing.path as NSString).appendingPathComponent(name)) {
@@ -229,7 +229,7 @@ struct FolderBrowser: View {
         ProgressView().frame(maxWidth: .infinity)
       }
     }
-    .navigationTitle(resolved.map { ($0 as NSString).lastPathComponent } ?? "Dossiers")
+    .navigationTitle(resolved.map { ($0 as NSString).lastPathComponent } ?? String(localized: "Folders"))
     .navigationBarTitleDisplayMode(.inline)
     .safeAreaInset(edge: .bottom) {
       if let resolved {
@@ -237,7 +237,7 @@ struct FolderBrowser: View {
           choose(resolved)
           dismissToSheet()
         } label: {
-          Text("Choisir « \((resolved as NSString).lastPathComponent) »")
+          Text("Choose “\((resolved as NSString).lastPathComponent)”")
             .frame(maxWidth: .infinity, minHeight: 34)
         }
         .buttonStyle(.glassProminent)
@@ -283,7 +283,7 @@ struct IconPicker: View {
                   .resizable()
                   .scaledToFit()
                   .frame(width: 44, height: 44)
-                Text("Icône du projet")
+                Text("Project Icon")
                 Spacer()
                 if appearance == nil { Image(systemName: "checkmark").foregroundStyle(.tint) }
               }
@@ -327,14 +327,14 @@ struct IconPicker: View {
         }
         .padding(16)
       }
-      .navigationTitle("Icône")
+      .navigationTitle("Icon")
       .navigationBarTitleDisplayMode(.inline)
       .toolbar {
         ToolbarItem(placement: .confirmationAction) {
           Button("OK", systemImage: "checkmark") { dismiss() }
         }
         ToolbarItem(placement: .cancellationAction) {
-          Button("Par défaut") {
+          Button("Default") {
             appearance = nil
             dismiss()
           }

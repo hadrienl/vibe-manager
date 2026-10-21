@@ -338,8 +338,8 @@ final class CompanionAgent {
       try? await Task.sleep(for: .seconds(delay))
       guard let installation, !isDeparting else { return }
       let request = CompanionRequest(
-        id: UUID().uuidString, macID: installation.id, sessionTitle: "Notification de test",
-        agent: Self.macName(), text: "vous envoie une notification de test", createdAt: Date())
+        id: UUID().uuidString, macID: installation.id, sessionTitle: "Vibe Manager",
+        agent: Self.macName(), text: CompanionRequests.testText, createdAt: Date())
       Self.notifyLogger.notice("test request: \(request.id, privacy: .public) written")
       await sync.save([.request(request)])
       await sync.note("demande de test \(ping.nonce.prefix(4)) écrite")

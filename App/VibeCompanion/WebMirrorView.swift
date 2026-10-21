@@ -31,20 +31,20 @@ struct WebMirrorView: View {
           scrolled: { channel.web(.scrollTo($0), in: sessionID) })
       } else if state != nil {
         ContentUnavailableView {
-          Label("Aucune page", systemImage: "globe")
+          Label("No Page", systemImage: "globe")
         } description: {
-          Text("Tape une adresse pour ouvrir une page, ici et sur le Mac.")
+          Text("Type an address to open a page, here and on the Mac.")
         }
       } else {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
       }
     }
-    .navigationTitle("Vue web")
-    .navigationSubtitle("Synchronisée avec le Mac")
+    .navigationTitle("Web View")
+    .navigationSubtitle("In sync with the Mac")
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        Menu("Onglets", systemImage: "square.on.square") {
+        Menu("Tabs", systemImage: "square.on.square") {
           ForEach(state?.tabs ?? []) { tab in
             Button {
               channel.web(.selectTab(tab.id), in: sessionID)
@@ -60,16 +60,16 @@ struct WebMirrorView: View {
         .disabled((state?.tabs.count ?? 0) < 2)
       }
       ToolbarItemGroup(placement: .bottomBar) {
-        Button("Page précédente", systemImage: "chevron.backward") {
+        Button("Back", systemImage: "chevron.backward") {
           channel.web(.back, in: sessionID)
         }
         .disabled(state?.canGoBack != true)
-        Button("Page suivante", systemImage: "chevron.forward") {
+        Button("Forward", systemImage: "chevron.forward") {
           channel.web(.forward, in: sessionID)
         }
         .disabled(state?.canGoForward != true)
         Spacer()
-        Button("Recharger", systemImage: "arrow.clockwise") {
+        Button("Reload", systemImage: "arrow.clockwise") {
           channel.web(.reload, in: sessionID)
           channel.reloadWeb += 1
         }
@@ -86,7 +86,7 @@ struct WebMirrorView: View {
     HStack(spacing: 8) {
       Image(systemName: activeTab?.isLoading == true ? "hourglass" : "globe")
         .foregroundStyle(.secondary)
-      TextField("Adresse", text: $address)
+      TextField("Address", text: $address)
         .focused($addressFocused)
         .keyboardType(.URL)
         .textInputAutocapitalization(.never)
@@ -96,7 +96,7 @@ struct WebMirrorView: View {
       if let count = state?.tabs.count, count > 1,
         let index = state?.tabs.firstIndex(where: { $0.id == state?.activeTabID })
       {
-        Text("\(index + 1) sur \(count)").font(.caption).foregroundStyle(.secondary)
+        Text("\(index + 1) of \(count)").font(.caption).foregroundStyle(.secondary)
       }
     }
     .padding(.horizontal, 14)

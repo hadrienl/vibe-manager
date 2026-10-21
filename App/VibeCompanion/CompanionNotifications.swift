@@ -74,12 +74,12 @@ final class CompanionNotifications {
 
   func registered(tokenLength: Int) {
     Self.logger.notice("push: registered, token of \(tokenLength, privacy: .public) bytes")
-    registration = "jeton reçu"
+    registration = String(localized: "token received")
   }
 
   func registrationFailed(_ error: any Error) {
     Self.logger.error("push: registration failed: \(error.localizedDescription, privacy: .public)")
-    registration = "échec : \(error.localizedDescription)"
+    registration = String(localized: "failed: \(error.localizedDescription)")
   }
 
   func delivered(_ delivery: Delivery) {
@@ -107,15 +107,15 @@ final class CompanionNotifications {
 }
 
 extension UNAuthorizationStatus {
-  /// Said on the debug screen, in French.
+  /// Said on the diagnostic screen.
   var label: String {
     switch self {
-    case .notDetermined: "pas encore demandée"
-    case .denied: "refusée"
-    case .authorized: "accordée"
-    case .provisional: "provisoire"
-    case .ephemeral: "éphémère"
-    @unknown default: "inconnue"
+    case .notDetermined: String(localized: "not asked yet")
+    case .denied: String(localized: "denied")
+    case .authorized: String(localized: "granted")
+    case .provisional: String(localized: "provisional")
+    case .ephemeral: String(localized: "ephemeral")
+    @unknown default: String(localized: "not known")
     }
   }
 }

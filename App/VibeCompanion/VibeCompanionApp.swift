@@ -1,3 +1,4 @@
+import CompanionCore
 import CompanionKit
 import SwiftUI
 import UIKit
@@ -125,13 +126,13 @@ struct RootView: View {
     SessionsView()
       // Here, above every screen: a failure is said wherever the user is.
       .alert(
-        "Le Mac n’a pas pu le faire",
+        "The Mac Couldn’t Do It",
         isPresented: Binding(
           get: { remote.failure != nil }, set: { if !$0 { remote.failure = nil } })
       ) {
         Button("OK", role: .cancel) {}
       } message: {
-        Text(verbatim: remote.failure ?? "")
+        Text(verbatim: remote.failure?.text ?? "")
       }
       .task {
         while !Task.isCancelled {
@@ -161,5 +162,24 @@ struct RootView: View {
       .onChange(of: model.selectedMac?.irohEndpointID, initial: true) { _, _ in
         if scenePhase == .active { remote.open(to: model.selectedMac) }
       }
+  }
+}
+
+extension RemoteFailure {
+  /// What went wrong, in the phone's language; the Mac's own words when it gave them.
+  var text: String {
+    switch self {
+    case .sessionGone: String(localized: "This session no longer exists on the Mac.")
+    case .messageNotSent: String(localized: "The message couldn’t be sent: the agent isn’t running.")
+    case .requestGone: String(localized: "This request no longer waits for an answer.")
+    case .answerNotGiven: String(localized: "The answer couldn’t be given. Answer on the Mac.")
+    case .restartNeedsMac:
+      String(
+        localized:
+          "The Mac can’t resume this conversation and asks what to do. Answer on the Mac.")
+    case .folderMissing: String(localized: "This folder doesn’t exist on the Mac.")
+    case .noAgent: String(localized: "The Mac knows no agent.")
+    case .other(let words): words
+    }
   }
 }

@@ -19,7 +19,7 @@ struct SessionsView: View {
     NavigationStack(path: $path) {
       List {
         Section {
-          Picker("Statut", selection: $filter) {
+          Picker("Status", selection: $filter) {
             ForEach(RemoteTaskStatus.columns, id: \.self) { status in
               Text("\(Text(status.label)) \(count(status))").tag(status)
             }
@@ -50,7 +50,7 @@ struct SessionsView: View {
           }
         }
         if channel.phase == .connected, groups.isEmpty {
-          Text("Aucune session \(Text(filter.label).foregroundStyle(.secondary))")
+          Text("Nothing in \(Text(filter.label).foregroundStyle(.secondary))")
             .foregroundStyle(.secondary)
         }
       }
@@ -58,10 +58,10 @@ struct SessionsView: View {
       .navigationTitle("Vibe Manager")
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
-          Button("Réglages", systemImage: "gearshape") { showsSettings = true }
+          Button("Settings", systemImage: "gearshape") { showsSettings = true }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          Button("Nouvelle session", systemImage: "plus") { showsNewSession = true }
+          Button("New Session", systemImage: "plus") { showsNewSession = true }
             .disabled(channel.phase != .connected)
         }
       }
@@ -75,7 +75,7 @@ struct SessionsView: View {
         }
         .buttonStyle(.glass)
         .clipShape(Circle())
-        .accessibilityLabel("Rechercher dans les sessions")
+        .accessibilityLabel("Search the Sessions")
         .padding(20)
       }
       .navigationDestination(for: String.self) { id in
@@ -166,7 +166,7 @@ struct SessionRow: View {
             .lineLimit(1)
           Spacer(minLength: 8)
           if session.isCoordinator {
-            Label("coordonne", systemImage: "person.3")
+            Label("Coordinator", systemImage: "person.3")
               .labelStyle(.iconOnly)
               .foregroundStyle(.tint)
           }
@@ -207,7 +207,7 @@ struct ConnectionBanner: View {
           }
           Spacer(minLength: 0)
           if case .failed = channel.phase {
-            Button("Réessayer") { channel.open(to: model.selectedMac) }
+            Button("Try Again") { channel.open(to: model.selectedMac) }
               .buttonStyle(.glass)
           }
         }
@@ -230,48 +230,48 @@ struct ConnectionBanner: View {
       return nil
     case .connecting:
       return Banner(
-        symbol: "", tint: .blue, title: "Connexion à \(name)…",
-        detail: "La liste reste visible telle qu’elle était.")
+        symbol: "", tint: .blue, title: "Connecting to \(name)…",
+        detail: String(localized: "The list stays as it was."))
     case .idle, .noMac, .failed:
       guard let mac else {
         return Banner(
-          symbol: "desktopcomputer", tint: .secondary, title: "Aucun Mac",
-          detail: "Ouvre Vibe Manager sur ton Mac, avec le même compte iCloud.")
+          symbol: "desktopcomputer", tint: .secondary, title: "No Mac",
+          detail: String(localized: "Open Vibe Manager on your Mac, signed in to the same iCloud account."))
       }
       if !model.isConnected {
         let seen = mac.lastSeen.formatted(.relative(presentation: .named))
         return mac.online
           ? Banner(
-            symbol: "moon.zzz", tint: .indigo, title: "\(name) en veille",
-            detail: "Vu \(seen). Les sessions reprendront à son réveil.")
+            symbol: "moon.zzz", tint: .indigo, title: "\(name) Is Asleep",
+            detail: String(localized: "Seen \(seen). The sessions go on when it wakes up."))
           : Banner(
             symbol: "desktopcomputer.trianglebadge.exclamationmark", tint: .red,
-            title: "\(name) hors ligne",
-            detail: "Vibe Manager a été quitté \(seen). Ouvre-le sur le Mac.")
+            title: "\(name) Is Offline",
+            detail: String(localized: "Vibe Manager quit \(seen). Open it on the Mac."))
       }
       if case .failed(let reason) = channel.phase {
         return Banner(
-          symbol: "bolt.horizontal.circle", tint: .orange, title: "Liaison impossible",
+          symbol: "bolt.horizontal.circle", tint: .orange, title: "Can’t Reach the Mac",
           detail: reason)
       }
       return Banner(
-        symbol: "bolt.horizontal.circle", tint: .orange, title: "Pas encore de liaison",
-        detail: "Le Mac n’a pas publié son adresse.")
+        symbol: "bolt.horizontal.circle", tint: .orange, title: "Not Connected Yet",
+        detail: String(localized: "The Mac hasn’t published its address."))
     }
   }
 }
 
-/// When a session last moved, as Mail and Messages say it in their lists: « à l’instant »,
-/// « 3 min », « 14:32 », « Hier », « lundi », « 12 oct. ».
+/// When a session last moved, as Mail and Messages say it in their lists: “now”, “3 min”,
+/// “14:32”, “Yesterday”, “Monday”, “Oct 12”.
 enum ShortDate {
   static func text(_ date: Date, now: Date = Date(), calendar: Calendar = .current) -> String {
     let seconds = now.timeIntervalSince(date)
-    if seconds < 60 { return String(localized: "à l’instant") }
+    if seconds < 60 { return String(localized: "now") }
     if seconds < 3600 { return String(localized: "\(Int(seconds / 60)) min") }
     if calendar.isDate(date, inSameDayAs: now) {
       return date.formatted(date: .omitted, time: .shortened)
     }
-    if calendar.isDateInYesterday(date) { return String(localized: "Hier") }
+    if calendar.isDateInYesterday(date) { return String(localized: "Yesterday") }
     if let days = calendar.dateComponents([.day], from: date, to: now).day, days < 7 {
       return date.formatted(.dateTime.weekday(.wide))
     }
