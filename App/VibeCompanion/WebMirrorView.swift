@@ -1,15 +1,17 @@
 import CompanionCore
 import SwiftUI
+import WebKit
 
-/// A session's web view, as the Mac shows it (#400): the picture of its page, kept in step both
-/// ways — a touch here clicks there, a page the agent opens there shows here.
+/// A session's web view, kept in step with the Mac's (#400): the same page, in a web view of the
+/// phone's own — scrolled at once under the finger — and whatever either side's user does there,
+/// the other does too: the address, the tab, the scroll.
+///
+/// A page of the Mac's own (`localhost:4000`, its local network) is loaded through the Mac, which
+/// makes each request for the phone; any other loads as in Safari.
 struct WebMirrorView: View {
   let sessionID: String
   @Environment(RemoteChannel.self) private var channel
   @State private var address = ""
-  @State private var typing = ""
-  @State private var editingAddress = false
-  @State private var showsKeyboardField = false
   @FocusState private var addressFocused: Bool
 
   private var state: RemoteWebState? {
@@ -22,7 +24,20 @@ struct WebMirrorView: View {
   var body: some View {
     VStack(spacing: 0) {
       addressBar
-      page
+      if let tab = activeTab, let url = URL(string: tab.url) {
+        SyncedWebView(
+          url: url, scroll: state?.scroll ?? 0, channel: channel,
+          navigated: { channel.web(.navigate($0.absoluteString), in: sessionID) },
+          scrolled: { channel.web(.scrollTo($0), in: sessionID) })
+      } else if state != nil {
+        ContentUnavailableView {
+          Label("Aucune page", systemImage: "globe")
+        } description: {
+          Text("Tape une adresse pour ouvrir une page, ici et sur le Mac.")
+        }
+      } else {
+        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
     }
     .navigationTitle("Vue web")
     .navigationSubtitle("Synchronisée avec le Mac")
@@ -54,23 +69,11 @@ struct WebMirrorView: View {
         }
         .disabled(state?.canGoForward != true)
         Spacer()
-        Button("Recharger", systemImage: "arrow.clockwise") { channel.web(.reload, in: sessionID) }
-        Button("Clavier", systemImage: "keyboard") { showsKeyboardField = true }
+        Button("Recharger", systemImage: "arrow.clockwise") {
+          channel.web(.reload, in: sessionID)
+          channel.reloadWeb += 1
+        }
       }
-    }
-    .alert("Taper dans la page", isPresented: $showsKeyboardField) {
-      TextField("Texte", text: $typing)
-      Button("Envoyer") {
-        channel.web(.type(typing), in: sessionID)
-        typing = ""
-      }
-      Button("Envoyer et valider") {
-        channel.web(.type(typing + "\n"), in: sessionID)
-        typing = ""
-      }
-      Button("Annuler", role: .cancel) { typing = "" }
-    } message: {
-      Text("Le texte va dans le champ touché en dernier.")
     }
     .onAppear { channel.showWeb(sessionID) }
     .onDisappear { channel.showWeb(nil) }
@@ -102,46 +105,155 @@ struct WebMirrorView: View {
     .padding(.horizontal, 12)
     .padding(.vertical, 8)
   }
+}
 
-  @ViewBuilder private var page: some View {
-    if let image = channel.webFrame, state != nil {
-      GeometryReader { geometry in
-        let size = Self.fitted(image.size, in: geometry.size)
-        Image(uiImage: image)
-          .resizable()
-          .frame(width: size.width, height: size.height)
-          .contentShape(Rectangle())
-          .gesture(
-            SpatialTapGesture().onEnded { value in
-              channel.web(
-                .tap(x: value.location.x / size.width, y: value.location.y / size.height),
-                in: sessionID)
-            }
-          )
-          .simultaneousGesture(
-            DragGesture(minimumDistance: 10).onEnded { value in
-              // Content follows the finger: a drag upwards scrolls down.
-              channel.web(.scroll(dy: -value.translation.height / size.height), in: sessionID)
-            }
-          )
-          .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-          .accessibilityLabel("Page web du Mac : \(activeTab?.title ?? "")")
-      }
-    } else if state != nil, state?.tabs.isEmpty == true {
-      ContentUnavailableView {
-        Label("Aucune page", systemImage: "globe")
-      } description: {
-        Text("Tape une adresse pour ouvrir une page dans la vue web du Mac.")
-      }
-    } else {
-      ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+/// The phone's web view: it loads what the Mac shows, and says what its user does.
+private struct SyncedWebView: UIViewRepresentable {
+  let url: URL
+  let scroll: Double
+  let channel: RemoteChannel
+  let navigated: (URL) -> Void
+  let scrolled: (Double) -> Void
+
+  func makeCoordinator() -> Coordinator { Coordinator() }
+
+  func makeUIView(context: Context) -> WKWebView {
+    let configuration = WKWebViewConfiguration()
+    let handler = MacSchemeHandler(channel: channel)
+    for scheme in ["http", "https"] {
+      configuration.setURLSchemeHandler(
+        handler, forURLScheme: RemoteWebAddress.proxiedPrefix + scheme)
+    }
+    let webView = WKWebView(frame: .zero, configuration: configuration)
+    webView.allowsBackForwardNavigationGestures = false
+    context.coordinator.attach(webView)
+    return webView
+  }
+
+  func updateUIView(_ webView: WKWebView, context: Context) {
+    let coordinator = context.coordinator
+    coordinator.navigated = navigated
+    coordinator.scrolled = scrolled
+    coordinator.show(url, in: webView)
+    coordinator.scroll(to: scroll, in: webView)
+    if coordinator.reloads != channel.reloadWeb {
+      coordinator.reloads = channel.reloadWeb
+      webView.reload()
     }
   }
 
-  /// The page's picture at the width it is given, its height in proportion.
-  static func fitted(_ image: CGSize, in space: CGSize) -> CGSize {
-    guard image.width > 0 else { return space }
-    let scale = min(space.width / image.width, space.height / image.height)
-    return CGSize(width: image.width * scale, height: image.height * scale)
+  @MainActor
+  final class Coordinator: NSObject {
+    var navigated: (URL) -> Void = { _ in }
+    var scrolled: (Double) -> Void = { _ in }
+    var reloads = 0
+    private var observations: [NSKeyValueObservation] = []
+    /// Until when a scroll is the Mac's, applied here, and not to be told back.
+    private var quietUntil = Date.distantPast
+    private var lastSentScroll: Double?
+    private var pendingScroll: DispatchWorkItem?
+
+    func attach(_ webView: WKWebView) {
+      observations.append(
+        webView.observe(\.url, options: [.new]) { [weak self] webView, _ in
+          MainActor.assumeIsolated {
+            guard let url = webView.url else { return }
+            self?.navigated(RemoteWebAddress.unproxied(url))
+          }
+        })
+      observations.append(
+        webView.scrollView.observe(\.contentOffset, options: [.new]) { [weak self] scrollView, _ in
+          MainActor.assumeIsolated { self?.userScrolled(scrollView) }
+        })
+    }
+
+    /// Loads the Mac's page, unless it is already the one shown.
+    func show(_ url: URL, in webView: WKWebView) {
+      if let current = webView.url,
+        RemoteWebAddress.same(
+          RemoteWebAddress.unproxied(current).absoluteString, url.absoluteString)
+      {
+        return
+      }
+      webView.load(URLRequest(url: RemoteWebAddress.proxied(url)))
+    }
+
+    /// Where the Mac's user scrolled, unless that is where the phone already is.
+    func scroll(to fraction: Double, in webView: WKWebView) {
+      let scrollView = webView.scrollView
+      let range = scrollView.contentSize.height - scrollView.bounds.height
+      guard range > 0, abs(Self.fraction(of: scrollView) - fraction) > 0.005,
+        lastSentScroll.map({ abs($0 - fraction) > 0.005 }) ?? true
+      else { return }
+      quietUntil = Date().addingTimeInterval(0.4)
+      scrollView.setContentOffset(
+        CGPoint(x: scrollView.contentOffset.x, y: fraction * range), animated: false)
+    }
+
+    /// The phone's user scrolled: told to the Mac, at most every tenth of a second.
+    private func userScrolled(_ scrollView: UIScrollView) {
+      guard Date() > quietUntil, scrollView.isTracking || scrollView.isDecelerating else {
+        return
+      }
+      pendingScroll?.cancel()
+      let work = DispatchWorkItem { [weak self, weak scrollView] in
+        guard let self, let scrollView else { return }
+        let fraction = Self.fraction(of: scrollView)
+        self.lastSentScroll = fraction
+        self.scrolled(fraction)
+      }
+      pendingScroll = work
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1, execute: work)
+    }
+
+    static func fraction(of scrollView: UIScrollView) -> Double {
+      let range = scrollView.contentSize.height - scrollView.bounds.height
+      guard range > 0 else { return 0 }
+      return min(1, max(0, scrollView.contentOffset.y / range))
+    }
+  }
+}
+
+/// Hands the web view's requests for the Mac's own pages to the channel, which has the Mac make
+/// them.
+private final class MacSchemeHandler: NSObject, WKURLSchemeHandler {
+  private let channel: RemoteChannel
+  /// The tasks WebKit stopped: answering one of them would raise.
+  private var stopped: Set<ObjectIdentifier> = []
+
+  init(channel: RemoteChannel) {
+    self.channel = channel
+  }
+
+  func webView(_ webView: WKWebView, start task: any WKURLSchemeTask) {
+    let request = task.request
+    guard let url = request.url else { return }
+    let key = ObjectIdentifier(task)
+    var headers = request.allHTTPHeaderFields ?? [:]
+    headers["Accept-Encoding"] = nil
+    let body = request.httpBody
+    Task { @MainActor in
+      let response = await channel.fetch(
+        url: RemoteWebAddress.unproxied(url), method: request.httpMethod ?? "GET",
+        headers: headers, body: body)
+      guard !stopped.contains(key) else { return }
+      if let failure = response.failure {
+        task.didFailWithError(
+          NSError(
+            domain: NSURLErrorDomain, code: NSURLErrorCannotConnectToHost,
+            userInfo: [NSLocalizedDescriptionKey: failure]))
+        return
+      }
+      let http = HTTPURLResponse(
+        url: url, statusCode: response.status, httpVersion: "HTTP/1.1",
+        headerFields: response.headers)
+      if let http { task.didReceive(http) }
+      task.didReceive(response.body)
+      task.didFinish()
+    }
+  }
+
+  func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {
+    stopped.insert(ObjectIdentifier(task))
   }
 }

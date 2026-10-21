@@ -128,11 +128,16 @@ final class CompanionRemoteServer {
     case .web(let id, let action):
       guard let mirror = peers[peer]?.web, mirror.sessionID.rawValue.uuidString == id else { return }
       Task { await mirror.perform(action) }
+    case .httpRequest(let request):
+      Task {
+        let response = await CompanionWebMirror.fetch(request)
+        send(peer, .httpResponse(response))
+      }
     case .listFolder(let path):
       let listing = Self.listing(of: path)
       send(peer, .folderListing(listing))
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
-      .folderListing, .iconData, .webState, .attachmentData:
+      .folderListing, .iconData, .webState, .attachmentData, .httpResponse:
       break
     }
   }

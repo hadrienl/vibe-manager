@@ -100,15 +100,6 @@ struct SessionsView: View {
         showsNewSession = false
         path.append(id)
       }
-      .alert(
-        "Le Mac n’a pas pu le faire",
-        isPresented: Binding(
-          get: { channel.failure != nil }, set: { if !$0 { channel.failure = nil } })
-      ) {
-        Button("OK", role: .cancel) {}
-      } message: {
-        Text(verbatim: channel.failure ?? "")
-      }
     }
   }
 

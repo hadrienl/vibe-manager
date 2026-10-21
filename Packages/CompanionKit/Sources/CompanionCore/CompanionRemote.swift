@@ -337,40 +337,124 @@ public struct RemoteWebTab: Codable, Hashable, Sendable, Identifiable {
   }
 }
 
-/// A session's web view as the Mac shows it (#400): its tabs, and the active page's picture.
+/// A session's web view as the Mac shows it (#400): its tabs, where the active one is, and how far
+/// down its page is scrolled. The phone shows the same page in a web view of its own, and each side
+/// tells the other what its user does there.
 public struct RemoteWebState: Codable, Hashable, Sendable {
   public var sessionID: String
   public var tabs: [RemoteWebTab]
   public var activeTabID: String?
   public var canGoBack: Bool
   public var canGoForward: Bool
-  /// The visible part of the page, in JPEG; `nil` when it has not changed since the last one.
-  public var frame: Data?
+  /// How far down the active page is, from 0 at its top to 1 at its end.
+  public var scroll: Double
 
   public init(
     sessionID: String, tabs: [RemoteWebTab], activeTabID: String?, canGoBack: Bool,
-    canGoForward: Bool, frame: Data?
+    canGoForward: Bool, scroll: Double
   ) {
     self.sessionID = sessionID
     self.tabs = tabs
     self.activeTabID = activeTabID
     self.canGoBack = canGoBack
     self.canGoForward = canGoForward
-    self.frame = frame
+    self.scroll = scroll
   }
 }
 
-/// What the phone does to the web view; the Mac's page does it.
+/// What the phone's user does in the web view, for the Mac's to do the same.
 public enum RemoteWebAction: Codable, Hashable, Sendable {
-  /// A touch, in fractions of the visible page: 0…1 from its top left corner.
-  case tap(x: Double, y: Double)
-  /// A scroll, in fractions of the visible height.
-  case scroll(dy: Double)
-  /// Text typed into what has the focus; Return as `\n`.
-  case type(String)
   case navigate(String)
   case back, forward, reload
   case selectTab(String)
+  /// Scrolled to this fraction of the page.
+  case scrollTo(Double)
+}
+
+/// A request of the phone's web view for a page only the Mac reaches — `localhost:4000` — made by
+/// the Mac on its behalf.
+public struct RemoteHTTPRequest: Codable, Hashable, Sendable {
+  public var id: Int
+  public var url: String
+  public var method: String
+  public var headers: [String: String]
+  public var body: Data?
+
+  public init(id: Int, url: String, method: String, headers: [String: String], body: Data?) {
+    self.id = id
+    self.url = url
+    self.method = method
+    self.headers = headers
+    self.body = body
+  }
+}
+
+public struct RemoteHTTPResponse: Codable, Hashable, Sendable {
+  public var id: Int
+  public var status: Int
+  public var headers: [String: String]
+  public var body: Data
+  /// Why there is no answer, when the Mac could not make the request.
+  public var failure: String?
+
+  public init(id: Int, status: Int, headers: [String: String], body: Data, failure: String? = nil) {
+    self.id = id
+    self.status = status
+    self.headers = headers
+    self.body = body
+    self.failure = failure
+  }
+}
+
+/// Whether an address is one only the Mac reaches — itself, or its local network — which the phone
+/// loads through it rather than on its own.
+public enum RemoteWebAddress {
+  public static func isMacLocal(_ url: URL) -> Bool {
+    guard let host = url.host?.lowercased() else { return false }
+    if host == "localhost" || host.hasSuffix(".localhost") || host.hasSuffix(".local")
+      || host == "::1" || host == "[::1]" || host == "0.0.0.0"
+    {
+      return true
+    }
+    let parts = host.split(separator: ".").compactMap { Int($0) }
+    guard parts.count == 4 else { return false }
+    switch (parts[0], parts[1]) {
+    case (127, _), (10, _), (192, 168): return true
+    case (172, let second) where (16...31).contains(second): return true
+    case (169, 254): return true
+    default: return false
+    }
+  }
+
+  /// The phone's own spelling of a Mac-local address: its scheme prefixed, for the web view to hand
+  /// it to the channel rather than to the network.
+  public static let proxiedPrefix = "vibemac-"
+
+  public static func proxied(_ url: URL) -> URL {
+    guard isMacLocal(url), let scheme = url.scheme, !scheme.hasPrefix(proxiedPrefix),
+      var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+    else { return url }
+    components.scheme = proxiedPrefix + scheme
+    return components.url ?? url
+  }
+
+  public static func unproxied(_ url: URL) -> URL {
+    guard let scheme = url.scheme, scheme.hasPrefix(proxiedPrefix),
+      var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+    else { return url }
+    components.scheme = String(scheme.dropFirst(proxiedPrefix.count))
+    return components.url ?? url
+  }
+
+  /// Two addresses for the same page: a trailing slash or a fragment changes nothing.
+  public static func same(_ first: String, _ second: String) -> Bool {
+    func key(_ text: String) -> String {
+      var value = text.split(separator: "#", maxSplits: 1).first.map(String.init) ?? text
+      while value.hasSuffix("/") { value.removeLast() }
+      return value
+    }
+    return key(first) == key(second)
+  }
 }
 
 /// Everything either end of the channel says.
@@ -402,6 +486,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   /// Shows a session's web view, pictured as the Mac draws it, until `nil`.
   case showWeb(sessionID: String?)
   case web(sessionID: String, RemoteWebAction)
+  case httpRequest(RemoteHTTPRequest)
 
   // The Mac to the phone.
   case welcome(protocolVersion: Int, macName: String)
@@ -414,6 +499,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case iconData(id: String, png: Data)
   case attachmentData(path: String, jpeg: Data)
   case webState(RemoteWebState)
+  case httpResponse(RemoteHTTPResponse)
   /// The session asked for exists: the phone shows it.
   case created(sessionID: String)
   /// What the Mac could not do of what was asked, in words for the user.

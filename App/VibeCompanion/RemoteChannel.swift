@@ -35,7 +35,12 @@ final class RemoteChannel {
   private(set) var homePath: String?
   /// The web view shown, and the latest picture of its page.
   private(set) var webState: RemoteWebState?
-  private(set) var webFrame: UIImage?
+  /// Bumped to reload the phone's web view along with the Mac's.
+  var reloadWeb = 0
+  /// The requests of the phone's web view the Mac is making, by identifier.
+  @ObservationIgnored private var fetches: [Int: CheckedContinuation<RemoteHTTPResponse, Never>] =
+    [:]
+  @ObservationIgnored private var nextFetch = 0
   private var webSessionID: String?
   /// The pictures of the images joined to messages, by their path on the Mac.
   private(set) var attachmentImages: [String: UIImage] = [:]
@@ -81,6 +86,12 @@ final class RemoteChannel {
   }
 
   func close() {
+    for (id, continuation) in fetches {
+      continuation.resume(
+        returning: RemoteHTTPResponse(
+          id: id, status: 0, headers: [:], body: Data(), failure: "Liaison coupée"))
+    }
+    fetches = [:]
     attempt += 1
     tasks.forEach { $0.cancel() }
     tasks = []
@@ -179,7 +190,8 @@ final class RemoteChannel {
     case .webState(let state):
       guard state.sessionID == webSessionID else { return }
       webState = state
-      if let data = state.frame, let image = UIImage(data: data) { webFrame = image }
+    case .httpResponse(let response):
+      fetches.removeValue(forKey: response.id)?.resume(returning: response)
     case .attachmentData(let path, let jpeg):
       attachmentImages[path] = UIImage(data: jpeg)
     case .iconData(let id, let png):
@@ -198,7 +210,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart:
+    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart, .httpRequest:
       break
     }
   }
@@ -277,15 +289,31 @@ final class RemoteChannel {
   /// Shows a session's web view, mirrored; `nil` when the phone leaves it.
   func showWeb(_ sessionID: String?) {
     webSessionID = sessionID
-    if webState?.sessionID != sessionID {
-      webState = nil
-      webFrame = nil
-    }
+    if webState?.sessionID != sessionID { webState = nil }
     write(.showWeb(sessionID: sessionID))
   }
 
   func web(_ action: RemoteWebAction, in sessionID: String) {
     write(.web(sessionID: sessionID, action))
+  }
+
+  /// A request of the web view for a page of the Mac's own, made by the Mac.
+  func fetch(url: URL, method: String, headers: [String: String], body: Data?) async
+    -> RemoteHTTPResponse
+  {
+    nextFetch += 1
+    let id = nextFetch
+    guard sending != nil else {
+      return RemoteHTTPResponse(
+        id: id, status: 0, headers: [:], body: Data(), failure: "Pas de liaison avec le Mac")
+    }
+    return await withCheckedContinuation { continuation in
+      fetches[id] = continuation
+      write(
+        .httpRequest(
+          RemoteHTTPRequest(
+            id: id, url: url.absoluteString, method: method, headers: headers, body: body)))
+    }
   }
 
   /// The picture of an image joined to a message: asked of the Mac once.

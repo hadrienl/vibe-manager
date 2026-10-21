@@ -6,25 +6,27 @@ import VibeDomain
 import VibeUI
 import WebKit
 
-/// A session's web view, mirrored on a phone (#400): its tabs and a picture of the active page,
-/// sent again whenever either changes, and what the phone does there done by the Mac's page —
-/// both ways in sync, since the phone shows the very page the Mac does.
+/// A session's web view, kept in step with the phone's (#400). The phone shows the same page in a
+/// web view of its own — its scrolling its own, at once — and each side tells the other what its
+/// user does: the address, the tab, how far down the page is.
 ///
-/// A picture rather than the page loaded again on the phone: the pages an agent shows are often
-/// the Mac's own (`localhost:4000`), which the phone cannot reach.
+/// The Mac sends its tabs and its scroll whenever they change; it takes the phone's the same way.
+/// A change one side just received is not sent back to it: neither side echoes the other.
 @MainActor
 final class CompanionWebMirror {
-  /// How often the page is pictured while the phone shows it.
-  private static let interval: Duration = .milliseconds(600)
-  /// The picture's longest side: sharp on a phone, light on the channel.
-  private static let side: CGFloat = 1100
+  /// How often the Mac's web view is read while the phone shows it.
+  private static let interval: Duration = .milliseconds(400)
+  /// How long after the phone scrolled the Mac's own scroll is taken for that one, not sent back.
+  private static let echoWindow: Duration = .milliseconds(900)
+  /// A scroll smaller than this is no scroll to tell.
+  private static let scrollStep = 0.004
 
   let sessionID: SessionID
   private weak var appModel: AppModel?
   private let send: @MainActor (RemoteMessage) -> Void
   private var loop: Task<Void, Never>?
-  private var lastFrame: Data?
   private var lastState: RemoteWebState?
+  private var phoneScrolledAt: ContinuousClock.Instant?
 
   init(
     sessionID: SessionID, appModel: AppModel, send: @escaping @MainActor (RemoteMessage) -> Void
@@ -55,12 +57,10 @@ final class CompanionWebMirror {
   private func tick() async {
     guard let browser else { return }
     let active = browser.activeTab
-    var frame: Data?
-    if let tab = active, let picture = await Self.picture(of: tab.ensureWebView()),
-      picture != lastFrame
-    {
-      lastFrame = picture
-      frame = picture
+    var scroll = lastState?.scroll ?? 0
+    let isEcho = phoneScrolledAt.map { ContinuousClock.now - $0 < Self.echoWindow } ?? false
+    if !isEcho, let webView = active?.webView, let fraction = await Self.scroll(of: webView) {
+      scroll = fraction
     }
     let state = RemoteWebState(
       sessionID: sessionID.rawValue.uuidString,
@@ -70,30 +70,30 @@ final class CompanionWebMirror {
           isLoading: $0.isLoading)
       },
       activeTabID: active?.id.rawValue.uuidString, canGoBack: active?.canGoBack ?? false,
-      canGoForward: active?.canGoForward ?? false, frame: nil)
-    guard frame != nil || state != lastState else { return }
+      canGoForward: active?.canGoForward ?? false, scroll: scroll)
+    guard let last = lastState else {
+      lastState = state
+      send(.webState(state))
+      return
+    }
+    var unscrolled = state
+    unscrolled.scroll = last.scroll
+    let moved = abs(state.scroll - last.scroll) >= Self.scrollStep
+    guard unscrolled != last || moved else { return }
     lastState = state
-    var sent = state
-    sent.frame = frame
-    send(.webState(sent))
+    send(.webState(state))
   }
 
-  /// The visible part of the page, in JPEG. A web view never laid out — its session's web view
-  /// never shown on the Mac — is given a window's size first, or there is nothing to picture.
-  static func picture(of webView: WKWebView) async -> Data? {
-    if webView.bounds.width < 10 || webView.bounds.height < 10 {
-      webView.frame = CGRect(x: 0, y: 0, width: 1024, height: 1366)
-    }
-    let configuration = WKSnapshotConfiguration()
-    let bounds = webView.bounds
-    let longest = max(bounds.width, bounds.height)
-    if longest > side {
-      configuration.snapshotWidth = NSNumber(value: Double(bounds.width * side / longest))
-    }
-    guard let image = try? await webView.takeSnapshot(configuration: configuration),
-      let tiff = image.tiffRepresentation, let bitmap = NSBitmapImageRep(data: tiff)
-    else { return nil }
-    return bitmap.representation(using: .jpeg, properties: [.compressionFactor: 0.6])
+  /// How far down the page is, 0 at its top and 1 at its end.
+  private static func scroll(of webView: WKWebView) async -> Double? {
+    let script = """
+      (() => {
+        const range = document.documentElement.scrollHeight - window.innerHeight;
+        return range > 0 ? window.scrollY / range : 0;
+      })()
+      """
+    return (try? await webView.evaluateJavaScript(script, in: nil, contentWorld: .defaultClient))
+      as? Double
   }
 
   // MARK: - What the phone does
@@ -102,15 +102,18 @@ final class CompanionWebMirror {
     guard let workspace = appModel?.browser, let browser else { return }
     let tab = browser.activeTab
     switch action {
-    case .tap(let x, let y):
-      await run(Self.tapScript(x: x, y: y), in: tab)
-    case .scroll(let dy):
-      await run("window.scrollBy({top: \(dy) * window.innerHeight, behavior: 'instant'})", in: tab)
-    case .type(let text):
-      await run(Self.typeScript(text), in: tab)
+    case .scrollTo(let fraction):
+      phoneScrolledAt = .now
+      lastState?.scroll = fraction
+      let script = """
+        window.scrollTo({top: \(fraction) * (document.documentElement.scrollHeight - window.innerHeight), behavior: 'instant'})
+        """
+      _ = try? await tab?.webView?.evaluateJavaScript(script, in: nil, contentWorld: .defaultClient)
     case .navigate(let address):
       guard let url = Self.url(from: address) else { return }
       if let tab {
+        // The phone is already there: told back, it would load the page a second time.
+        guard !RemoteWebAddress.same(tab.url.absoluteString, url.absoluteString) else { return }
         tab.load(url)
       } else {
         _ = workspace.open(url, in: sessionID, openedBy: .user)
@@ -122,54 +125,6 @@ final class CompanionWebMirror {
       guard let uuid = UUID(uuidString: id) else { return }
       browser.activate(BrowserTabID(rawValue: uuid))
     }
-    // Pictured at once rather than at the next beat: the phone sees its touch answered.
-    try? await Task.sleep(for: .milliseconds(150))
-    await tick()
-  }
-
-  private func run(_ script: String, in tab: BrowserTabModel?) async {
-    guard let webView = tab?.webView else { return }
-    _ = try? await webView.evaluateJavaScript(script, in: nil, contentWorld: .page)
-  }
-
-  /// A touch as a mouse would make it on the element under it: pointer and mouse events, then
-  /// a click, which follows links and presses buttons; a field gets the focus.
-  static func tapScript(x: Double, y: Double) -> String {
-    """
-    (() => {
-      const x = \(x) * window.innerWidth, y = \(y) * window.innerHeight;
-      const el = document.elementFromPoint(x, y);
-      if (!el) return;
-      const options = {bubbles: true, cancelable: true, clientX: x, clientY: y, view: window};
-      for (const type of ['pointerdown', 'mousedown', 'pointerup', 'mouseup']) {
-        const Event = type.startsWith('pointer') ? PointerEvent : MouseEvent;
-        el.dispatchEvent(new Event(type, options));
-      }
-      if (el.focus) el.focus();
-      el.click();
-    })()
-    """
-  }
-
-  /// Text into the focused field, as typed; a line break submits its form.
-  static func typeScript(_ text: String) -> String {
-    let literal =
-      (try? String(data: JSONEncoder().encode(text), encoding: .utf8) ?? "\"\"") ?? "\"\""
-    return """
-      (() => {
-        const text = \(literal);
-        const el = document.activeElement;
-        if (!el) return;
-        for (const [index, line] of text.split('\\n').entries()) {
-          if (index > 0) {
-            const form = el.form;
-            el.dispatchEvent(new KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
-            if (form) form.requestSubmit ? form.requestSubmit() : form.submit();
-          }
-          if (line) document.execCommand('insertText', false, line);
-        }
-      })()
-      """
   }
 
   /// What was typed in the address field: an address with its scheme, `localhost:4000` or a
@@ -183,4 +138,45 @@ final class CompanionWebMirror {
         of: #"^[\w.-]+:\d+"#, options: .regularExpression) != nil
     return URL(string: (isLocal ? "http://" : "https://") + text)
   }
+
+  // MARK: - The phone's requests
+
+  /// A request of the phone's web view for a page of the Mac's own: made here, the answer sent
+  /// back whole. Only to the Mac itself or its local network, never anywhere a phone could reach
+  /// on its own.
+  static func fetch(_ request: RemoteHTTPRequest) async -> RemoteHTTPResponse {
+    guard let url = URL(string: request.url), RemoteWebAddress.isMacLocal(url) else {
+      return RemoteHTTPResponse(
+        id: request.id, status: 0, headers: [:], body: Data(), failure: "Adresse refusée")
+    }
+    var urlRequest = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+    urlRequest.httpMethod = request.method
+    urlRequest.httpBody = request.body
+    for (name, value) in request.headers where !ignoredHeaders.contains(name.lowercased()) {
+      urlRequest.setValue(value, forHTTPHeaderField: name)
+    }
+    do {
+      let (data, response) = try await URLSession.shared.data(for: urlRequest)
+      let http = response as? HTTPURLResponse
+      var headers: [String: String] = [:]
+      for (name, value) in http?.allHeaderFields ?? [:] {
+        guard let name = name as? String, let value = value as? String,
+          !ignoredHeaders.contains(name.lowercased())
+        else { continue }
+        headers[name] = value
+      }
+      return RemoteHTTPResponse(
+        id: request.id, status: http?.statusCode ?? 200, headers: headers, body: data)
+    } catch {
+      return RemoteHTTPResponse(
+        id: request.id, status: 0, headers: [:], body: Data(),
+        failure: error.localizedDescription)
+    }
+  }
+
+  /// What the transport sets itself, or what no longer holds once the body is whole.
+  private static let ignoredHeaders: Set<String> = [
+    "host", "content-length", "connection", "transfer-encoding", "content-encoding",
+    "accept-encoding",
+  ]
 }
