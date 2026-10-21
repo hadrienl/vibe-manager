@@ -32,9 +32,7 @@ struct ConversationView: View {
         ForEach(conversation?.entries ?? []) { entry in
           EntryView(entry: entry)
         }
-        if session?.activity == .working {
-          TypingDots().padding(.vertical, 4)
-        }
+
       }
       .padding(.horizontal, 16)
       .padding(.vertical, 12)
@@ -43,6 +41,11 @@ struct ConversationView: View {
     .scrollDismissesKeyboard(.interactively)
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 8) {
+        if isWorking, conversation?.request == nil {
+          WorkingLine(
+            agent: session?.agentName ?? "L’agent", tool: runningTool,
+            interrupt: { channel.interrupt(sessionID) })
+        }
         if let request = conversation?.request {
           RequestCard(request: request, sessionID: sessionID)
             .padding(.horizontal, 12)
@@ -137,6 +140,12 @@ struct ConversationView: View {
     return true
   }
 
+  /// The tool the agent runs now, as its row reads.
+  private var runningTool: String? {
+    guard case .tool(_, let title, _, true, _) = conversation?.entries.last?.kind else { return nil }
+    return title
+  }
+
   private var canSend: Bool {
     !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty
   }
@@ -185,35 +194,21 @@ struct ConversationView: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 22))
-        if isWorking && !canSend {
-          // While the agent works and nothing is written: its turn stopped, as Escape on the Mac.
-          Button {
-            channel.interrupt(sessionID)
-          } label: {
-            Image(systemName: "stop.fill")
-              .font(.body.weight(.bold))
-              .frame(width: 30, height: 30)
-          }
-          .buttonStyle(.glassProminent)
-          .buttonBorderShape(.circle)
-          .accessibilityLabel("Interrompre l’agent")
-        } else {
-          Button {
-            let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard canSend else { return }
-            channel.send(text, files: files, to: sessionID)
-            draft = ""
-            files = []
-          } label: {
-            Image(systemName: "arrow.up")
-              .font(.body.weight(.bold))
-              .frame(width: 30, height: 30)
-          }
-          .buttonStyle(.glassProminent)
-          .buttonBorderShape(.circle)
-          .disabled(!canSend)
-          .accessibilityLabel("Envoyer")
+        Button {
+          let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+          guard canSend else { return }
+          channel.send(text, files: files, to: sessionID)
+          draft = ""
+          files = []
+        } label: {
+          Image(systemName: "arrow.up")
+            .font(.body.weight(.bold))
+            .frame(width: 30, height: 30)
         }
+        .buttonStyle(.glassProminent)
+        .buttonBorderShape(.circle)
+        .disabled(!canSend)
+        .accessibilityLabel("Envoyer")
       }
       .padding(.horizontal, 12)
     }
@@ -538,6 +533,40 @@ private struct AnyButtonStyle: PrimitiveButtonStyle {
   }
 
   func makeBody(configuration: Configuration) -> some View { make(configuration) }
+}
+
+/// What the agent does, over the field, and the way to interrupt it: the Mac's line, word for
+/// word.
+private struct WorkingLine: View {
+  let agent: String
+  let tool: String?
+  let interrupt: () -> Void
+
+  var body: some View {
+    HStack(spacing: 8) {
+      ProgressView().controlSize(.small)
+      Group {
+        if let tool {
+          Text("\(agent) exécute \(tool)…")
+        } else {
+          Text("\(agent) écrit…")
+        }
+      }
+      .lineLimit(1)
+      .truncationMode(.middle)
+      Spacer()
+      Button(action: interrupt) {
+        Label("Interrompre", systemImage: "stop.fill")
+          .labelStyle(.titleAndIcon)
+          .font(.footnote.weight(.semibold))
+      }
+      .buttonStyle(.glass)
+      .accessibilityLabel("Interrompre l’agent")
+    }
+    .font(.footnote)
+    .foregroundStyle(.secondary)
+    .padding(.horizontal, 16)
+  }
 }
 
 private struct TypingDots: View {
