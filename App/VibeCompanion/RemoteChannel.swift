@@ -37,6 +37,9 @@ final class RemoteChannel {
   private(set) var webState: RemoteWebState?
   private(set) var webFrame: UIImage?
   private var webSessionID: String?
+  /// The pictures of the images joined to messages, by their path on the Mac.
+  private(set) var attachmentImages: [String: UIImage] = [:]
+  @ObservationIgnored private var askedAttachments: Set<String> = []
   /// The project icons the sessions wear, by content: asked once, kept in the caches.
   private(set) var icons: [String: UIImage] = [:]
   @ObservationIgnored private var askedIcons: Set<String> = []
@@ -122,6 +125,9 @@ final class RemoteChannel {
       if let webSessionID { write(.showWeb(sessionID: webSessionID)) }
       // Icons asked while the channel was down are asked again.
       for id in askedIcons where icons[id] == nil { write(.icon(id: id)) }
+      for path in askedAttachments where attachmentImages[path] == nil {
+        write(.attachmentImage(path: path))
+      }
       tasks.append(Task.detached { [weak self] in await self?.receive(on: stream, attempt: attempt) })
       tasks.append(
         Task { [weak self] in
@@ -174,6 +180,8 @@ final class RemoteChannel {
       guard state.sessionID == webSessionID else { return }
       webState = state
       if let data = state.frame, let image = UIImage(data: data) { webFrame = image }
+    case .attachmentData(let path, let jpeg):
+      attachmentImages[path] = UIImage(data: jpeg)
     case .iconData(let id, let png):
       guard let image = UIImage(data: png) else { return }
       icons[id] = image
@@ -190,7 +198,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let text):
       failure = text
-    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web:
+    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions, .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage:
       break
     }
   }
@@ -278,6 +286,15 @@ final class RemoteChannel {
 
   func web(_ action: RemoteWebAction, in sessionID: String) {
     write(.web(sessionID: sessionID, action))
+  }
+
+  /// The picture of an image joined to a message: asked of the Mac once.
+  func attachmentImage(_ path: String) -> UIImage? {
+    if let image = attachmentImages[path] { return image }
+    if askedAttachments.insert(path).inserted {
+      Task { @MainActor in self.write(.attachmentImage(path: path)) }
+    }
+    return nil
   }
 
   /// Stops what the agent does.

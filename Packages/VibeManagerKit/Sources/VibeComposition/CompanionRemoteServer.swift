@@ -40,6 +40,8 @@ final class CompanionRemoteServer {
   private var sessionsObserved = false
   private var lastSessions: [RemoteSession] = []
   private var searchIndex: SessionSearchIndex?
+  /// The files joined to the messages sent to phones: the only ones a phone may ask a picture of.
+  private var servedAttachments: Set<String> = []
 
   init(
     appModel: AppModel, macName: String, attachmentsFolder: URL,
@@ -90,6 +92,15 @@ final class CompanionRemoteServer {
         else { return }
         send(peer, .iconData(id: id, png: png))
       }
+    case .attachmentImage(let path):
+      // Only a file a conversation sent to a phone joins: never any path a phone names.
+      guard servedAttachments.contains(path) else { return }
+      Task.detached {
+        guard let data = FileManager.default.contents(atPath: path),
+          let jpeg = Self.thumbnail(data, side: 800, type: "public.jpeg")
+        else { return }
+        await self.send(peer, .attachmentData(path: path, jpeg: jpeg))
+      }
     case .interrupt(let id):
       guard let sessionID = Self.sessionID(id) else { return }
       Task { await appModel?.companionInterrupt(sessionID) }
@@ -109,7 +120,7 @@ final class CompanionRemoteServer {
       let listing = Self.listing(of: path)
       send(peer, .folderListing(listing))
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
-      .folderListing, .iconData, .webState:
+      .folderListing, .iconData, .webState, .attachmentData:
       break
     }
   }
@@ -239,6 +250,11 @@ final class CompanionRemoteServer {
         self?.sendConversation(of: id, model: model, revision: revision, to: peer)
       }
     }
+    for entry in conversation.entries {
+      if case .user(_, let attachments) = entry.kind {
+        servedAttachments.formUnion(attachments.compactMap(\.path))
+      }
+    }
     send(peer, .conversation(conversation))
   }
 
@@ -246,8 +262,21 @@ final class CompanionRemoteServer {
     entries.compactMap { entry in
       let kind: RemoteEntry.Kind
       switch entry.content {
-      case .userPrompt(let text, _):
-        kind = .user(text)
+      case .userPrompt(let text, let attachments):
+        kind = .user(
+          AttachedPaths.displayText(
+            text, joinedCount: attachments.filter(\.isWrittenInText).count),
+          attachments: attachments.enumerated().map { index, attachment in
+            let url: URL? =
+              switch attachment.source {
+              case .file(let url), .fileWithEmbedded(let url, _): url
+              default: nil
+              }
+            return RemoteAttachment(
+              id: attachment.id,
+              name: attachment.name ?? url?.lastPathComponent ?? "Image \(index + 1)",
+              isImage: attachment.kind == .image, path: url?.path)
+          })
       case .agentText(let text):
         kind = .agent(text)
       case .tool(let call):
@@ -473,19 +502,22 @@ final class CompanionRemoteServer {
   }
 
   /// A project icon at the size the phone draws it, 96 pixels: the stored one can be 1024.
-  static func thumbnail(_ png: Data) -> Data? {
+  nonisolated static func thumbnail(
+    _ png: Data, side: Int = 96, type: String = "public.png"
+  ) -> Data? {
     guard let source = CGImageSourceCreateWithData(png as CFData, nil),
       let image = CGImageSourceCreateThumbnailAtIndex(
         source, 0,
         [
           kCGImageSourceCreateThumbnailFromImageAlways: true,
-          kCGImageSourceThumbnailMaxPixelSize: 96,
+          kCGImageSourceCreateThumbnailWithTransform: true,
+          kCGImageSourceThumbnailMaxPixelSize: side,
         ] as CFDictionary)
     else { return nil }
     let data = NSMutableData()
     guard
       let destination = CGImageDestinationCreateWithData(
-        data, "public.png" as CFString, 1, nil)
+        data, type as CFString, 1, nil)
     else { return nil }
     CGImageDestinationAddImage(destination, image, nil)
     return CGImageDestinationFinalize(destination) ? data as Data : nil

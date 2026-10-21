@@ -254,15 +254,22 @@ private struct EntryView: View {
 
   var body: some View {
     switch entry.kind {
-    case .user(let text):
-      Text(verbatim: text)
-        .padding(.horizontal, 13)
-        .padding(.vertical, 9)
-        .foregroundStyle(.white)
-        .background(Color.accentColor, in: .rect(cornerRadius: 18))
-        .frame(maxWidth: .infinity, alignment: .trailing)
-        .padding(.leading, 48)
-        .textSelection(.enabled)
+    case .user(let text, let attachments):
+      VStack(alignment: .trailing, spacing: 6) {
+        if !attachments.isEmpty {
+          AttachmentStrip(attachments: attachments)
+        }
+        if !text.isEmpty {
+          Text(verbatim: text)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
+            .foregroundStyle(.white)
+            .background(Color.accentColor, in: .rect(cornerRadius: 18))
+            .textSelection(.enabled)
+        }
+      }
+      .frame(maxWidth: .infinity, alignment: .trailing)
+      .padding(.leading, 48)
     case .agent(let text):
       Text(Self.markdown(text))
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -296,6 +303,78 @@ private struct EntryView: View {
       markdown: text,
       options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)))
       ?? AttributedString(text)
+  }
+}
+
+/// The files of a message: the pictures of its images, a chip for the rest.
+private struct AttachmentStrip: View {
+  let attachments: [RemoteAttachment]
+  @Environment(RemoteChannel.self) private var channel
+  @State private var shown: UIImage?
+
+  var body: some View {
+    HStack(spacing: 6) {
+      ForEach(attachments) { attachment in
+        if attachment.isImage, let path = attachment.path {
+          Group {
+            if let image = channel.attachmentImage(path) {
+              Button {
+                shown = image
+              } label: {
+                Image(uiImage: image)
+                  .resizable()
+                  .scaledToFill()
+              }
+              .buttonStyle(.plain)
+            } else {
+              Color(.secondarySystemBackground).overlay { ProgressView() }
+            }
+          }
+          .frame(width: 140, height: 140)
+          .clipShape(.rect(cornerRadius: 14))
+          .accessibilityLabel(attachment.name)
+        } else {
+          Label(attachment.name, systemImage: attachment.isImage ? "photo" : "doc")
+            .font(.caption)
+            .lineLimit(1)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Color(.secondarySystemBackground), in: Capsule())
+        }
+      }
+    }
+    .fullScreenCover(item: $shown.identified) { item in
+      ZoomedImage(image: item.image)
+    }
+  }
+}
+
+/// An image whole, on black, closed with a tap.
+private struct ZoomedImage: View {
+  let image: UIImage
+  @Environment(\.dismiss) private var dismiss
+
+  var body: some View {
+    Image(uiImage: image)
+      .resizable()
+      .scaledToFit()
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
+      .background(.black)
+      .onTapGesture { dismiss() }
+      .accessibilityAddTraits(.isButton)
+      .accessibilityLabel("Fermer l’image")
+  }
+}
+
+private struct IdentifiedImage: Identifiable {
+  let image: UIImage
+  var id: ObjectIdentifier { ObjectIdentifier(image) }
+}
+
+extension Binding where Value == UIImage? {
+  fileprivate var identified: Binding<IdentifiedImage?> {
+    Binding<IdentifiedImage?>(
+      get: { wrappedValue.map(IdentifiedImage.init) }, set: { wrappedValue = $0?.image })
   }
 }
 

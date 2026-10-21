@@ -132,10 +132,27 @@ public struct RemoteRequest: Codable, Hashable, Sendable {
   }
 }
 
+/// A file that came with a message: an image the phone asks a picture of (`attachmentImage`).
+public struct RemoteAttachment: Codable, Hashable, Sendable, Identifiable {
+  public var id: String
+  public var name: String
+  public var isImage: Bool
+  /// Where it is on the Mac, the key the phone asks its picture by; `nil` for an image only the
+  /// transcript holds.
+  public var path: String?
+
+  public init(id: String, name: String, isImage: Bool, path: String?) {
+    self.id = id
+    self.name = name
+    self.isImage = isImage
+    self.path = path
+  }
+}
+
 /// One entry of a conversation, as the Mac's conversation view shows it.
 public struct RemoteEntry: Codable, Hashable, Sendable, Identifiable {
   public enum Kind: Codable, Hashable, Sendable {
-    case user(String)
+    case user(String, attachments: [RemoteAttachment])
     /// The agent's words, in Markdown.
     case agent(String)
     /// A tool the agent ran, as its compact row reads: an SF Symbol, "Read Session.swift", the
@@ -373,6 +390,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case listFolder(path: String?)
   /// A project icon's PNG.
   case icon(id: String)
+  /// The picture of an image joined to a message, by its path on the Mac.
+  case attachmentImage(path: String)
   /// Stops what the agent does, as Escape in its terminal.
   case interrupt(sessionID: String)
   /// Shows a session's web view, pictured as the Mac draws it, until `nil`.
@@ -388,6 +407,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case newSessionOffer(RemoteNewSessionOptions)
   case folderListing(RemoteFolderListing)
   case iconData(id: String, png: Data)
+  case attachmentData(path: String, jpeg: Data)
   case webState(RemoteWebState)
   /// The session asked for exists: the phone shows it.
   case created(sessionID: String)
