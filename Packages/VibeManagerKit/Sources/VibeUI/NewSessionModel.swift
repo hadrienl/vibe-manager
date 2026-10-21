@@ -18,6 +18,9 @@ public final class NewSessionModel {
   /// instructions at launch.
   public private(set) var coordinatingAgentIDs: Set<AgentProviderID> = []
   public private(set) var models: [AgentModel] = []
+  /// The reasoning efforts the chosen agent takes, with the chosen model (#411). Empty for an
+  /// agent whose effort is not set from here: the field is not shown.
+  public private(set) var effortLevels: [String] = []
   public private(set) var issues: [SessionDraftIssue] = []
   public private(set) var isSubmitting = false
   public private(set) var isLoadingAgents = false
@@ -249,7 +252,8 @@ public final class NewSessionModel {
     return draft.trimmedName.isEmpty
       && (folder.isEmpty || draft.workingDirectoryPath == preselectedFolder)
       && (draft.providerID == nil || draft.providerID == defaultProviderID)
-      && draft.modelID == nil && draft.appearance == nil && draft.conversationTheme == nil
+      && draft.modelID == nil && draft.effort == nil && draft.appearance == nil
+      && draft.conversationTheme == nil
       && draft.coordination == nil
       && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
       && draft.attachments.isEmpty
@@ -527,6 +531,22 @@ public final class NewSessionModel {
     if let modelID = draft.modelID, !models.contains(where: { $0.id == modelID }) {
       draft.modelID = nil
     }
+    await loadEffortLevels()
+  }
+
+  /// The levels of the chosen agent for the chosen model: Codex's differ from one model to the
+  /// next. A level the new list lacks goes back to the agent's default.
+  public func loadEffortLevels() async {
+    guard let providerID = draft.providerID,
+      let provider = await registry.provider(id: AgentProviderID(providerID))
+        as? any AgentEffortControlling
+    else {
+      effortLevels = []
+      if draft.effort != nil { draft.effort = nil }
+      return
+    }
+    effortLevels = await provider.effortLevels(modelID: draft.modelID)
+    if let effort = draft.effort, !effortLevels.contains(effort) { draft.effort = nil }
   }
 
   /// Picks an agent and lists that agent's models — the two belong together, so no state exists
@@ -535,6 +555,7 @@ public final class NewSessionModel {
     guard draft.providerID != id else { return }
     draft.providerID = id
     draft.modelID = nil
+    draft.effort = nil
     await loadModels()
     await revalidateIfSubmitted()
   }
