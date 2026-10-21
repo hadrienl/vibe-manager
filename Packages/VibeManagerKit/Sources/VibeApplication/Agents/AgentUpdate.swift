@@ -1,0 +1,84 @@
+import Foundation
+
+/// A CLI updated on disk while one of its processes still runs the build it was started from
+/// (#409).
+///
+/// Claude Code installs its updates while it runs and says `Restart to update`; Codex updates at
+/// a start, and the sessions already open stay on the previous build without a word. Neither is
+/// read off the screen: the build a process runs is the file the kernel loaded, and the build the
+/// next start would get is the one its executable resolves to now.
+public struct AgentUpdate: Hashable, Sendable {
+  /// The version the process runs, read from its path: `2.1.299`. `nil` when the path says none.
+  public let runningVersion: String?
+  /// The version the next start would get: `2.1.303`.
+  public let installedVersion: String?
+
+  public init(runningVersion: String?, installedVersion: String?) {
+    self.runningVersion = runningVersion
+    self.installedVersion = installedVersion
+  }
+
+  /// The update between the file a process runs and the one its executable resolves to now, or
+  /// `nil` when they are the same build — or when nothing says they are two builds of one CLI.
+  ///
+  /// Both paths are resolved, links followed. Two builds of one install differ only by their
+  /// versions: `…/claude/versions/2.1.299` and `…/claude/versions/2.1.303`, Codex's
+  /// `…/releases/0.162.1-aarch64-apple-darwin/bin/codex`, Homebrew's `…/Cellar/codex/0.162.1/…`.
+  /// A process that runs another file altogether — `node`, for a CLI installed by npm — tells
+  /// nothing, and is never taken for an update.
+  public static func between(running: String, installed: String) -> AgentUpdate? {
+    let old = running.split(separator: "/", omittingEmptySubsequences: true)
+    let new = installed.split(separator: "/", omittingEmptySubsequences: true)
+    guard old.count == new.count, old != new else { return nil }
+    let changed = zip(old, new).filter { $0 != $1 }
+    guard changed.allSatisfy({ version(in: $0) != nil && version(in: $1) != nil }) else {
+      return nil
+    }
+    guard let first = changed.first else { return nil }
+    return AgentUpdate(runningVersion: version(in: first.0), installedVersion: version(in: first.1))
+  }
+
+  /// The version a path component opens on: `0.162.1` of `0.162.1-aarch64-apple-darwin`.
+  static func version(in component: Substring) -> String? {
+    guard let match = component.prefixMatch(of: /v?(\d+(?:\.\d+)+)/) else { return nil }
+    return String(match.output.1)
+  }
+}
+
+/// Whether a session can have its agent restarted without anything being lost (#409): the same
+/// answer for the button and for the automatic restart.
+public enum AgentUpdateRestartReadiness {
+  /// - Parameters:
+  ///   - activity: the session's agent activity; `nil` when none is followed.
+  ///   - screen: the terminal's screen, as `SessionLauncher.screen(of:)` reads it.
+  ///   - runsSubagents: whether a sub-agent of the conversation still runs.
+  public static func isReady(
+    activity: AgentActivityState?,
+    screen: String?,
+    runsSubagents: Bool
+  ) -> Bool {
+    guard let activity, activity.activity == .idle, activity.requests.isEmpty, !runsSubagents
+    else { return false }
+    guard let screen else { return false }
+    if let input = PromptInputRecognition.input(screen: screen),
+      PromptInputRecognition.holdsText(input)
+    {
+      return false
+    }
+    return !runsInBackground(screen: screen)
+  }
+
+  /// Whether the footer under Claude Code's prompt counts work going on behind it —
+  /// `▶▶ auto mode on · 2 shells · ← 1 agent`. Only below the prompt's last rule: the same words
+  /// in what an agent wrote above it are not a footer.
+  public static func runsInBackground(screen: String) -> Bool {
+    let lines = screen.components(separatedBy: "\n")
+    let footer = lines.lastIndex(where: PromptInputRecognition.isRule).map {
+      lines[($0 + 1)...]
+    }
+    guard let footer else { return false }
+    return footer.contains { line in
+      line.contains(/\b\d+ (shells?|agents?|background tasks?|tasks?)\b/)
+    }
+  }
+}

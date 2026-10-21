@@ -295,6 +295,17 @@ public struct SystemProcessLivenessProbe: ProcessLivenessProbe {
     )
   }
 
+  /// The file a process runs, as the kernel loaded it: links resolved, and the build it was
+  /// started from even when the file its command named has since been replaced (#409).
+  public func imagePath(of processIdentifier: Int32) -> String? {
+    guard processIdentifier > 0 else { return nil }
+    // PROC_PIDPATHINFO_MAXSIZE, which Swift does not import: four times MAXPATHLEN.
+    var buffer = [CChar](repeating: 0, count: 4 * Int(MAXPATHLEN))
+    let length = proc_pidpath(processIdentifier, &buffer, UInt32(buffer.count))
+    guard length > 0 else { return nil }
+    return String(decoding: buffer.prefix(Int(length)).map { UInt8(bitPattern: $0) }, as: UTF8.self)
+  }
+
   @discardableResult
   public func terminate(processGroup: Int32) -> Bool {
     guard processGroup > 0 else { return false }

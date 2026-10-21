@@ -488,13 +488,23 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   /// A session that turns out to be running already answers `alreadyRunning`, not a failure: the
   /// agent the user asked for is up, and reporting that as an error put a banner over it.
   @discardableResult
+  ///
+  /// - Parameter update: the update of its CLI the agent is restarted onto (#409), named in the
+  ///   separator when its conversation is resumed.
   public func restart(
-    _ restart: SessionRestart, at date: Date = Date(), afterRelaunch: Bool = false
+    _ restart: SessionRestart, at date: Date = Date(), afterRelaunch: Bool = false,
+    update: AgentUpdate? = nil
   ) async -> SessionStartOutcome {
-    await start(
+    let notice: String
+    if let update, case .native = restart.mode {
+      notice = Self.updateSeparator(for: update, at: date)
+    } else {
+      notice = Self.separator(for: restart.mode, at: date)
+    }
+    return await start(
       session: restart.session,
       plan: restart.plan,
-      notice: Self.separator(for: restart.mode, at: date),
+      notice: notice,
       run: UsageRunContext(kind: Self.usageKind(for: restart.mode), afterRelaunch: afterRelaunch)
     )
   }
@@ -608,6 +618,25 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       localized: "separator.restart", defaultValue: "Restart", bundle: .module,
       comment: "The title of the line a terminal shows above a restarted agent: a noun.")
     return "\r\n\u{1B}[2m── \(title) · \(stamp) · \(what) ──\u{1B}[0m\r\n"
+  }
+
+  /// The line written into the terminal above an agent restarted onto its updated CLI (#409):
+  /// the output above it is the previous build's.
+  static func updateSeparator(for update: AgentUpdate, at date: Date) -> String {
+    let stamp = date.formatted(date: .abbreviated, time: .shortened)
+    let title = String(
+      localized: "separator.update", defaultValue: "Update", bundle: .module,
+      comment: "The title of the line a terminal shows above an agent restarted onto its updated CLI: a noun.")
+    let what = String(
+      localized: "resumed conversation", bundle: .module,
+      comment: "In the line a terminal shows above a restarted agent: how it was started.")
+    let versions =
+      switch (update.runningVersion, update.installedVersion) {
+      case (let old?, let new?): " · \(old) → \(new)"
+      case (nil, let new?): " · \(new)"
+      default: ""
+      }
+    return "\r\n\u{1B}[2m── \(title) · \(stamp)\(versions) · \(what) ──\u{1B}[0m\r\n"
   }
 
   /// Takes back a session whose process the terminal host kept while the application was closed,
