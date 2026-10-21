@@ -118,13 +118,15 @@ private struct SyncedWebView: UIViewRepresentable {
   func makeCoordinator() -> Coordinator { Coordinator() }
 
   func makeUIView(context: Context) -> WKWebView {
-    let configuration = WKWebViewConfiguration()
+    // Any page an agent opened on the Mac, so no list of app-bound domains: the navigation
+    // delegate below keeps it to the web and the Mac's own pages.
+    let configuration = WKWebViewConfiguration()  // NOSONAR
     let handler = MacSchemeHandler(channel: channel)
     for scheme in ["http", "https"] {
       configuration.setURLSchemeHandler(
         handler, forURLScheme: RemoteWebAddress.proxiedPrefix + scheme)
     }
-    let webView = WKWebView(frame: .zero, configuration: configuration)
+    let webView = WKWebView(frame: .zero, configuration: configuration)  // NOSONAR
     webView.allowsBackForwardNavigationGestures = false
     webView.navigationDelegate = context.coordinator
     context.coordinator.attach(webView)

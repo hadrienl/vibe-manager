@@ -386,13 +386,13 @@ final class RemoteChannel {
       kSecAttrService as String: keyService,
       // No user presence asked: the channel opens by itself at each return to the foreground, and
       // the key never leaves this device. As the Mac keeps its endpoints' secrets.
-      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,  // NOSONAR
+      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
       kSecValueData as String: key,
     ]
     SecItemDelete(
       [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keyService]
         as CFDictionary)
-    SecItemAdd(add as CFDictionary, nil)
+    SecItemAdd(add as CFDictionary, nil)  // NOSONAR: no user presence, said above
     return key
   }
 }
