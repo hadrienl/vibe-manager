@@ -21,8 +21,9 @@ The sound marks "a session out of sight needs you", whatever the reason: one sou
 sound per kind of request. When a notification is posted, it carries the sound, so that Focus and
 the "Play sound for notifications" switch of System Settings apply without anything of ours. With
 the floating panel in place of the notifications, in the background, a notification is still posted
-to carry the sound, and taken away as soon as it is delivered: the panel says what happened, macOS
-plays the sound — or keeps it quiet during a Focus. In front, or with the panel while the system
+to carry the sound, and taken away once macOS has delivered it — taken away as soon as it is added,
+it never sounds. The panel says what happened; macOS plays the sound, or keeps it quiet during a
+Focus. In front, or with the panel while the system
 may not notify, `AppModel.soundAttention(title:body:)` plays it directly; the session on screen
 never sounds, the requests read back at launch or replayed do not either, and several signals within
 a second sound once. With the notifications turned off and no floating panel, the user asked for

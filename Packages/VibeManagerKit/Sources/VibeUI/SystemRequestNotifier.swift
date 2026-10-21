@@ -154,13 +154,22 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
     }
   }
 
-  /// Delivered, its sound is on its way: the banner goes, the floating panel stays.
+  /// Delivered, its sound is on its way: the banner goes, the floating panel stays. Added is not
+  /// delivered: taken away before macOS presents it, it never sounds — so it is looked for among
+  /// the delivered ones first, for a few seconds at most.
   private func deliverSoundOnly(_ request: UNNotificationRequest) {
     let identifier = request.identifier
     center.add(request) { [weak self] _ in
-      Task { @MainActor in self?.center.removeDeliveredNotifications(withIdentifiers: [identifier])
-      }
+      Task { @MainActor in await self?.withdrawOnceDelivered(identifier) }
     }
+  }
+
+  private func withdrawOnceDelivered(_ identifier: String) async {
+    for _ in 0..<30 {
+      if await isStillShown(identifier) { break }
+      try? await Task.sleep(for: .milliseconds(100))
+    }
+    center.removeDeliveredNotifications(withIdentifiers: [identifier])
   }
 
   /// The alert sound the user chose (#393): the system's until one is copied where the
