@@ -384,7 +384,9 @@ final class RemoteChannel {
     let add: [String: Any] = [
       kSecClass as String: kSecClassGenericPassword,
       kSecAttrService as String: keyService,
-      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
+      // No user presence asked: the channel opens by itself at each return to the foreground, and
+      // the key never leaves this device. As the Mac keeps its endpoints' secrets.
+      kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,  // NOSONAR
       kSecValueData as String: key,
     ]
     SecItemDelete(

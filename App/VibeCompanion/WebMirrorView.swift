@@ -126,6 +126,7 @@ private struct SyncedWebView: UIViewRepresentable {
     }
     let webView = WKWebView(frame: .zero, configuration: configuration)
     webView.allowsBackForwardNavigationGestures = false
+    webView.navigationDelegate = context.coordinator
     context.coordinator.attach(webView)
     return webView
   }
@@ -143,7 +144,22 @@ private struct SyncedWebView: UIViewRepresentable {
   }
 
   @MainActor
-  final class Coordinator: NSObject {
+  final class Coordinator: NSObject, WKNavigationDelegate {
+    /// The pages the web view goes to: the web, and the Mac's own through the channel. Anything
+    /// else — a file, another application's scheme — is not opened from here.
+    static let allowedSchemes: Set<String> = [
+      "http", "https", "about", "blob", "data",
+      RemoteWebAddress.proxiedPrefix + "http", RemoteWebAddress.proxiedPrefix + "https",
+    ]
+
+    func webView(
+      _ webView: WKWebView, decidePolicyFor action: WKNavigationAction,
+      decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
+    ) {
+      let scheme = action.request.url?.scheme?.lowercased() ?? ""
+      decisionHandler(Self.allowedSchemes.contains(scheme) ? .allow : .cancel)
+    }
+
     var navigated: (URL) -> Void = { _ in }
     var scrolled: (Double) -> Void = { _ in }
     var reloads = 0

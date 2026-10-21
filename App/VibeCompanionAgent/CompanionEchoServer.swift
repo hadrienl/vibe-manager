@@ -270,7 +270,9 @@ actor CompanionEchoServer {
     SecItemDelete(item as CFDictionary)
     var added = item
     added[kSecValueData as String] = key
-    added[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+    // No user presence asked: the agent runs without a window, and must answer the phones while
+    // nobody is at the Mac. The key never leaves it, as the endpoints' secrets of the application.
+    added[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly  // NOSONAR
     added[kSecAttrLabel as String] = "Vibe Manager Companion"
     let status = SecItemAdd(added as CFDictionary, nil)
     guard status == errSecSuccess else {
