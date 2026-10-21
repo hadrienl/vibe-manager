@@ -137,7 +137,8 @@ public struct CodexModelCatalog: CodexModelCatalogSource {
         slug = try container.decode(String.self, forKey: .slug)
         displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
         // Reshaped levels must not cost the model its place in the list.
-        reasoningLevels = try? container.decodeIfPresent([ReasoningLevel].self, forKey: .reasoningLevels)
+        reasoningLevels = try? container.decodeIfPresent(
+          [ReasoningLevel].self, forKey: .reasoningLevels)
       }
     }
 

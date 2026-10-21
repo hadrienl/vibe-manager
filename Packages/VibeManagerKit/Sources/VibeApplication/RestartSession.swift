@@ -362,7 +362,7 @@ public struct RestartSession: Sendable {
       request: AgentLaunchRequest(
         workingDirectoryPath: path,
         modelID: session.agent?.modelID,
-          effort: session.agent?.effort,
+        effort: session.agent?.effort,
         initialPrompt: prompt.isEmpty ? nil : session.initialPrompt,
         resume: .none
       )
@@ -444,7 +444,7 @@ public struct RestartSession: Sendable {
       request: AgentLaunchRequest(
         workingDirectoryPath: path,
         modelID: session.agent?.modelID,
-          effort: session.agent?.effort,
+        effort: session.agent?.effort,
         initialPrompt: summary.text,
         resume: .none
       )
