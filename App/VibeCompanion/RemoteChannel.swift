@@ -392,7 +392,7 @@ final class RemoteChannel {
     SecItemDelete(
       [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keyService]
         as CFDictionary)
-    SecItemAdd(add as CFDictionary, nil)  // NOSONAR: no user presence, said above
+    SecItemAdd(add as CFDictionary, nil)
     return key
   }
 }

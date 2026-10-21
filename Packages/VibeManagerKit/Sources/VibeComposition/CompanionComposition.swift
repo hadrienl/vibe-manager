@@ -95,7 +95,7 @@ final class CompanionComposition {
     let link = self.link
     let receive = ReceiveCompanionTest(publisher: link, alerts: AppKitCompanionTestAlert())
     let remote = self.remote
-    Task {
+    Task { [weak self] in
       await link.start(
         onTest: { test in await receive(test) },
         onRemote: { peer, message in
@@ -103,7 +103,7 @@ final class CompanionComposition {
             if let message { remote?.receive(message, from: peer) } else { remote?.closed(peer) }
           }
         },
-        onEvent: { [weak self] event in
+        onEvent: { event in
           await MainActor.run { self?.apply(event) }
         })
     }

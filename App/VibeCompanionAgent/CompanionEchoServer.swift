@@ -274,7 +274,7 @@ actor CompanionEchoServer {
     // nobody is at the Mac. The key never leaves it, as the endpoints' secrets of the application.
     added[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
     added[kSecAttrLabel as String] = "Vibe Manager Companion"
-    let status = SecItemAdd(added as CFDictionary, nil)  // NOSONAR: no user presence, said above
+    let status = SecItemAdd(added as CFDictionary, nil)
     guard status == errSecSuccess else {
       throw NSError(domain: NSOSStatusErrorDomain, code: Int(status))
     }
