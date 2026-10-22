@@ -252,6 +252,7 @@ struct SettingsSidebarContent {
     tools.append(.coordination)
     if model.dictation != nil { tools.append(.dictation) }
     if model.ticketTitles.canReadPages { tools.append(.tickets) }
+    if model.archiveRules != nil { tools.append(.archiveRules) }
     groups.append(
       Group(
         id: "tools",
@@ -412,6 +413,10 @@ struct SettingsPageView: View {
     case .dictation:
       if let dictation = model.dictation {
         DictationSettingsView(dictation: dictation)
+      }
+    case .archiveRules:
+      if let rules = model.archiveRules {
+        ArchiveRulesSettingsView(model: model, rules: rules)
       }
     case .tickets:
       TicketSettingsView(model: model.ticketTitles, pane: .general) { model.settingsPage = $0 }

@@ -136,6 +136,21 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
     }
   }
 
+  /// Without a sound: nothing waits on the user, it only says what left the list.
+  public func postArchiveRun(ruleName: String, count: Int) {
+    let identifier = "archive-run|\(UUID().uuidString)"
+    wanted.insert(identifier)
+    Task {
+      guard await authorized() else { return }
+      let content = UNMutableNotificationContent()
+      content.body = String(
+        localized: "“\(ruleName)” archived \(count) sessions.", bundle: .module,
+        comment: "A notification: an automatic archive rule, by its name, archived sessions.")
+      content.sound = nil
+      deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+    }
+  }
+
   public func postAlertSound(title: String, body: String) {
     guard let sound = alertSound else { return }
     let identifier = "alert-sound|\(UUID().uuidString)"

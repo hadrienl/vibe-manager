@@ -156,6 +156,9 @@ public final class AppModel {
   public var isWaitingOnBackgroundWork: ((WorkSession) async -> Bool)?
   /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
   public var endpoints: EndpointsSettingsModel?
+  /// The automatic archive's rules (#405). Set by the composition: a workspace assembled without
+  /// it archives nothing on its own and has no tab.
+  public var archiveRules: ArchiveRulesModel?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
   /// workspace assembled without it has no Updates tab.
   public var updates: UpdatesModel?
@@ -682,7 +685,7 @@ public final class AppModel {
   var keyboardHeldInSidebarFor: SessionID?
   /// Archives under way, from the command to the reload that takes the session out of its column.
   /// Until then the row is still there, and a second ⌃⌘A would archive it a second time.
-  public private(set) var archivingSessionIDs: Set<SessionID> = []
+  public internal(set) var archivingSessionIDs: Set<SessionID> = []
   /// Whether the list of the archived sessions is open at the foot of the sidebar. Here rather
   /// than in the view, so that the menu can open it.
   public var isArchiveListPresented = false
@@ -1591,8 +1594,10 @@ public final class AppModel {
     }
   }
 
-  private func archiveProcess(_ id: SessionID) async throws -> SessionArchival {
-    let archival = try await archiveSession(id: id)
+  func archiveProcess(
+    _ id: SessionID, cause: SessionStatusChange.Cause = .user
+  ) async throws -> SessionArchival {
+    let archival = try await archiveSession(id: id, cause: cause)
     await activityTracker?.forget(id)
     ticketTitles.forget(id)
     browser?.release(id)
@@ -2806,6 +2811,9 @@ public final class AppModel {
     // The wake-ups the coordinators asked for before the relaunch, once the agents left running
     // are adopted: a coordinator not running yet keeps its wake-up (#352).
     await startCoordination()
+    // Once the sessions are read and the running agents adopted: a time missed while the
+    // application was closed is caught up now, on what runs (#405).
+    await startArchiveRules()
     await settleUsage()
     // Now that the host is known: one kept from before the access was granted is restarted here
     // if no agent runs in it, before anything is resumed into it (#76).
@@ -3287,6 +3295,11 @@ public final class AppModel {
       // and on a cold cache this is a detection the first frame would otherwise wait for.
       resolutionTask?.cancel()
       resolutionTask = Task { [weak self] in await self?.refreshResolutions() }
+      // A rule that runs continuously looks at every change of the sessions (#405); a run that
+      // just happened waits its minute.
+      if archiveRules?.runsContinuously == true {
+        Task { [weak self] in await self?.runArchiveRules() }
+      }
     } catch {
       await report(error)
     }

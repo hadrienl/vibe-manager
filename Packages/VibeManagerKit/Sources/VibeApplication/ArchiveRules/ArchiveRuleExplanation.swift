@@ -25,11 +25,11 @@ public struct ArchiveRuleVocabulary: Sendable {
     return "\(name) (\(hex))"
   }
 
-  func symbol(_ name: String) -> String {
+  public func symbol(_ name: String) -> String {
     symbolNames[name].map { "\($0) (\(name))" } ?? name
   }
 
-  func agent(_ id: String) -> String {
+  public func agent(_ id: String) -> String {
     agentNames[id] ?? id
   }
 }
