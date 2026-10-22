@@ -9,6 +9,7 @@ import VibeDomain
 /// The stub agent signs in at once: the tests drive what happens before and after.
 extension WorkspaceProvider: AgentSigningIn {
   func signIn() async -> AgentSignInOutcome { .signedIn }
+  func signInRoute() async -> AgentSignInRoute { .browser }
 }
 
 /// #410: a session whose turn stopped because its CLI's sign-in expired.
@@ -90,6 +91,36 @@ struct SignInWorkspaceTests {
     try await Task.sleep(for: .milliseconds(20))
     model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
 
+    #expect(model.signInNotice(for: subject.id)?.state == .expired)
+  }
+
+  /// #419: the browser signs a subscription in; another account is the terminal's, and a key
+  /// or a provider set outside the CLI is no one's here.
+  @Test("Sign In is only offered for an account the browser signs in")
+  func signInRoutes() async throws {
+    let (model, subject) = try await running()
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+    let stub = AgentProviderID("stub")
+    // Until the CLI has said, the terminal only.
+    #expect(model.signInNotice(for: subject.id)?.route == .unknown)
+    model.signIn(from: subject.id)
+    #expect(model.signIns[stub] == nil)
+
+    // The stub's own answer, once looked up: it would otherwise come over the ones set here.
+    model.publishSignIns()
+    let deadline = ContinuousClock.now + .seconds(30)
+    while model.signInRoutes[stub] == nil, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(model.signInNotice(for: subject.id)?.route == .browser)
+
+    model.signInRoutes[stub] = (.terminal, Date())
+    #expect(model.signInNotice(for: subject.id)?.route == .terminal)
+    model.signIn(from: subject.id)
+    #expect(model.signIns[stub] == nil)
+
+    model.signInRoutes[stub] = (.elsewhere, Date())
+    #expect(model.signInNotice(for: subject.id)?.route == .elsewhere)
     #expect(model.signInNotice(for: subject.id)?.state == .expired)
   }
 

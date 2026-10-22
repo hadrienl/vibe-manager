@@ -10,6 +10,20 @@ public enum ClaudeCodeAuthenticationStatus {
     return result.exitCode == 0 ? nil : false
   }
 
+  /// How the account `auth status --json` describes is signed in again (#419). `auth login`
+  /// without an option signs a Claude subscription in; a Console account — a key the CLI's
+  /// `/login` manages — is signed in from the terminal, where `/login` asks which. A key, a
+  /// token or a provider set in the environment is not the CLI's to change.
+  public static func signInRoute(in output: String) -> AgentSignInRoute {
+    guard let status = decodeStatus(in: output) else { return .browser }
+    switch status.authMethod {
+    case nil, "claude.ai", "none": return .browser
+    case "api_key" where status.apiKeySource == "/login managed key": return .terminal
+    case "api_key", "api_key_helper", "oauth_token", "third_party": return .elsewhere
+    default: return .terminal
+    }
+  }
+
   /// The answer as JSON, wherever it sits in the stream.
   ///
   /// Anything else the run put on the way — a Node deprecation warning, a proxy or certificate
@@ -37,5 +51,7 @@ public enum ClaudeCodeAuthenticationStatus {
 
   private struct Status: Decodable {
     let loggedIn: Bool
+    let authMethod: String?
+    let apiKeySource: String?
   }
 }

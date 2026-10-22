@@ -39,4 +39,15 @@ struct AgentSignInTests {
     #expect(ConversationEntry.promptFailedOnSignIn(in: entries) == nil)
     #expect(ConversationEntry.promptFailedOnSignIn(in: []) == nil)
   }
+
+  /// #419: the agent had begun on the prompt; without one, nothing is to be gone on with.
+  @Test func aTurnBegunBeforeTheSignInExpiredIsToBeGoneOnWith() {
+    let begun = [
+      prompt("audit"), ConversationEntry(id: "a", content: .agentText("Reading the lockfile.")),
+      error,
+    ]
+    #expect(ConversationEntry.turnFailedOnSignInMidway(in: begun))
+    #expect(!ConversationEntry.turnFailedOnSignInMidway(in: [prompt("audit"), error]))
+    #expect(!ConversationEntry.turnFailedOnSignInMidway(in: [error]))
+  }
 }
