@@ -397,56 +397,70 @@ struct ArchiveRuleBenchView: View {
   }
 }
 
-/// Changes a made-up session: its colour, its column, when it was done, what runs in it.
+/// Changes a made-up session: its colour, its column, when it was done, what runs in it. Every
+/// field looks the session up by its identifier: removed meanwhile, it changes nothing.
 private struct BenchSessionEditor: View {
   @Bindable var model: ArchiveRuleBenchModel
   let id: SessionID
 
-  private var index: Int? { model.sessions.firstIndex { $0.id == id } }
+  private var session: BenchSession? { model.sessions.first { $0.id == id } }
+
+  private func update(_ change: (inout BenchSession) -> Void) {
+    guard let index = model.sessions.firstIndex(where: { $0.id == id }) else { return }
+    change(&model.sessions[index])
+  }
+
+  private func binding<Value>(
+    _ path: WritableKeyPath<BenchSession, Value>, default value: Value
+  ) -> Binding<Value> {
+    Binding(
+      get: { session?[keyPath: path] ?? value },
+      set: { newValue in update { $0[keyPath: path] = newValue } })
+  }
 
   var body: some View {
-    if let index {
+    if let session {
       Form {
-        TextField(text: $model.sessions[index].name) {
+        TextField(text: binding(\.name, default: "")) {
           Text("Name", bundle: .module, comment: "A field of a made-up session of the test bench.")
         }
-        TextField(text: $model.sessions[index].colorHex) {
+        TextField(text: binding(\.colorHex, default: "")) {
           Text("Badge colour", bundle: .module, comment: "A field of a made-up session: #RRGGBB.")
         }
-        Toggle(isOn: $model.sessions[index].showsProjectIcon) {
+        Toggle(isOn: binding(\.showsProjectIcon, default: false)) {
           Text("Shows the project's icon", bundle: .module, comment: "A field of a made-up session.")
         }
         TextField(
           text: Binding(
-            get: { model.sessions[index].project ?? "" },
-            set: { model.sessions[index].project = $0.isEmpty ? nil : $0 })
+            get: { self.session?.project ?? "" },
+            set: { text in update { $0.project = text.isEmpty ? nil : text } })
         ) {
           Text("Group", bundle: .module, comment: "A field of a made-up session.")
         }
-        Toggle(isOn: $model.sessions[index].isDirty) {
+        Toggle(isOn: binding(\.isDirty, default: false)) {
           Text("Its folder has changes", bundle: .module, comment: "A field of a made-up session.")
         }
         Toggle(
           isOn: Binding(
-            get: { model.sessions[index].runningUntil != nil },
+            get: { self.session?.runningUntil != nil },
             set: { on in
-              model.sessions[index].runningUntil =
-                on ? model.calendar.date(byAdding: .day, value: 7, to: model.start) : nil
+              let until = on ? model.calendar.date(byAdding: .day, value: 7, to: model.start) : nil
+              update { $0.runningUntil = until }
             })
         ) {
           Text("Something runs in it", bundle: .module, comment: "A field of a made-up session.")
         }
-        if let until = model.sessions[index].runningUntil {
+        if let until = session.runningUntil {
           DatePicker(
-            selection: Binding(get: { until }, set: { model.sessions[index].runningUntil = $0 })
+            selection: Binding(get: { until }, set: { date in update { $0.runningUntil = date } })
           ) {
             Text("Until", bundle: .module, comment: "When what runs in a made-up session stops.")
           }
         }
         Picker(
           selection: Binding(
-            get: { model.sessions[index].status(at: model.cursor) },
-            set: { model.sessions[index].move(to: $0, at: model.cursor) })
+            get: { self.session?.status(at: model.cursor) ?? .todo },
+            set: { status in update { $0.move(to: status, at: model.cursor) } })
         ) {
           ForEach(SessionTaskStatus.allCases, id: \.self) { status in
             Text(status.label).tag(status)
@@ -456,20 +470,22 @@ private struct BenchSessionEditor: View {
         }
         Button {
           // Archived by hand an hour before, and brought back now.
-          model.sessions[index].move(
-            to: .archived, at: model.cursor.addingTimeInterval(-3600), cause: .user)
-          model.sessions[index].move(to: .done, at: model.cursor, cause: .unarchive)
+          let cursor = model.cursor
+          update {
+            $0.move(to: .archived, at: cursor.addingTimeInterval(-3600), cause: .user)
+            $0.move(to: .done, at: cursor, cause: .unarchive)
+          }
         } label: {
           Text("Unarchived by you at the cursor", bundle: .module, comment: "Adds an event to a made-up session.")
         }
         HStack {
           Button {
-            model.duplicate(model.sessions[index])
+            model.duplicate(session)
           } label: {
             Text("Duplicate", bundle: .module, comment: "Copies a made-up session of the test bench.")
           }
           Button(role: .destructive) {
-            model.remove(model.sessions[index])
+            model.remove(session)
           } label: {
             Text("Remove", bundle: .module, comment: "Removes a made-up session of the test bench.")
           }

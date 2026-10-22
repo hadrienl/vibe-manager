@@ -9,6 +9,8 @@ struct ArchiveRulesSettingsView: View {
   @Bindable var rules: ArchiveRulesModel
   @State private var sheet: ArchiveRuleSheetModel?
   @State private var bench: ArchiveRuleBenchModel?
+  /// “Not What I Wanted” from the bench: the sheet to refine opens once the bench is gone.
+  @State private var pendingRefinement: (rule: StoredArchiveRule, text: String)?
 
   var body: some View {
     Form {
@@ -117,14 +119,21 @@ struct ArchiveRulesSettingsView: View {
         self.sheet = nil
       }
     }
-    .sheet(item: $bench) { bench in
+    .sheet(
+      item: $bench,
+      onDismiss: {
+        guard let pending = pendingRefinement else { return }
+        pendingRefinement = nil
+        let sheet = sheetModel(.refine(pending.rule))
+        sheet.refinement = pending.text
+        self.sheet = sheet
+      }
+    ) { bench in
       ArchiveRuleBenchView(model: bench) { refinement in
-        self.bench = nil
         if let refinement, case .stored(let stored) = bench.origin {
-          let sheet = sheetModel(.refine(stored))
-          sheet.refinement = refinement
-          self.sheet = sheet
+          pendingRefinement = (stored, refinement)
         }
+        self.bench = nil
       }
     }
   }

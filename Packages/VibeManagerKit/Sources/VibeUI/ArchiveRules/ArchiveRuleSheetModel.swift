@@ -242,8 +242,13 @@ public final class ArchiveRuleSheetModel: Identifiable {
   public func save(trial: Bool) async -> Bool {
     guard let current else { return false }
     let replacing: UUID? = if case .refine(let stored) = purpose { stored.id } else { nil }
+    // A protection sheet keeps protections only: nothing it saves archives anything.
+    let document =
+      purpose == .protection
+      ? ArchiveRuleDocument(protections: current.document.protections) : current.document
+    guard !document.isEmpty else { return false }
     let saved = await rules.save(
-      current.document, sentence: versions.first?.sentence ?? current.sentence,
+      document, sentence: versions.first?.sentence ?? current.sentence,
       agent: current.agentID, state: trial ? .trial : .active, replacing: replacing)
     if saved {
       announce(

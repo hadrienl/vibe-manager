@@ -89,7 +89,9 @@ extension AppModel {
 
   /// One tick: the rules due now claimed, then run in the order of the list.
   func runArchiveRules() async {
-    guard let model = archiveRules, !model.isRunning, model.problem == nil,
+    // A write of the Settings that failed does not stop the rules: only a file that cannot be
+    // read does.
+    guard let model = archiveRules, !model.isRunning, model.problem != .unreadable,
       case .loaded = state
     else { return }
     model.isRunning = true
@@ -125,8 +127,21 @@ extension AppModel {
         calendar: calendar)
       var archived: [SessionArchiveUndo] = []
       if !run.isTrial {
+        // Reading Git and archiving take time: the user may have started, moved or protected a
+        // session since the plan. Each is looked at again, as it stands now, right before.
+        await reload()
         for id in plan.archived {
-          guard let session = sessions.first(where: { $0.id == id }), session.status != .archived,
+          guard let session = sessions.first(where: { $0.id == id }),
+            var live = archiveCandidates().first(where: { $0.id == id })
+          else { continue }
+          if let planned = candidates.first(where: { $0.id == id }) {
+            live.branch = planned.branch
+            live.isDirty = planned.isDirty
+          }
+          guard
+            ArchiveRuleEvaluation.verdict(
+              of: live, rule: run.rule, protections: protections, now: now, calendar: calendar)
+              == .archive,
             archivingSessionIDs.insert(id).inserted
           else { continue }
           defer { archivingSessionIDs.remove(id) }

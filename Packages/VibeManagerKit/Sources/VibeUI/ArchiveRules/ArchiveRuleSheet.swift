@@ -35,6 +35,8 @@ struct ArchiveRuleSheet: View {
       await model.loadOptions()
       sentenceFocused = true
     }
+    // Closed while an agent translates: its process is stopped, not left to time out.
+    .onDisappear { if model.isGenerating { model.cancel() } }
     .sheet(item: $bench) { bench in
       ArchiveRuleBenchView(model: bench) { refinement in
         self.bench = nil
@@ -343,6 +345,7 @@ struct ArchiveRuleSheet: View {
         Spacer()
       }
       Button(role: .cancel) {
+        model.cancel()
         close()
       } label: {
         Text("Cancel", bundle: .module, comment: "Closes the sheet of a new archive rule without saving.")
@@ -366,7 +369,9 @@ struct ArchiveRuleSheet: View {
       }
       .buttonStyle(.borderedProminent)
       .keyboardShortcut(.defaultAction)
-      .disabled(model.current == nil || model.isGenerating)
+      .disabled(
+        model.current == nil || model.isGenerating
+          || (model.purpose == .protection && model.current?.document.protections.isEmpty == true))
     }
     .padding(.horizontal, 24)
     .padding(.vertical, 14)
