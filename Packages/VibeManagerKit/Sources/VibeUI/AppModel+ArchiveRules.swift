@@ -3,8 +3,8 @@ import VibeApplication
 import VibeDomain
 
 /// Running the automatic archive's rules (#405): the sessions as the rules see them, the times
-/// due claimed, the sessions archived as the user would archive them — detached, then written —,
-/// in one batch ⌘Z takes back.
+/// due claimed, the sessions archived as the user would archive them — detached, then written.
+/// ⌘Z does not take them back: they are unarchived from the archive.
 extension AppModel {
   /// Reads the rules, and starts looking at them.
   func startArchiveRules() async {
@@ -125,15 +125,13 @@ extension AppModel {
       let plan = ArchiveRuleEvaluation.plan(
         rule: run.rule, protections: protections, candidates: candidates, now: now,
         calendar: calendar)
-      var archived: [SessionArchiveUndo] = []
+      var archived: [SessionID] = []
       if !run.isTrial {
         // Reading Git and archiving take time: the user may have started, moved or protected a
         // session since the plan. Each is looked at again, as it stands now, right before.
         await reload()
         for id in plan.archived {
-          guard let session = sessions.first(where: { $0.id == id }),
-            var live = archiveCandidates().first(where: { $0.id == id })
-          else { continue }
+          guard var live = archiveCandidates().first(where: { $0.id == id }) else { continue }
           if let planned = candidates.first(where: { $0.id == id }) {
             live.branch = planned.branch
             live.isDirty = planned.isDirty
@@ -145,19 +143,9 @@ extension AppModel {
             archivingSessionIDs.insert(id).inserted
           else { continue }
           defer { archivingSessionIDs.remove(id) }
-          do {
-            _ = try await archiveProcess(id, cause: .rule(id: run.ruleID, name: run.rule.name))
-            archived.append(
-              SessionArchiveUndo(
-                id: id, taskStatus: session.taskStatus, wasSelected: selectedSessionID == id))
-          } catch {
-            diagnostics.record(
-              .session, .error, "archive.rules.archiveFailed", ["session": diagnostics.pseudonym(id)])
-          }
+          if await archiveByRule(id, run: run) { archived.append(id) }
         }
-        // One run is one batch: ⌘Z brings it all back, as an archive by hand (#242).
-        sidebarHistory.record(archived)
-        let gone = Set(archived.map(\.id))
+        let gone = Set(archived)
         candidates.removeAll { gone.contains($0.id) }
       }
       let count = run.isTrial ? plan.archived.count : archived.count
@@ -178,6 +166,35 @@ extension AppModel {
     if let set = try? await model.store.load() { model.replace(set) }
     await reload()
     reconcileSelection()
+  }
+}
+
+extension AppModel {
+  /// Archives one session for a rule, as an archive by hand does but without ⌘Z: a rule's archive
+  /// is undone from the archive, never by a key the user pressed for something else. The session
+  /// on screen hands the selection to its neighbour, the keyboard staying in the sidebar.
+  func archiveByRule(_ id: SessionID, run: ArchiveDueRun) async -> Bool {
+    let visible = orderedSessions
+    let wasSelected = selectedSessionID == id
+    do {
+      _ = try await archiveProcess(id, cause: .rule(id: run.ruleID, name: run.rule.name))
+    } catch {
+      diagnostics.record(
+        .session, .error, "archive.rules.archiveFailed", ["session": diagnostics.pseudonym(id)])
+      return false
+    }
+    prepareHandOff(from: id, listedBefore: visible)
+    if wasSelected, layout.columns.isSidebarVisible {
+      keyboardHeldInSidebarFor = preferredSelection
+    }
+    await reload()
+    handOffSelection(from: id, listedBefore: visible, wasSelected: wasSelected)
+    reconcileSelection()
+    if wasSelected, selectedSessionID != id, layout.columns.isSidebarVisible {
+      keyboardHeldInSidebarFor = selectedSessionID
+      focusSidebar()
+    }
+    return true
   }
 }
 

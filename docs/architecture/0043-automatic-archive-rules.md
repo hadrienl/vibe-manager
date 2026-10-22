@@ -82,11 +82,17 @@ change of the store, at most once a minute.
 ### A run
 
 Each session the plan names is archived through `ArchiveSession` — detach, then write, as by hand —
-with the cause `rule`; the run is one entry of `SessionSidebarHistory`, so ⌘Z takes it back while
-the application runs. A run on trial archives nothing and records what it would have. The result is
+with the cause `rule`. ⌘Z does not take it back: a run in the background is not the user's last
+gesture, and ⌘Z must not undo it in place of the rename they just made; an archived session comes
+back from the archive. The session on screen hands the selection to its neighbour, the keyboard
+staying in the sidebar, as an archive by hand does. Each session is read again, as it stands, right
+before it is archived: one started, moved or protected since the plan is left. A run on trial archives nothing and records what it would have. The result is
 shown on the rule's line; a discreet notification, which can be turned off, says it. Diagnostics
 `archive.rules.run` and `archive.rules.generation` hold counts and durations, never a sentence, a
 rule or a session's name.
+
+Two rules never share a name. A version whose rule is named like a rule kept is not saved over
+it: the sheet asks for another name first.
 
 ### Asking an agent
 

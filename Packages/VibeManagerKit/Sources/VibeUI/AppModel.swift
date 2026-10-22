@@ -1778,7 +1778,7 @@ public final class AppModel {
   ///
   /// `wasSelected` is read before the change: the reload that follows it already moved the
   /// selection off a row it could no longer see, to the top of the column.
-  private func handOffSelection(
+  func handOffSelection(
     from id: SessionID, listedBefore visible: [WorkSession], wasSelected: Bool
   ) {
     guard wasSelected, let index = visible.firstIndex(where: { $0.id == id }),
@@ -1799,7 +1799,7 @@ public final class AppModel {
 
   /// The row that will take a session's place, handed to the reload so that it lands on it
   /// directly: going through the top of the column first would show another terminal for a frame.
-  private func prepareHandOff(from id: SessionID, listedBefore visible: [WorkSession]) {
+  func prepareHandOff(from id: SessionID, listedBefore visible: [WorkSession]) {
     guard selectedSessionID == id, let index = visible.firstIndex(where: { $0.id == id }) else {
       return
     }

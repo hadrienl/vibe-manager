@@ -55,6 +55,16 @@ public final class ArchiveRuleSheetModel: Identifiable {
   public private(set) var generatingAgent: String?
   public private(set) var isRetrying = false
   public var problem: Problem?
+  /// The rules whose name another rule already has, each to be given another one before saving.
+  public var renames: [Rename] = []
+  @ObservationIgnored private var savesOnTrial = false
+
+  /// A rule of the version to name again.
+  public struct Rename: Identifiable, Equatable {
+    public let id: Int
+    public let original: String
+    public var name: String
+  }
   /// The sentence a question was asked about, and the answers given so far.
   private var askedSentence: String?
   private var answers: [ArchiveRuleGenerationRequest.Answer] = []
@@ -243,14 +253,34 @@ public final class ArchiveRuleSheetModel: Identifiable {
     guard let current else { return false }
     let replacing: UUID? = if case .refine(let stored) = purpose { stored.id } else { nil }
     // A protection sheet keeps protections only: nothing it saves archives anything.
-    let document =
+    var document =
       purpose == .protection
       ? ArchiveRuleDocument(protections: current.document.protections) : current.document
     guard !document.isEmpty else { return false }
+    // A name another rule has: the user is asked for another one, nothing is replaced.
+    let taken = rules.takenNames(excluding: replacingID)
+    if renames.isEmpty {
+      let conflicts = document.rules.enumerated().filter { taken.contains($0.element.name.lowercased()) }
+      if !conflicts.isEmpty {
+        renames = conflicts.map { Rename(id: $0.offset, original: $0.element.name, name: "") }
+        savesOnTrial = trial
+        announce(
+          String(
+            localized: "A rule already has this name: give this one another.", bundle: .module,
+            comment: "Said to VoiceOver when an archive rule must be renamed before it is saved."))
+        return false
+      }
+    } else {
+      guard renameProblem == nil else { return false }
+      for rename in renames {
+        document.rules[rename.id].name = rename.name.trimmingCharacters(in: .whitespaces)
+      }
+    }
     let saved = await rules.save(
       document, sentence: versions.first?.sentence ?? current.sentence,
       agent: current.agentID, state: trial ? .trial : .active, replacing: replacing)
     if saved {
+      renames = []
       announce(
         trial
           ? String(
@@ -262,6 +292,58 @@ public final class ArchiveRuleSheetModel: Identifiable {
       problem = .saving
     }
     return saved
+  }
+
+  /// A version as if an agent had answered it: for the tests.
+  func setVersionForTesting(_ document: ArchiveRuleDocument) {
+    versions.append(
+      Version(
+        sentence: "", agentName: "", agentID: "claude", document: document,
+        text: ArchiveRulePrinter.text(of: document), assumptions: []))
+  }
+
+  private var replacingID: UUID? {
+    if case .refine(let stored) = purpose { stored.id } else { nil }
+  }
+
+  /// Saves under the new names given.
+  @discardableResult
+  public func saveRenamed() async -> Bool {
+    await save(trial: savesOnTrial)
+  }
+
+  public func cancelRenames() {
+    renames = []
+  }
+
+  /// What keeps the new names from being saved: empty, too long, taken, or given twice.
+  public var renameProblem: String? {
+    let taken = rules.takenNames(excluding: replacingID)
+    let others = Set(
+      (current?.document.rules ?? []).enumerated()
+        .filter { index, _ in !renames.contains { $0.id == index } }
+        .map { $0.element.name.lowercased() })
+    var given: Set<String> = []
+    for rename in renames {
+      let name = rename.name.trimmingCharacters(in: .whitespaces)
+      guard !name.isEmpty else {
+        return String(
+          localized: "Give each rule a name.", bundle: .module,
+          comment: "Renaming archive rules: a name is empty.")
+      }
+      guard name.count <= ArchiveRuleParser.maximumNameLength else {
+        return String(
+          localized: "A rule's name is at most \(ArchiveRuleParser.maximumNameLength) characters.",
+          bundle: .module, comment: "Renaming archive rules.")
+      }
+      let key = name.lowercased()
+      guard !taken.contains(key), !others.contains(key), given.insert(key).inserted else {
+        return String(
+          localized: "“\(name)” is already the name of a rule.", bundle: .module,
+          comment: "Renaming archive rules: the name given is taken.")
+      }
+    }
+    return nil
   }
 
   // MARK: What the screen says

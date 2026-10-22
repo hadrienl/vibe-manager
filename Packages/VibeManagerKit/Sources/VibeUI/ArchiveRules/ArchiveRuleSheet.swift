@@ -37,6 +37,13 @@ struct ArchiveRuleSheet: View {
     }
     // Closed while an agent translates: its process is stopped, not left to time out.
     .onDisappear { if model.isGenerating { model.cancel() } }
+    // A name another rule has: asked for another one, never replaced.
+    .sheet(
+      isPresented: Binding(
+        get: { !model.renames.isEmpty }, set: { if !$0 { model.cancelRenames() } })
+    ) {
+      ArchiveRuleRenameView(model: model) { close() }
+    }
     .sheet(item: $bench) { bench in
       ArchiveRuleBenchView(model: bench) { refinement in
         self.bench = nil
@@ -375,5 +382,52 @@ struct ArchiveRuleSheet: View {
     }
     .padding(.horizontal, 24)
     .padding(.vertical, 14)
+  }
+}
+
+/// Asks for another name for each rule whose name another rule already has.
+private struct ArchiveRuleRenameView: View {
+  @Bindable var model: ArchiveRuleSheetModel
+  let saved: () -> Void
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 14) {
+      Text("Rename the Rule", bundle: .module, comment: "The title of the sheet asking for another name for an archive rule.")
+        .font(.headline)
+      ForEach($model.renames) { $rename in
+        VStack(alignment: .leading, spacing: 6) {
+          Text(
+            "A rule is already named “\(rename.original)”. Give this one another name.",
+            bundle: .module, comment: "Renaming an archive rule whose name is taken.")
+          .fixedSize(horizontal: false, vertical: true)
+          TextField(text: $rename.name, prompt: Text(verbatim: rename.original)) {
+            Text("New name", bundle: .module, comment: "The field of an archive rule's new name.")
+          }
+          .textFieldStyle(.roundedBorder)
+        }
+      }
+      if let problem = model.renameProblem, model.renames.contains(where: { !$0.name.isEmpty }) {
+        Text(verbatim: problem).font(.callout).foregroundStyle(.orange)
+      }
+      HStack {
+        Spacer()
+        Button(role: .cancel) {
+          model.cancelRenames()
+        } label: {
+          Text("Cancel", bundle: .module, comment: "Goes back to the archive rule without renaming it.")
+        }
+        .keyboardShortcut(.cancelAction)
+        Button {
+          Task { if await model.saveRenamed() { saved() } }
+        } label: {
+          Text("Save", bundle: .module, comment: "Saves archive rules under their new names.")
+        }
+        .buttonStyle(.borderedProminent)
+        .keyboardShortcut(.defaultAction)
+        .disabled(model.renameProblem != nil)
+      }
+    }
+    .padding(20)
+    .frame(width: 420)
   }
 }

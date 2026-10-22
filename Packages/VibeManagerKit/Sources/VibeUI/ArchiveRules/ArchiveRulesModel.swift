@@ -199,9 +199,11 @@ public final class ArchiveRulesModel {
           agent: first.agent, createdAt: set.rules[index].createdAt, activatedAt: now)
         set.rules[index] = rules.removeFirst()
       }
-      // A name already taken by another rule is the new rule's: the old one goes.
-      let names = Set(rules.compactMap { $0.rule?.name.lowercased() })
-      set.rules.removeAll { $0.id != replacing && names.contains($0.rule?.name.lowercased() ?? "") }
+      // A name taken meanwhile is refused: the sheet asks for another one first.
+      let taken = Set(set.rules.filter { $0.id != replacing }.compactMap { $0.rule?.name.lowercased() })
+      guard rules.allSatisfy({ !taken.contains($0.rule?.name.lowercased() ?? "") }) else {
+        throw NameTaken()
+      }
       set.rules.append(contentsOf: rules)
       let known = Set(set.protections.map(\.text))
       set.protections.append(contentsOf: protections.filter { !known.contains($0.text) })
@@ -209,6 +211,13 @@ public final class ArchiveRulesModel {
     restartTicker()
     return saved
   }
+
+  /// The names of the rules kept, but `excluding`'s, in lower case: two rules never share one.
+  func takenNames(excluding: UUID?) -> Set<String> {
+    Set(set.rules.filter { $0.id != excluding }.compactMap { $0.rule?.name.lowercased() })
+  }
+
+  struct NameTaken: Error {}
 
   // MARK: The ticker
 

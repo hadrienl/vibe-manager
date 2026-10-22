@@ -100,7 +100,7 @@ struct ArchiveRulesRunTests {
     return (model, repository, notifier, sessions, store)
   }
 
-  @Test("A rule due archives what it names, says the rule in the history, and ⌘Z takes it back")
+  @Test("A rule due archives what it names, says the rule in the history, and ⌘Z leaves it")
   func archives() async throws {
     let (model, repository, notifier, sessions, store) = await model()
     await model.runArchiveRules()
@@ -122,9 +122,38 @@ struct ArchiveRulesRunTests {
     await model.runArchiveRules()
     #expect(notifier.runs.count == 1)
 
-    #expect(model.canUndoSidebarChange)
-    await model.undoSidebarChange()
-    #expect(await repository.session(id: sessions[0].id)?.status == .closed)
+    // Undone from the archive, never by ⌘Z.
+    #expect(!model.canUndoSidebarChange)
+  }
+
+  @Test("The session on screen archived by a rule hands the selection to its neighbour")
+  func handOff() async throws {
+    let (model, _, _, sessions, _) = await model()
+    model.setColumn(.done)
+    model.select(sessions[0].id)
+    await model.runArchiveRules()
+    #expect(model.selectedSessionID == sessions[1].id)
+  }
+
+  @Test("A name another rule has is asked again, never replaced")
+  func rename() async throws {
+    let (model, _, _, _, store) = await model()
+    let rules = try #require(model.archiveRules)
+    let sheet = ArchiveRuleSheetModel(purpose: .newRules, rules: rules) { .sample }
+    sheet.announce = { _ in }
+    let document = try ArchiveRuleParser.parse(
+      #"rule "reds" archive done sessions on daily at 18:00"#)
+    sheet.setVersionForTesting(document)
+
+    #expect(!(await sheet.save(trial: false)))
+    #expect(sheet.renames.map(\.original) == ["reds"])
+    sheet.renames[0].name = "Reds"
+    #expect(sheet.renameProblem != nil)
+    sheet.renames[0].name = "Reds, every day"
+    #expect(sheet.renameProblem == nil)
+    #expect(await sheet.saveRenamed())
+    let names = try await store.load().rules.compactMap { $0.rule?.name }
+    #expect(names == ["Reds", "Reds, every day"])
   }
 
   @Test("A rule on trial archives nothing, and says what it would have")
