@@ -32,6 +32,8 @@ public enum SettingsPage: Hashable, Sendable {
   case templates
   /// The composer's dictation (#340): the speech model, and the language spoken.
   case dictation
+  /// The rules that archive finished sessions on their own (#405).
+  case archiveRules
   /// The titles of the tickets a new session names (#89).
   case tickets
   /// The resolvers that recognise a ticket's address, reached from the tickets.
@@ -67,6 +69,8 @@ public enum SettingsPage: Hashable, Sendable {
     case .alertSounds: 900
     // The list of the resolvers, their editor, and the test under them.
     case .ticketResolvers: 860
+    // A line per rule: its explanation, when it next runs and what it last did.
+    case .archiveRules: 760
     default: Self.standardDetailWidth
     }
   }
@@ -121,6 +125,10 @@ public enum SettingsPage: Hashable, Sendable {
     case .dictation:
       LocalizedStringResource(
         "Dictation", bundle: .module, comment: "A page of the Settings window.")
+    case .archiveRules:
+      LocalizedStringResource(
+        "Automatic Archive", bundle: .module,
+        comment: "A page of the Settings window: the rules that archive finished sessions on their own.")
     case .tickets:
       LocalizedStringResource("Tickets", bundle: .module, comment: "A page of the Settings window.")
     case .ticketResolvers:
@@ -149,6 +157,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .templates: "text.badge.plus"
     case .dictation: "mic.fill"
     case .tickets, .ticketResolvers: "ticket.fill"
+    case .archiveRules: "archivebox.fill"
     case .privacy: "hand.raised.fill"
     case .updates: "arrow.down.circle.fill"
     }
@@ -169,6 +178,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .templates: .purple
     case .dictation: .red
     case .tickets, .ticketResolvers: .orange
+    case .archiveRules: .green
     case .privacy: .blue
     }
   }

@@ -532,6 +532,15 @@ public final class AppEnvironment {
       cacheDirectory: dataFolder.appendingPathComponent("Sounds/Shipped", isDirectory: true))
     appModel.alertSounds = alertSounds
     Task { await alertSounds.load() }
+    // The automatic archive (#405): its rules in the data folder, translated by the agents that
+    // answer to a schema, Git read only when a rule asks for a branch or for changes. They start
+    // running once the sessions are loaded.
+    appModel.archiveRules = ArchiveRulesModel(
+      store: FileArchiveRuleStore(url: FileArchiveRuleStore.defaultURL(dataFolder: dataFolder)),
+      generators: AgentArchiveRuleGenerators(agents: registry),
+      gitReader: GitStatusReader(
+        git: ProcessGitCommandRunner(timeout: .seconds(30), diagnostics: diagnostics.log)),
+      diagnostics: diagnostics)
     let backgroundWork = BackgroundWorkProbe(
       agents: registry, hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) }
     )

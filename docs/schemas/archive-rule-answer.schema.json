@@ -1,0 +1,60 @@
+{
+  "additionalProperties" : false,
+  "properties" : {
+    "assumptions" : {
+      "items" : {
+        "additionalProperties" : false,
+        "properties" : {
+          "chosen" : {
+            "type" : "string"
+          },
+          "said" : {
+            "type" : "string"
+          }
+        },
+        "required" : [
+          "chosen",
+          "said"
+        ],
+        "type" : "object"
+      },
+      "type" : "array"
+    },
+    "question" : {
+      "additionalProperties" : false,
+      "properties" : {
+        "choices" : {
+          "items" : {
+            "type" : "string"
+          },
+          "type" : "array"
+        },
+        "text" : {
+          "description" : "The question, in the user's language.",
+          "type" : "string"
+        }
+      },
+      "required" : [
+        "choices",
+        "text"
+      ],
+      "type" : [
+        "object",
+        "null"
+      ]
+    },
+    "rules" : {
+      "description" : "The text of the rules in the language of rules, or null with a question.",
+      "type" : [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "required" : [
+    "assumptions",
+    "question",
+    "rules"
+  ],
+  "type" : "object"
+}

@@ -776,7 +776,7 @@ extension AppModel {
       if let reserved { coordination.startingFolders[reserved] = nil }
     }
     if child.taskStatus != status {
-      try await changeTaskStatus(id: child.id, to: status)
+      try await changeTaskStatus(id: child.id, to: status, cause: .coordinator(coordinator.id))
       await reload()
       coordination.record(
         CoordinationTraceEntry(

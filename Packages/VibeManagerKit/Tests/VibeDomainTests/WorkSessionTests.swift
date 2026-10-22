@@ -35,11 +35,11 @@ func sessionLifecycleTransitions() throws {
   #expect(session.status == .closed)
   #expect(session.closedAt == createdAt.addingTimeInterval(10))
 
-  try session.archive(at: createdAt.addingTimeInterval(20))
+  try session.archive(at: createdAt.addingTimeInterval(20), cause: .user)
   #expect(session.status == .archived)
   #expect(session.archivedAt == createdAt.addingTimeInterval(20))
 
-  try session.restore(at: createdAt.addingTimeInterval(30))
+  try session.restore(at: createdAt.addingTimeInterval(30), cause: .user)
   #expect(session.status == .closed)
   #expect(session.closedAt == createdAt.addingTimeInterval(10))
   #expect(session.archivedAt == nil)
@@ -60,7 +60,7 @@ func invalidLifecycleTransition() {
   )
 
   #expect(throws: SessionTransitionError.invalidTransition(from: .active, to: .archived)) {
-    try session.archive(at: date.addingTimeInterval(1))
+    try session.archive(at: date.addingTimeInterval(1), cause: .user)
   }
   #expect(session.status == .active)
   #expect(session.updatedAt == date)
@@ -76,7 +76,7 @@ func archiveLegacyClosedSession() throws {
     updatedAt: date
   )
 
-  try session.archive(at: date.addingTimeInterval(10))
+  try session.archive(at: date.addingTimeInterval(10), cause: .user)
 
   #expect(session.status == .archived)
   #expect(session.closedAt == date)
