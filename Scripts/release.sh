@@ -34,6 +34,13 @@ set -euo pipefail
 readonly repository_root="${0:A:h:h}"
 readonly notary_profile="vibe-manager-notary"
 readonly bundle_identifier="eu.hadrien.VibeManager"
+# The mobile companion's agent (#397, ADR 0040), in Contents/Helpers: the only bundle that holds
+# iCloud and the pushes, signed with a Developer ID provisioning profile of its own. Its name, as
+# the developer portal gave it; the release job installs the profile from its secret.
+readonly companion_identifier="eu.hadrien.VibeManager.CompanionAgent"
+companion_profile="${VIBE_COMPANION_PROFILE:-Vibe Manager Companion Developer ID}"
+readonly profiles_directory="$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"
+installed_profile=""
 # The Sparkle whose `sign_update` signs the update archive: the version the application embeds,
 # pinned by digest like the Apple intermediates. Nothing runs here that cannot be named.
 readonly sparkle_version="2.10.0"
@@ -89,6 +96,7 @@ notary_credentials=(--keychain-profile "$notary_profile")
 sparkle_key=()
 
 cleanup() {
+  [[ -n "$installed_profile" ]] && rm -f "$installed_profile"
   if [[ -n "$keychain" ]]; then
     security list-keychains -d user -s "${saved_keychains[@]}" 2>/dev/null || true
     security delete-keychain "$keychain" 2>/dev/null || true
@@ -100,7 +108,8 @@ trap cleanup EXIT
 if (( in_ci )); then
   step "Preparing a temporary keychain"
   for variable in DEVELOPER_ID_CERTIFICATE_P12 DEVELOPER_ID_CERTIFICATE_PASSWORD \
-    NOTARY_API_KEY_P8 NOTARY_API_KEY_ID NOTARY_API_ISSUER_ID SPARKLE_ED_PRIVATE_KEY GH_TOKEN; do
+    NOTARY_API_KEY_P8 NOTARY_API_KEY_ID NOTARY_API_ISSUER_ID SPARKLE_ED_PRIVATE_KEY GH_TOKEN \
+    COMPANION_PROVISIONING_PROFILE; do
     [[ -n "${(P)variable:-}" ]] || fail "$variable is not set in the release environment"
   done
   mkdir -p "$secrets"
@@ -136,6 +145,14 @@ if (( in_ci )); then
   )
   print -rn -- "$SPARKLE_ED_PRIVATE_KEY" > "$secrets/sparkle.key"
   sparkle_key=(--ed-key-file "$secrets/sparkle.key")
+  # The companion agent's profile, where Xcode looks for it, under its UUID; removed on the way out.
+  print -rn -- "$COMPANION_PROVISIONING_PROFILE" | base64 --decode > "$secrets/companion.provisionprofile"
+  security cms -D -i "$secrets/companion.provisionprofile" > "$secrets/companion.plist" \
+    || fail "COMPANION_PROVISIONING_PROFILE is not a provisioning profile"
+  companion_profile="$(plutil -extract Name raw "$secrets/companion.plist")"
+  mkdir -p "$profiles_directory"
+  installed_profile="$profiles_directory/$(plutil -extract UUID raw "$secrets/companion.plist").provisionprofile"
+  cp "$secrets/companion.provisionprofile" "$installed_profile"
 fi
 
 # 1. The tree is what CI tested.
@@ -211,12 +228,19 @@ xcodebuild \
   CODE_SIGN_STYLE=Manual \
   CODE_SIGN_IDENTITY="$identity" \
   OTHER_CODE_SIGN_FLAGS="--timestamp" \
+  VIBE_EMBED_COMPANION=YES \
+  VIBE_COMPANION_PROFILE="$companion_profile" \
+  VIBE_CLOUDKIT_ENVIRONMENT=Production \
+  VIBE_APS_ENVIRONMENT=production \
   archive
 
 step "Exporting"
 export_options="$work/ExportOptions.plist"
 cp Configuration/ExportOptions.plist "$export_options"
 plutil -replace teamID -string "$team" "$export_options"
+plutil -insert provisioningProfiles -dictionary "$export_options"
+plutil -insert "provisioningProfiles.${companion_identifier//./\\.}" -string "$companion_profile" \
+  "$export_options"
 xcodebuild -exportArchive -archivePath "$archive" -exportPath "$exported" \
   -exportOptionsPlist "$export_options"
 [[ -d "$app" ]] || fail "the export has no application"
@@ -254,6 +278,21 @@ readonly update_key="$(defaults read "$app/Contents/Info.plist" SUPublicEDKey 2>
   || fail "the bundle does not carry version $version"
 [[ -n "$(find "$app" -name mock-agent.sh)" ]] \
   || fail "mock-agent.sh is missing: the smoke test runs against it (security review A8)"
+# The mobile companion's agent (#397): embedded, with its profile, and in CloudKit's Production —
+# the only environment a Developer ID signature reaches. Its entitlements are its own; the
+# application's, checked above, stay the microphone's alone.
+readonly agent="$app/Contents/Helpers/Vibe Manager Companion.app"
+[[ -d "$agent" ]] || fail "the companion agent is not embedded"
+[[ -f "$agent/Contents/embedded.provisionprofile" ]] \
+  || fail "the companion agent carries no provisioning profile"
+agent_entitlements="$(codesign -d --entitlements - --xml "$agent" 2>/dev/null \
+  | plutil -convert json -o - - 2>/dev/null || true)"
+[[ "$agent_entitlements" == *'"com.apple.developer.icloud-container-environment":"Production"'* \
+  && "$agent_entitlements" == *'"com.apple.developer.aps-environment":"production"'* \
+  && "$agent_entitlements" == *'"com.apple.developer.icloud-services":["CloudKit"]'* ]] \
+  || fail "the companion agent is not signed for iCloud and pushes in Production: $agent_entitlements"
+[[ "$(codesign -d --verbose=2 "$agent" 2>&1)" == *"Identifier=$companion_identifier"* ]] \
+  || fail "the companion agent is not $companion_identifier"
 if [[ -n "$(find "$app" -name 'Local.xcconfig')" ]]; then
   fail "a Local.xcconfig was bundled"
 fi

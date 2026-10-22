@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The companion agent of #347, alone in the bundle to hold these: CloudKit in the container shared
+  with the iOS application, and the pushes it notifies changes with (macOS names that key with the
+  developer prefix). The application keeps the microphone alone (ADR 0021). Restricted, these need
+  a provisioning profile embedded in this bundle, checked at every launch.
+-->
+<plist version="1.0">
+<dict>
+	<key>com.apple.developer.icloud-container-identifiers</key>
+	<array>
+		<string>iCloud.eu.hadrien.VibeManager</string>
+	</array>
+	<key>com.apple.developer.icloud-services</key>
+	<array>
+		<string>CloudKit</string>
+	</array>
+	<key>com.apple.developer.icloud-container-environment</key>
+	<string>$(VIBE_CLOUDKIT_ENVIRONMENT)</string>
+	<key>com.apple.developer.aps-environment</key>
+	<string>$(VIBE_APS_ENVIRONMENT)</string>
+</dict>
+</plist>

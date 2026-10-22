@@ -49,5 +49,7 @@ jobs:
           NOTARY_API_ISSUER_ID: ${{ secrets.NOTARY_API_ISSUER_ID }}
           # Signs the update archive (#92, ADR 0033).
           SPARKLE_ED_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          # The mobile companion's agent (#397): its Developer ID provisioning profile, in base64.
+          COMPANION_PROVISIONING_PROFILE: ${{ secrets.COMPANION_PROVISIONING_PROFILE }}
           GH_TOKEN: ${{ github.token }}
         run: Scripts/release.sh "${GITHUB_REF_NAME#v}"

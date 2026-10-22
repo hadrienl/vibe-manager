@@ -124,12 +124,15 @@ neither deleted nor renamed; the trial one stays, unused, at no cost.
   and the helper is arm64 only, macOS 14.5 or later. The application itself does not link it.
 - IrohLib 1.1's Swift bindings panic on every `watch*` call ("there is no reactor running"); the
   POC polls `paths()` every second and `addr()` every 30 s instead. To report upstream.
-- The direct channel must authenticate the phone: the POC's echo accepts any peer. The real protocol
-  admits only endpoint IDs the user paired, and the helper keeps its secret key in the Keychain, not
-  in a file.
-- `release.sh` refuses the helper today; a release with it changes that check, notarizes the helper
-  with its profile, gives the profile to the release job, and keeps the application's designated
-  requirement unchanged for Sparkle and TCC.
+- The direct channel authenticates the phone (#398): each iPhone writes its endpoint ID in a
+  `device` record of the user's private database, the helper admits those alone and logs the others,
+  and Settings › iPhone Companion removes a phone's record. The helper keeps its secret key in the
+  Keychain, one per installation (#397).
+- Releases carry the helper (#397): `release.sh` signs it with its Developer ID profile — a secret
+  of the release job — in CloudKit's Production, notarizes it with the application, and checks the
+  application keeps its designated requirement and the microphone's entitlement alone. Every build
+  of the maintainer's team uses Production, so the phone sees a release and a local build alike.
+  The companion is off until the user turns it on in the settings.
 - The phone sees the Mac only while it is awake and its helper running; a Mac asleep is said so.
 - n0 may change the terms of its public relays. If they went, the direct path and CloudKit would
   remain; a relay of our own would cost money and is not an option under the cost rule.
