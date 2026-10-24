@@ -121,8 +121,10 @@ extension AppModel {
       entries.flatMap(ConversationEntry.promptFailedOnSignIn(in:))
       ?? (entries.map(ConversationEntry.turnFailedOnSignInMidway(in:)) == true
         ? Self.continuePrompt : nil)
-    guard let screen = await launcher.screen(of: id), isStillStoppedOnSignIn(id) else { return }
-    guard AgentUpdateRestartReadiness.promptIsEmpty(screen: screen),
+    guard let screen = await launcher.screen(of: id) else { return }
+    let runsInBackground = await runsBackgroundWork(id)
+    guard isStillStoppedOnSignIn(id) else { return }
+    guard AgentUpdateRestartReadiness.promptIsEmpty(screen: screen), !runsInBackground,
       !AgentUpdateRestartReadiness.runsInBackground(screen: screen)
     else {
       // Text the user typed, or work behind the prompt: theirs to resume when it is done.
