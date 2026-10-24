@@ -212,7 +212,9 @@ func terminalRepliesAreNotKeystrokes() async {
     ("\u{1B}[I", true), ("\u{1B}[O\u{1B}[I", true), ("\u{1B}[?62;22c", true),
     ("\u{1B}[>0;276;0c", true), ("\u{1B}P>|SwiftTerm(1.2)\u{1B}\\", true),
     ("\u{1B}]11;rgb:0000/0000/0000\u{07}", true), ("\u{1B}[?1004;1$y", true), ("\u{1B}[?0u", true),
-    ("\u{1B}[A", false), ("\u{1B}", false), ("a", false), ("\u{1B}[Ia", false), ("", false),
+    ("\u{1B}[<35;102;57M", true), ("\u{1B}[<0;10;4M\u{1B}[<0;10;4m", true),
+    ("\u{1B}[M #!", true), ("\u{1B}[A", false), ("\u{1B}[M", false), ("\u{1B}", false),
+    ("a", false), ("\u{1B}[Ia", false), ("", false),
     ("\u{1B}[1;2R", false), ("\u{1B}P>|unfinished", false),
   ])
 func terminalReplies(_ text: String, _ isReply: Bool) {

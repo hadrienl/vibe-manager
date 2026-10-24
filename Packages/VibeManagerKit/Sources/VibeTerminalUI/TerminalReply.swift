@@ -1,9 +1,10 @@
 /// What the terminal itself sends the process: its answers to the program's queries, and the
-/// focus reports the program asked for (#411).
+/// focus and mouse reports the program asked for (#411).
 ///
 /// They travel the way keystrokes do, yet the user typed none of them. Claude Code asks for the
 /// terminal's version and attributes as soon as a command is typed at its prompt, and reports
-/// focus: taken for the user's keys, they stopped the application from submitting what it typed.
+/// focus; Codex follows the mouse, which crosses the terminal on its way to the status bar's menu.
+/// Taken for the user's keys, they stopped the application from submitting what it typed.
 enum TerminalReply {
   private static let escape: UInt8 = 0x1B
 
@@ -20,6 +21,12 @@ enum TerminalReply {
   /// Where the answer that starts at `start` ends, or `nil` if what starts there is not one.
   private static func replyEnd(in bytes: [UInt8], from start: Int) -> Int? {
     guard bytes[start] == escape, start + 1 < bytes.count else { return nil }
+    // A mouse report in the oldest encoding: `ESC [ M` and three bytes, its button and place.
+    if start + 5 < bytes.count, bytes[start + 1] == UInt8(ascii: "["),
+      bytes[start + 2] == UInt8(ascii: "M")
+    {
+      return start + 6
+    }
     switch bytes[start + 1] {
     case UInt8(ascii: "["): return controlSequenceEnd(in: bytes, from: start + 2)
     // A device control string (XTVERSION, XTGETTCAP) or an operating system command (colours).
@@ -46,6 +53,9 @@ enum TerminalReply {
         [UInt8(ascii: "?"), UInt8(ascii: ">")].contains(parameters.first) && intermediates.isEmpty
       // A mode's state (DECRPM).
       case UInt8(ascii: "y"): Array(intermediates) == [UInt8(ascii: "$")]
+      // A mouse report, `ESC [ < button ; column ; row M` — `m` once released.
+      case UInt8(ascii: "M"), UInt8(ascii: "m"):
+        parameters.first == UInt8(ascii: "<") && intermediates.isEmpty
       // The keyboard protocol's flags.
       case UInt8(ascii: "u"): parameters.first == UInt8(ascii: "?") && intermediates.isEmpty
       default: false
