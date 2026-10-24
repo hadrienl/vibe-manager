@@ -50,6 +50,8 @@ public enum CompanionLinkMessage: Codable, Equatable, Sendable {
   case agentStatus(signedIn: Bool, reachable: Bool)
   /// The phones admitted to the direct channel, whole, at each change (#398).
   case devices([CompanionDevice])
+  /// An answer the user gave from a notification (#401), for the application to give.
+  case answerReceived(CompanionAnswer)
 }
 
 enum CompanionLinkFrameError: Error, Equatable {

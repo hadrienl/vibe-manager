@@ -414,13 +414,34 @@ final class CompanionRemoteServer {
   private func answer(
     _ id: String, requestID: String, choiceIDs: [String], text: String?, for peer: String
   ) async {
+    if let failure = await give(id, requestID: requestID, choiceIDs: choiceIDs, text: text) {
+      send(peer, .failure(failure))
+    }
+  }
+
+  /// An answer from a notification of the phone (#401), given like one from the channel. Nobody
+  /// waits for it: a request answered meanwhile on the Mac is left as it is.
+  func answer(_ answer: CompanionAnswer) async {
+    let failure = await give(
+      answer.sessionID, requestID: answer.requestID, choiceIDs: [answer.choice.rawValue],
+      text: nil)
+    if let failure {
+      Self.logger.notice(
+        "notification answer to \(answer.requestID, privacy: .public) not given: \(String(describing: failure), privacy: .public)"
+      )
+    }
+  }
+
+  /// Gives an answer as the window's request card does; what kept it from being given, if anything.
+  private func give(
+    _ id: String, requestID: String, choiceIDs: [String], text: String?
+  ) async -> RemoteFailure? {
     guard let appModel, let sessionID = Self.sessionID(id),
       let request = appModel.activity(for: sessionID)?.requests.first(where: {
         $0.id.key == requestID
       })
     else {
-      send(peer, .failure(.requestGone))
-      return
+      return .requestGone
     }
     let answer: AgentAnswer
     switch request.content {
@@ -439,14 +460,13 @@ final class CompanionRemoteServer {
       } else if let index = indices.first {
         answer = .answers([.option(index)])
       } else {
-        return
+        // A notification's Allow or Deny never answers a question.
+        return .answerNotGiven
       }
     default:
-      return
+      return .answerNotGiven
     }
-    if !(await appModel.answer(answer, to: request.id)) {
-      send(peer, .failure(.answerNotGiven))
-    }
+    return await appModel.answer(answer, to: request.id) ? nil : .answerNotGiven
   }
 
   private func search(_ query: String, token: Int, for peer: String) async {

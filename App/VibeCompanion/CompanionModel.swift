@@ -117,7 +117,7 @@ final class CompanionModel {
       case .pong(let pong): pongs.append(pong)
       case .request(let request): requests.append(request)
       case .device(let device): devices.append(device)
-      case .ping: break
+      case .ping, .answer: break
       }
     }
     self.devices = devices

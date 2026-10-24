@@ -81,13 +81,41 @@ public enum CompanionRequests {
     CompanionRequest(
       id: id, macID: macID, sessionTitle: session.title,
       agent: session.agent.isEmpty ? unnamedAgent : session.agent, text: waitingText,
-      createdAt: now)
+      createdAt: now, sessionID: session.id, detail: session.request)
   }
 
   /// The names of this Mac's requests past `maximumAge`: another Mac's are its own to delete.
   public static func expired(_ requests: [CompanionRequest], macID: String, now: Date) -> [String] {
     requests.filter { $0.macID == macID && now.timeIntervalSince($0.createdAt) > maximumAge }
       .map { CompanionRecordName.request($0.id) }.sorted()
+  }
+}
+
+/// The answers the phone wrote from a notification (#401), as the Mac's agent finds them.
+public enum CompanionAnswers {
+  /// Past this, an answer is not given: the user may since have answered on the Mac, or forgotten.
+  public static let maximumAge: TimeInterval = 10 * 60
+
+  public struct Triage: Equatable, Sendable {
+    /// For the application to give, oldest first.
+    public var toGive: [CompanionAnswer] = []
+    /// Record names: every answer of this Mac's, given or too old.
+    public var toDelete: [String] = []
+  }
+
+  /// This Mac's answers: each given once, however many fetches find it, and none too old. Another
+  /// Mac's are its own to read.
+  public static func triage(
+    _ answers: [CompanionAnswer], macID: String, given: Set<String>, now: Date
+  ) -> Triage {
+    var triage = Triage()
+    for answer in answers.sorted(by: { $0.createdAt < $1.createdAt }) where answer.macID == macID {
+      triage.toDelete.append(CompanionRecordName.answer(answer.id))
+      if !given.contains(answer.id), now.timeIntervalSince(answer.createdAt) <= maximumAge {
+        triage.toGive.append(answer)
+      }
+    }
+    return triage
   }
 }
 
@@ -110,7 +138,7 @@ public enum CompanionSessionMerge {
       uniquingKeysWith: { first, _ in first })
     var saves: [CompanionSession] = []
     for info in snapshot {
-      if let existing = own[info.id], existing.info == info { continue }
+      if let existing = own[info.id], existing.info == info.listed { continue }
       saves.append(
         CompanionSession(
           id: info.id, macID: macID, title: info.title, agent: info.agent, state: info.state,

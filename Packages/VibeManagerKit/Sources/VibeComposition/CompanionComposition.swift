@@ -141,6 +141,8 @@ final class CompanionComposition {
       connected[peer] = nil
     case .agentGone:
       model.update(state: .failed)
+    case .answer(let answer):
+      Task { await remote?.answer(answer) }
     }
   }
 

@@ -229,6 +229,8 @@ public actor CompanionLink: CompanionPublishing {
         await onEvent?(.status(signedIn: signedIn, reachable: reachable))
       case .devices(let devices):
         await onEvent?(.devices(devices))
+      case .answerReceived(let answer):
+        await onEvent?(.answer(answer))
       case .hello, .snapshot, .testAcknowledged, .remoteSend, .remoteDrop, .removeDevice:
         break
       }
@@ -244,7 +246,12 @@ public actor CompanionLink: CompanionPublishing {
     snapshot.sessions.map { session in
       CompanionSessionInfo(
         id: session.id.rawValue.uuidString, title: session.title, agent: session.agent,
-        state: CompanionSessionState(rawValue: session.state.rawValue) ?? .waiting)
+        state: CompanionSessionState(rawValue: session.state.rawValue) ?? .waiting,
+        request: session.request.map {
+          CompanionRequestDetail(
+            requestID: $0.id, kind: $0.kind == .permission ? .permission : .question,
+            title: $0.title, subject: $0.subject)
+        })
     }
   }
 }
@@ -263,4 +270,6 @@ public enum CompanionLinkEvent: Sendable {
   case phoneLeft(peer: String)
   /// The agent went, and was not started again.
   case agentGone
+  /// The user answered a permission from the phone's notification (#401).
+  case answer(CompanionAnswer)
 }

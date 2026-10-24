@@ -45,7 +45,7 @@ final class NotificationService: UNNotificationServiceExtension {
           return
         }
         Self.logger.notice("fetch: request read, alert written")
-        pending.deliver(PendingAlert.Texts(title: alert.title, body: alert.body))
+        pending.deliver(alert)
       } catch {
         Self.logger.error(
           "fetch: \(CompanionErrorText.describe(error), privacy: .public), generic alert")
@@ -55,11 +55,16 @@ final class NotificationService: UNNotificationServiceExtension {
   }
 
   /// What the agent waits for, in the phone's language.
-  static func phrase(agent: String, code: String) -> String {
+  static func phrase(agent: String, code: String, kind: CompanionRequestDetail.Kind?) -> String {
     let name = agent.isEmpty ? String(localized: "The agent") : agent
-    return code == CompanionRequests.testText
-      ? String(localized: "\(name) sends you a test notification")
-      : String(localized: "\(name) is waiting for your answer")
+    if code == CompanionRequests.testText {
+      return String(localized: "\(name) sends you a test notification")
+    }
+    return switch kind {
+    case .permission: String(localized: "\(name) asks for a permission")
+    case .question: String(localized: "\(name) asks you a question")
+    case nil: String(localized: "\(name) is waiting for your answer")
+    }
   }
 
   /// iOS's time is up: the generic alert, unless the fetch delivered just before.
@@ -72,11 +77,6 @@ final class NotificationService: UNNotificationServiceExtension {
 /// The content handler and the generic alert, behind a lock: `didReceive`, the fetch's task and
 /// `serviceExtensionTimeWillExpire` reach it from different threads, and the handler is called once.
 private final class PendingAlert: @unchecked Sendable {
-  struct Texts: Sendable {
-    let title: String
-    let body: String
-  }
-
   private let lock = NSLock()
   private var handler: ((UNNotificationContent) -> Void)?
   private var content: UNMutableNotificationContent?
@@ -90,20 +90,23 @@ private final class PendingAlert: @unchecked Sendable {
     }
   }
 
-  /// The request's texts on the generic alert — or `nil`, the generic alert as it is. Only the
-  /// first call counts.
+  /// The request's alert on the generic one — its texts, and since #401 its actions and what they
+  /// answer — or `nil`, the generic alert as it is. Only the first call counts.
   /// `diagnostic`, the debug build only: why the alert stayed generic, as its subtitle — the
   /// extension's logs are out of reach without a cable (#368 trial).
-  func deliver(_ texts: Texts?, diagnostic: String? = nil) {
+  func deliver(_ alert: CompanionRequestAlerts.Alert?, diagnostic: String? = nil) {
     let delivery: (handler: (UNNotificationContent) -> Void, content: UNNotificationContent)? =
       lock.withLock {
         guard let handler, let content else { return nil }
         self.handler = nil
         self.content = nil
-        if let texts {
+        if let alert {
           // A request without a session's title keeps « Vibe Manager ».
-          if !texts.title.isEmpty { content.title = texts.title }
-          content.body = texts.body
+          if !alert.title.isEmpty { content.title = alert.title }
+          content.subtitle = alert.subtitle
+          content.body = alert.body
+          if let category = alert.category { content.categoryIdentifier = category }
+          content.userInfo.merge(alert.userInfo) { _, new in new }
         }
         #if DEBUG
           if let diagnostic { content.subtitle = "Extension : \(diagnostic)" }

@@ -52,6 +52,8 @@ final class RemoteChannel {
   @ObservationIgnored private var askedIcons: Set<String> = []
   /// The session just created from the phone, for the list to show it.
   var createdSessionID: String?
+  /// The session a tapped notification is about (#401): the list opens it.
+  var notifiedSessionID: String?
   /// The last thing the Mac could not do, for an alert.
   var failure: RemoteFailure?
   /// This phone's endpoint, once bound: what pairing writes.

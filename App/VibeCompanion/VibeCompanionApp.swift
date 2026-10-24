@@ -55,6 +55,7 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate,
     // Before the launch ends: a tap on a notification that launched the application is handed
     // to the delegate set by then.
     UNUserNotificationCenter.current().delegate = self
+    UNUserNotificationCenter.current().setNotificationCategories(Self.categories)
     // The engine registers for remote notifications itself; the notifications ask again once it
     // has, for the debug screen to see the token come.
     Task {
@@ -88,13 +89,64 @@ final class CompanionAppDelegate: NSObject, UIApplicationDelegate,
     completionHandler([.banner, .list, .sound])
   }
 
-  /// A tap on the alert: the application opens, which is all it asks (#368).
+  /// A tap on the alert opens its session (#401); Allow or Deny on a permission's answers it
+  /// without opening the application, which iOS wakes in the background for that long.
   func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse,
     withCompletionHandler completionHandler: @escaping () -> Void
   ) {
     note(response.notification)
-    completionHandler()
+    let userInfo = response.notification.request.content.userInfo
+    guard
+      let answer = CompanionRequestAlerts.answer(
+        fromAction: response.actionIdentifier, userInfo: userInfo, id: UUID().uuidString,
+        now: Date())
+    else {
+      if response.actionIdentifier == UNNotificationDefaultActionIdentifier {
+        remote.notifiedSessionID = CompanionRequestAlerts.sessionID(fromAlert: userInfo)
+      }
+      completionHandler()
+      return
+    }
+    Task { @MainActor in
+      do {
+        try await CompanionRequestAlerts.send(answer)
+      } catch {
+        await Self.sayAnswerNotSent(for: response.notification.request.content)
+      }
+      completionHandler()
+    }
+  }
+
+  /// No iCloud, no network: the request still waits on the Mac, and a notification says so, with
+  /// the session to open — the application is not on screen.
+  private static func sayAnswerNotSent(for alert: UNNotificationContent) async {
+    let content = UNMutableNotificationContent()
+    content.title = alert.title
+    content.body = String(
+      localized: "Your answer couldn’t be sent. Answer in the app or on the Mac.")
+    content.userInfo = alert.userInfo
+    content.categoryIdentifier = CompanionRequestAlerts.Category.question
+    try? await UNUserNotificationCenter.current().add(
+      UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
+  }
+
+  /// A permission's alert answers from the lock screen: Allow once Face ID — or the code — said
+  /// it is the user, Deny at once, as it runs nothing (#401). A question's opens the application.
+  static var categories: Set<UNNotificationCategory> {
+    let allow = UNNotificationAction(
+      identifier: CompanionRequestAlerts.Action.allow, title: String(localized: "Allow"),
+      options: [.authenticationRequired])
+    let deny = UNNotificationAction(
+      identifier: CompanionRequestAlerts.Action.deny, title: String(localized: "Deny"),
+      options: [.destructive])
+    return [
+      UNNotificationCategory(
+        identifier: CompanionRequestAlerts.Category.permission, actions: [allow, deny],
+        intentIdentifiers: []),
+      UNNotificationCategory(
+        identifier: CompanionRequestAlerts.Category.question, actions: [], intentIdentifiers: []),
+    ]
   }
 
   private func note(_ notification: UNNotification) {
@@ -130,7 +182,7 @@ struct RootView: View {
         isPresented: Binding(
           get: { remote.failure != nil }, set: { if !$0 { remote.failure = nil } })
       ) {
-        Button("OK", role: .cancel) { /* The alert dismisses itself. */ }
+        Button("OK", role: .cancel) { /* The alert dismisses itself. */  }
       } message: {
         Text(verbatim: remote.failure?.text ?? "")
       }

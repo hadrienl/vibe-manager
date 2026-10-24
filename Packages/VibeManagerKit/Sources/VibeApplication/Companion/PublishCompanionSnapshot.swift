@@ -11,17 +11,60 @@ public struct CompanionSnapshot: Hashable, Sendable {
     case needsAttention
   }
 
+  /// What an agent waits for, as the phone's notification says it (#401): a permission and what
+  /// it is for, or a question. Its first request, the one its terminal shows.
+  public struct Request: Hashable, Sendable {
+    public enum Kind: Hashable, Sendable {
+      case permission, question
+    }
+
+    /// The request's key, which an answer from the phone names.
+    public let id: String
+    public let kind: Kind
+    /// Why the permission is asked, or the question.
+    public let title: String
+    /// The command, the file, the URL a permission is for.
+    public let subject: String?
+
+    public init(id: String, kind: Kind, title: String, subject: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.subject = subject
+    }
+
+    /// A permission or the first of the questions; nothing for what only the terminal answers.
+    public init?(_ request: AgentRequest) {
+      switch request.content {
+      case .permission(let permission):
+        self.init(
+          id: request.id.key, kind: .permission, title: permission.purpose ?? "",
+          subject: permission.subject ?? permission.toolName)
+      case .questions(let questions):
+        guard let question = questions.first else { return nil }
+        self.init(id: request.id.key, kind: .question, title: question.text)
+      default:
+        return nil
+      }
+    }
+  }
+
   public struct Session: Hashable, Sendable {
     public let id: SessionID
     public let title: String
     public let agent: String
     public let state: State
+    /// While the agent waits for the user.
+    public let request: Request?
 
-    public init(id: SessionID, title: String, agent: String, state: State) {
+    public init(
+      id: SessionID, title: String, agent: String, state: State, request: Request? = nil
+    ) {
       self.id = id
       self.title = title
       self.agent = agent
       self.state = state
+      self.request = request
     }
   }
 
@@ -42,10 +85,13 @@ public struct CompanionSnapshot: Hashable, Sendable {
     let active = sessions.filter { $0.status == .active }.sorted { $0.rank < $1.rank }
     return CompanionSnapshot(
       sessions: active.map { session in
-        Session(
+        let activity = activity(session.id)
+        let state = State(activity?.activity)
+        return Session(
           id: session.id, title: session.name,
           agent: session.agent.map { agentName($0.providerID) } ?? "",
-          state: State(activity(session.id)?.activity))
+          state: state,
+          request: state == .needsAttention ? activity?.requests.first.flatMap(Request.init) : nil)
       })
   }
 }
