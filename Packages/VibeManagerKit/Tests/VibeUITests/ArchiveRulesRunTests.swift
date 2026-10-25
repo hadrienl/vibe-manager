@@ -82,7 +82,8 @@ struct ArchiveRulesRunTests {
     model.requestNotifier = notifier
     let time = calendar().dateComponents([.hour, .minute], from: friday)
     let text = String(
-      format: "rule \"Reds\" archive done sessions where badge.color = #B42318 on daily at %02d:%02d",
+      format:
+        "rule \"Reds\" archive done sessions where badge.color = #B42318 on daily at %02d:%02d",
       time.hour ?? 0, time.minute ?? 0)
     let store = InMemoryArchiveRuleStore(
       ArchiveRuleSet(
@@ -172,6 +173,53 @@ struct ArchiveRulesRunTests {
     let (model, _, notifier, _, _) = await model(notifies: false)
     await model.runArchiveRules()
     #expect(notifier.runs.isEmpty)
+  }
+
+  @Test("“Would archive now” counts with Git, as a run does")
+  func countsWithGit() async throws {
+    let (model, _, _, _, store) = await model()
+    let rules = try #require(model.archiveRules)
+    try await store.update { set in
+      set.rules = [
+        StoredArchiveRule(
+          text: "rule \"Clean\" archive done sessions where not git.dirty on daily at 18:00",
+          state: .active, sentence: "", agent: "claude", createdAt: friday, activatedAt: friday)
+      ]
+    }
+    await rules.load()
+    // Not read: a folder whose state is not known matches nothing.
+    #expect(rules.lines.first?.wouldArchive == 0)
+    rules.readGitFacts = { candidates in
+      candidates.map { candidate in
+        var candidate = candidate
+        candidate.isDirty = candidate.session.name == "Red"
+        return candidate
+      }
+    }
+    await rules.refreshGitFacts()
+    #expect(rules.lines.first?.wouldArchive == 1)
+  }
+
+  @Test("A change within the minute a continuous rule just used runs at its end, not later")
+  func continuousChange() async throws {
+    let (model, repository, _, sessions, store) = await model()
+    let rules = try #require(model.archiveRules)
+    try await store.update { [friday] set in
+      set.rules = [
+        StoredArchiveRule(
+          text: "rule \"Reds\" archive done sessions where badge.color = #B42318 on continuously",
+          state: .active, sentence: "", agent: "claude",
+          createdAt: friday.addingTimeInterval(-86_400),
+          activatedAt: friday.addingTimeInterval(-86_400),
+          lastHandled: friday.addingTimeInterval(-30))
+      ]
+    }
+    await rules.load()
+    model.archiveRulesSawChange()
+    let waiting = try #require(rules.continuousRun)
+    #expect(await repository.session(id: sessions[0].id)?.status == .closed)
+    waiting.cancel()
+    rules.continuousRun = nil
   }
 
   @Test("The Done column's button opens the automatic archive's tab")

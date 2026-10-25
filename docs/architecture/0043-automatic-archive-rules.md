@@ -77,7 +77,9 @@ rule from running.
 
 The application looks at the rules at the next time due (a quarter of an hour at most later), when
 the Mac wakes, at launch once the running agents are adopted, and — for `continuously` — at each
-change of the store, at most once a minute.
+change of the store, at most once a minute: a change within the minute a run used runs at its end.
+What a rule “would archive now” in the Settings is counted with the same facts as a run, Git
+included.
 
 ### A run
 

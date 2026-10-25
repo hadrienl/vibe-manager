@@ -34,6 +34,9 @@ public final class ArchiveRulesModel {
 
   public private(set) var set = ArchiveRuleSet()
   public private(set) var loaded = false
+  /// The branch and the state of the sessions' folders, read from Git when a rule or a protection
+  /// asks: what “would archive now” counts with, as a run does.
+  private(set) var gitFacts: [SessionID: (branch: String?, isDirty: Bool?)] = [:]
   public var problem: Problem?
 
   @ObservationIgnored let store: any ArchiveRuleStore
@@ -50,10 +53,16 @@ public final class ArchiveRulesModel {
   @ObservationIgnored var vocabulary: @MainActor () -> ArchiveRuleVocabulary = {
     ArchiveRuleVocabulary()
   }
+  /// Reads the candidates' branch and changes from Git, given by the application's model.
+  @ObservationIgnored var readGitFacts:
+    @MainActor ([ArchiveCandidate]) async -> [ArchiveCandidate] =
+      { $0 }
   @ObservationIgnored var ticker: Task<Void, Never>?
   @ObservationIgnored var wakeObserver: NSObjectProtocol?
   /// A run under way: another tick waits for the next one rather than running the same rules.
   @ObservationIgnored var isRunning = false
+  /// A run of the continuous rules waiting for the end of the minute the last one used.
+  @ObservationIgnored var continuousRun: Task<Void, Never>?
   /// Off in tests, which tick by hand.
   @ObservationIgnored public var startsTicker = true
 
@@ -95,7 +104,14 @@ public final class ArchiveRulesModel {
     let explanation = self.explanation
     let now = now()
     let calendar = calendar()
-    let candidates = candidates()
+    let candidates = candidates().map { candidate in
+      var candidate = candidate
+      if let facts = gitFacts[candidate.id] {
+        candidate.branch = facts.branch
+        candidate.isDirty = facts.isDirty
+      }
+      return candidate
+    }
     let protections = set.readableProtections
     return set.rules.map { stored in
       guard let rule = stored.rule else {
@@ -125,6 +141,25 @@ public final class ArchiveRulesModel {
     return set.protections.map { stored in
       (stored, stored.protection.map(explanation.sentence(of:)))
     }
+  }
+
+  /// Whether a rule or a protection reads what only Git knows.
+  var readsGit: Bool {
+    self.set.rules.contains { $0.rule?.condition?.readsGit == true }
+      || self.set.protections.contains { $0.protection?.condition.readsGit == true }
+  }
+
+  /// Reads again from Git what the lines count with; nothing when no rule asks.
+  public func refreshGitFacts() async {
+    guard readsGit else {
+      gitFacts = [:]
+      return
+    }
+    var facts: [SessionID: (branch: String?, isDirty: Bool?)] = [:]
+    for candidate in await readGitFacts(candidates()) {
+      facts[candidate.id] = (candidate.branch, candidate.isDirty)
+    }
+    gitFacts = facts
   }
 
   /// Whether a rule that runs looks at every change of the sessions.
@@ -200,7 +235,8 @@ public final class ArchiveRulesModel {
         set.rules[index] = rules.removeFirst()
       }
       // A name taken meanwhile is refused: the sheet asks for another one first.
-      let taken = Set(set.rules.filter { $0.id != replacing }.compactMap { $0.rule?.name.lowercased() })
+      let taken = Set(
+        set.rules.filter { $0.id != replacing }.compactMap { $0.rule?.name.lowercased() })
       guard rules.allSatisfy({ !taken.contains($0.rule?.name.lowercased() ?? "") }) else {
         throw NameTaken()
       }
@@ -235,7 +271,8 @@ public final class ArchiveRulesModel {
         guard let self else { return }
         await self.tick?()
         let now = self.now()
-        let next = ArchiveRuleScheduler.nextWake(for: self.set, after: now, calendar: self.calendar())
+        let next = ArchiveRuleScheduler.nextWake(
+          for: self.set, after: now, calendar: self.calendar())
         let delay = min(max(next?.timeIntervalSince(now) ?? 900, 1), 900)
         try? await Task.sleep(for: .seconds(delay))
       }
@@ -252,6 +289,8 @@ public final class ArchiveRulesModel {
   func stop() {
     ticker?.cancel()
     ticker = nil
+    continuousRun?.cancel()
+    continuousRun = nil
     if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
     wakeObserver = nil
   }

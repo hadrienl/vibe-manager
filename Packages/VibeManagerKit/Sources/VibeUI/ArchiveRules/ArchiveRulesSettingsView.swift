@@ -114,6 +114,7 @@ struct ArchiveRulesSettingsView: View {
     }
     .formStyle(.grouped)
     .task { if !rules.loaded { await rules.load() } }
+    .task(id: rules.set) { await rules.refreshGitFacts() }
     .sheet(item: $sheet) { sheet in
       ArchiveRuleSheet(model: sheet, palette: model.archiveRuleContext().palette) {
         self.sheet = nil

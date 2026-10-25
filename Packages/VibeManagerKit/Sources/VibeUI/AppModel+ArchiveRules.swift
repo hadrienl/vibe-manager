@@ -10,7 +10,9 @@ extension AppModel {
   func startArchiveRules() async {
     guard let archiveRules else { return }
     archiveRules.candidates = { [weak self] in self?.archiveCandidates() ?? [] }
-    archiveRules.vocabulary = { [weak self] in self?.archiveVocabulary() ?? ArchiveRuleVocabulary() }
+    archiveRules.vocabulary = { [weak self] in self?.archiveVocabulary() ?? ArchiveRuleVocabulary()
+    }
+    archiveRules.readGitFacts = { [weak self] in await self?.withGitFacts($0) ?? $0 }
     archiveRules.tick = { [weak self] in await self?.runArchiveRules() }
     await archiveRules.load()
     archiveRules.restartTicker()
@@ -85,6 +87,26 @@ extension AppModel {
       }
     }
     return result
+  }
+
+  /// A change of the sessions, for the rules that run continuously: they run now, or at the end
+  /// of the minute the last run used — a change within it is not left for the next quarter of
+  /// an hour. The reloads of a run are its own, not changes to look at.
+  func archiveRulesSawChange() {
+    guard let rules = archiveRules, rules.runsContinuously, !rules.isRunning,
+      rules.continuousRun == nil
+    else { return }
+    let last =
+      rules.set.rules.filter { $0.runs && $0.rule?.schedule == .continuously }
+      .compactMap(\.lastHandled).max() ?? .distantPast
+    let wait = last.addingTimeInterval(ArchiveRuleScheduler.continuousThrottle)
+      .timeIntervalSince(rules.now())
+    rules.continuousRun = Task { [weak self] in
+      if wait > 0 { try? await Task.sleep(for: .seconds(wait)) }
+      rules.continuousRun = nil
+      guard !Task.isCancelled else { return }
+      await self?.runArchiveRules()
+    }
   }
 
   /// One tick: the rules due now claimed, then run in the order of the list.

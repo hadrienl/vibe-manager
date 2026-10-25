@@ -3295,11 +3295,8 @@ public final class AppModel {
       // and on a cold cache this is a detection the first frame would otherwise wait for.
       resolutionTask?.cancel()
       resolutionTask = Task { [weak self] in await self?.refreshResolutions() }
-      // A rule that runs continuously looks at every change of the sessions (#405); a run that
-      // just happened waits its minute.
-      if archiveRules?.runsContinuously == true {
-        Task { [weak self] in await self?.runArchiveRules() }
-      }
+      // A rule that runs continuously looks at every change of the sessions (#405).
+      archiveRulesSawChange()
     } catch {
       await report(error)
     }
