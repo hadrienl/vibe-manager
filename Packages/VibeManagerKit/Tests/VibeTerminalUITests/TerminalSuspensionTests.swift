@@ -312,7 +312,8 @@ struct TerminalSuspensionTests {
 }
 
 @MainActor
-@Suite("What the terminal answers of itself is not the user's typing (#417)", .timeLimit(.minutes(1)))
+@Suite(
+  "What the terminal answers of itself is not the user's typing (#417)", .timeLimit(.minutes(1)))
 struct TerminalAnswerTests {
   @Test("The answer to a question reaches the process, but is not noted as typed")
   func answerIsNotTyping() async {
