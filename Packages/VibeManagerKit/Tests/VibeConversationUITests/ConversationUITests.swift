@@ -400,6 +400,67 @@ struct ConversationScrollStateTests {
       contentFrame: CGRect(x: 0, y: 0, width: 800, height: 200), viewportHeight: viewport)
     #expect(model.scrollToBottomRequest == asked + 2)
   }
+
+  /// A long last answer, estimated taller than it is while the conversation sat hidden (#418).
+  private static let atTheEnd = CGRect(x: 0, y: -400, width: 800, height: 1000)
+  private static let pastTheEnd = CGRect(x: 0, y: -1200, width: 800, height: 1000)
+
+  @MainActor
+  @Test("Back on a session whose last answer is long, the view is sent to the end until it lands")
+  func backOnALongAnswer() {
+    let model = ConversationModel(sessionID: SessionID())
+    let viewport = 600.0
+    model.scrollGeometryChanged(contentFrame: Self.atTheEnd, viewportHeight: viewport)
+    model.setShown(false)
+    // Hidden behind another session: nothing to see, nothing asked, no attempt spent.
+    model.scrollGeometryChanged(contentFrame: Self.pastTheEnd, viewportHeight: viewport)
+    let asked = model.scrollToBottomRequest
+    model.setShown(true)
+    #expect(model.scrollToBottomRequest == asked + 1)
+    // Read before it went there: asked only once.
+    model.scrollGeometryChanged(contentFrame: Self.pastTheEnd, viewportHeight: viewport)
+    #expect(model.scrollToBottomRequest == asked + 1)
+    // Gone there, still past the end once the answer is measured, with no new geometry to come:
+    // asked again.
+    model.scrolledToBottom()
+    #expect(model.scrollToBottomRequest == asked + 2)
+    // Landed at the end: nothing more.
+    model.scrollGeometryChanged(contentFrame: Self.atTheEnd, viewportHeight: viewport)
+    model.scrolledToBottom()
+    #expect(model.scrollToBottomRequest == asked + 2)
+  }
+
+  @MainActor
+  @Test("Measurements that never settle send the view to the end a few times, then let it be")
+  func repositionIsBounded() {
+    let model = ConversationModel(sessionID: SessionID())
+    let viewport = 600.0
+    let asked = model.scrollToBottomRequest
+    model.scrollGeometryChanged(contentFrame: Self.pastTheEnd, viewportHeight: viewport)
+    for _ in 0..<10 { model.scrolledToBottom() }
+    #expect(
+      model.scrollToBottomRequest == asked + ConversationModel.maxRepositionAttempts)
+    // Back at the end, the attempts start again.
+    model.scrollGeometryChanged(contentFrame: Self.atTheEnd, viewportHeight: viewport)
+    model.scrollGeometryChanged(contentFrame: Self.pastTheEnd, viewportHeight: viewport)
+    #expect(
+      model.scrollToBottomRequest == asked + ConversationModel.maxRepositionAttempts + 1)
+  }
+
+  @MainActor
+  @Test("A conversation the reader scrolled up keeps its place when it comes back on screen")
+  func scrolledUpKeepsItsPlace() {
+    let model = ConversationModel(sessionID: SessionID())
+    let viewport = 600.0
+    model.scrollGeometryChanged(contentFrame: Self.atTheEnd, viewportHeight: viewport)
+    model.scrollGeometryChanged(
+      contentFrame: CGRect(x: 0, y: -100, width: 800, height: 1000), viewportHeight: viewport)
+    #expect(!model.scroll.isFollowing)
+    let asked = model.scrollToBottomRequest
+    model.setShown(false)
+    model.setShown(true)
+    #expect(model.scrollToBottomRequest == asked)
+  }
 }
 
 @Suite("A question answered, read back from its call")

@@ -221,6 +221,8 @@ public struct ConversationView: View {
       .modifier(ToolbarVeil())
       .onChange(of: model.scrollToBottomRequest) {
         proxy.scrollTo(Self.bottomID, anchor: .bottom)
+        // Once it has gone there, and the rows it reached are measured.
+        DispatchQueue.main.async { model.scrolledToBottom() }
       }
       .onChange(of: model.pageRequest) {
         guard let top = pager.readableTop(after: model.pageRequest.page) else { return }
