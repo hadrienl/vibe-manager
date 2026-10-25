@@ -153,7 +153,7 @@ struct ArchiveRulesRunTests {
     sheet.renames[0].name = "Reds, every day"
     #expect(sheet.renameProblem == nil)
     #expect(await sheet.saveRenamed())
-    let names = try await store.load().rules.compactMap { $0.rule?.name }
+    let names = await store.load().rules.compactMap { $0.rule?.name }
     #expect(names == ["Reds", "Reds, every day"])
   }
 
