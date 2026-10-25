@@ -37,11 +37,12 @@ struct ConversationPagingTests {
     return view as? NSScrollView ?? view.subviews.lazy.compactMap(scrollView(in:)).first
   }
 
-  /// Laid out until `condition` holds; cancelled by the time limit rather than spinning on.
+  /// Laid out until `condition` holds. Said where it stands before the time limit cuts it off.
   private func settled(
     _ window: NSWindow, until condition: (NSScrollView) -> Bool
   ) async throws -> NSScrollView {
-    while !Task.isCancelled {
+    let deadline = ContinuousClock.now + Self.patience
+    while ContinuousClock.now < deadline {
       window.layoutIfNeeded()
       if let scroll = scrollView(in: window.contentView), scroll.documentView != nil,
         condition(scroll)
@@ -50,15 +51,36 @@ struct ConversationPagingTests {
       }
       try await Task.sleep(for: .milliseconds(10))
     }
+    let scroll = scrollView(in: window.contentView)
+    Issue.record(
+      "Never settled: \(scroll.map(Self.describe) ?? "no scroll view")")
     throw CancellationError()
   }
 
-  /// Waits for the scroll view to get where `condition` says; cancelled by the time limit.
-  private func waitUntil(_ condition: () -> Bool) async throws {
+  /// Waits for the scroll view to get where `condition` says, and says where it stopped.
+  private func waitUntil(
+    _ step: String, _ scroll: NSScrollView, _ model: ConversationModel,
+    _ condition: () -> Bool
+  ) async throws {
+    let deadline = ContinuousClock.now + Self.patience
     while !condition() {
-      try Task.checkCancellation()
+      guard ContinuousClock.now < deadline else {
+        Issue.record(
+          "Stuck at \(step): \(Self.describe(scroll)), following \(model.scroll.isFollowing)")
+        throw CancellationError()
+      }
       try await Task.sleep(for: .milliseconds(10))
     }
+  }
+
+  /// Under the suite's time limit: long enough for a runner that stalls, short enough to say why.
+  private static let patience: Duration = .seconds(25)
+
+  private static func describe(_ scroll: NSScrollView) -> String {
+    let bounds = scroll.contentView.bounds
+    return "origin \(bounds.origin.y), visible \(bounds.height), document "
+      + "\(scroll.documentView?.frame.height ?? -1), insets \(scroll.contentInsets.top)/"
+      + "\(scroll.contentInsets.bottom)"
   }
 
   @Test("Page Up scrolls the messages, page after page, up to the first one below the toolbar")
@@ -78,7 +100,9 @@ struct ConversationPagingTests {
 
     model.scrollPage(.up)
     // Before the fix, nothing moves: the pager never found the messages' scroll view.
-    try await waitUntil { origin < end - 1 && !model.scroll.isFollowing }
+    try await waitUntil("the first page", scroll, model) {
+      origin < end - 1 && !model.scroll.isFollowing
+    }
     // A page is what was read, less the overlap: no line skipped under the toolbar.
     #expect(end - origin <= readable, "moved \(end - origin) for \(readable) read")
     #expect(end - origin >= readable / 2)
@@ -87,12 +111,12 @@ struct ConversationPagingTests {
     while origin > -top + 0.5 {
       let before = origin
       model.scrollPage(.up)
-      try await waitUntil { origin < before - 0.5 }
+      try await waitUntil("a page up from \(before)", scroll, model) { origin < before - 0.5 }
     }
     #expect(abs(origin - -top) < 1)
 
     model.scrollPage(.down)
-    try await waitUntil { origin > -top + 1 }
+    try await waitUntil("a page down", scroll, model) { origin > -top + 1 }
   }
 
   @Test("A draft taller than its field keeps Page Up, Page Down and End to scroll itself")
