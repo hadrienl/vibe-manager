@@ -33,12 +33,16 @@ public protocol RequestNotifying: AnyObject {
   /// floating panel already says what happened, and macOS keeps the sound quiet during a Focus.
   /// Played here when the system may not notify.
   func postAlertSound(title: String, body: String)
+  /// An automatic archive rule archived sessions (#405): a discreet notification, turned off in
+  /// the Settings.
+  func postArchiveRun(ruleName: String, count: Int)
 }
 
 extension RequestNotifying {
   public func postOutcome(_ notification: SessionOutcomeNotification) {}
   public func postDictationReady(notifies: Bool) {}
   public func postAlertSound(title: String, body: String) {}
+  public func postArchiveRun(ruleName: String, count: Int) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.

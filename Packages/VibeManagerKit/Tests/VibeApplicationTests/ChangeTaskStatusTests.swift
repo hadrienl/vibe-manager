@@ -38,7 +38,7 @@ struct ChangeTaskStatusTests {
     let change = ChangeTaskStatus(
       repository: repository, clock: TaskClock(value: Date(timeIntervalSince1970: 500)))
 
-    let updated = try await change(id: subject.id, to: .waiting)
+    let updated = try await change(id: subject.id, to: .waiting, cause: .user)
 
     #expect(updated.taskStatus == .waiting)
     #expect(updated.status == .active)
@@ -52,7 +52,7 @@ struct ChangeTaskStatusTests {
     let change = ChangeTaskStatus(
       repository: TaskSessionRepository(value: subject), clock: TaskClock(value: .distantPast))
 
-    let updated = try await change(id: subject.id, to: .todo)
+    let updated = try await change(id: subject.id, to: .todo, cause: .user)
 
     #expect(updated.taskStatus == .todo)
     #expect(updated.updatedAt == createdAt)
@@ -64,7 +64,7 @@ struct ChangeTaskStatusTests {
     let change = ChangeTaskStatus(repository: TaskSessionRepository(value: subject))
 
     await #expect(throws: SessionTaskStatusError.self) {
-      try await change(id: subject.id, to: .archived)
+      try await change(id: subject.id, to: .archived, cause: .user)
     }
   }
 
@@ -78,7 +78,7 @@ struct ChangeTaskStatusTests {
     ])
   func beginWork(from status: SessionTaskStatus, to expected: SessionTaskStatus) async throws {
     var subject = session(.closed)
-    if status != subject.taskStatus { try subject.setTaskStatus(status, at: createdAt) }
+    if status != subject.taskStatus { try subject.setTaskStatus(status, at: createdAt, cause: .user) }
     let repository = TaskSessionRepository(value: subject)
 
     let updated = try await ChangeTaskStatus(repository: repository).beginWork(id: subject.id)
@@ -92,7 +92,28 @@ struct ChangeTaskStatusTests {
     let missing = SessionID()
 
     await #expect(throws: ChangeSessionStatusError.sessionNotFound(missing)) {
-      try await change(id: missing, to: .done)
+      try await change(id: missing, to: .done, cause: .user)
     }
+  }
+
+  @Test("Each use case says why the status changed, for the session's history (#406)")
+  func causesAreRecorded() async throws {
+    let repository = TaskSessionRepository(value: session(.closed))
+    let id = try #require(await repository.sessions().first?.id)
+    let clock = TaskClock(value: Date(timeIntervalSince1970: 500))
+
+    _ = try await ChangeTaskStatus(repository: repository, clock: clock).beginWork(id: id)
+    _ = try await ChangeTaskStatus(repository: repository, clock: clock)(
+      id: id, to: .done, cause: .user)
+    let rule = UUID()
+    _ = try await ArchiveSession(repository: repository, clock: clock)(
+      id: id, cause: .rule(id: rule, name: "Red"))
+    _ = try await RestoreSession(repository: repository, clock: clock)(id: id)
+
+    let history = try #require(await repository.session(id: id)?.statusHistory)
+    #expect(
+      history.entries.suffix(4).map(\.cause) == [
+        .launch, .user, .rule(id: rule, name: "Red"), .unarchive,
+      ])
   }
 }

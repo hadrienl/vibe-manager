@@ -45,7 +45,7 @@ them up, and its children stay under it.
 `sessions.json` goes to schema 10, the v9 shape with one optional field, read field by field: a role
 written by a later build, or a child said to be its own, reads as an ordinary session rather than as
 a store that cannot be opened. A child whose coordinator is archived or gone is an ordinary session
-again; the field is kept, so unarchiving the coordinator gives it back its children.
+again; the field is kept, so unarchiving the coordinator gives it back its children. (Schema 11 adds the history of statuses: ADR 0043.)
 
 ### The tools: a second server on the web view's channel
 

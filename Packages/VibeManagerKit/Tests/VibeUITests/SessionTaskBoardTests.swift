@@ -335,7 +335,7 @@ struct SessionTaskBoardTests {
   func archivedSelectionSticks() async {
     let kept = session("Kept")
     var archived = session("Archived", in: .done)
-    try? archived.archive(at: Date(timeIntervalSince1970: 500))
+    try? archived.archive(at: Date(timeIntervalSince1970: 500), cause: .user)
     let (model, _, _) = makeWorkspace([kept, archived])
     await model.load()
 
@@ -352,7 +352,7 @@ struct SessionTaskBoardTests {
   @Test("Unarchiving brings a session back to Done")
   func unarchivingGoesToDone() async {
     var archived = session("Archived", in: .done)
-    try? archived.archive(at: Date(timeIntervalSince1970: 500))
+    try? archived.archive(at: Date(timeIntervalSince1970: 500), cause: .user)
     let (model, _, repository) = makeWorkspace([archived])
     await model.load()
 
@@ -508,7 +508,7 @@ struct SessionTaskBoardTests {
   func archivedIsNotMovedInProgress() async {
     let path = folder()
     var archived = session("Archived", in: .done, path: path)
-    try? archived.archive(at: Date(timeIntervalSince1970: 500))
+    try? archived.archive(at: Date(timeIntervalSince1970: 500), cause: .user)
     let (model, launcher, repository) = makeWorkspace([archived])
     await model.load()
 

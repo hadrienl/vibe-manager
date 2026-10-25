@@ -38,7 +38,10 @@ public struct ChangeSessionStatus: Sendable {
 
   public func callAsFunction(
     id: SessionID,
-    action: SessionLifecycleAction
+    action: SessionLifecycleAction,
+    /// Why an archive or a restore happens, for the session's history (#406). Closing and
+    /// reopening leave the status alone.
+    cause: SessionStatusChange.Cause = .user
   ) async throws -> WorkSession {
     let now = clock.now()
     let updated = try await repository.mutate(id: id) { session in
@@ -52,9 +55,9 @@ public struct ChangeSessionStatus: Sendable {
       case .reopen:
         try session.reopen(at: date)
       case .archive:
-        try session.archive(at: date)
+        try session.archive(at: date, cause: cause)
       case .restore:
-        try session.restore(at: date)
+        try session.restore(at: date, cause: cause)
       }
     }
 

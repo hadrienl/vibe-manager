@@ -156,6 +156,9 @@ public final class AppModel {
   public var isWaitingOnBackgroundWork: ((WorkSession) async -> Bool)?
   /// The endpoints the user declared (#107). A workspace assembled without them has no tab.
   public var endpoints: EndpointsSettingsModel?
+  /// The automatic archive's rules (#405). Set by the composition: a workspace assembled without
+  /// it archives nothing on its own and has no tab.
+  public var archiveRules: ArchiveRulesModel?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
   /// workspace assembled without it has no Updates tab.
   public var updates: UpdatesModel?
@@ -685,7 +688,7 @@ public final class AppModel {
   var keyboardHeldInSidebarFor: SessionID?
   /// Archives under way, from the command to the reload that takes the session out of its column.
   /// Until then the row is still there, and a second ⌃⌘A would archive it a second time.
-  public private(set) var archivingSessionIDs: Set<SessionID> = []
+  public internal(set) var archivingSessionIDs: Set<SessionID> = []
   /// Whether the list of the archived sessions is open at the foot of the sidebar. Here rather
   /// than in the view, so that the menu can open it.
   public var isArchiveListPresented = false
@@ -1459,7 +1462,7 @@ public final class AppModel {
     }
     guard session.taskStatus != status else { return .skipped(.alreadyInStatus) }
     do {
-      try await changeTaskStatus(id: id, to: status)
+      try await changeTaskStatus(id: id, to: status, cause: .user)
       diagnostics.record(
         .session, .info, "session.taskStatusChanged",
         ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
@@ -1596,8 +1599,10 @@ public final class AppModel {
     }
   }
 
-  private func archiveProcess(_ id: SessionID) async throws -> SessionArchival {
-    let archival = try await archiveSession(id: id)
+  func archiveProcess(
+    _ id: SessionID, cause: SessionStatusChange.Cause = .user
+  ) async throws -> SessionArchival {
+    let archival = try await archiveSession(id: id, cause: cause)
     await activityTracker?.forget(id)
     ticketTitles.forget(id)
     browser?.release(id)
@@ -1633,9 +1638,9 @@ public final class AppModel {
     guard !back.isEmpty else { return beep() }
     for archive in back {
       do {
-        _ = try await restoreSession(id: archive.id)
+        _ = try await restoreSession(id: archive.id, cause: .undo)
         if archive.taskStatus != .done, archive.taskStatus != .archived {
-          try await changeTaskStatus(id: archive.id, to: archive.taskStatus)
+          try await changeTaskStatus(id: archive.id, to: archive.taskStatus, cause: .undo)
         }
         diagnostics.record(
           .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(archive.id)])
@@ -1679,8 +1684,10 @@ public final class AppModel {
   /// To Do and Waiting ask whether to close a session whose agent runs (#353).
   ///
   /// `restarting: false` writes the status and nothing else: the move ⌘Z takes back.
+  /// `cause` is what the session's history says made the move (#406).
   public func setTaskStatus(
-    _ status: SessionTaskStatus, for id: SessionID, restarting: Bool = true
+    _ status: SessionTaskStatus, for id: SessionID, restarting: Bool = true,
+    cause: SessionStatusChange.Cause = .user
   ) async {
     guard let session = sessions.first(where: { $0.id == id }), session.taskStatus != status
     else { return }
@@ -1713,7 +1720,8 @@ public final class AppModel {
         closing = true
       }
     }
-    await writeTaskStatus(status, of: session, restarting: restarting, closing: closing)
+    await writeTaskStatus(
+      status, of: session, restarting: restarting, closing: closing, cause: cause)
   }
 
   /// The move, once nothing is left to ask: the status, then the close or the restart it makes.
@@ -1721,13 +1729,13 @@ public final class AppModel {
   /// its grace period to stop.
   private func writeTaskStatus(
     _ status: SessionTaskStatus, of session: WorkSession, restarting: Bool = true,
-    closing: Bool
+    closing: Bool, cause: SessionStatusChange.Cause = .user
   ) async {
     let id = session.id
     let visible = orderedSessions
     let wasSelected = selectedSessionID == id
     do {
-      try await changeTaskStatus(id: id, to: status)
+      try await changeTaskStatus(id: id, to: status, cause: cause)
       diagnostics.record(
         .session, .info, "session.taskStatusChanged",
         ["session": diagnostics.pseudonym(id), "status": .token(status.diagnosticToken)])
@@ -1740,7 +1748,7 @@ public final class AppModel {
       coordinationStatusChangedByUser(id, to: status)
     } catch {
       reportAction(error, .moveStatus, on: id) { [weak self] in
-        await self?.setTaskStatus(status, for: id, restarting: restarting)
+        await self?.setTaskStatus(status, for: id, restarting: restarting, cause: cause)
       }
       return
     }
@@ -1775,7 +1783,7 @@ public final class AppModel {
   ///
   /// `wasSelected` is read before the change: the reload that follows it already moved the
   /// selection off a row it could no longer see, to the top of the column.
-  private func handOffSelection(
+  func handOffSelection(
     from id: SessionID, listedBefore visible: [WorkSession], wasSelected: Bool
   ) {
     guard wasSelected, let index = visible.firstIndex(where: { $0.id == id }),
@@ -1796,7 +1804,7 @@ public final class AppModel {
 
   /// The row that will take a session's place, handed to the reload so that it lands on it
   /// directly: going through the top of the column first would show another terminal for a frame.
-  private func prepareHandOff(from id: SessionID, listedBefore visible: [WorkSession]) {
+  func prepareHandOff(from id: SessionID, listedBefore visible: [WorkSession]) {
     guard selectedSessionID == id, let index = visible.firstIndex(where: { $0.id == id }) else {
       return
     }
@@ -1857,7 +1865,7 @@ public final class AppModel {
     guard sessions.first(where: { $0.id == undo.id })?.taskStatus == undo.to else {
       return beep()
     }
-    await setTaskStatus(undo.from, for: undo.id, restarting: false)
+    await setTaskStatus(undo.from, for: undo.id, restarting: false, cause: .undo)
     if undo.wasSelected { select(undo.id) }
   }
 
@@ -2718,7 +2726,7 @@ public final class AppModel {
     await reload()
   }
 
-  private func report(
+  func report(
     _ detachment: SessionDetachOutcome,
     for session: WorkSession,
     action: DetachWarning.Action
@@ -2808,6 +2816,9 @@ public final class AppModel {
     // The wake-ups the coordinators asked for before the relaunch, once the agents left running
     // are adopted: a coordinator not running yet keeps its wake-up (#352).
     await startCoordination()
+    // Once the sessions are read and the running agents adopted: a time missed while the
+    // application was closed is caught up now, on what runs (#405).
+    await startArchiveRules()
     await settleUsage()
     // Now that the host is known: one kept from before the access was granted is restarted here
     // if no agent runs in it, before anything is resumed into it (#76).
@@ -3289,6 +3300,8 @@ public final class AppModel {
       // and on a cold cache this is a detection the first frame would otherwise wait for.
       resolutionTask?.cancel()
       resolutionTask = Task { [weak self] in await self?.refreshResolutions() }
+      // A rule that runs continuously looks at every change of the sessions (#405).
+      archiveRulesSawChange()
     } catch {
       await report(error)
     }

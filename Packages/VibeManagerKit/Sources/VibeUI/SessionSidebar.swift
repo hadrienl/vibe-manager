@@ -44,6 +44,9 @@ struct SessionSidebar: View {
     let _ = BodyCounter.tick(.sessionSidebar)
     VStack(spacing: 0) {
       ColumnTabs(model: model)
+      if model.filter.column == .done, model.archiveRules != nil {
+        ArchiveRulesButton(model: model)
+      }
       columns
       Divider()
       ArchivedSessionsBar(model: model)
@@ -922,5 +925,37 @@ private struct ArchivedSessionsList: View {
 
   private func ordered(_ ids: Set<SessionID>, in archived: [WorkSession]) -> [SessionID] {
     archived.map(\.id).filter { ids.contains($0) }
+  }
+}
+
+/// At the head of the Done column, and only there: opens the automatic archive's tab of the
+/// Settings (#405). It shows nothing else — no time, no count, no rule.
+private struct ArchiveRulesButton: View {
+  let model: AppModel
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    HStack {
+      Spacer()
+      Button {
+        model.showArchiveRulesSettings()
+        openSettings()
+      } label: {
+        Label {
+          Text("Automatic Archive…", bundle: .module, comment: "A button at the head of the Done column.")
+        } icon: {
+          Image(systemName: "archivebox.circle")
+        }
+        .font(.caption)
+      }
+      .buttonStyle(.borderless)
+      .help(
+        Text(
+          "Change the automatic archive rules in the Settings", bundle: .module,
+          comment: "The help of the Automatic Archive… button of the Done column."))
+      .accessibilityIdentifier("done-automatic-archive")
+    }
+    .padding(.horizontal, 12)
+    .padding(.bottom, 4)
   }
 }

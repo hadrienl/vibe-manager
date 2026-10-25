@@ -19,14 +19,14 @@ public struct ChangeTaskStatus: Sendable {
   }
 
   @discardableResult
-  public func callAsFunction(id: SessionID, to status: SessionTaskStatus) async throws
-    -> WorkSession
-  {
+  public func callAsFunction(
+    id: SessionID, to status: SessionTaskStatus, cause: SessionStatusChange.Cause
+  ) async throws -> WorkSession {
     let now = clock.now()
     let updated = try await repository.mutate(id: id) { session in
       // Clamped like every other transition: a wall clock that stepped back must not strand the
       // user, and `updatedAt` stays monotonic.
-      try session.setTaskStatus(status, at: max(now, session.updatedAt))
+      try session.setTaskStatus(status, at: max(now, session.updatedAt), cause: cause)
     }
     guard let updated else { throw ChangeSessionStatusError.sessionNotFound(id) }
     return updated
@@ -41,7 +41,7 @@ public struct ChangeTaskStatus: Sendable {
   public func beginWork(id: SessionID) async throws -> WorkSession? {
     guard let current = try await repository.session(id: id) else { return nil }
     guard current.taskStatus == .todo || current.taskStatus == .done else { return current }
-    return try await self(id: id, to: .doing)
+    return try await self(id: id, to: .doing, cause: .launch)
   }
 }
 
