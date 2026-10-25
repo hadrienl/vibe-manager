@@ -189,14 +189,26 @@ extension AppModel {
       let processIdentifier = await launcher.runningProcessIdentifiers()[id],
       let update = agentUpdate(of: id, processIdentifier: processIdentifier)
     else { return }
+    let runsSubagents = await runsBackgroundWork(id)
     guard isFreeForUpdateRestart(id) else { return }
-    let runsSubagents =
-      conversations.existingModel(for: id)?.trayItems.contains { !$0.hasEnded } ?? false
     guard
       AgentUpdateRestartReadiness.isReady(
         activity: activity(for: id), screen: screen, runsSubagents: runsSubagents)
     else { return }
     await restartInPlace(id, update: update)
+  }
+
+  /// Whether a sub-agent or a shell the agent left behind its prompt still runs: the tray of a
+  /// conversation on screen, or else its transcript — a hidden conversation's tray is not kept
+  /// up to date, and one never opened has none. What the footer counts is not taken for it:
+  /// Claude Code 2.1.299 keeps `← 1 agent` in sessions idle for days.
+  func runsBackgroundWork(_ id: SessionID) async -> Bool {
+    if conversations.existingModel(for: id)?.trayItems.contains(where: { !$0.hasEnded }) == true {
+      return true
+    }
+    guard let isWaitingOnBackgroundWork, let session = sessions.first(where: { $0.id == id })
+    else { return false }
+    return await isWaitingOnBackgroundWork(session)
   }
 
   /// No other command is at work on the session, and the restart would resume its conversation.

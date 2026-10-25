@@ -32,6 +32,8 @@ public struct ConversationView: View {
   @State private var pager = ConversationPager()
   /// Where a page leads, in the messages: a mark that SwiftUI scrolls to (#227).
   @State private var pageTarget = 0.0
+  /// A page asked for, scrolled to once the mark has been laid out where it leads.
+  @State private var pagePending = false
   /// One selection from one message to the next (#381).
   @State private var selection = ConversationSelection()
 
@@ -202,6 +204,16 @@ public struct ConversationView: View {
             .frame(width: 1, height: 1)
             .id(Self.pageTargetID)
             .padding(.top, max(pageTarget, 0))
+            // Scrolled to once laid out there: asked any sooner — on the next turn of the main
+            // loop, on a machine that lags —, SwiftUI scrolls to where it was, and the page does
+            // not move.
+            .onGeometryChange(for: Double.self) {
+              $0.size.height
+            } action: { _ in
+              guard pagePending else { return }
+              pagePending = false
+              proxy.scrollTo(Self.pageTargetID, anchor: .top)
+            }
             .accessibilityHidden(true)
         }
         .onGeometryChange(for: CGRect.self) {
@@ -224,9 +236,13 @@ public struct ConversationView: View {
       }
       .onChange(of: model.pageRequest) {
         guard let top = pager.readableTop(after: model.pageRequest.page) else { return }
+        // A mark already there is not laid out again.
+        guard max(top, 0) != max(pageTarget, 0) else {
+          proxy.scrollTo(Self.pageTargetID, anchor: .top)
+          return
+        }
+        pagePending = true
         pageTarget = top
-        // Once the mark has moved there.
-        DispatchQueue.main.async { proxy.scrollTo(Self.pageTargetID, anchor: .top) }
       }
       .onChange(of: model.revealRequest) {
         guard let id = model.revealedBlockID else { return }

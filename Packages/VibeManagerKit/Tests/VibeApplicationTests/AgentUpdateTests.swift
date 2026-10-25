@@ -15,7 +15,8 @@ struct AgentUpdateTests {
   @Test func codexReleasesAndHomebrewKegsToo() {
     #expect(
       AgentUpdate.between(
-        running: "/Users/me/.codex/packages/standalone/releases/0.162.1-aarch64-apple-darwin/bin/codex",
+        running:
+          "/Users/me/.codex/packages/standalone/releases/0.162.1-aarch64-apple-darwin/bin/codex",
         installed:
           "/Users/me/.codex/packages/standalone/releases/0.163.0-aarch64-apple-darwin/bin/codex")
         == AgentUpdate(runningVersion: "0.162.1", installedVersion: "0.163.0"))
@@ -89,14 +90,17 @@ struct AgentUpdateTests {
   }
 
   @Test func anIdleAgentWithNothingBehindItsPromptIsReady() {
-    #expect(AgentUpdateRestartReadiness.isReady(activity: idle, screen: screen(), runsSubagents: false))
+    #expect(
+      AgentUpdateRestartReadiness.isReady(activity: idle, screen: screen(), runsSubagents: false))
   }
 
   @Test func aWorkingAgentIsNot() {
     let working = AgentActivityState(activity: .working, source: .structured)
     #expect(
-      !AgentUpdateRestartReadiness.isReady(activity: working, screen: screen(), runsSubagents: false))
-    #expect(!AgentUpdateRestartReadiness.isReady(activity: nil, screen: screen(), runsSubagents: false))
+      !AgentUpdateRestartReadiness.isReady(
+        activity: working, screen: screen(), runsSubagents: false))
+    #expect(
+      !AgentUpdateRestartReadiness.isReady(activity: nil, screen: screen(), runsSubagents: false))
   }
 
   @Test func textTypedIntoThePromptIsKept() {
@@ -111,10 +115,26 @@ struct AgentUpdateTests {
   @Test func shellsAndAgentsInTheBackgroundAreWaitedFor() {
     #expect(
       !AgentUpdateRestartReadiness.isReady(
-        activity: idle, screen: screen(footer: "  ▶▶ auto mode on · 2 shells · ← 1 agent"),
+        activity: idle, screen: screen(footer: "  ▶▶ auto mode on · 2 shells"),
         runsSubagents: false))
     #expect(
       !AgentUpdateRestartReadiness.isReady(activity: idle, screen: screen(), runsSubagents: true))
+  }
+
+  /// What sessions idle since the day before showed, the update installed: the agent the footer
+  /// counts is none at work.
+  @Test func theFootersAgentCountIsNotWaitedFor() {
+    let screen = """
+      ⏺ Remote Control disconnected — JWT refresh failed: no OAuth token — run /login
+                                                                ✔ Update installed · Restart to update
+      ────────────────────────────────────────
+      ❯ 
+      ────────────────────────────────────────
+        ➜ Prisme.ai Projects Opus 5.5 (1M context) ctx:9%
+        ⏵⏵ auto mode on (shift+tab to cycle) · ← 1 agent
+      """
+    #expect(
+      AgentUpdateRestartReadiness.isReady(activity: idle, screen: screen, runsSubagents: false))
   }
 
   /// Above the prompt is what the agent wrote, not its footer.
@@ -139,9 +159,11 @@ struct AgentUpdateTests {
 
         gpt-5.5 high · ~/project
       """
-    #expect(AgentUpdateRestartReadiness.isReady(activity: idle, screen: empty, runsSubagents: false))
+    #expect(
+      AgentUpdateRestartReadiness.isReady(activity: idle, screen: empty, runsSubagents: false))
     let typed = empty.replacingOccurrences(of: "Ask a follow-up question", with: "fix the tests")
-    #expect(!AgentUpdateRestartReadiness.isReady(activity: idle, screen: typed, runsSubagents: false))
+    #expect(
+      !AgentUpdateRestartReadiness.isReady(activity: idle, screen: typed, runsSubagents: false))
   }
 
   /// A prompt that cannot be read may hold what the user typed: it is not taken for empty.
