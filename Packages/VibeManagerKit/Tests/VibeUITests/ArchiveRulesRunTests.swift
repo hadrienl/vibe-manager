@@ -150,11 +150,45 @@ struct ArchiveRulesRunTests {
     #expect(sheet.renames.map(\.original) == ["reds"])
     sheet.renames[0].name = "Reds"
     #expect(sheet.renameProblem != nil)
+    sheet.renames[0].name = "Reds \u{202E}yad"
+    #expect(sheet.renameProblem != nil)
+    sheet.renames[0].name = "🧑‍💻 Reds"
+    #expect(sheet.renameProblem == nil)
     sheet.renames[0].name = "Reds, every day"
     #expect(sheet.renameProblem == nil)
     #expect(await sheet.saveRenamed())
     let names = await store.load().rules.compactMap { $0.rule?.name }
     #expect(names == ["Reds", "Reds, every day"])
+  }
+
+  @Test("The names asked for go with their version: a new one asks again")
+  func renamesFollowTheVersion() async throws {
+    let (model, _, _, _, _) = await model()
+    let rules = try #require(model.archiveRules)
+    let sheet = ArchiveRuleSheetModel(purpose: .newRules, rules: rules) { .sample }
+    sheet.announce = { _ in }
+    sheet.setVersionForTesting(
+      try ArchiveRuleParser.parse(
+        #"rule "Other" archive done sessions on daily at 18:00 rule "reds" archive done sessions on daily at 19:00"#
+      ))
+    #expect(!(await sheet.save(trial: false)))
+    #expect(sheet.renames.map(\.id) == [1])
+    sheet.setVersionForTesting(
+      try ArchiveRuleParser.parse(#"rule "Other" archive done sessions on daily at 18:00"#))
+    #expect(sheet.renames.isEmpty)
+  }
+
+  @Test("A protection that no longer reads claims nothing: the times due wait for it")
+  func unreadableProtection() async throws {
+    let (model, repository, _, sessions, store) = await model()
+    try await store.update { set in
+      set.protections = [StoredArchiveProtection(text: "protect where nonsense", sentence: "")]
+    }
+    let rules = try #require(model.archiveRules)
+    await rules.load()
+    await model.runArchiveRules()
+    #expect(await repository.session(id: sessions[0].id)?.status == .closed)
+    #expect(await store.load().rules.first?.lastHandled == nil)
   }
 
   @Test("A rule on trial archives nothing, and says what it would have")

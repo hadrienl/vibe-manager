@@ -26,7 +26,6 @@ public final class ArchiveRulesModel {
     public var id: UUID { stored.id }
     /// `nil` for a rule that does not read any more.
     public let explanation: String?
-    public let shortSchedule: String?
     public let next: Date?
     /// How many sessions it would archive if it ran now.
     public let wouldArchive: Int
@@ -116,7 +115,7 @@ public final class ArchiveRulesModel {
     return set.rules.map { stored in
       guard let rule = stored.rule else {
         return Line(
-          stored: stored, explanation: nil, shortSchedule: nil, next: nil, wouldArchive: 0)
+          stored: stored, explanation: nil, next: nil, wouldArchive: 0)
       }
       let next: Date? =
         stored.runs
@@ -129,7 +128,6 @@ public final class ArchiveRulesModel {
       }
       return Line(
         stored: stored, explanation: explanation.sentence(of: rule),
-        shortSchedule: explanation.shortSchedule(rule.schedule),
         next: rule.schedule == .continuously ? nil : next,
         wouldArchive: plan?.archived.count ?? 0)
     }
@@ -225,6 +223,12 @@ public final class ArchiveRulesModel {
       StoredArchiveProtection(text: ArchiveRulePrinter.text(of: $0), sentence: sentence)
     }
     let saved = await change { set in
+      // A name taken meanwhile, or given twice, is refused: the sheet asks for another one first.
+      var names = Set(
+        set.rules.filter { $0.id != replacing }.compactMap { $0.rule?.name.lowercased() })
+      guard rules.allSatisfy({ names.insert($0.rule?.name.lowercased() ?? "").inserted }) else {
+        throw NameTaken()
+      }
       var rules = rules
       if let replacing, let index = set.rules.firstIndex(where: { $0.id == replacing }),
         let first = rules.first
@@ -233,12 +237,6 @@ public final class ArchiveRulesModel {
           id: replacing, text: first.text, state: first.state, sentence: first.sentence,
           agent: first.agent, createdAt: set.rules[index].createdAt, activatedAt: now)
         set.rules[index] = rules.removeFirst()
-      }
-      // A name taken meanwhile is refused: the sheet asks for another one first.
-      let taken = Set(
-        set.rules.filter { $0.id != replacing }.compactMap { $0.rule?.name.lowercased() })
-      guard rules.allSatisfy({ !taken.contains($0.rule?.name.lowercased() ?? "") }) else {
-        throw NameTaken()
       }
       set.rules.append(contentsOf: rules)
       let known = Set(set.protections.map(\.text))
@@ -286,7 +284,8 @@ public final class ArchiveRulesModel {
     }
   }
 
-  func stop() {
+  /// Stops looking at the rules: the application quits.
+  public func stop() {
     ticker?.cancel()
     ticker = nil
     continuousRun?.cancel()

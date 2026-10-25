@@ -30,6 +30,15 @@ public enum ArchiveRuleParser {
   public static let shortestInterval = ArchiveDuration(15, .minutes)
   public static let maximumTextLength = 20_000
 
+  /// Whether a name holds no invisible character that reorders or hides text. The joiner of
+  /// emoji such as 🧑‍💻 hides nothing, and is kept.
+  public static func isReadableName(_ name: String) -> Bool {
+    !name.unicodeScalars.contains {
+      $0.properties.isBidiControl
+        || ($0.properties.generalCategory == .format && $0.value != 0x200D)
+    }
+  }
+
   public static func parse(_ text: String) throws(ArchiveRuleProblem) -> ArchiveRuleDocument {
     guard text.utf8.count <= maximumTextLength else {
       throw ArchiveRuleProblem(
@@ -358,11 +367,7 @@ private struct Parser {
     guard name.count <= ArchiveRuleParser.maximumNameLength else {
       throw problem("A rule's name is at most \(ArchiveRuleParser.maximumNameLength) characters.")
     }
-    guard
-      !name.unicodeScalars.contains(where: {
-        $0.properties.generalCategory == .format || $0.properties.isBidiControl
-      })
-    else {
+    guard ArchiveRuleParser.isReadableName(name) else {
       throw problem("A rule's name cannot hold characters that reorder text.")
     }
     advance()

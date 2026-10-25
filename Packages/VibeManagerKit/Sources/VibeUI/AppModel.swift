@@ -2726,7 +2726,7 @@ public final class AppModel {
     await reload()
   }
 
-  private func report(
+  func report(
     _ detachment: SessionDetachOutcome,
     for session: WorkSession,
     action: DetachWarning.Action

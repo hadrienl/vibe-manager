@@ -37193,6 +37193,107 @@
         }
       }
     },
+    "A rule's name cannot hold characters that reorder text." : {
+      "comment" : "Renaming archive rules: the name holds invisible characters that reorder text.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن أن يحتوي اسم القاعدة على أحرف تعيد ترتيب النص."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Name einer Regel darf keine Zeichen enthalten, die den Text umordnen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nombre de una regla no puede contener caracteres que reordenen el texto."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nom d’une règle ne peut pas contenir de caractères qui réordonnent le texte."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "नियम के नाम में ऐसे वर्ण नहीं हो सकते जो टेक्स्ट का क्रम बदलें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il nome di una regola non può contenere caratteri che riordinano il testo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ルール名にテキストの順序を入れ替える文字は使えません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "규칙 이름에는 텍스트 순서를 바꾸는 문자를 넣을 수 없습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De naam van een regel mag geen tekens bevatten die de tekst herschikken."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nazwa reguły nie może zawierać znaków zmieniających kolejność tekstu."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O nome de uma regra não pode conter caracteres que reordenam o texto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Имя правила не может содержать символы, меняющие порядок текста."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bir kuralın adı metnin sırasını değiştiren karakterler içeremez."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назва правила не може містити символи, що змінюють порядок тексту."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "规则名称不能包含会重排文本的字符。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "規則名稱不能包含會重排文字的字元。"
+          }
+        }
+      }
+    },
     "A rule's name is at most %lld characters." : {
       "comment" : "Renaming archive rules.",
       "localizations" : {

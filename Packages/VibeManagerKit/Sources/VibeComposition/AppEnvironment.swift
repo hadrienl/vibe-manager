@@ -718,6 +718,7 @@ public final class AppEnvironment {
       ])
     memorySampler.stop()
     bodyEvaluations?.stop()
+    appModel.archiveRules?.stop()
     // The agent sees its socket close and writes the Mac offline, whatever happens to the agents.
     await companion?.stop()
     hangDetector?.stop()

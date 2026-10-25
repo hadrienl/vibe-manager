@@ -49,7 +49,10 @@ public final class ArchiveRuleSheetModel: Identifiable {
   public private(set) var options: [ArchiveRuleGeneratorOption] = []
   public private(set) var optionsLoaded = false
   public var selectedAgent: AgentProviderID?
-  public private(set) var versions: [Version] = []
+  public private(set) var versions: [Version] = [] {
+    // The names asked for are the rules' of the version they were asked on.
+    didSet { renames = [] }
+  }
   public private(set) var question: ArchiveRuleQuestion?
   public var chosenAnswer: String?
   public private(set) var generatingAgent: String?
@@ -335,6 +338,11 @@ public final class ArchiveRuleSheetModel: Identifiable {
         return String(
           localized: "A rule's name is at most \(ArchiveRuleParser.maximumNameLength) characters.",
           bundle: .module, comment: "Renaming archive rules.")
+      }
+      guard ArchiveRuleParser.isReadableName(name) else {
+        return String(
+          localized: "A rule's name cannot hold characters that reorder text.", bundle: .module,
+          comment: "Renaming archive rules: the name holds invisible characters that reorder text.")
       }
       let key = name.lowercased()
       guard !taken.contains(key), !others.contains(key), given.insert(key).inserted else {
