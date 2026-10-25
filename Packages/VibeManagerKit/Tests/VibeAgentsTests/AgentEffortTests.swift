@@ -255,6 +255,26 @@ struct AgentEffortKeystrokeTests {
     #expect(CodexEffortPanel(level: "ultra").step(on: more) == .press("\u{1B}[B"))
   }
 
+  @Test("From Max or Ultra, the cursor leaves More reasoning, whose footer offers no s")
+  func fromAdvancedLevel() {
+    let up = CodexEffortPanel.up
+    #expect(
+      CodexEffortPanel(level: "low").step(on: DialogScreens.codexLevelsUltraInForce)
+        == .press(String(repeating: up, count: 4)))
+    #expect(
+      CodexEffortPanel(level: "high").step(on: DialogScreens.codexLevelsUltraInForce)
+        == .press(String(repeating: up, count: 2)))
+    #expect(
+      CodexEffortPanel(level: "medium").step(on: DialogScreens.codexLevelsMaxInForceOnMedium)
+        == .finish("s"))
+    #expect(
+      CodexEffortPanel(level: "max").step(on: DialogScreens.codexLevelsUltraInForce) == .press("\r")
+    )
+    #expect(
+      CodexEffortPanel(level: "ultra").step(on: DialogScreens.codexAdvancedMaxInForce)
+        == .press(CodexEffortPanel.down))
+  }
+
   @Test("A panel without the choice of the session is never validated: Return writes config.toml")
   func olderFooter() {
     let older = Self.levelPanel(cursor: 3)

@@ -18,6 +18,8 @@ import VibeApplication
 ///       enter default · s session · esc back
 ///
 /// Max and Ultra are on a panel of their own, behind the last row, titled "Advanced Reasoning".
+/// While one of them is in force, the panel opens on that last row, `More reasoning… (current)`,
+/// and its footer — the row under the cursor's — offers no `s` (codex-cli 0.164).
 ///
 /// The model in use is kept: its row is chosen again. The level is then chosen with `s`, which
 /// applies it to this session; Return would also write it in `config.toml`, for every session, and
@@ -71,10 +73,14 @@ public struct CodexEffortPanel: AgentEffortPanelDriving {
     let rows = Self.rows(in: lines)
     let wanted = Self.label(of: level).lowercased()
     if let target = rows.firstIndex(where: { Self.name(of: $0.label).lowercased() == wanted }) {
+      // The footer is the row under the cursor's: More reasoning, where Max or Ultra in force
+      // opens the panel, offers no `s`. The cursor is brought to the level first.
+      guard let cursor = rows.firstIndex(where: \.isSelected) else { return .wait }
+      if cursor != target { return move(rows, to: target, then: "s") }
       // Only `s` applies the level to this session alone. A panel that does not offer it is left
       // as it is — and closed once given up: Return could write it for every session.
       guard lines.contains(where: { $0.contains("s session") }) else { return .wait }
-      return move(rows, to: target, then: "s", finishing: true)
+      return .finish("s")
     }
     // Max and Ultra are behind a row of their own.
     if let more = rows.firstIndex(where: { $0.label.hasPrefix(Self.moreRow) }) {
@@ -84,11 +90,9 @@ public struct CodexEffortPanel: AgentEffortPanelDriving {
   }
 
   /// The arrows that bring the cursor to a row, or the key pressed once it is there.
-  private func move(
-    _ rows: [Row], to target: Int, then key: String, finishing: Bool = false
-  ) -> AgentEffortPanelStep {
+  private func move(_ rows: [Row], to target: Int, then key: String) -> AgentEffortPanelStep {
     guard let cursor = rows.firstIndex(where: \.isSelected) else { return .wait }
-    if cursor == target { return finishing ? .finish(key) : .press(key) }
+    if cursor == target { return .press(key) }
     let arrow = target > cursor ? Self.down : Self.up
     return .press(String(repeating: arrow, count: abs(target - cursor)))
   }
