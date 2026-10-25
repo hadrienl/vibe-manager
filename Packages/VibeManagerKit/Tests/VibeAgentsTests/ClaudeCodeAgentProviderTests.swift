@@ -305,4 +305,27 @@ struct ClaudeCodeAuthenticationStatusTests {
         in: ProbeResult(exitCode: 0, standardError: #"{"loggedIn":true}"#)) == true
     )
   }
+
+  /// #419: `auth login` signs a subscription in; the CLI's `/login` a Console account; nothing
+  /// a key, a token or a provider of the environment.
+  @Test("How the account is signed in again is read from its method")
+  func signInRoute() {
+    func route(_ json: String) -> AgentSignInRoute {
+      ClaudeCodeAuthenticationStatus.signInRoute(in: json)
+    }
+    #expect(
+      route(#"{"loggedIn":true,"authMethod":"claude.ai","apiProvider":"firstParty"}"#) == .browser)
+    #expect(route(#"{"loggedIn":false,"authMethod":"none"}"#) == .browser)
+    #expect(
+      route(#"{"loggedIn":true,"authMethod":"api_key","apiKeySource":"/login managed key"}"#)
+        == .terminal)
+    #expect(
+      route(#"{"loggedIn":true,"authMethod":"api_key","apiKeySource":"ANTHROPIC_API_KEY"}"#)
+        == .elsewhere)
+    #expect(
+      route(#"{"loggedIn":true,"authMethod":"third_party","apiProvider":"bedrock"}"#) == .elsewhere)
+    #expect(route(#"{"loggedIn":true,"authMethod":"oauth_token"}"#) == .elsewhere)
+    #expect(route(#"{"loggedIn":true,"authMethod":"something_new"}"#) == .terminal)
+    #expect(route("not json") == .browser)
+  }
 }

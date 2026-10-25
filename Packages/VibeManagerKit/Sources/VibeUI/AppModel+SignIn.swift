@@ -31,7 +31,8 @@ extension AppModel {
   /// on it shows the same one.
   public func signIn(from id: SessionID) {
     guard let provider = agentProvider(of: id), signingInAgents.contains(provider),
-      signInTasks[provider] == nil, let agents
+      signInTasks[provider] == nil, signInRoutes[provider]?.route == .browser,
+      let agents
     else { return }
     signIns[provider] = .running
     publishSignIns()
@@ -113,10 +114,17 @@ extension AppModel {
     guard let launcher, let session = sessions.first(where: { $0.id == id }),
       isStillStoppedOnSignIn(id)
     else { return }
-    let prompt = await conversations.entries(of: session).flatMap(
-      ConversationEntry.promptFailedOnSignIn(in:))
-    guard let screen = await launcher.screen(of: id), isStillStoppedOnSignIn(id) else { return }
-    guard AgentUpdateRestartReadiness.promptIsEmpty(screen: screen),
+    let entries = await conversations.entries(of: session)
+    // A sign-in that expired once the agent was at work leaves no prompt to hand back: it is
+    // told to go on from where it stopped (#419).
+    let prompt =
+      entries.flatMap(ConversationEntry.promptFailedOnSignIn(in:))
+      ?? (entries.map(ConversationEntry.turnFailedOnSignInMidway(in:)) == true
+        ? Self.continuePrompt : nil)
+    guard let screen = await launcher.screen(of: id) else { return }
+    let runsInBackground = await runsBackgroundWork(id)
+    guard isStillStoppedOnSignIn(id) else { return }
+    guard AgentUpdateRestartReadiness.promptIsEmpty(screen: screen), !runsInBackground,
       !AgentUpdateRestartReadiness.runsInBackground(screen: screen)
     else {
       // Text the user typed, or work behind the prompt: theirs to resume when it is done.
@@ -126,6 +134,9 @@ extension AppModel {
     guard await restartInPlace(id), let prompt else { return }
     await typeBack(prompt, into: id)
   }
+
+  /// What a turn the sign-in stopped half way is resumed with (#419).
+  static let continuePrompt = "continue"
 
   /// The session still waits on its sign-in, and nothing else is at work on it.
   private func isStillStoppedOnSignIn(_ id: SessionID) -> Bool {
@@ -165,9 +176,28 @@ extension AppModel {
   }
 
   func publishSignIn(for id: SessionID) {
+    if let request = signInRequest(of: id), let provider = agentProvider(of: id) {
+      lookUpSignInRoute(of: provider, after: request.receivedAt)
+    }
     guard let model = conversations.existingModel(for: id) else { return }
     let notice = signInNotice(for: id)
     if model.signIn != notice { model.signIn = notice }
+  }
+
+  /// Asks the CLI how its account is signed in again, once per expiry: the account may have
+  /// changed since the last one.
+  func lookUpSignInRoute(of provider: AgentProviderID, after expiry: Date) {
+    guard (signInRoutes[provider]?.at ?? .distantPast) < expiry,
+      signInRouteLookups.insert(provider).inserted, let agents
+    else { return }
+    Task { [weak self] in
+      let route =
+        await (agents.provider(id: provider) as? any AgentSigningIn)?.signInRoute() ?? .browser
+      guard let self else { return }
+      self.signInRouteLookups.remove(provider)
+      self.signInRoutes[provider] = (route, Date())
+      self.publishSignIns()
+    }
   }
 
   func signInNotice(for id: SessionID) -> ConversationSignIn? {
@@ -184,19 +214,27 @@ extension AppModel {
       return ConversationSignIn(agentName: name, state: .resuming)
     }
     guard let request = signInRequest(of: id) else { return nil }
+    let route: ConversationSignIn.Route =
+      switch signInRoutes[provider]?.route {
+      case .terminal?: .terminal
+      case .elsewhere?: .elsewhere
+      case .browser?: .browser
+      case nil: .unknown
+      }
     switch signIns[provider] {
     case .running?:
-      return ConversationSignIn(agentName: name, state: .signingIn)
+      return ConversationSignIn(agentName: name, state: .signingIn, route: route)
     case .failed(let detail, let at)? where at > request.receivedAt:
-      return ConversationSignIn(agentName: name, state: .failed(detail: detail))
+      return ConversationSignIn(agentName: name, state: .failed(detail: detail), route: route)
     case .failed?, nil:
       if let signedIn = signedInAt[provider], signedIn > request.receivedAt {
         return ConversationSignIn(
           agentName: name,
           state: .signedIn(
-            canResume: canRestartInPlace(id), textWaiting: signInTextWaiting.contains(id)))
+            canResume: canRestartInPlace(id), textWaiting: signInTextWaiting.contains(id)),
+          route: route)
       }
-      return ConversationSignIn(agentName: name, state: .expired)
+      return ConversationSignIn(agentName: name, state: .expired, route: route)
     }
   }
 }

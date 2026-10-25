@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  What the generated Info.plist cannot hold (#347): the background mode CloudKit's silent pushes
+  wake the application with, which has no INFOPLIST_KEY_ setting, and the CloudKit environment the
+  entitlements name, for the debug screen to say.
+-->
+<plist version="1.0">
+<dict>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	<key>VibeCloudKitEnvironment</key>
+	<string>$(VIBE_CLOUDKIT_ENVIRONMENT)</string>
+</dict>
+</plist>

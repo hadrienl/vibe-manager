@@ -39773,6 +39773,107 @@
         }
       }
     },
+    "Added %@" : {
+      "comment" : "When an iPhone was first admitted; %@ is a date.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouté le %@"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أُضيف في %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hinzugefügt am %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadido el %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "जोड़ा गया: %@"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiunto il %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "追加日: %@"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추가됨: %@"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Toegevoegd op %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dodano %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionado em %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавлено: %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eklenme: %@"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додано: %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加于 %@"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "加入於 %@"
+          }
+        }
+      }
+    },
     "Address" : {
       "localizations" : {
         "ar" : {
@@ -58849,6 +58950,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "衝突"
+          }
+        }
+      }
+    },
+    "Connected" : {
+      "comment" : "An iPhone of the companion, connected now.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecté"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متصل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectado"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कनेक्टेड"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connesso"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続済み"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "연결됨"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verbonden"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Połączono"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conectado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключено"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bağlı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підключено"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已连接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已連線"
           }
         }
       }
@@ -84763,6 +84965,107 @@
         }
       }
     },
+    "It can no longer connect to this Mac. Opening Vibe Companion on it again adds it back." : {
+      "comment" : "Explains removing an iPhone.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne pourra plus se connecter à ce Mac. Rouvrir Vibe Companion dessus le rajoute."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لن يتمكن بعد الآن من الاتصال بهذا الـ Mac. يؤدي فتح Vibe Companion عليه مرة أخرى إلى إضافته من جديد."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Es kann sich nicht mehr mit diesem Mac verbinden. Wenn du Vibe Companion darauf erneut öffnest, wird es wieder hinzugefügt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ya no podrá conectarse a este Mac. Si vuelves a abrir Vibe Companion en él, se añadirá de nuevo."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "वह अब इस Mac से कनेक्ट नहीं हो पाएगा। उस पर Vibe Companion दोबारा खोलने से वह वापस जुड़ जाता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non potrà più connettersi a questo Mac. Riaprendo Vibe Companion su di esso, verrà aggiunto di nuovo."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacに接続できなくなります。そのiPhoneでVibe Companionをもう一度開くと、再び追加されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "더 이상 이 Mac에 연결할 수 없습니다. 해당 기기에서 Vibe Companion을 다시 열면 다시 추가됩니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze kan geen verbinding meer maken met deze Mac. Als je Vibe Companion er opnieuw op opent, wordt hij weer toegevoegd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie będzie już mógł połączyć się z tym Makiem. Ponowne otwarcie na nim Vibe Companion doda go z powrotem."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ele não poderá mais se conectar a este Mac. Abrir o Vibe Companion nele novamente o adiciona de volta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Он больше не сможет подключаться к этому Mac. Если снова открыть на нём Vibe Companion, он будет добавлен заново."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Artık bu Mac’e bağlanamaz. Üzerinde Vibe Companion’ı yeniden açmak onu geri ekler."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Він більше не зможе підключатися до цього Mac. Якщо знову відкрити на ньому Vibe Companion, його буде додано знову."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它将无法再连接到这台 Mac。在其上再次打开 Vibe Companion 即可重新添加。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "它將無法再連線到這部 Mac。在其上再次打開 Vibe Companion 即可重新加入。"
+          }
+        }
+      }
+    },
     "It cannot be recovered. Export it first to keep it." : {
       "localizations" : {
         "ar" : {
@@ -109342,6 +109645,107 @@
         }
       }
     },
+    "Only the iPhones of your iCloud account can connect. Remove one you gave away or lost: it can no longer reach this Mac." : {
+      "comment" : "Settings › iPhone Companion: footer of the iPhones.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seuls les iPhone de votre compte iCloud peuvent se connecter. Retirez celui que vous avez donné ou perdu : il ne pourra plus accéder à ce Mac."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يمكن فقط لأجهزة iPhone المرتبطة بحساب iCloud الخاص بك الاتصال. أزِل الجهاز الذي أعطيته لغيرك أو فقدته: لن يتمكن بعد ذلك من الوصول إلى هذا الـ Mac."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur die iPhones deines iCloud-Accounts können sich verbinden. Entferne eines, das du weitergegeben oder verloren hast: Es kann diesen Mac dann nicht mehr erreichen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo pueden conectarse los iPhone de tu cuenta de iCloud. Elimina el que hayas regalado o perdido: ya no podrá acceder a este Mac."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "केवल आपके iCloud खाते के iPhone ही कनेक्ट हो सकते हैं। जो iPhone आपने किसी को दे दिया या खो दिया हो, उसे हटा दें: वह इस Mac तक नहीं पहुँच पाएगा।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo gli iPhone del tuo account iCloud possono connettersi. Rimuovi quello che hai regalato o perso: non potrà più raggiungere questo Mac."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "接続できるのは、お使いのiCloudアカウントのiPhoneだけです。譲渡または紛失したiPhoneは削除してください。そのiPhoneはこのMacにアクセスできなくなります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iCloud 계정의 iPhone만 연결할 수 있습니다. 양도했거나 분실한 iPhone은 제거하세요. 해당 iPhone은 더 이상 이 Mac에 접근할 수 없습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alleen de iPhones van je iCloud-account kunnen verbinding maken. Verwijder een iPhone die je hebt weggegeven of kwijt bent: die heeft dan geen toegang meer tot deze Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Połączyć mogą się tylko iPhone’y z Twojego konta iCloud. Usuń ten, który oddałeś(-aś) lub zgubiłeś(-aś): nie będzie już miał dostępu do tego Maca."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Somente os iPhones da sua conta do iCloud podem se conectar. Remova um que você deu ou perdeu: ele não poderá mais acessar este Mac."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Подключаться могут только iPhone из вашей учётной записи iCloud. Удалите тот, который вы отдали или потеряли: он больше не сможет получить доступ к этому Mac."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yalnızca iCloud hesabınızdaki iPhone’lar bağlanabilir. Birine verdiğiniz veya kaybettiğiniz bir iPhone’u kaldırın: artık bu Mac’e erişemez."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Підключатися можуть лише iPhone з вашого облікового запису iCloud. Видаліть той, який ви віддали або втратили: він більше не матиме доступу до цього Mac."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有登录你 iCloud 账户的 iPhone 才能连接。请移除你已送人或丢失的 iPhone：它将无法再访问这台 Mac。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "只有登入你 iCloud 帳號的 iPhone 才能連線。請移除你已送人或遺失的 iPhone：它將無法再存取這部 Mac。"
+          }
+        }
+      }
+    },
     "Open %@" : {
       "comment" : "Opens a link of the summary; the URL or its short name.",
       "localizations" : {
@@ -110242,6 +110646,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "打開系統設定…"
+          }
+        }
+      }
+    },
+    "Open Vibe Companion on an iPhone signed in to the same iCloud account: it appears here." : {
+      "comment" : "Settings › iPhone Companion: no iPhone yet.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Vibe Companion sur un iPhone connecté au même compte iCloud : il apparaît ici."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "افتح Vibe Companion على iPhone مسجَّل الدخول بحساب iCloud نفسه: سيظهر هنا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Öffne Vibe Companion auf einem iPhone, das mit demselben iCloud-Account angemeldet ist: Es erscheint dann hier."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abre Vibe Companion en un iPhone con la sesión iniciada en la misma cuenta de iCloud: aparecerá aquí."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "उसी iCloud खाते में साइन इन किए हुए iPhone पर Vibe Companion खोलें: वह यहाँ दिखाई देगा।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apri Vibe Companion su un iPhone connesso allo stesso account iCloud: apparirà qui."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じiCloudアカウントでサインインしているiPhoneでVibe Companionを開くと、ここに表示されます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 iCloud 계정으로 로그인한 iPhone에서 Vibe Companion을 열면 여기에 나타납니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Open Vibe Companion op een iPhone die is ingelogd met hetzelfde iCloud-account: de iPhone verschijnt dan hier."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otwórz Vibe Companion na iPhonie zalogowanym na to samo konto iCloud: pojawi się tutaj."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Abra o Vibe Companion em um iPhone conectado à mesma conta do iCloud: ele aparecerá aqui."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Откройте Vibe Companion на iPhone, на котором выполнен вход в ту же учётную запись iCloud: он появится здесь."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aynı iCloud hesabında oturum açmış bir iPhone’da Vibe Companion’ı açın: burada görünür."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Відкрийте Vibe Companion на iPhone, на якому виконано вхід в той самий обліковий запис iCloud: він з’явиться тут."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在登录了同一 iCloud 账户的 iPhone 上打开 Vibe Companion，它就会出现在这里。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在登入同一個 iCloud 帳號的 iPhone 上打開 Vibe Companion，它就會出現在這裡。"
           }
         }
       }
@@ -117782,6 +118287,107 @@
         }
       }
     },
+    "Ready: your iPhones can connect" : {
+      "comment" : "The companion's agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prêt : vos iPhone peuvent se connecter"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جاهز: يمكن لأجهزة iPhone الاتصال"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bereit: Deine iPhones können sich verbinden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Listo: tus iPhone pueden conectarse"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "तैयार: आपके iPhone कनेक्ट हो सकते हैं"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronto: i tuoi iPhone possono connettersi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "準備完了: iPhoneから接続できます"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "준비 완료: iPhone을 연결할 수 있습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klaar: je iPhones kunnen verbinding maken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gotowe: Twoje iPhone’y mogą się połączyć"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pronto: seus iPhones podem se conectar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово: ваши iPhone могут подключаться"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hazır: iPhone’larınız bağlanabilir"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Готово: ваші iPhone можуть підключатися"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已就绪：你的 iPhone 可以连接"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "已就緒：你的 iPhone 可以連線"
+          }
+        }
+      }
+    },
     "Reasoning" : {
       "localizations" : {
         "ar" : {
@@ -120801,6 +121407,208 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "要移除此頭像嗎？"
+          }
+        }
+      }
+    },
+    "Remove “%@”?" : {
+      "comment" : "Asks before removing an iPhone; %@ is its name.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer « %@ » ?"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هل تريد إزالة “%@”؟"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ entfernen?"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "¿Eliminar “%@”?"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” को हटाएँ?"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovere “%@”?"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を削除しますか？"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@”을(를) 제거하시겠습니까?"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” verwijderen?"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usunąć „%@”?"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover “%@”?"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить «%@»?"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” kaldırılsın mı?"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити «%@»?"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除“%@”吗？"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要移除「%@」嗎？"
+          }
+        }
+      }
+    },
+    "Remove…" : {
+      "comment" : "Removes an iPhone from the companion.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer…"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إزالة…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entfernen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar…"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "हटाएँ…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Rimuovi…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "削除…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "제거…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Verwijder…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuń…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Remover…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kaldır…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "移除…"
           }
         }
       }
@@ -137322,6 +138130,107 @@
         }
       }
     },
+    "Sign in to iCloud on this Mac to use the companion" : {
+      "comment" : "The companion's agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à iCloud sur ce Mac pour utiliser le compagnon"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سجّل الدخول إلى iCloud على هذا الـ Mac لاستخدام الرفيق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Melde dich auf diesem Mac bei iCloud an, um den Begleiter zu verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inicia sesión en iCloud en este Mac para usar el compañero"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कंपेनियन का उपयोग करने के लिए इस Mac पर iCloud में साइन इन करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi a iCloud su questo Mac per usare il companion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンパニオンを使うには、このMacでiCloudにサインインしてください"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "컴패니언을 사용하려면 이 Mac에서 iCloud에 로그인하세요"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Log op deze Mac in bij iCloud om de companion te gebruiken"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zaloguj się do iCloud na tym Macu, aby używać companiona"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Faça login no iCloud neste Mac para usar o companion"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Выполните вход в iCloud на этом Mac, чтобы использовать компаньон"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yardımcıyı kullanmak için bu Mac’te iCloud’da oturum açın"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Увійдіть в iCloud на цьому Mac, щоб використовувати компаньйон"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请在这台 Mac 上登录 iCloud 以使用伴侣功能"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請在這部 Mac 上登入 iCloud 以使用夥伴功能"
+          }
+        }
+      }
+    },
     "Signal" : {
       "comment" : "An alert sound shipped with the application: three short beeps.",
       "localizations" : {
@@ -145475,6 +146384,107 @@
         }
       }
     },
+    "The Vibe Companion app shows this Mac’s sessions, follows their conversations and answers their requests. It finds the Mac through your iCloud account, then talks to it directly." : {
+      "comment" : "Settings › iPhone Companion: under the switch.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’app Vibe Companion affiche les sessions de ce Mac, suit leurs conversations et répond à leurs demandes. Elle retrouve le Mac grâce à votre compte iCloud, puis communique directement avec lui."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعرض تطبيق Vibe Companion جلسات هذا Mac ويتابع محادثاتها ويردّ على طلباتها. يعثر على الـ Mac عبر حساب iCloud الخاص بك، ثم يتواصل معه مباشرةً."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die App Vibe Companion zeigt die Sitzungen dieses Mac an, verfolgt ihre Unterhaltungen und beantwortet ihre Anfragen. Sie findet den Mac über deinen iCloud-Account und kommuniziert dann direkt mit ihm."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La app Vibe Companion muestra las sesiones de este Mac, sigue sus conversaciones y responde a sus peticiones. Encuentra el Mac a través de tu cuenta de iCloud y después se comunica directamente con él."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Companion ऐप इस Mac के सेशन दिखाता है, उनकी बातचीत को फ़ॉलो करता है और उनके अनुरोधों का जवाब देता है। यह आपके iCloud खाते के ज़रिए Mac को ढूँढता है, फिर सीधे उससे संवाद करता है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’app Vibe Companion mostra le sessioni di questo Mac, segue le loro conversazioni e risponde alle loro richieste. Trova il Mac tramite il tuo account iCloud, poi comunica direttamente con lui."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Companionアプリは、このMacのセッションを表示し、その会話を追い、リクエストに応答します。iCloudアカウントを通じてMacを見つけ、その後は直接通信します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Companion 앱은 이 Mac의 세션을 보여 주고, 대화를 따라가며, 요청에 응답합니다. iCloud 계정을 통해 Mac을 찾은 다음 직접 통신합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De app Vibe Companion toont de sessies van deze Mac, volgt hun gesprekken en beantwoordt hun verzoeken. Hij vindt de Mac via je iCloud-account en communiceert daarna rechtstreeks met de Mac."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aplikacja Vibe Companion pokazuje sesje tego Maca, śledzi ich rozmowy i odpowiada na ich prośby. Znajduje Maca przez Twoje konto iCloud, a potem komunikuje się z nim bezpośrednio."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O app Vibe Companion mostra as sessões deste Mac, acompanha as conversas delas e responde às solicitações. Ele encontra o Mac pela sua conta do iCloud e depois se comunica diretamente com ele."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Приложение Vibe Companion показывает сеансы этого Mac, следит за их диалогами и отвечает на их запросы. Оно находит Mac через вашу учётную запись iCloud, а затем общается с ним напрямую."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Companion uygulaması bu Mac’in oturumlarını gösterir, sohbetlerini takip eder ve isteklerini yanıtlar. Mac’i iCloud hesabınız üzerinden bulur, ardından onunla doğrudan iletişim kurar."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Застосунок Vibe Companion показує сеанси цього Mac, стежить за їхніми розмовами та відповідає на їхні запити. Він знаходить Mac через ваш обліковий запис iCloud, а потім спілкується з ним напряму."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Companion App 会显示这台 Mac 的会话，跟进会话中的对话并回应其请求。它通过你的 iCloud 账户找到这台 Mac，然后直接与其通信。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Companion App 會顯示這部 Mac 的工作階段，追蹤其中的對話並回應其請求。它會透過你的 iCloud 帳號找到這部 Mac，然後直接與其通訊。"
+          }
+        }
+      }
+    },
     "The agent can open a page too, with its tab_open tool or `vibe browser open <url>`." : {
       "localizations" : {
         "ar" : {
@@ -152605,6 +153615,107 @@
         }
       }
     },
+    "The companion could not start" : {
+      "comment" : "The companion's agent.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le compagnon n’a pas pu démarrer"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تعذّر تشغيل الرفيق"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Begleiter konnte nicht gestartet werden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se ha podido iniciar el compañero"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कंपेनियन शुरू नहीं हो सका"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile avviare il companion"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンパニオンを起動できませんでした"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "컴패니언을 시작할 수 없습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De companion kon niet worden gestart"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie udało się uruchomić companiona"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foi possível iniciar o companion"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удалось запустить компаньон"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yardımcı başlatılamadı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдалося запустити компаньйон"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伴侣功能无法启动"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "夥伴功能無法啟動"
+          }
+        }
+      }
+    },
     "The composition is cancelled: nothing was changed." : {
       "comment" : "Said when the user cancels the composition of a sound.",
       "localizations" : {
@@ -155914,6 +157025,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法重新命名群組。"
+          }
+        }
+      }
+    },
+    "The iPhone companion needs a Mac with Apple silicon." : {
+      "comment" : "Settings › iPhone Companion: an Intel Mac.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le compagnon iPhone nécessite un Mac avec puce Apple."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يتطلب رفيق iPhone جهاز Mac بمعالج Apple silicon."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der iPhone-Begleiter benötigt einen Mac mit Apple Silicon."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El compañero para iPhone necesita un Mac con chip de Apple."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone कंपेनियन के लिए Apple सिलिकॉन वाला Mac चाहिए।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il companion per iPhone richiede un Mac con chip Apple."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneコンパニオンにはAppleシリコン搭載のMacが必要です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 컴패니언에는 Apple 실리콘이 탑재된 Mac이 필요합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De iPhone-companion vereist een Mac met Apple silicon."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Companion na iPhone’a wymaga Maca z układem Apple."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O companion para iPhone requer um Mac com chip Apple."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для компаньона iPhone нужен Mac с чипом Apple."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone yardımcısı, Apple silikonlu bir Mac gerektirir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Для компаньйона iPhone потрібен Mac із чипом Apple."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 伴侣需要搭载 Apple 芯片的 Mac。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 夥伴需要搭載 Apple 晶片的 Mac。"
           }
         }
       }
@@ -165535,6 +166747,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "此版本沒有用於檢查更新的密鑰，因此不會檢查更新。"
+          }
+        }
+      }
+    },
+    "This build of Vibe Manager does not include the companion." : {
+      "comment" : "Settings › iPhone Companion: a build without the companion.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette version de Vibe Manager n’inclut pas le compagnon."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يتضمن هذا الإصدار من Vibe Manager الرفيق."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Diese Version von Vibe Manager enthält den Begleiter nicht."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta versión de Vibe Manager no incluye el compañero."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager के इस बिल्ड में कंपेनियन शामिल नहीं है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa versione di Vibe Manager non include il companion."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このバージョンのVibe Managerにはコンパニオンが含まれていません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 버전의 Vibe Manager에는 컴패니언이 포함되어 있지 않습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze versie van Vibe Manager bevat de companion niet."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ta wersja Vibe Managera nie zawiera companiona."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta versão do Vibe Manager não inclui o companion."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта сборка Vibe Manager не включает компаньон."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager’ın bu sürümü yardımcıyı içermiyor."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ця збірка Vibe Manager не містить компаньйона."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本的 Vibe Manager 不包含伴侣功能。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此版本的 Vibe Manager 不包含夥伴功能。"
           }
         }
       }
@@ -177368,6 +178681,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "使用此聲音"
+          }
+        }
+      }
+    },
+    "Use Vibe Manager from your iPhone" : {
+      "comment" : "Settings › iPhone Companion: the switch that turns the companion on.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser Vibe Manager depuis votre iPhone"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "استخدم Vibe Manager من iPhone"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager auf deinem iPhone verwenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa Vibe Manager desde tu iPhone"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अपने iPhone से Vibe Manager का उपयोग करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usa Vibe Manager dal tuo iPhone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneからVibe Managerを使う"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone에서 Vibe Manager 사용"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gebruik Vibe Manager vanaf je iPhone"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Używaj Vibe Managera na iPhonie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Use o Vibe Manager no seu iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Использовать Vibe Manager с iPhone"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager’ı iPhone’unuzdan kullanın"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Використовувати Vibe Manager з iPhone"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 iPhone 上使用 Vibe Manager"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 iPhone 上使用 Vibe Manager"
           }
         }
       }
@@ -190380,6 +191794,208 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "綠色"
+          }
+        }
+      }
+    },
+    "iPhone Companion" : {
+      "comment" : "A page of the Settings window.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compagnon iPhone"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "رفيق iPhone"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-Begleiter"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compañero para iPhone"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone कंपेनियन"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Companion per iPhone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhoneコンパニオン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 컴패니언"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone-companion"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Companion na iPhone’a"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Companion para iPhone"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Компаньон для iPhone"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone Yardımcısı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Компаньйон для iPhone"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 伴侣"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone 夥伴"
+          }
+        }
+      }
+    },
+    "iPhones" : {
+      "comment" : "A section of Settings › iPhone Companion.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أجهزة iPhone"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhones"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhones"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’y"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhones"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone’lar"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
           }
         }
       }

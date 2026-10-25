@@ -29527,102 +29527,203 @@
         }
       }
     },
-    "Signed in. The session resumes, and its last message is sent again." : {
+    "Signed in. The session resumes where it stopped." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "تم تسجيل الدخول. تُستأنف الجلسة وتُرسل رسالتها الأخيرة من جديد."
+            "value" : "تم تسجيل الدخول. تُستأنف الجلسة من حيث توقفت."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Angemeldet. Die Sitzung wird fortgesetzt und ihre letzte Nachricht erneut gesendet."
+            "value" : "Angemeldet. Die Sitzung wird dort fortgesetzt, wo sie angehalten hat."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Sesión iniciada. La sesión se reanuda y su último mensaje se vuelve a enviar."
+            "value" : "Sesión iniciada. La sesión se reanuda donde se detuvo."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Connecté. La session reprend, et son dernier message est renvoyé."
+            "value" : "Connecté. La session reprend là où elle s’était arrêtée."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "साइन इन हो गया। सेशन फिर से शुरू होता है, और उसका आख़िरी संदेश दोबारा भेजा जाता है।"
+            "value" : "साइन इन हो गया। सेशन वहीं से फिर शुरू होता है जहाँ वह रुका था।"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Accesso effettuato. La sessione riprende e il suo ultimo messaggio viene inviato di nuovo."
+            "value" : "Accesso effettuato. La sessione riprende da dove si era fermata."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "サインインしました。セッションを再開し、最後のメッセージをもう一度送信します。"
+            "value" : "サインインしました。セッションは中断したところから再開します。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "로그인되었습니다. 세션이 재개되고 마지막 메시지가 다시 전송됩니다."
+            "value" : "로그인되었습니다. 세션이 멈춘 곳에서 재개됩니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aangemeld. De sessie wordt hervat en het laatste bericht opnieuw verstuurd."
+            "value" : "Aangemeld. De sessie gaat verder waar ze was gestopt."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Zalogowano. Sesja zostaje wznowiona, a jej ostatnia wiadomość wysłana ponownie."
+            "value" : "Zalogowano. Sesja zostaje wznowiona tam, gdzie się zatrzymała."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Conectado. A sessão é retomada e a última mensagem é enviada de novo."
+            "value" : "Conectado. A sessão é retomada de onde parou."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Вход выполнен. Сессия продолжается, её последнее сообщение отправляется снова."
+            "value" : "Вход выполнен. Сессия продолжается с того места, где остановилась."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Oturum açıldı. Oturum sürüyor ve son mesajı yeniden gönderiliyor."
+            "value" : "Oturum açıldı. Oturum kaldığı yerden sürüyor."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Вхід виконано. Сеанс продовжується, його останнє повідомлення надсилається знову."
+            "value" : "Вхід виконано. Сеанс продовжується з того місця, де зупинився."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已登录。会话将继续，并重新发送其最后一条消息。"
+            "value" : "已登录。会话将从中断处继续。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已登入。工作階段將繼續，並重新傳送其最後一則訊息。"
+            "value" : "已登入。工作階段將從中斷處繼續。"
+          }
+        }
+      }
+    },
+    "Signing in again does not change the API key or the provider %@ uses. Check them, then restart the session." : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا تُغيّر إعادة تسجيل الدخول مفتاح API أو المزوّد الذي يستخدمه %@. تحقّق منهما، ثم أعد تشغيل الجلسة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eine erneute Anmeldung ändert weder den API-Schlüssel noch den Anbieter, den %@ verwendet. Überprüfen Sie beide und starten Sie dann die Sitzung neu."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a iniciar sesión no cambia la clave de API ni el proveedor que usa %@. Compruébelos y, después, reinicie la sesión."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se reconnecter ne change ni la clé d’API ni le fournisseur qu’utilise %@. Vérifiez-les, puis redémarrez la session."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "फिर से साइन इन करने से %@ की API कुंजी या प्रदाता नहीं बदलता। उन्हें जाँचें, फिर सेशन फिर से शुरू करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedere di nuovo non cambia la chiave API né il provider che usa %@. Controllali, poi riavvia la sessione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度サインインしても、%@ が使う API キーやプロバイダは変わりません。それらを確認してから、セッションを再起動してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 로그인해도 %@이(가) 사용하는 API 키나 제공업체는 바뀌지 않습니다. 확인한 다음 세션을 다시 시작하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnieuw aanmelden verandert de API-sleutel of de provider die %@ gebruikt niet. Controleer ze en start de sessie daarna opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponowne zalogowanie nie zmienia klucza API ani dostawcy, z których korzysta %@. Sprawdź je, a potem uruchom sesję ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar de novo não muda a chave de API nem o provedor que o %@ usa. Verifique-os e depois reinicie a sessão."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторный вход не меняет ключ API или провайдера, которые использует %@. Проверьте их, затем перезапустите сессию."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yeniden oturum açmak, %@ uygulamasının kullandığı API anahtarını veya sağlayıcıyı değiştirmez. Bunları denetleyin, ardından oturumu yeniden başlatın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повторний вхід не змінює ключ API чи постачальника, які використовує %@. Перевірте їх, а потім перезапустіть сеанс."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登录不会更改 %@ 使用的 API 密钥或提供商。请检查它们，然后重新启动会话。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登入不會變更 %@ 使用的 API 金鑰或供應商。請檢查它們，然後重新啟動工作階段。"
           }
         }
       }

@@ -4,9 +4,9 @@ import VibeApplication
 import VibeDomain
 
 /// What Open Quickly says, decided without a view so that it can be tested (#37).
-enum QuickOpenPresentation {
+public enum QuickOpenPresentation {
   /// Why a session is listed, in words, on the second line of its row.
-  static func reason(_ reason: QuickOpenReason) -> String? {
+  public static func reason(_ reason: QuickOpenReason) -> String? {
     switch reason {
     case .resource(let kind, let label, let context, let involvement):
       let resource = described(kind: kind, label: label, context: context, involvement: involvement)

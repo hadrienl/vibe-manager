@@ -417,6 +417,9 @@ public final class AppModel {
   public internal(set) var resumingAfterSignIn: Set<SessionID> = []
   /// Sessions the sign-in left alone: text waited in their prompt, or work behind it.
   var signInTextWaiting: Set<SessionID> = []
+  /// How each agent's account is signed in again, and when that was asked (#419).
+  var signInRoutes: [AgentProviderID: (route: AgentSignInRoute, at: Date)] = [:]
+  var signInRouteLookups: Set<AgentProviderID> = []
 
   /// When each resumed conversation was handed to its agent, kept only for as long as it takes
   /// to tell a refused resume from an ordinary exit.
@@ -731,6 +734,8 @@ public final class AppModel {
   public let appearancePalette: SessionAppearancePaletteModel
   /// Coordinators and their children (#352): settings, traces, wake-ups, who calls the user.
   public let coordination: CoordinationModel
+  /// The iPhone companion (#397), when this build carries it.
+  public var companion: MobileCompanionModel?
 
   // MARK: Identity (#183)
 

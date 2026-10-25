@@ -102,12 +102,26 @@ public struct ConversationSignIn: Equatable, Sendable {
     case resuming
   }
 
+  /// How the account is signed in again (#419): what the notice offers.
+  public enum Route: Equatable, Sendable {
+    /// Sign In, in the browser, and the CLI's own command in the terminal.
+    case browser
+    /// The CLI's own command in the terminal only.
+    case terminal
+    /// Nothing: a key or a provider set outside the CLI.
+    case elsewhere
+    /// Not known yet: the terminal only, until the CLI has said.
+    case unknown
+  }
+
   public let agentName: String
   public let state: State
+  public let route: Route
 
-  public init(agentName: String, state: State) {
+  public init(agentName: String, state: State, route: Route = .browser) {
     self.agentName = agentName
     self.state = state
+    self.route = route
   }
 }
 
@@ -475,7 +489,21 @@ public final class ConversationModel {
   /// The snapshot most recently received, laid out or not.
   private var latestSnapshot: ConversationSnapshot { heldSnapshot ?? snapshot }
 
+  /// Whether the window shows it, as its view last said.
+  @ObservationIgnored private var isShownInWindow = true
+  /// The phones showing it (#400): shown for them, whatever the window does, so that what is read
+  /// is laid out and published at once rather than held for later.
+  @ObservationIgnored public var remoteViewers = 0 {
+    didSet { applyShown() }
+  }
+
   public func setShown(_ shown: Bool) {
+    isShownInWindow = shown
+    applyShown()
+  }
+
+  private func applyShown() {
+    let shown = isShownInWindow || remoteViewers > 0
     guard shown != isShown else { return }
     isShown = shown
     shownOrder = Self.nextShownOrder()

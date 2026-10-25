@@ -250,6 +250,7 @@ struct SettingsSidebarContent {
     if model.browser != nil { tools.append(.webView) }
     tools.append(.templates)
     tools.append(.coordination)
+    if model.companion != nil { tools.append(.companion) }
     if model.dictation != nil { tools.append(.dictation) }
     if model.ticketTitles.canReadPages { tools.append(.tickets) }
     if model.archiveRules != nil { tools.append(.archiveRules) }
@@ -406,6 +407,10 @@ struct SettingsPageView: View {
       }
     case .coordination:
       CoordinationSettingsView(coordination: model.coordination)
+    case .companion:
+      if let companion = model.companion {
+        CompanionSettingsView(companion: companion)
+      }
     case .templates:
       PromptTemplatesView(
         model: model.templates, themes: model.conversations.themes,

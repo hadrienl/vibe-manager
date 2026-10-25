@@ -104,15 +104,19 @@ public enum AgentUpdateRestartReadiness {
   static let codexHints: Set<String> = ["Ask Codex to do anything", "Ask a follow-up question"]
 
   /// Whether the footer under the prompt counts work going on behind it — Claude Code's
-  /// `▶▶ auto mode on · 2 shells · ← 1 agent`. Only below the prompt's last rule: the same words
-  /// in what an agent wrote above it are not a footer. Without a rule — Codex — its last lines.
+  /// `▶▶ auto mode on · 2 shells`. Only below the prompt's last rule: the same words in what an
+  /// agent wrote above it are not a footer. Without a rule — Codex — its last lines.
+  ///
+  /// Its agents are not counted: Claude Code 2.1.299 keeps `← 1 agent` in sessions idle for days,
+  /// and kept every one from restarting. The sub-agents still at work are the conversation's
+  /// tray's to say (`runsSubagents`).
   public static func runsInBackground(screen: String) -> Bool {
     let lines = screen.components(separatedBy: "\n")
     let footer =
       lines.lastIndex(where: PromptInputRecognition.isRule).map { lines[($0 + 1)...] }
       ?? lines.suffix(3)
     return footer.contains { line in
-      line.contains(/\b\d+ (shells?|agents?|(background )?(tasks?|terminals?))\b/)
+      line.contains(/\b\d+ (shells?|(background )?(tasks?|terminals?))\b/)
     }
   }
 }
