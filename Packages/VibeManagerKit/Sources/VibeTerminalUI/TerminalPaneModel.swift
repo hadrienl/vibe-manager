@@ -381,7 +381,8 @@ public final class TerminalPaneModel {
   @ObservationIgnored public private(set) var lastKeyboardInputAt: ContinuousClock.Instant?
 
   /// Told each time the user types in the terminal or sends from the composer — never of what the
-  /// application types: a coordinator that called them has been answered (#417).
+  /// application types, nor of what the terminal answers the program of itself: a coordinator
+  /// that called them has been answered (#417).
   @ObservationIgnored public var onKeyboardInput: (() -> Void)?
 
   public func noteKeyboardInput() {

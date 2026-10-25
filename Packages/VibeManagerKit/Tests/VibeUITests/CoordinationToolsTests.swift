@@ -297,6 +297,9 @@ struct CoordinationToolsTests {
     let model = await makeModel()
     let center = NotificationCenter()
     model.observeApplicationActivation(in: center)
+    // A second window asks again: still one observer of each.
+    model.observeApplicationActivation(in: center)
+    #expect(model.activationObservers.count == 2)
     model.select(parent.id)
     center.post(name: NSApplication.willResignActiveNotification, object: nil)
     let away = await call(model, "notify_user", ["message": "Approve the plan."], as: parent.id)

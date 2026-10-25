@@ -72,8 +72,10 @@ extension AppModel {
 
   /// Follows the application coming to the front and leaving it. Not the scene's phase: on macOS
   /// it does not change when the user comes back from another application, and the application
-  /// believed itself behind for good after the first switch (#417).
+  /// believed itself behind for good after the first switch (#417). Once for the model: each
+  /// window that opens asks again, and a block's observer stays until it is removed.
   public func observeApplicationActivation(in center: NotificationCenter = .default) {
+    guard activationObservers.isEmpty else { return }
     activationObservers = [
       center.addObserver(
         forName: NSApplication.didBecomeActiveNotification, object: nil, queue: nil
