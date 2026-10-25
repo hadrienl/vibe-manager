@@ -377,7 +377,7 @@ struct SessionDiagnosticsTests {
   func refusalIsNoted() async {
     let log = RecordingDiagnosticLog()
     var archived = storedSession()
-    try? archived.archive(at: Date())
+    try? archived.archive(at: Date(), cause: .user)
     let repository = MutableRepository(sessions: [archived])
     let launcher = SessionLauncher(
       supervisor: SpySupervisor(),

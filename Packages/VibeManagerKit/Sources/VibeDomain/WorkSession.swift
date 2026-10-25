@@ -338,6 +338,8 @@ public enum WorkSessionValidationError: Error, Equatable, Sendable {
   case emptyConversationTheme
   /// A session said to be the child of itself (#352).
   case selfCoordinated
+  /// A history of statuses that does not lead to where the session stands (#406).
+  case invalidStatusHistory
 }
 
 public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
@@ -370,6 +372,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
   public var conversationTheme: String?
   /// Whether it coordinates other sessions, or is one of them (#352). `nil` for most sessions.
   public var coordination: SessionCoordination?
+  /// Every status it went through, and why (#406). Written by `setTaskStatus`, `archive` and
+  /// `restore`, the only ways its status changes.
+  public private(set) var statusHistory: SessionStatusHistory
 
   public var status: SessionStatus {
     lifecycle.status
@@ -423,6 +428,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     rank: Int = 0,
     conversationTheme: String? = nil,
     coordination: SessionCoordination? = nil,
+    /// `nil`, or a history that does not lead to the session's status, is rebuilt from the
+    /// lifecycle: a history that does not hold never keeps a session from being read.
+    statusHistory: SessionStatusHistory? = nil,
     /// See `SessionLifecycle.init`: whether a `nil` start is inferred or means never started.
     infersStartedAt: Bool = true
   ) {
@@ -451,6 +459,11 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     self.rank = rank
     self.conversationTheme = conversationTheme
     self.coordination = coordination
+    if let statusHistory, statusHistory.isConsistent(with: self.taskStatus) {
+      self.statusHistory = statusHistory
+    } else {
+      self.statusHistory = .reconstructed(lifecycle: lifecycle, taskStatus: self.taskStatus)
+    }
   }
 
   public mutating func close(at date: Date) throws {
@@ -461,28 +474,39 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     try lifecycle.reopen(at: date)
   }
 
-  public mutating func archive(at date: Date) throws {
+  public mutating func archive(at date: Date, cause: SessionStatusChange.Cause) throws {
     try lifecycle.archive(at: date)
-    taskStatus = .archived
+    record(.archived, at: date, cause: cause)
   }
 
   /// An unarchived session comes back finished: it was archived from Done, or on its way out.
-  public mutating func restore(at date: Date) throws {
+  public mutating func restore(at date: Date, cause: SessionStatusChange.Cause) throws {
     try lifecycle.restore(at: date)
-    taskStatus = .done
+    record(.done, at: date, cause: cause)
   }
 
   /// Moves the session between the four columns. The process is left alone: marking a task done
   /// does not stop an agent that may still be writing its summary.
   ///
   /// The session is touched, so that it arrives at the top of a column sorted by last activity.
-  public mutating func setTaskStatus(_ newStatus: SessionTaskStatus, at date: Date) throws {
+  public mutating func setTaskStatus(
+    _ newStatus: SessionTaskStatus, at date: Date, cause: SessionStatusChange.Cause
+  ) throws {
     guard newStatus != taskStatus else { return }
     guard newStatus != .archived, taskStatus != .archived else {
       throw SessionTaskStatusError.requiresLifecycleChange(from: taskStatus, to: newStatus)
     }
     try lifecycle.touch(at: date)
+    record(newStatus, at: date, cause: cause)
+  }
+
+  private mutating func record(
+    _ newStatus: SessionTaskStatus, at date: Date, cause: SessionStatusChange.Cause
+  ) {
+    let previous = taskStatus
     taskStatus = newStatus
+    guard previous != newStatus else { return }
+    statusHistory.append(from: previous, to: newStatus, at: date, cause: cause)
   }
 
   /// Every conversation this session has had, oldest first — the agents it was switched away from,
@@ -573,6 +597,9 @@ public struct WorkSession: Identifiable, Hashable, Codable, Sendable {
     }
     guard coordination != .child(of: id) else {
       throw WorkSessionValidationError.selfCoordinated
+    }
+    guard statusHistory.isConsistent(with: taskStatus) else {
+      throw WorkSessionValidationError.invalidStatusHistory
     }
   }
 

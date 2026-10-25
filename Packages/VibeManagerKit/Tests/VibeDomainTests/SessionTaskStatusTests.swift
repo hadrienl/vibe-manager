@@ -46,7 +46,7 @@ struct SessionTaskStatusTests {
   @Test("Moving between columns leaves the process alone and touches the session")
   func movingTouchesOnly() throws {
     var subject = session(.active)
-    try subject.setTaskStatus(.waiting, at: date.addingTimeInterval(60))
+    try subject.setTaskStatus(.waiting, at: date.addingTimeInterval(60), cause: .user)
 
     #expect(subject.taskStatus == .waiting)
     #expect(subject.status == .active)
@@ -58,16 +58,16 @@ struct SessionTaskStatusTests {
   func archivedGoesThroughTheLifecycle() throws {
     var subject = session(.closed)
     #expect(throws: SessionTaskStatusError.requiresLifecycleChange(from: .done, to: .archived)) {
-      try subject.setTaskStatus(.archived, at: date)
+      try subject.setTaskStatus(.archived, at: date, cause: .user)
     }
 
-    try subject.archive(at: date.addingTimeInterval(10))
+    try subject.archive(at: date.addingTimeInterval(10), cause: .user)
     #expect(subject.taskStatus == .archived)
     #expect(throws: SessionTaskStatusError.requiresLifecycleChange(from: .archived, to: .todo)) {
-      try subject.setTaskStatus(.todo, at: date.addingTimeInterval(20))
+      try subject.setTaskStatus(.todo, at: date.addingTimeInterval(20), cause: .user)
     }
 
-    try subject.restore(at: date.addingTimeInterval(30))
+    try subject.restore(at: date.addingTimeInterval(30), cause: .user)
     #expect(subject.taskStatus == .done)
     #expect(subject.status == .closed)
   }
@@ -75,7 +75,7 @@ struct SessionTaskStatusTests {
   @Test("Closing and reopening the agent keep the status")
   func processDoesNotMoveTheTask() throws {
     var subject = session(.active)
-    try subject.setTaskStatus(.waiting, at: date)
+    try subject.setTaskStatus(.waiting, at: date, cause: .user)
     try subject.close(at: date.addingTimeInterval(10))
     #expect(subject.taskStatus == .waiting)
     try subject.reopen(at: date.addingTimeInterval(20))

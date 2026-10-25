@@ -38,8 +38,11 @@ public struct ArchiveSession: Sendable {
     close = CloseSession(repository: repository, runtime: runtime, clock: clock)
   }
 
+  /// - Parameter cause: who archives it, for the session's history (#406): the user, or a rule.
   @discardableResult
-  public func callAsFunction(id: SessionID) async throws -> SessionArchival {
+  public func callAsFunction(
+    id: SessionID, cause: SessionStatusChange.Cause = .user
+  ) async throws -> SessionArchival {
     // Stops the process and writes `closed` first, so the archived status is only ever reached
     // from a state where nothing is running.
     let closure = try await close(id: id)
@@ -53,7 +56,7 @@ public struct ArchiveSession: Sendable {
       // A session relaunched between the close and here refuses the transition, and the refusal
       // is raised rather than swallowed: reporting a success would release the pane under a
       // session the store still lists as active, leaving it running nothing.
-      try session.archive(at: max(now, session.updatedAt))
+      try session.archive(at: max(now, session.updatedAt), cause: cause)
     }
 
     guard let updated else { throw ChangeSessionStatusError.sessionNotFound(id) }
@@ -83,12 +86,15 @@ public struct RestoreSession: Sendable {
     changeStatus = ChangeSessionStatus(repository: repository, clock: clock)
   }
 
+  /// - Parameter cause: `.unarchive` from the archive, `.undo` when ⌘Z takes an archive back.
   @discardableResult
-  public func callAsFunction(id: SessionID) async throws -> WorkSession {
+  public func callAsFunction(
+    id: SessionID, cause: SessionStatusChange.Cause = .unarchive
+  ) async throws -> WorkSession {
     guard let current = try await repository.session(id: id) else {
       throw ChangeSessionStatusError.sessionNotFound(id)
     }
     guard current.status == .archived else { return current }
-    return try await changeStatus(id: id, action: .restore)
+    return try await changeStatus(id: id, action: .restore, cause: cause)
   }
 }

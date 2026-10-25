@@ -334,7 +334,7 @@ struct AgentSwitchTests {
     let (plan, repository) = subject(stored)
     let planned = try await plan(id: stored.id, to: AgentTarget(providerID: "codex"))
     _ = try await repository.mutate(id: stored.id) {
-      try $0.archive(at: Date(timeIntervalSince1970: 1_700_000_200))
+      try $0.archive(at: Date(timeIntervalSince1970: 1_700_000_200), cause: .user)
     }
 
     await #expect(throws: AgentSwitchRefusal.sessionMoved) {

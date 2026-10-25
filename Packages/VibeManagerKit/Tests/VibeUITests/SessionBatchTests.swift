@@ -550,7 +550,7 @@ struct SessionBatchTests {
     var archived: [WorkSession] = []
     for index in 1...2 {
       var stored = session("A\(index)", updatedAt: TimeInterval(300 - index))
-      try? stored.archive(at: Date(timeIntervalSince1970: 500))
+      try? stored.archive(at: Date(timeIntervalSince1970: 500), cause: .user)
       archived.append(stored)
     }
     let (model, _, repository) = makeWorkspace(archived)

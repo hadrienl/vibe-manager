@@ -418,7 +418,7 @@ struct SessionDropDeliveryTests {
   func sweep() async throws {
     let active = session(path: "/tmp")
     var archived = session(path: "/tmp")
-    try archived.archive(at: Date(timeIntervalSince1970: 2))
+    try archived.archive(at: Date(timeIntervalSince1970: 2), cause: .user)
     let store = RecordingDropStore()
     let model = AppModel(
       repository: WorkspaceRepository(sessions: [active, archived]),

@@ -81,7 +81,7 @@ struct TaskStatusStoreTests {
     var session = WorkSession(
       name: "Waiting on review", status: .active, createdAt: Date(timeIntervalSince1970: 100),
       updatedAt: Date(timeIntervalSince1970: 100), startedAt: Date(timeIntervalSince1970: 100))
-    try session.setTaskStatus(.waiting, at: Date(timeIntervalSince1970: 200))
+    try session.setTaskStatus(.waiting, at: Date(timeIntervalSince1970: 200), cause: .user)
     let codec = SessionStoreCodec()
 
     let data = try codec.encode(sessions: [session])
@@ -90,7 +90,7 @@ struct TaskStatusStoreTests {
     #expect(decoded.sessions == [session])
     #expect(decoded.requiresRewrite == false)
     let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-    #expect(object["schemaVersion"] as? Int == 10)
+    #expect(object["schemaVersion"] as? Int == 11)
   }
 
   @Test("A status written by a later build is read from the lifecycle")
@@ -131,8 +131,8 @@ struct TaskStatusStoreTests {
     try await repository.save(planned)
 
     let change = ChangeTaskStatus(repository: repository)
-    try await change(id: planned.id, to: .waiting)
-    try await change(id: planned.id, to: .todo)
+    try await change(id: planned.id, to: .waiting, cause: .user)
+    try await change(id: planned.id, to: .todo, cause: .user)
 
     let stored = try #require(try await repository.session(id: planned.id))
     #expect(stored.taskStatus == .todo)

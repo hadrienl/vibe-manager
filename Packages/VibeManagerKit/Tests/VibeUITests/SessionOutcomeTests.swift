@@ -196,7 +196,7 @@ struct SessionOutcomeTests {
   func opensArchived() async {
     let kept = session("Kept")
     var archived = session("Archived", in: .done)
-    try? archived.archive(at: Date(timeIntervalSince1970: 500))
+    try? archived.archive(at: Date(timeIntervalSince1970: 500), cause: .user)
     let (model, _) = await makeModel([kept, archived])
     model.select(kept.id)
 
