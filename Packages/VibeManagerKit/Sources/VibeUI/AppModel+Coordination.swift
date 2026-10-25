@@ -139,8 +139,9 @@ extension AppModel {
     await coordination.loadTrace(of: id)
   }
 
-  /// The session in front of the user changed: a coordinator that called them has been answered.
-  func coordinationSessionShown(_ id: SessionID?) {
+  /// A coordinator that called the user has been answered: its session came in front of them, or
+  /// they wrote to it — from its terminal, its composer or the phone (#417).
+  func coordinationCallAnswered(_ id: SessionID?) {
     guard let id, coordination.calls[id] != nil else { return }
     coordination.calls[id] = nil
   }

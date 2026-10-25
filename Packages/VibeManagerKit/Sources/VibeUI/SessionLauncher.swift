@@ -99,6 +99,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   public var openLink: (@MainActor (SessionID, URL, LinkGesture) -> Void)?
   /// Whether a session has a web view, for the menu of a link in its terminal (#186).
   public var hasWebView: (@MainActor (SessionID) -> Bool)?
+  /// Told of what the user types into a session's terminal, or sends from its composer (#417).
+  public var keyboardInput: (@MainActor (SessionID) -> Void)?
 
   /// Told of each agent process as soon as it is known — started, or adopted from the terminal
   /// host — so that what it is can be read before its number could be given to another (#69).
@@ -790,6 +792,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       self?.openLink?(id, url, gesture)
     }
     pane.hasWebView = { [weak self] in self?.hasWebView?(id) ?? false }
+    pane.onKeyboardInput = { [weak self] in self?.keyboardInput?(id) }
     panes[id] = pane
     return pane
   }

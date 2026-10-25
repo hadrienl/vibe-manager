@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import VibeApplication
 import VibeDomain
@@ -69,6 +70,24 @@ extension AppModel {
     Task { await answerRequest.readStartupDialog(id) }
   }
 
+  /// Follows the application coming to the front and leaving it. Not the scene's phase: on macOS
+  /// it does not change when the user comes back from another application, and the application
+  /// believed itself behind for good after the first switch (#417).
+  public func observeApplicationActivation(in center: NotificationCenter = .default) {
+    activationObservers = [
+      center.addObserver(
+        forName: NSApplication.didBecomeActiveNotification, object: nil, queue: nil
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.applicationDidBecomeActive() }
+      },
+      center.addObserver(
+        forName: NSApplication.willResignActiveNotification, object: nil, queue: nil
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.applicationWillResignActive() }
+      },
+    ]
+  }
+
   /// The main window was hidden, minimised or covered — or shown again.
   public func mainWindowVisibilityChanged(_ isVisible: Bool) {
     guard isMainWindowVisible != isVisible else { return }
@@ -81,7 +100,7 @@ extension AppModel {
   func updateVisibleSession() {
     let visible = isApplicationActive && isMainWindowVisible ? selectedSessionID : nil
     // A coordinator that called the user is answered once it is in front of them (#352).
-    coordinationSessionShown(visible)
+    coordinationCallAnswered(visible)
     guard let activityTracker else { return }
     let previous = visibleSessionUpdate
     visibleSessionUpdate = Task {
