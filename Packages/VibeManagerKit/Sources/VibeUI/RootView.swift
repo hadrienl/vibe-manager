@@ -19,7 +19,6 @@ public struct RootView: View {
   @State private var hostWindow = HostWindow()
   /// Where the detail column lies: the room of the window's title depends on it (#159).
   @State private var titleRoom = WindowTitleRoom()
-  @Environment(\.scenePhase) private var scenePhase
   @Environment(\.openSettings) private var openSettings
   /// The window's: where ⌘Z finds a discarded draft (#293).
   @Environment(\.undoManager) private var undoManager
@@ -90,6 +89,7 @@ public struct RootView: View {
     // thresholds the columns fold, and the window is still worth opening.
     .frame(minWidth: 640, minHeight: 480)
     .task {
+      model.observeApplicationActivation()
       await model.load()
       // Launched behind another application — at login, with `open -g` — it never resigned: it
       // must not believe it is in front, or the floating panel of #41 would wait for nothing.
@@ -108,15 +108,6 @@ public struct RootView: View {
     ) { result in
       guard case .success(let files) = result else { return }
       Task { await model.attachChosenFiles(files) }
-    }
-    // Back from sleep, or from another application: an event may have been missed meanwhile.
-    .onChange(of: scenePhase) { _, phase in
-      if phase == .active { model.applicationDidBecomeActive() }
-    }
-    .onReceive(
-      NotificationCenter.default.publisher(for: NSApplication.willResignActiveNotification)
-    ) {
-      _ in model.applicationWillResignActive()
     }
     .sheet(
       item: Binding(

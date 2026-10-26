@@ -217,6 +217,8 @@ public final class AppModel {
   var visibleSessionUpdate: Task<Void, Never>?
   var isApplicationActive = true
   var isMainWindowVisible = true
+  /// The application's own notifications of coming to the front and leaving it (#417).
+  var activationObservers: [any NSObjectProtocol] = []
   /// What the agent did to the branches of each session, as last read. Only the session on
   /// screen is read, so the others keep what was true when they were last looked at.
   public private(set) var branchReports: [SessionID: SessionBranchReport] = [:]
@@ -955,6 +957,7 @@ public final class AppModel {
     }
 
     connectBrowser()
+    launcher?.keyboardInput = { [weak self] id in self?.coordinationCallAnswered(id) }
 
     launcher?.sessionDidClose = { [weak self] id, state in
       guard let self else { return }

@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 import VibeApplication
@@ -285,7 +286,34 @@ struct CoordinationToolsTests {
     #expect(!result.isError)
     #expect(model.isCallingUser(parent.id))
     #expect(model.summary(of: .doing).needsAttention)
-    model.coordinationSessionShown(parent.id)
+    model.coordinationCallAnswered(parent.id)
+    #expect(!model.isCallingUser(parent.id))
+  }
+
+  /// #417: the scene's phase did not change on coming back from another application, and the
+  /// application believed itself behind for good — calling the user it was in front of.
+  @Test("Coming back from another application answers the coordinator in front")
+  func comingBackAnswers() async {
+    let model = await makeModel()
+    let center = NotificationCenter()
+    model.observeApplicationActivation(in: center)
+    // A second window asks again: still one observer of each.
+    model.observeApplicationActivation(in: center)
+    #expect(model.activationObservers.count == 2)
+    model.select(parent.id)
+    center.post(name: NSApplication.willResignActiveNotification, object: nil)
+    let away = await call(model, "notify_user", ["message": "Approve the plan."], as: parent.id)
+    #expect(!away.isError)
+    #expect(model.isCallingUser(parent.id))
+
+    center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+    #expect(!model.isCallingUser(parent.id))
+
+    // Back in front after another trip away: the user reads the message on the coordinator.
+    center.post(name: NSApplication.willResignActiveNotification, object: nil)
+    center.post(name: NSApplication.didBecomeActiveNotification, object: nil)
+    let back = await call(model, "notify_user", ["message": "Approve the plan."], as: parent.id)
+    #expect(text(back) == "The user is looking at your session.")
     #expect(!model.isCallingUser(parent.id))
   }
 

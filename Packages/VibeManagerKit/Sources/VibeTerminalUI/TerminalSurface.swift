@@ -133,6 +133,8 @@ extension EnvironmentValues {
 
 private enum TerminalCommand: Sendable {
   case write([UInt8])
+  /// What the terminal answered the program of itself: written, but not typed by the user (#417).
+  case answer([UInt8])
   case resize(TerminalSize)
   /// Back on screen: the view's size, given to the process only if another view changed it.
   case reclaim(TerminalSize)
@@ -231,6 +233,8 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
         case .write(let bytes):
           // Typed by the user in the terminal: nothing is typed over it meanwhile (#352).
           pane.noteKeyboardInput()
+          await pane.write(bytes)
+        case .answer(let bytes):
           await pane.write(bytes)
         case .resize(let size):
           if self.isMirror {
@@ -737,7 +741,11 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
 
   nonisolated public func send(source: TerminalView, data: ArraySlice<UInt8>) {
     guard !replay.isOn else { return }
-    commands.yield(.write([UInt8](data)))
+    // SwiftTerm sends from the main thread, the keys as the answers it makes as it reads.
+    let isAnswer =
+      Thread.isMainThread
+      && MainActor.assumeIsolated { (source as? AccessibleTerminalView)?.isAnswering == true }
+    commands.yield(isAnswer ? .answer([UInt8](data)) : .write([UInt8](data)))
   }
 
   nonisolated public func sizeChanged(source: TerminalView, newCols: Int, newRows: Int) {

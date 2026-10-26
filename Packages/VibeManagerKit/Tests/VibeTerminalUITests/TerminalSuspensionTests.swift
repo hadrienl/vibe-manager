@@ -103,7 +103,9 @@ private struct Harness {
   let coordinator: TerminalSurfaceCoordinator
   let view: TerminalView
 
-  static func make() async -> Harness {
+  static func make(
+    view: TerminalView = TerminalView(frame: NSRect(x: 0, y: 0, width: 640, height: 400))
+  ) async -> Harness {
     let id = TerminalID()
     let session = ScriptedSession(id: id)
     let pane = TerminalPaneModel(
@@ -112,7 +114,6 @@ private struct Harness {
     await pane.adopt(session)
     let coordinator = TerminalSurfaceCoordinator(pane: pane, suspensionDelay: .zero)
     // Never put in a window, never shown.
-    let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 640, height: 400))
     view.terminalDelegate = coordinator
     coordinator.bind(to: view)
     coordinator.attachIfNeeded(to: session)
@@ -307,5 +308,27 @@ struct TerminalSuspensionTests {
     coordinator.followActivation(true, in: view)
 
     #expect(!coordinator.isSuspended)
+  }
+}
+
+@MainActor
+@Suite(
+  "What the terminal answers of itself is not the user's typing (#417)", .timeLimit(.minutes(1)))
+struct TerminalAnswerTests {
+  @Test("The answer to a question reaches the process, but is not noted as typed")
+  func answerIsNotTyping() async {
+    let harness = await Harness.make(
+      view: AccessibleTerminalView(frame: NSRect(x: 0, y: 0, width: 640, height: 400)))
+    var typed = 0
+    harness.pane.onKeyboardInput = { typed += 1 }
+    await harness.session.print("prompt> \u{1B}[6n")
+    while await harness.session.cursorReports < 1 { try? await Task.sleep(for: .milliseconds(5)) }
+    #expect(typed == 0)
+    #expect(harness.pane.lastKeyboardInputAt == nil)
+
+    // A key the user types is.
+    harness.view.send(data: Array("y".utf8)[...])
+    while await harness.session.written.count < 2 { try? await Task.sleep(for: .milliseconds(5)) }
+    #expect(typed == 1)
   }
 }

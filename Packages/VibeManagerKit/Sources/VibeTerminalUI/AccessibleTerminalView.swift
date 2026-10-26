@@ -22,6 +22,17 @@ public final class AccessibleTerminalView: TerminalView {
 
   public override func accessibilityLabel() -> String? { accessibilityTitle }
 
+  /// On while the terminal answers the program of itself — its attributes, the cursor's place, a
+  /// focus report, a click it reports: SwiftTerm sends those through the delegate as it sends the
+  /// keys, and they are not the user's (#417).
+  private(set) var isAnswering = false
+
+  public override func send(source: Terminal, data: ArraySlice<UInt8>) {
+    isAnswering = true
+    defer { isAnswering = false }
+    super.send(source: source, data: data)
+  }
+
   /// Told of Escape without a modifier, on its way to the program: the block a panel opens in the
   /// conversation follows what it does there (#219). SwiftTerm's handling of keys cannot be
   /// overridden: Escape is seen before it, while this view has the keyboard, and passed on.
