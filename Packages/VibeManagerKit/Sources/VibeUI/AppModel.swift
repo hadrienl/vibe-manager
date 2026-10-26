@@ -418,7 +418,7 @@ public final class AppModel {
   /// Sessions being restarted and handed their prompt back, once signed in.
   public internal(set) var resumingAfterSignIn: Set<SessionID> = []
   /// Sessions the sign-in left alone: text waited in their prompt, or work behind it.
-  var signInTextWaiting: Set<SessionID> = []
+  var signInWaiting: [SessionID: ConversationSignIn.Waiting] = [:]
   /// How each agent's account is signed in again, and when that was asked (#419).
   var signInRoutes: [AgentProviderID: (route: AgentSignInRoute, at: Date)] = [:]
   var signInRouteLookups: Set<AgentProviderID> = []

@@ -97,9 +97,18 @@ public struct ConversationSignIn: Equatable, Sendable {
     case failed(detail: String?)
     /// Signed in, and this session was not resumed by itself: text waited in its prompt, or work
     /// behind it, or it could not be restarted.
-    case signedIn(canResume: Bool, textWaiting: Bool)
+    case signedIn(canResume: Bool, waiting: Waiting?)
     /// Restarted, its prompt about to be typed back.
     case resuming
+  }
+
+  /// What kept a session signed in again from being resumed by itself.
+  public enum Waiting: Equatable, Sendable {
+    /// Text in its prompt, which Resume sends in place of the prompt that failed; `nil` when it
+    /// cannot be read back — an image, a text pasted, a prompt not drawn.
+    case text(String?)
+    /// Work behind its prompt: a shell, a task in the background.
+    case work
   }
 
   /// How the account is signed in again (#419): what the notice offers.

@@ -97,4 +97,24 @@ struct PromptInputRecognitionTests {
     #expect(PromptInputRecognition.holdsText(["rebase on ma"]))
     #expect(PromptInputRecognition.holdsText(["first line", "  second"]))
   }
+
+  /// #410: typed back into the agent restarted once signed in again.
+  @Test("The text a prompt holds, read back to be typed again")
+  func textReadBack() {
+    let wrapped = PromptInputRecognition.input(
+      screen: Self.screen(
+        "❯ J'ai parfois ce bug. J'appuie sur\n  entrée, mais c'est interprété comme un\n  retour à la ligne.\n\n  Et toi ?"
+      ))
+    #expect(
+      PromptInputRecognition.text(of: wrapped ?? [])
+        == "J'ai parfois ce bug. J'appuie sur entrée, mais c'est interprété comme un retour à la ligne.\n\nEt toi ?"
+    )
+    #expect(PromptInputRecognition.text(of: ["c'est déployé"]) == "c'est déployé")
+    #expect(PromptInputRecognition.text(of: ["c'est déployé", ""]) == "c'est déployé")
+    // Nothing to send, or more than what shows.
+    #expect(PromptInputRecognition.text(of: [""]) == nil)
+    #expect(PromptInputRecognition.text(of: ["Try \"fix lint errors\""]) == nil)
+    #expect(PromptInputRecognition.text(of: ["Regarde ça[Image #1]"]) == nil)
+    #expect(PromptInputRecognition.text(of: ["[Pasted text #1 +40 lines]"]) == nil)
+  }
 }

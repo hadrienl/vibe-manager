@@ -62,7 +62,15 @@ struct SignInNotice: View {
           Text("Try Again", bundle: .module)
         }
       }
-    case .signedIn(let canResume, _):
+    case .signedIn(let canResume, let waiting):
+      // What waits is seen, finished or cleared there.
+      if waiting != nil {
+        Button {
+          model.showTerminal?()
+        } label: {
+          Text("Show the Terminal", bundle: .module)
+        }
+      }
       if canResume {
         Button {
           model.resumeAfterSignIn?()
@@ -126,12 +134,18 @@ struct SignInNotice: View {
           "Signing in again does not change the API key or the provider \(signIn.agentName) uses. Check them, then restart the session.",
         bundle: .module, comment: "An agent's name.")
     case .failed(let detail): detail
-    case .signedIn(_, let textWaiting):
-      textWaiting
-        ? String(
-          localized:
-            "Text or work is waiting in this session’s prompt. Resume once it is done.",
-          bundle: .module) : nil
+    case .signedIn(_, .text(let text?)?):
+      String(
+        localized: "Resume sends what waits in this session’s prompt: “\(text)”", bundle: .module,
+        comment: "The text typed into an agent's prompt, sent once the agent is restarted.")
+    case .signedIn(_, .text(nil)?):
+      String(
+        localized: "Text or work is waiting in this session’s prompt. Resume once it is done.",
+        bundle: .module)
+    case .signedIn(_, .work?):
+      String(
+        localized: "Work is still running in this session’s terminal. Resume once it is done.",
+        bundle: .module, comment: "A shell or a task the agent runs in the background.")
     default: nil
     }
   }
