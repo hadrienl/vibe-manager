@@ -38,10 +38,7 @@ extension AppModel {
     var said = report.effort
     let cutoff = [effortGivenAt[id], launcher?.launchDate(of: id)].compactMap(\.self).max()
     if let cutoff, (report.saidAt ?? .distantPast) < cutoff { said = nil }
-    // A level set by hand in the terminal is the one kept for the next launch, as one chosen
-    // here. The agent's own default, said while none is kept, stays its default: a later change
-    // of its settings still applies.
-    if let said, said != agent.effort, agent.effort != nil || said != report.configuredEffort {
+    if Self.keepsSaidEffort(said, kept: agent.effort), let said {
       await keepEffort(said, providerID: agent.providerID, of: id)
     }
     var menu = SessionEffortMenu(
@@ -51,6 +48,15 @@ extension AppModel {
     if let current = menu.current, !menu.levels.contains(current) { menu.levels.append(current) }
     menu.isApplying = effortCells.value(for: id)?.isApplying ?? false
     effortCells.set(menu, for: id)
+  }
+
+  /// Whether the level the agent says it runs with replaces the one kept on the session. Only
+  /// once the user has chosen one: a level set by hand in the terminal then replaces it. Never
+  /// while none is kept — what the agent says is its default, whether its settings name it or
+  /// not, and it must stay its default for the next launches.
+  nonisolated static func keepsSaidEffort(_ said: String?, kept: String?) -> Bool {
+    guard let said, let kept else { return false }
+    return said != kept
   }
 
   /// A turn ended: Codex wrote the level it ran with, set by hand in the terminal perhaps.
