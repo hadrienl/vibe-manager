@@ -26780,7 +26780,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Reprendre envoie ce qui attend dans l’invite de cette session : « %@ »"
+            "value" : "Reprendre envoie ce qui attend dans l’invite de cette session : « %@ »"
           }
         },
         "hi" : {
