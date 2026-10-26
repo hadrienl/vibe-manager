@@ -467,19 +467,23 @@ extension Binding where Value == UIImage? {
   }
 }
 
-/// A permission or a question, answered here as on the Mac.
+/// A permission or questions, answered here as on the Mac: one answer per question, sent together.
 private struct RequestCard: View {
   let request: RemoteRequest
   let sessionID: String
   @Environment(RemoteChannel.self) private var channel
-  @State private var selection: Set<String> = []
-  @State private var text = ""
+  /// The choices taken and the words typed, by question.
+  @State private var selections: [Int: Set<String>] = [:]
+  @State private var texts: [Int: String] = [:]
+
+  private var questions: [RemoteQuestion] { request.shownQuestions }
+  private var isSeveral: Bool { questions.count > 1 }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Label {
         Group {
-          if request.title.isEmpty {
+          if isSeveral || request.title.isEmpty {
             Text(request.kind == .permission ? "Allow this command?" : "The agent asks you")
           } else {
             Text(verbatim: request.title)
@@ -490,7 +494,7 @@ private struct RequestCard: View {
         Image(systemName: request.kind == .permission ? "checkmark.shield" : "questionmark.bubble")
       }
       .foregroundStyle(.orange)
-      if let subject = request.subject {
+      if !isSeveral, let subject = request.subject {
         Text(verbatim: subject)
           .font(.footnote.monospaced())
           .padding(10)
@@ -508,45 +512,83 @@ private struct RequestCard: View {
             choice.id == "allowOnce" ? AnyButtonStyle(.glassProminent) : AnyButtonStyle(.glass))
         }
       } else {
-        ForEach(request.choices) { choice in
-          Button {
-            toggle(choice.id)
-          } label: {
-            HStack(alignment: .top, spacing: 10) {
-              Image(systemName: selection.contains(choice.id) ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(.tint)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: choice.label).font(.subheadline.weight(.semibold))
-                if let detail = choice.detail {
-                  Text(verbatim: detail).font(.caption).foregroundStyle(.secondary)
-                }
+        ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
+          if isSeveral {
+            if index > 0 { Divider() }
+            VStack(alignment: .leading, spacing: 2) {
+              if let header = question.header, !header.isEmpty {
+                Text(verbatim: header).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
               }
-              Spacer(minLength: 0)
+              Text(verbatim: question.title).font(.subheadline.weight(.semibold))
             }
-            .contentShape(Rectangle())
           }
-          .buttonStyle(.plain)
-        }
-        if request.allowsText {
-          TextField("Another answer…", text: $text)
-            .textFieldStyle(.roundedBorder)
+          choices(of: question, at: index)
         }
         Button {
-          channel.answer(
-            request, in: sessionID, choiceIDs: Array(selection),
-            text: text.isEmpty ? nil : text)
+          channel.answer(request, in: sessionID, answers: answers)
         } label: {
-          Text("Answer").frame(maxWidth: .infinity, minHeight: 30)
+          Text(isSeveral ? "Send Answers" : "Answer").frame(maxWidth: .infinity, minHeight: 30)
         }
         .buttonStyle(.glassProminent)
-        .disabled(selection.isEmpty && text.isEmpty)
+        .disabled(!answers.allSatisfy(\.isGiven))
       }
     }
     .padding(14)
     .glassEffect(.regular.tint(.orange.opacity(0.12)), in: .rect(cornerRadius: 20))
     .onChange(of: request.id) { _, _ in
-      selection = []
-      text = ""
+      selections = [:]
+      texts = [:]
+    }
+  }
+
+  @ViewBuilder
+  private func choices(of question: RemoteQuestion, at index: Int) -> some View {
+    let selection = selections[index] ?? []
+    ForEach(question.choices) { choice in
+      Button {
+        toggle(choice.id, of: question, at: index)
+      } label: {
+        HStack(alignment: .top, spacing: 10) {
+          Image(systemName: Self.symbol(chosen: selection.contains(choice.id), of: question))
+            .foregroundStyle(.tint)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: choice.label).font(.subheadline.weight(.semibold))
+            if let detail = choice.detail {
+              Text(verbatim: detail).font(.caption).foregroundStyle(.secondary)
+            }
+          }
+          Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityAddTraits(selection.contains(choice.id) ? .isSelected : [])
+    }
+    if question.allowsText {
+      TextField(
+        "Another answer…",
+        text: Binding(get: { texts[index] ?? "" }, set: { texts[index] = $0 })
+      )
+      .textFieldStyle(.roundedBorder)
+    }
+  }
+
+  /// Rounds for a single choice, boxes for several, as on the Mac.
+  static func symbol(chosen: Bool, of question: RemoteQuestion) -> String {
+    switch (question.allowsSeveral, chosen) {
+    case (true, true): "checkmark.square.fill"
+    case (true, false): "square"
+    case (false, true): "checkmark.circle.fill"
+    case (false, false): "circle"
+    }
+  }
+
+  /// One per question, in order.
+  private var answers: [RemoteAnswer] {
+    questions.indices.map { index in
+      let text = texts[index] ?? ""
+      return RemoteAnswer(
+        choiceIDs: Array(selections[index] ?? []).sorted(), text: text.isEmpty ? nil : text)
     }
   }
 
@@ -560,12 +602,14 @@ private struct RequestCard: View {
     }
   }
 
-  private func toggle(_ id: String) {
-    if request.allowsSeveral {
+  private func toggle(_ id: String, of question: RemoteQuestion, at index: Int) {
+    var selection = selections[index] ?? []
+    if question.allowsSeveral {
       if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
     } else {
       selection = [id]
     }
+    selections[index] = selection
   }
 }
 

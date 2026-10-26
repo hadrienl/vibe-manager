@@ -75,8 +75,12 @@ final class CompanionRemoteServer {
       Task { await self.type(text, into: id, files: files, for: peer) }
     case .answer(let id, let requestID, let choiceIDs, let text):
       Task {
-        await self.answer(id, requestID: requestID, choiceIDs: choiceIDs, text: text, for: peer)
+        await self.answer(
+          id, requestID: requestID, answers: [RemoteAnswer(choiceIDs: choiceIDs, text: text)],
+          for: peer)
       }
+    case .answers(let id, let requestID, let answers):
+      Task { await self.answer(id, requestID: requestID, answers: answers, for: peer) }
     case .setStatus(let id, let status):
       guard let appModel, let sessionID = Self.sessionID(id),
         let taskStatus = SessionTaskStatus(rawValue: status.rawValue)
@@ -374,13 +378,17 @@ final class CompanionRemoteServer {
         id: id, kind: .permission, title: permission.purpose ?? "",
         subject: permission.subject ?? permission.toolName, choices: choices)
     case .questions(let questions):
-      guard let question = questions.first else { return nil }
+      guard !questions.isEmpty else { return nil }
       return RemoteRequest(
-        id: id, kind: .question, title: question.text, subject: question.header,
-        choices: question.options.enumerated().map { index, option in
-          RemoteChoice(id: String(index), label: option.label, detail: option.description)
-        },
-        allowsSeveral: question.allowsMultipleChoices, allowsText: question.allowsFreeText)
+        id: id,
+        questions: questions.map { question in
+          RemoteQuestion(
+            header: question.header, title: question.text,
+            choices: question.options.enumerated().map { index, option in
+              RemoteChoice(id: String(index), label: option.label, detail: option.description)
+            },
+            allowsSeveral: question.allowsMultipleChoices, allowsText: question.allowsFreeText)
+        })
     default:
       return nil
     }
@@ -412,9 +420,9 @@ final class CompanionRemoteServer {
   }
 
   private func answer(
-    _ id: String, requestID: String, choiceIDs: [String], text: String?, for peer: String
+    _ id: String, requestID: String, answers: [RemoteAnswer], for peer: String
   ) async {
-    if let failure = await give(id, requestID: requestID, choiceIDs: choiceIDs, text: text) {
+    if let failure = await give(id, requestID: requestID, answers: answers) {
       send(peer, .failure(failure))
     }
   }
@@ -423,8 +431,8 @@ final class CompanionRemoteServer {
   /// waits for it: a request answered meanwhile on the Mac is left as it is.
   func answer(_ answer: CompanionAnswer) async {
     let failure = await give(
-      answer.sessionID, requestID: answer.requestID, choiceIDs: [answer.choice.rawValue],
-      text: nil)
+      answer.sessionID, requestID: answer.requestID,
+      answers: [RemoteAnswer(choiceIDs: [answer.choice.rawValue])])
     if let failure {
       Self.logger.notice(
         "notification answer to \(answer.requestID, privacy: .public) not given: \(String(describing: failure), privacy: .public)"
@@ -434,7 +442,7 @@ final class CompanionRemoteServer {
 
   /// Gives an answer as the window's request card does; what kept it from being given, if anything.
   private func give(
-    _ id: String, requestID: String, choiceIDs: [String], text: String?
+    _ id: String, requestID: String, answers: [RemoteAnswer]
   ) async -> RemoteFailure? {
     guard let appModel, let sessionID = Self.sessionID(id),
       let request = appModel.activity(for: sessionID)?.requests.first(where: {
@@ -443,30 +451,45 @@ final class CompanionRemoteServer {
     else {
       return .requestGone
     }
-    let answer: AgentAnswer
-    switch request.content {
-    case .permission:
-      switch choiceIDs.first {
-      case "allowAlways": answer = .allowAlways
-      case "deny": answer = .deny
-      default: answer = .allowOnce
-      }
-    case .questions(let questions):
-      let indices = choiceIDs.compactMap(Int.init)
-      if let text, !text.isEmpty {
-        answer = .answers([.text(text)])
-      } else if questions.first?.allowsMultipleChoices == true {
-        answer = .answers([.options(Set(indices))])
-      } else if let index = indices.first {
-        answer = .answers([.option(index)])
-      } else {
-        // A notification's Allow or Deny never answers a question.
-        return .answerNotGiven
-      }
-    default:
+    guard let answer = Self.answer(to: request.content, with: answers) else {
       return .answerNotGiven
     }
     return await appModel.answer(answer, to: request.id) ? nil : .answerNotGiven
+  }
+
+  /// The answer the phone's words give: a permission's choice, or one answer per question, as the
+  /// Mac's own panel sends them. `nil` when it leaves a question unanswered — a notification's
+  /// Allow on a question, a phone of protocol 1 on a request of several — which the agent would
+  /// get half of.
+  static func answer(to content: AgentRequestContent, with answers: [RemoteAnswer])
+    -> AgentAnswer?
+  {
+    switch content {
+    case .permission:
+      switch answers.first?.choiceIDs.first {
+      case "allowAlways": return .allowAlways
+      case "deny": return .deny
+      default: return .allowOnce
+      }
+    case .questions(let questions):
+      guard !questions.isEmpty, answers.count == questions.count else { return nil }
+      var given: [AgentQuestionAnswer] = []
+      for (question, answer) in zip(questions, answers) {
+        let indices = answer.choiceIDs.compactMap(Int.init).filter(question.options.indices.contains)
+        if let text = answer.text, !text.isEmpty {
+          given.append(.text(text))
+        } else if question.allowsMultipleChoices, !indices.isEmpty {
+          given.append(.options(Set(indices)))
+        } else if let index = indices.first {
+          given.append(.option(index))
+        } else {
+          return nil
+        }
+      }
+      return .answers(given)
+    default:
+      return nil
+    }
   }
 
   private func search(_ query: String, token: Int, for peer: String) async {

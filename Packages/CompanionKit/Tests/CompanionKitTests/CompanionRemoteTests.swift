@@ -66,3 +66,70 @@ func macLocalAddresses() throws {
   #expect(RemoteWebAddress.same("http://a/b/", "http://a/b#top"))
   #expect(!RemoteWebAddress.same("http://a/b", "http://a/c"))
 }
+
+@Test("A request of several questions travels whole, with one answer per question (#428)")
+func severalQuestions() throws {
+  let request = RemoteRequest(
+    id: "R",
+    questions: [
+      RemoteQuestion(
+        header: "Action", title: "What now?",
+        choices: [RemoteChoice(id: "0", label: "Merge"), RemoteChoice(id: "1", label: "Wait")]),
+      RemoteQuestion(
+        header: "Checks", title: "Which checks?",
+        choices: [
+          RemoteChoice(id: "0", label: "Tests", detail: "swift test"),
+          RemoteChoice(id: "1", label: "Lint"),
+        ],
+        allowsSeveral: true, allowsText: true),
+    ])
+  // The first question also said as protocol 1 does.
+  #expect(request.title == "What now?")
+  #expect(request.subject == "Action")
+  #expect(request.choices.map(\.label) == ["Merge", "Wait"])
+  #expect(!request.allowsSeveral)
+  let messages: [RemoteMessage] = [
+    .conversation(RemoteConversation(sessionID: "S", entries: [], request: request)),
+    .answers(
+      sessionID: "S", requestID: "R",
+      answers: [RemoteAnswer(choiceIDs: ["1"]), RemoteAnswer(choiceIDs: ["0", "1"])]),
+  ]
+  var decoder = RemoteFrame.Decoder()
+  #expect(try decoder.append(messages.map(RemoteFrame.encode).reduce(Data(), +)) == messages)
+  #expect(request.shownQuestions.count == 2)
+}
+
+@Test("A request of protocol 1 shows its single question, and its Mac gets `answer`")
+func protocolOneRequest() throws {
+  let json = #"""
+    {"id":"R","kind":"question","title":"Which?","subject":"Pick","choices":[{"id":"0","label":"A","isDestructive":false}],"allowsSeveral":true,"allowsText":false}
+    """#
+  let request = try JSONDecoder().decode(RemoteRequest.self, from: Data(json.utf8))
+  #expect(request.questions.isEmpty)
+  #expect(
+    request.shownQuestions == [
+      RemoteQuestion(
+        header: "Pick", title: "Which?", choices: [RemoteChoice(id: "0", label: "A")],
+        allowsSeveral: true)
+    ])
+  let permission = RemoteRequest(
+    id: "P", kind: .permission, title: "", choices: [RemoteChoice(id: "allowOnce", label: "")])
+  #expect(permission.shownQuestions.isEmpty)
+  #expect(!CompanionRemote.takesAnswers(1))
+  #expect(!CompanionRemote.takesAnswers(nil))
+  #expect(CompanionRemote.takesAnswers(CompanionRemote.protocolVersion))
+  // A phone of protocol 1 skips the newer message rather than failing on it.
+  var bytes = RemoteFrame.encode(
+    .answers(sessionID: "S", requestID: "R", answers: [RemoteAnswer(choiceIDs: ["0"])]))
+  bytes.append(RemoteFrame.encode(.failure(.requestGone)))
+  var decoder = RemoteFrame.Decoder()
+  #expect(try decoder.append(bytes).count == 2)
+}
+
+@Test("An answer counts once it takes a choice or words")
+func answerGiven() {
+  #expect(RemoteAnswer(choiceIDs: ["0"]).isGiven)
+  #expect(RemoteAnswer(choiceIDs: [], text: "Other").isGiven)
+  #expect(!RemoteAnswer(choiceIDs: [], text: "  ").isGiven)
+  #expect(!RemoteAnswer(choiceIDs: []).isGiven)
+}
