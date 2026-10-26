@@ -52,18 +52,3 @@ public actor InMemoryArchiveReportStore: ArchiveReportStore {
     stored = [:]
   }
 }
-
-/// Whether an agent writes a paragraph over each batch. `nil` until the user chooses: it then
-/// follows the journal's summary, which costs the same kind of pass.
-public protocol ArchiveReportPreferences: AnyObject {
-  var synthesisEnabled: Bool? { get set }
-}
-
-/// Kept for this run only.
-public final class InMemoryArchiveReportPreferences: ArchiveReportPreferences {
-  public var synthesisEnabled: Bool?
-
-  public init(synthesisEnabled: Bool? = nil) {
-    self.synthesisEnabled = synthesisEnabled
-  }
-}

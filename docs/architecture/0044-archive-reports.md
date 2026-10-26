@@ -23,9 +23,10 @@ it was then), the sessions archived, and those it left with the reason — somet
 unarchived since it was done, over the rule's limit. A run on trial that would have archived forms
 a batch too, marked trial, shown only when asked.
 
-Archives by hand — ⌃⌘A, the swipe, the batch — join **one batch per day**, “Archived by Hand”: a
-report of what was done does not depend on how it was archived, and ⌃⌘A pressed ten times does not
-make ten batches. ⌘Z does not take a rule's archive back (0043), so no batch is ever “undone”; a
+Sessions selected and archived together form **a batch of their own**, “Selection Archived”. An
+archive of one session — ⌃⌘A, the swipe — joins **one batch per day**, “Archived by Hand”: a report
+of what was done does not depend on how it was archived, and ⌃⌘A pressed ten times does not make ten
+batches. ⌘Z does not take a rule's archive back (0043), so no batch is ever “undone”; a
 session unarchived since stays in its batch, and the report says when it left the archive, read
 from its status history.
 
@@ -52,10 +53,13 @@ is escaped: a session's name never makes a heading or a link.
 As the journal's summary: one pass of the first available agent that answers to a schema (Claude
 Code `haiku`, no tools; Codex read-only, no network), outside any session, from an empty folder. It
 is given the sessions' names, groups, journal sentences and resources, **16 KiB at most, never a
-transcript**, and answers `{"summary": "…"}`, read strictly. It is written after a rule's batch, in
-the background; a failure keeps the summary without agent and offers Try Again. Archives by hand
-and periods are summarized on demand. It is on by default when the journal summarizes, which costs
-the same kind of pass, until the user chooses in Settings › Automatic Archive.
+transcript**, and answers `{"summary": "…"}`, read strictly, in the background; a failure keeps the summary without
+agent and offers Try Again. **Whether it is written is asked where the archive is decided**, never
+in a setting of its own: the sheet that makes or refines a rule has “Summarize each batch with an
+agent”, checked by default (a rule kept before the question was asked summarizes); archiving a
+selection offers “Archive and Summarize” beside Archive. A rule's or a selection's batch can still be
+summarized later from its report; the day's archives one by one never are — a paragraph over ⌃⌘A
+pressed here and there says nothing. Periods are summarized on demand.
 
 ### Storage
 
@@ -70,7 +74,7 @@ Diagnostics `archive.reports.*` hold counts, durations and outcomes, never a nam
 Window ▸ Archive Reports, beside Usage: the periods, then the batches by day; on the right the
 report, with Copy and Export as Markdown, Open and Unarchive for each session still archived. The
 notification of a rule's batch opens its report; the archive's list has See Reports; the Settings
-have the paragraph's switch, Show Reports and Clear Reports….
+have Show Reports and Clear Reports….
 
 ## Consequences
 

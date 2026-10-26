@@ -217,14 +217,16 @@ extension AppModel {
       }
       let batch = await archiveReports?.recordRun(
         kind: run.isTrial
-          ? .trial(id: run.ruleID, name: run.rule.name) : .rule(id: run.ruleID, name: run.rule.name),
+          ? .trial(id: run.ruleID, name: run.rule.name)
+          : .rule(id: run.ruleID, name: run.rule.name),
         date: now, sessions: photos,
         skipped: plan.skipped.compactMap { id, verdict in
           guard let reason = SkippedSession.Reason(verdict),
             let name = candidates.first(where: { $0.id == id })?.session.name
           else { return nil }
           return SkippedSession(sessionID: id, name: name, reason: reason)
-        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending })
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending },
+        summarizing: model.set.rules.first { $0.id == run.ruleID }?.summarizes ?? false)
       let count = run.isTrial ? plan.archived.count : archived.count
       let result = ArchiveRunResult(
         date: now, archived: count, skipped: plan.skipped.count, isTrial: run.isTrial)

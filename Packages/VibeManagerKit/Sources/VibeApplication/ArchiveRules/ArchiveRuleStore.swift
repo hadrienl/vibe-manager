@@ -39,10 +39,19 @@ public struct StoredArchiveRule: Identifiable, Hashable, Codable, Sendable {
   /// before the run, so that two copies of the application never run the same time twice.
   public var lastHandled: Date?
   public var lastRun: ArchiveRunResult?
+  /// Whether an agent writes a paragraph over each batch it archives (#408), asked when the rule
+  /// is made. A rule kept before the question was asked does.
+  private var summary: Bool?
+
+  public var summarizes: Bool {
+    get { summary ?? true }
+    set { summary = newValue }
+  }
 
   public init(
     id: UUID = UUID(), text: String, state: State, sentence: String, agent: String,
-    createdAt: Date, activatedAt: Date, lastHandled: Date? = nil, lastRun: ArchiveRunResult? = nil
+    createdAt: Date, activatedAt: Date, lastHandled: Date? = nil, lastRun: ArchiveRunResult? = nil,
+    summarizes: Bool = true
   ) {
     self.id = id
     self.text = text
@@ -53,6 +62,7 @@ public struct StoredArchiveRule: Identifiable, Hashable, Codable, Sendable {
     self.activatedAt = activatedAt
     self.lastHandled = lastHandled
     self.lastRun = lastRun
+    summary = summarizes
   }
 
   /// The rule, or `nil` when the text does not read as one rule any more — written by a later

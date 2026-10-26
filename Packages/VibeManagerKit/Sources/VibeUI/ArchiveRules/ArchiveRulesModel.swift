@@ -211,13 +211,13 @@ public final class ArchiveRulesModel {
   /// existing one takes its place, under the same identifier.
   public func save(
     _ document: ArchiveRuleDocument, sentence: String, agent: String,
-    state: StoredArchiveRule.State, replacing: UUID? = nil
+    state: StoredArchiveRule.State, summarizes: Bool = true, replacing: UUID? = nil
   ) async -> Bool {
     let now = now().rounded
     let rules = document.rules.map { rule in
       StoredArchiveRule(
         text: ArchiveRulePrinter.text(of: rule), state: state, sentence: sentence, agent: agent,
-        createdAt: now, activatedAt: now)
+        createdAt: now, activatedAt: now, summarizes: summarizes)
     }
     let protections = document.protections.map {
       StoredArchiveProtection(text: ArchiveRulePrinter.text(of: $0), sentence: sentence)
@@ -235,7 +235,8 @@ public final class ArchiveRulesModel {
       {
         rules[0] = StoredArchiveRule(
           id: replacing, text: first.text, state: first.state, sentence: first.sentence,
-          agent: first.agent, createdAt: set.rules[index].createdAt, activatedAt: now)
+          agent: first.agent, createdAt: set.rules[index].createdAt, activatedAt: now,
+          summarizes: summarizes)
         set.rules[index] = rules.removeFirst()
       }
       set.rules.append(contentsOf: rules)

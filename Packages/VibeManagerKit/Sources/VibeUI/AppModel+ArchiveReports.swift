@@ -9,7 +9,6 @@ extension AppModel {
   func startArchiveReports() async {
     guard let archiveReports else { return }
     archiveReports.sessions = { [weak self] in self?.sessions ?? [] }
-    archiveReports.journalSummarizes = { [weak self] in self?.journal?.summariesEnabled ?? true }
     await archiveReports.load()
   }
 

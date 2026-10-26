@@ -567,7 +567,6 @@ public final class AppEnvironment {
       store: FileArchiveReportStore(
         directory: FileArchiveReportStore.defaultDirectory(dataFolder: dataFolder)),
       synthesizers: AgentArchiveSynthesizers(agents: registry),
-      preferences: UserDefaultsArchiveReportPreferences(suiteName: data.defaultsSuite),
       diagnostics: diagnostics)
     let backgroundWork = BackgroundWorkProbe(
       agents: registry, hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) }

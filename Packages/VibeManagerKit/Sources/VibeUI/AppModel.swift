@@ -1449,10 +1449,11 @@ public final class AppModel {
     }
   }
 
-  /// One session of a batch archive (#77).
-  func archiveInBatch(_ id: SessionID) async -> SessionBatchItemResult {
+  /// One session of a batch archive (#77). `recordsByHand: false` when the batch forms its own
+  /// report (#408).
+  func archiveInBatch(_ id: SessionID, recordsByHand: Bool = true) async -> SessionBatchItemResult {
     do {
-      let archival = try await archiveProcess(id)
+      let archival = try await archiveProcess(id, recordsByHand: recordsByHand)
       return Self.result(of: archival.detachment, for: archival.session, action: .archived)
     } catch {
       return .failed(message: Self.message(for: error), suggestion: nil)
@@ -1622,12 +1623,12 @@ public final class AppModel {
   }
 
   func archiveProcess(
-    _ id: SessionID, cause: SessionStatusChange.Cause = .user
+    _ id: SessionID, cause: SessionStatusChange.Cause = .user, recordsByHand: Bool = true
   ) async throws -> SessionArchival {
     let before = sessions.first { $0.id == id }
     let archival = try await archiveSession(id: id, cause: cause)
-    // An archive by hand joins the day's batch (#408); a rule's forms its own.
-    if cause == .user, let before { await recordArchiveByHand(before) }
+    // An archive by hand joins the day's batch (#408); a rule's, or a selection's, forms its own.
+    if cause == .user, recordsByHand, let before { await recordArchiveByHand(before) }
     await activityTracker?.forget(id)
     ticketTitles.forget(id)
     browser?.release(id)

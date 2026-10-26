@@ -32,27 +32,22 @@ public final class ArchiveReportsModel {
 
   @ObservationIgnored let book: ArchiveReportBook
   @ObservationIgnored let synthesizers: any ArchiveSynthesizerResolving
-  @ObservationIgnored let preferences: any ArchiveReportPreferences
   @ObservationIgnored let diagnostics: Diagnostics
   @ObservationIgnored public var now: @MainActor () -> Date
   @ObservationIgnored public var calendar: @MainActor () -> Calendar
   /// The sessions as they stand, to mark the ones unarchived since. Given by the application's
   /// model.
   @ObservationIgnored var sessions: @MainActor () -> [WorkSession] = { [] }
-  /// Whether the journal summarizes, which the synthesis follows until the user chooses.
-  @ObservationIgnored var journalSummarizes: @MainActor () -> Bool = { true }
 
   public init(
     store: any ArchiveReportStore = InMemoryArchiveReportStore(),
     synthesizers: any ArchiveSynthesizerResolving = NoArchiveSynthesizers(),
-    preferences: any ArchiveReportPreferences = InMemoryArchiveReportPreferences(),
     diagnostics: Diagnostics = .disabled,
     now: @escaping @MainActor () -> Date = Date.init,
     calendar: @escaping @MainActor () -> Calendar = { .autoupdatingCurrent }
   ) {
     book = ArchiveReportBook(store: store)
     self.synthesizers = synthesizers
-    self.preferences = preferences
     self.diagnostics = diagnostics
     self.now = now
     self.calendar = calendar
@@ -98,21 +93,11 @@ public final class ArchiveReportsModel {
 
   // MARK: Forming
 
-  /// Whether an agent writes a paragraph after each batch.
-  public var synthesisEnabled: Bool {
-    get {
-      access(keyPath: \.synthesisEnabled)
-      return preferences.synthesisEnabled ?? journalSummarizes()
-    }
-    set {
-      withMutation(keyPath: \.synthesisEnabled) { preferences.synthesisEnabled = newValue }
-    }
-  }
-
-  /// A run of a rule that archived, or on trial would have: its batch, then its paragraph.
+  /// A run of a rule that archived, or on trial would have, or a selection archived together:
+  /// its batch, then its paragraph when the rule or the user asked for one.
   func recordRun(
     kind: ArchiveBatch.Kind, date: Date, sessions: [ArchivedSessionSnapshot],
-    skipped: [SkippedSession]
+    skipped: [SkippedSession] = [], summarizing: Bool
   ) async -> ArchiveBatch? {
     do {
       guard
@@ -126,7 +111,7 @@ public final class ArchiveReportsModel {
           "trial": .flag(batch.isTrial),
         ])
       batches = await book.batches()
-      if !batch.isTrial, synthesisEnabled { synthesize(batch.id) }
+      if batch.offersSynthesis, summarizing { synthesize(batch.id) }
       return batch
     } catch {
       diagnostics.record(.store, .error, "archive.reports.writeFailed")
@@ -134,8 +119,7 @@ public final class ArchiveReportsModel {
     }
   }
 
-  /// An archive by hand, in the day's batch. Its paragraph is not asked at each archive: on
-  /// demand, from the report.
+  /// An archive of one session by hand, in the day's batch, which no agent summarizes.
   func recordByHand(_ snapshot: ArchivedSessionSnapshot) async {
     do {
       try await book.recordByHand(snapshot, calendar: calendar())
@@ -150,7 +134,8 @@ public final class ArchiveReportsModel {
   /// Writes the paragraph over a batch, in the background. A failure keeps the summary, and says
   /// so with Try Again.
   public func synthesize(_ id: UUID) {
-    guard let batch = batch(id), synthesizing.insert(id).inserted else { return }
+    guard let batch = batch(id), batch.offersSynthesis, synthesizing.insert(id).inserted
+    else { return }
     let request = ArchiveSynthesisRequest(
       report: ArchiveReport(batch: batch), language: Self.language)
     Task { [weak self] in
@@ -159,7 +144,8 @@ public final class ArchiveReportsModel {
       self.synthesizing.remove(id)
       let synthesis: ArchiveSynthesis =
         switch outcome {
-        case .success(let (text, provider)): .ready(text: text, providerID: provider, at: self.now())
+        case .success(let (text, provider)):
+          .ready(text: text, providerID: provider, at: self.now())
         case .failure: .failed(at: self.now())
         }
       try? await self.book.setSynthesis(synthesis, of: id)

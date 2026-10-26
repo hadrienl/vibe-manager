@@ -162,15 +162,25 @@ private struct BatchRow: View {
         Text(Self.title(of: batch))
         Text(
           "\(batch.date.formatted(date: .omitted, time: .shortened)) · \(batch.sessions.count) sessions",
-          bundle: .module, comment: "Archive reports: a batch's time and how many sessions it holds."
+          bundle: .module,
+          comment: "Archive reports: a batch's time and how many sessions it holds."
         )
         .font(.caption)
         .foregroundStyle(.secondary)
       }
     } icon: {
-      Image(systemName: batch.isTrial ? "testtube.2" : batch.ruleName == nil ? "hand.raised" : "archivebox")
+      Image(systemName: Self.symbol(of: batch))
     }
     .accessibilityElement(children: .combine)
+  }
+
+  static func symbol(of batch: ArchiveBatch) -> String {
+    switch batch.kind {
+    case .rule: "archivebox"
+    case .trial: "testtube.2"
+    case .selection: "checklist"
+    case .manual: "hand.raised"
+    }
   }
 
   static func title(of batch: ArchiveBatch) -> String {
@@ -179,7 +189,13 @@ private struct BatchRow: View {
     case .trial(_, let name):
       String(
         localized: "\(name) (trial)", bundle: .module,
-        comment: "Archive reports: a rule's run on trial, which archived nothing. The argument is its name.")
+        comment:
+          "Archive reports: a rule's run on trial, which archived nothing. The argument is its name."
+      )
+    case .selection:
+      String(
+        localized: "Selection Archived", bundle: .module,
+        comment: "Archive reports: sessions the user selected and archived together.")
     case .manual:
       String(
         localized: "Archived by Hand", bundle: .module,
@@ -311,7 +327,7 @@ private struct ArchiveReportView: View {
             Text("Try Again", bundle: .module)
           }
         }
-      } else if !batch.isTrial {
+      } else if batch.offersSynthesis {
         Button {
           reports.synthesize(batch.id)
         } label: {
@@ -392,14 +408,17 @@ private struct SessionReportRow: View {
     VStack(alignment: .leading, spacing: 6) {
       HStack(alignment: .firstTextBaseline, spacing: 8) {
         SessionBadge(
-          appearance: SessionAppearance(symbolName: snapshot.symbolName, colorHex: snapshot.colorHex),
+          appearance: SessionAppearance(
+            symbolName: snapshot.symbolName, colorHex: snapshot.colorHex),
           size: 18)
         VStack(alignment: .leading, spacing: 2) {
           Text(snapshot.name).font(.headline)
           Text(details).font(.caption).foregroundStyle(.secondary)
         }
         Spacer()
-        if model.sessions.contains(where: { $0.id == snapshot.sessionID && $0.taskStatus == .archived }) {
+        if model.sessions.contains(where: {
+          $0.id == snapshot.sessionID && $0.taskStatus == .archived
+        }) {
           Button {
             model.showArchived(snapshot.sessionID)
             model.showWorkspaceWindow?()
@@ -490,5 +509,6 @@ struct MarkdownDocument: FileDocument {
 }
 
 extension UTType {
-  fileprivate static let markdown = UTType(importedAs: "net.daringfireball.markdown", conformingTo: .plainText)
+  fileprivate static let markdown = UTType(
+    importedAs: "net.daringfireball.markdown", conformingTo: .plainText)
 }

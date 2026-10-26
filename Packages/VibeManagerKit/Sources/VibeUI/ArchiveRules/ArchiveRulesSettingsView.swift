@@ -311,22 +311,11 @@ private struct ArchiveRuleRow: View {
 }
 
 extension ArchiveRulesSettingsView {
-  /// What was archived, batch by batch (#408): the agent's paragraph after each batch, the window,
-  /// and clearing it all.
+  /// What was archived, batch by batch (#408): the window, and clearing it all. Whether an agent
+  /// summarizes is asked with each rule.
   @ViewBuilder
   func reportsSection(_ reports: ArchiveReportsModel) -> some View {
     Section {
-      Toggle(
-        isOn: Binding(get: { reports.synthesisEnabled }, set: { reports.synthesisEnabled = $0 })
-      ) {
-        Text(
-          "Summarize each batch with an agent", bundle: .module,
-          comment: "Settings › Automatic Archive: an agent writes a paragraph over each batch.")
-        Text(
-          "Its journal's sentences and resources only, never a conversation.", bundle: .module,
-          comment: "Settings › Automatic Archive: what the agent is given to summarize a batch.")
-      }
-      .accessibilityIdentifier("archive-reports-synthesis")
       HStack {
         Button {
           model.showArchiveReports()

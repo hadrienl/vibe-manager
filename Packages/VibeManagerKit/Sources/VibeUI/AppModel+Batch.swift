@@ -14,6 +14,9 @@ public struct SessionBatchConfirmation: Equatable, Identifiable {
   /// A second way to answer yes, for a move to To Do or Waiting of sessions whose agents run
   /// (#353): the sessions are moved and their agents keep running. The first answer closes them.
   public let keepOpenTitle: String?
+  /// A second way to answer yes, for an archive of several (#408): the sessions are archived
+  /// together, and an agent writes a paragraph over their batch.
+  public var summarizeTitle: String?
 
   public var id: SessionBatchAction { plan.action }
 
@@ -178,10 +181,11 @@ extension AppModel {
   /// gives: SwiftUI dismisses the dialog, and clears it, before the button runs.
   ///
   /// `restarting: false` is the answer "Move Without Restarting" gives (#192), `closing: false`
-  /// the answer "Move and Keep Open" gives (#353).
+  /// the answer "Move and Keep Open" gives (#353), `summarizing: true` the answer "Archive and
+  /// Summarize" gives (#408).
   public func confirmBatch(
     _ confirmation: SessionBatchConfirmation, askAgain: Bool = true, restarting: Bool = true,
-    closing: Bool = true
+    closing: Bool = true, summarizing: Bool = false
   ) async {
     pendingBatch = nil
     if !askAgain {
@@ -193,7 +197,7 @@ extension AppModel {
     }
     await performBatch(
       confirmation.plan, skipsAnnounced: true, restarting: restarting,
-      closing: confirmation.keepOpenTitle != nil ? closing : nil)
+      closing: confirmation.keepOpenTitle != nil ? closing : nil, summarizing: summarizing)
   }
 
   public func cancelBatch() {
@@ -212,10 +216,16 @@ extension AppModel {
     var confirmTitle: String
     var withoutRestartTitle: String?
     var keepOpenTitle: String?
+    var summarizeTitle: String?
     switch plan.action {
     case .archive:
       title = String(localized: "Archive \(count) Sessions?", bundle: .module)
       confirmTitle = String(localized: "Archive", bundle: .module)
+      if count > 1, archiveReports != nil {
+        summarizeTitle = String(
+          localized: "Archive and Summarize", bundle: .module,
+          comment: "Archives several sessions, and an agent writes a paragraph over what they did.")
+      }
       let running = eligible.filter { launcher?.isRunning($0.id) == true }.count
       if running > 0 {
         sentences.append(
@@ -341,7 +351,7 @@ extension AppModel {
     return SessionBatchConfirmation(
       plan: plan, title: title, message: sentences.joined(separator: " "),
       confirmTitle: confirmTitle, withoutRestartTitle: withoutRestartTitle,
-      keepOpenTitle: keepOpenTitle)
+      keepOpenTitle: keepOpenTitle, summarizeTitle: summarizeTitle)
   }
 
   // MARK: - Running
@@ -350,7 +360,7 @@ extension AppModel {
   /// it was not asked, and the setting decides.
   func performBatch(
     _ plan: SessionBatchPlan, skipsAnnounced: Bool, restarting: Bool = true,
-    closing: Bool? = nil
+    closing: Bool? = nil, summarizing: Bool = false
   ) async {
     // Asked again: a session may have been closed, restarted or archived since the question.
     let current = batchPlan(plan.action, for: plan.eligible)
@@ -369,7 +379,29 @@ extension AppModel {
     case .archive:
       let columns = Dictionary(
         uniqueKeysWithValues: sessions.map { ($0.id, $0.taskStatus) })
-      results.merge(await concurrently(current.eligible) { await $0.archiveInBatch($1) }) { $1 }
+      // Several archived together form a batch of their own (#408), photographed right before;
+      // one alone joins the day's archives by hand.
+      let together = current.eligible.count > 1 && archiveReports != nil
+      let date = Date()
+      var photos: [SessionID: ArchivedSessionSnapshot] = [:]
+      if together {
+        for id in current.eligible {
+          guard let session = sessions.first(where: { $0.id == id }) else { continue }
+          photos[id] = await archiveSnapshot(of: session, at: date)
+        }
+      }
+      results.merge(
+        await concurrently(current.eligible) {
+          await $0.archiveInBatch($1, recordsByHand: !together)
+        }
+      ) { $1 }
+      if together {
+        let archived = current.eligible.filter { results[$0]?.isDone == true }.compactMap {
+          photos[$0]
+        }
+        _ = await archiveReports?.recordRun(
+          kind: .selection, date: date, sessions: archived, summarizing: summarizing)
+      }
       // One ⌘Z brings the whole batch back, the session on screen selected again (#242).
       sidebarHistory.record(
         current.eligible.compactMap { id in

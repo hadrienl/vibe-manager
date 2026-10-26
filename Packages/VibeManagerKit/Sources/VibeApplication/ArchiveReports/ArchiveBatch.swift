@@ -2,7 +2,7 @@ import Foundation
 import VibeDomain
 
 /// One archive, and what it took away (#408): a run of a rule that archived something, a run on
-/// trial that would have, or the day's archives by hand. Each session is kept as it stood then,
+/// trial that would have, several sessions archived together, or the day's other archives by hand. Each session is kept as it stood then,
 /// so that its report stays right after a rename, an unarchive, or a journal cleared.
 public struct ArchiveBatch: Identifiable, Hashable, Codable, Sendable {
   public static let format = 1
@@ -12,7 +12,10 @@ public struct ArchiveBatch: Identifiable, Hashable, Codable, Sendable {
     case rule(id: UUID, name: String)
     /// A rule on trial would have archived them: nothing left the list.
     case trial(id: UUID, name: String)
-    /// The day's archives by hand: ⌃⌘A, the swipe, the batch. One per day.
+    /// Several sessions selected and archived together: a batch of their own, which the user
+    /// may have summarized.
+    case selection
+    /// The day's archives of one session by hand: ⌃⌘A, the swipe. One per day, never summarized.
     case manual
   }
 
@@ -48,7 +51,16 @@ public struct ArchiveBatch: Identifiable, Hashable, Codable, Sendable {
   public var ruleName: String? {
     switch kind {
     case .rule(_, let name), .trial(_, let name): name
-    case .manual: nil
+    case .selection, .manual: nil
+    }
+  }
+
+  /// Whether an agent's paragraph can be asked for: a rule's batch, or a selection's — never a
+  /// trial's, nor the day's archives one by one.
+  public var offersSynthesis: Bool {
+    switch kind {
+    case .rule, .selection: true
+    case .trial, .manual: false
     }
   }
 }

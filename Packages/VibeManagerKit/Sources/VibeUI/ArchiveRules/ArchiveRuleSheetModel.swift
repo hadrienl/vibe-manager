@@ -60,6 +60,8 @@ public final class ArchiveRuleSheetModel: Identifiable {
   public var problem: Problem?
   /// The rules whose name another rule already has, each to be given another one before saving.
   public var renames: [Rename] = []
+  /// Whether an agent writes a paragraph over each batch the rules archive (#408).
+  public var summarizes = true
   @ObservationIgnored private var savesOnTrial = false
 
   /// A rule of the version to name again.
@@ -87,6 +89,7 @@ public final class ArchiveRuleSheetModel: Identifiable {
     if case .refine(let stored) = purpose {
       sentence = stored.sentence
       selectedAgent = AgentProviderID(stored.agent)
+      summarizes = stored.summarizes
     } else {
       sentence = ""
     }
@@ -281,7 +284,8 @@ public final class ArchiveRuleSheetModel: Identifiable {
     }
     let saved = await rules.save(
       document, sentence: versions.first?.sentence ?? current.sentence,
-      agent: current.agentID, state: trial ? .trial : .active, replacing: replacing)
+      agent: current.agentID, state: trial ? .trial : .active, summarizes: summarizes,
+      replacing: replacing)
     if saved {
       renames = []
       announce(

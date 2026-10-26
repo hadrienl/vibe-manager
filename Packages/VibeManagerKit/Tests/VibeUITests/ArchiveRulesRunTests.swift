@@ -53,6 +53,17 @@ private final class ArchiveNotifier: RequestNotifying {
   }
 }
 
+/// An agent that always writes the same paragraph.
+private struct WritingSynthesizers: ArchiveSynthesizerResolving, ArchiveSynthesizing {
+  func synthesizer() async -> (providerID: String, synthesizer: any ArchiveSynthesizing)? {
+    ("claude", self)
+  }
+
+  func synthesize(_ request: ArchiveSynthesisRequest) async throws -> Data {
+    Data(#"{"summary":"The reds were shipped."}"#.utf8)
+  }
+}
+
 /// The rules running in the application (#405): what they archive, how, and what they leave.
 @MainActor
 @Suite("Archive rules in the application (#405)")
@@ -76,7 +87,9 @@ struct ArchiveRulesRunTests {
   }
 
   /// A model whose rule is due now: daily at the time `friday` is, turned on the day before.
-  private func model(state: StoredArchiveRule.State = .active, notifies: Bool = true) async -> (
+  private func model(
+    state: StoredArchiveRule.State = .active, notifies: Bool = true, summarizes: Bool = true
+  ) async -> (
     AppModel, RulesRepository, ArchiveNotifier, [WorkSession], InMemoryArchiveRuleStore
   ) {
     let sessions = [done("Red", color: "#B42318"), done("Blue", color: "#0B63E5")]
@@ -95,14 +108,15 @@ struct ArchiveRulesRunTests {
           StoredArchiveRule(
             text: text, state: state, sentence: "", agent: "claude",
             createdAt: friday.addingTimeInterval(-86_400),
-            activatedAt: friday.addingTimeInterval(-86_400))
+            activatedAt: friday.addingTimeInterval(-86_400), summarizes: summarizes)
         ], notifies: notifies))
     let rules = ArchiveRulesModel(
       store: store, now: { [friday] in friday }, calendar: { [calendar] in calendar() })
     rules.startsTicker = false
     model.archiveRules = rules
     model.archiveReports = ArchiveReportsModel(
-      now: { [friday] in friday }, calendar: { [calendar] in calendar() })
+      synthesizers: WritingSynthesizers(), now: { [friday] in friday },
+      calendar: { [calendar] in calendar() })
     await model.load()
     return (model, repository, notifier, sessions, store)
   }
@@ -248,6 +262,74 @@ struct ArchiveRulesRunTests {
     #expect(reports.batches.count == 1)
     #expect(reports.batches.first?.kind == .manual)
     #expect(Set(reports.batches.first?.sessions.map(\.name) ?? []) == ["Red", "Blue"])
+  }
+
+  @Test("A rule asked to summarize has its batch summarized; one that was not, never")
+  func ruleSummarizes() async throws {
+    let (model, _, _, _, _) = await model()
+    await model.runArchiveRules()
+    let reports = try #require(model.archiveReports)
+    await waitUntil("the batch summarized") {
+      if case .ready(let text, _, _) = reports.batches.first?.synthesis {
+        text == "The reds were shipped."
+      } else {
+        false
+      }
+    }
+
+    let (silent, _, _, _, _) = await self.model(summarizes: false)
+    await silent.runArchiveRules()
+    let unsummarized = try #require(silent.archiveReports)
+    #expect(unsummarized.batches.count == 1)
+    #expect(unsummarized.synthesizing.isEmpty)
+    #expect(unsummarized.batches.first?.synthesis == nil)
+  }
+
+  @Test("Whether a rule summarizes is asked in its sheet, and kept")
+  func sheetSummarizes() async throws {
+    let (model, _, _, _, store) = await model()
+    let rules = try #require(model.archiveRules)
+    let sheet = ArchiveRuleSheetModel(purpose: .newRules, rules: rules) { .sample }
+    sheet.announce = { _ in }
+    sheet.setVersionForTesting(
+      try ArchiveRuleParser.parse(#"rule "Blues" archive done sessions on daily at 18:00"#))
+    #expect(sheet.summarizes)
+    sheet.summarizes = false
+    #expect(await sheet.save(trial: false))
+    let saved = try #require(await store.load().rules.first { $0.rule?.name == "Blues" })
+    #expect(!saved.summarizes)
+
+    let refined = ArchiveRuleSheetModel(purpose: .refine(saved), rules: rules) { .sample }
+    #expect(!refined.summarizes)
+  }
+
+  @Test("Several archived together form their own batch, summarized when the user asks")
+  func selection() async throws {
+    let (model, _, _, sessions, _) = await model()
+    let reports = try #require(model.archiveReports)
+    let ids = sessions.map(\.id)
+    let confirmation = try #require(model.confirmation(for: model.batchPlan(.archive, for: ids)))
+    #expect(confirmation.summarizeTitle != nil)
+    await model.confirmBatch(confirmation, summarizing: true)
+    let batch = try #require(reports.batches.first)
+    #expect(reports.batches.count == 1)
+    #expect(batch.kind == .selection)
+    #expect(Set(batch.sessions.map(\.name)) == ["Red", "Blue"])
+    await waitUntil("the selection summarized") {
+      if case .ready = reports.batches.first?.synthesis { true } else { false }
+    }
+  }
+
+  @Test("A selection archived without asking is not summarized")
+  func selectionWithoutSummary() async throws {
+    let (model, _, _, sessions, _) = await model()
+    let reports = try #require(model.archiveReports)
+    let confirmation = try #require(
+      model.confirmation(for: model.batchPlan(.archive, for: sessions.map(\.id))))
+    await model.confirmBatch(confirmation)
+    #expect(reports.batches.first?.kind == .selection)
+    #expect(reports.synthesizing.isEmpty)
+    #expect(reports.batches.first?.synthesis == nil)
   }
 
   @Test("The notification can be turned off")
