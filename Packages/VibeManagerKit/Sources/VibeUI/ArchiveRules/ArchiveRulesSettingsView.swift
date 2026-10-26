@@ -187,7 +187,11 @@ private struct ArchiveRuleRow: View {
       VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 6) {
           Text(verbatim: name).fontWeight(.semibold)
-          if let pill { pill }
+          if stored.state == .trial, stored.rule != nil {
+            trialMenu
+          } else if let pill {
+            pill
+          }
         }
         if let explanation = line.explanation {
           Text(verbatim: explanation).font(.callout).fixedSize(horizontal: false, vertical: true)
@@ -255,6 +259,51 @@ private struct ArchiveRuleRow: View {
         Text("More for \(name)", bundle: .module, comment: "The menu of an archive rule, by its name."))
     }
     .padding(.vertical, 2)
+  }
+
+  /// A rule on trial asks, from its badge, whether the trial was conclusive: turning it on is the
+  /// answer the badge leads to, rather than an item of the “…” menu.
+  private var trialMenu: some View {
+    Menu {
+      Section {
+        Button {
+          Task { await rules.setState(.active, of: stored.id) }
+        } label: {
+          Text(
+            "Yes, Turn It On", bundle: .module,
+            comment: "The menu of a rule on trial: the trial was conclusive, the rule archives from now on.")
+        }
+        Button(action: redo) {
+          Text(
+            "No, Refine It…", bundle: .module,
+            comment: "The menu of a rule on trial: the trial was not conclusive, describe a change.")
+        }
+        Button {
+          Task { await rules.setState(.paused, of: stored.id) }
+        } label: {
+          Text("Pause", bundle: .module, comment: "A menu of an archive rule.")
+        }
+      } header: {
+        Text(
+          "Was the trial conclusive?", bundle: .module,
+          comment: "The menu of a rule on trial, which archives nothing yet.")
+      }
+    } label: {
+      HStack(spacing: 2) {
+        Text("On Trial", bundle: .module, comment: "A badge of an archive rule that archives nothing yet.")
+        Image(systemName: "chevron.down").imageScale(.small)
+      }
+      .font(.caption2.bold())
+      .foregroundStyle(.blue)
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .background(.blue.opacity(0.12), in: .capsule)
+    }
+    .menuStyle(.button)
+    .buttonStyle(.plain)
+    .menuIndicator(.hidden)
+    .fixedSize()
+    .accessibilityIdentifier("archive-rule-trial")
   }
 
   private var pill: Text? {
