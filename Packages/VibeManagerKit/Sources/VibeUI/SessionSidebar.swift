@@ -913,6 +913,28 @@ private struct ArchivedSessionsList: View {
         }
       }
     }
+    .safeAreaInset(edge: .bottom, spacing: 0) {
+      // What was archived, batch by batch (#408).
+      if model.archiveReports != nil {
+        VStack(spacing: 0) {
+          Divider()
+          HStack {
+            Spacer()
+            Button {
+              model.isArchiveListPresented = false
+              model.showArchiveReports()
+            } label: {
+              Text(
+                "See Reports", bundle: .module,
+                comment: "Opens Window › Archive Reports from the list of archived sessions.")
+            }
+            .controlSize(.small)
+            .accessibilityIdentifier("archive-see-reports")
+          }
+          .padding(8)
+        }
+      }
+    }
     .frame(width: 320, height: 300)
   }
 

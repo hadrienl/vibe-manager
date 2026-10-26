@@ -34,8 +34,8 @@ public protocol RequestNotifying: AnyObject {
   /// Played here when the system may not notify.
   func postAlertSound(title: String, body: String)
   /// An automatic archive rule archived sessions (#405): a discreet notification, turned off in
-  /// the Settings.
-  func postArchiveRun(ruleName: String, count: Int)
+  /// the Settings. Clicked, it opens the batch's report (#408).
+  func postArchiveRun(ruleName: String, count: Int, batchID: UUID?)
   /// The voice that reads the answers is ready (#357).
   func postSpeechReady(notifies: Bool)
 }
@@ -49,7 +49,7 @@ extension RequestNotifying {
     // Nothing: a notifier that does not say the voice is ready stays silent.
   }
   public func postAlertSound(title: String, body: String) {}
-  public func postArchiveRun(ruleName: String, count: Int) {}
+  public func postArchiveRun(ruleName: String, count: Int, batchID: UUID?) {}
 }
 
 /// An answer given from outside the terminal, said for a moment.

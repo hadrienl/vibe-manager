@@ -36,6 +36,7 @@ private struct NoAgents: AgentProviderResolving {
 @MainActor
 private final class ArchiveNotifier: RequestNotifying {
   private(set) var runs: [(String, Int)] = []
+  private(set) var batches: [UUID?] = []
   func post(_: RequestNotification) {
     // Only the archive's notification counts here.
   }
@@ -46,7 +47,10 @@ private final class ArchiveNotifier: RequestNotifying {
     // The badge is not what these tests look at.
   }
   func isAuthorized() async -> Bool? { true }
-  func postArchiveRun(ruleName: String, count: Int) { runs.append((ruleName, count)) }
+  func postArchiveRun(ruleName: String, count: Int, batchID: UUID?) {
+    runs.append((ruleName, count))
+    batches.append(batchID)
+  }
 }
 
 /// The rules running in the application (#405): what they archive, how, and what they leave.
@@ -97,6 +101,8 @@ struct ArchiveRulesRunTests {
       store: store, now: { [friday] in friday }, calendar: { [calendar] in calendar() })
     rules.startsTicker = false
     model.archiveRules = rules
+    model.archiveReports = ArchiveReportsModel(
+      now: { [friday] in friday }, calendar: { [calendar] in calendar() })
     await model.load()
     return (model, repository, notifier, sessions, store)
   }
@@ -200,6 +206,48 @@ struct ArchiveRulesRunTests {
     let result = try #require(await store.load().rules.first?.lastRun)
     #expect(result.isTrial)
     #expect(result.archived == 1)
+  }
+
+  @Test("A run forms a batch with its sessions as they stood; the notification names it")
+  func batch() async throws {
+    let (model, _, notifier, sessions, _) = await model()
+    await model.runArchiveRules()
+    let reports = try #require(model.archiveReports)
+    let batch = try #require(reports.batches.first)
+    #expect(reports.batches.count == 1)
+    #expect(batch.ruleName == "Reds")
+    #expect(!batch.isTrial)
+    #expect(batch.sessions.map(\.name) == ["Red"])
+    #expect(batch.sessions.first?.sessionID == sessions[0].id)
+    #expect(notifier.batches == [batch.id])
+
+    model.showArchiveReport(batch.id)
+    #expect(reports.selection == .batch(batch.id))
+    let report = try #require(reports.report)
+    #expect(report.totals.sessions == 1)
+  }
+
+  @Test("A run on trial forms a batch apart, and archives nothing")
+  func trialBatch() async throws {
+    let (model, _, _, _, _) = await model(state: .trial)
+    await model.runArchiveRules()
+    let reports = try #require(model.archiveReports)
+    #expect(reports.batches.count == 1)
+    #expect(reports.batches.first?.isTrial == true)
+    #expect(reports.days.isEmpty)
+    reports.showsTrials = true
+    #expect(reports.days.count == 1)
+  }
+
+  @Test("Archives by hand go to the day's batch")
+  func byHand() async throws {
+    let (model, _, _, sessions, _) = await model()
+    await model.archive(sessions[0].id, askAgain: false)
+    await model.archive(sessions[1].id, askAgain: false)
+    let reports = try #require(model.archiveReports)
+    #expect(reports.batches.count == 1)
+    #expect(reports.batches.first?.kind == .manual)
+    #expect(Set(reports.batches.first?.sessions.map(\.name) ?? []) == ["Red", "Blue"])
   }
 
   @Test("The notification can be turned off")

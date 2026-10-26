@@ -11,6 +11,7 @@ struct ArchiveRulesSettingsView: View {
   @State private var bench: ArchiveRuleBenchModel?
   /// “Not What I Wanted” from the bench: the sheet to refine opens once the bench is gone.
   @State private var pendingRefinement: (rule: StoredArchiveRule, text: String)?
+  @State private var confirmsClearingReports = false
 
   var body: some View {
     Form {
@@ -110,6 +111,9 @@ struct ArchiveRulesSettingsView: View {
             comment: "Settings › Automatic Archive: a notification when a rule archived sessions.")
         }
         .accessibilityIdentifier("archive-rules-notifies")
+      }
+      if let reports = model.archiveReports {
+        reportsSection(reports)
       }
     }
     .formStyle(.grouped)
@@ -303,5 +307,60 @@ private struct ArchiveRuleRow: View {
     return String(
       localized: "Last: \(date) · \(last.archived) archived, \(last.skipped) skipped",
       bundle: .module, comment: "Settings › Automatic Archive: what a rule's last run did.")
+  }
+}
+
+extension ArchiveRulesSettingsView {
+  /// What was archived, batch by batch (#408): the agent's paragraph after each batch, the window,
+  /// and clearing it all.
+  @ViewBuilder
+  func reportsSection(_ reports: ArchiveReportsModel) -> some View {
+    Section {
+      Toggle(
+        isOn: Binding(get: { reports.synthesisEnabled }, set: { reports.synthesisEnabled = $0 })
+      ) {
+        Text(
+          "Summarize each batch with an agent", bundle: .module,
+          comment: "Settings › Automatic Archive: an agent writes a paragraph over each batch.")
+        Text(
+          "Its journal's sentences and resources only, never a conversation.", bundle: .module,
+          comment: "Settings › Automatic Archive: what the agent is given to summarize a batch.")
+      }
+      .accessibilityIdentifier("archive-reports-synthesis")
+      HStack {
+        Button {
+          model.showArchiveReports()
+        } label: {
+          Text("Show Reports", bundle: .module, comment: "Opens Window › Archive Reports.")
+        }
+        Spacer()
+        Button(role: .destructive) {
+          confirmsClearingReports = true
+        } label: {
+          Text("Clear Reports…", bundle: .module, comment: "Removes every archive report.")
+        }
+        .disabled(reports.batches.isEmpty)
+      }
+    } header: {
+      Text("Reports", bundle: .module, comment: "Settings › Automatic Archive: a section.")
+    } footer: {
+      Text(
+        "Each archive keeps a report of what its sessions did, for twelve months.", bundle: .module,
+        comment: "Settings › Automatic Archive: the reports' section.")
+    }
+    .task { if !reports.loaded { await reports.load() } }
+    .confirmationDialog(
+      Text("Clear every archive report?", bundle: .module),
+      isPresented: $confirmsClearingReports
+    ) {
+      Button(role: .destructive) {
+        Task { await reports.clear() }
+      } label: {
+        Text("Clear Reports", bundle: .module, comment: "Confirms removing every archive report.")
+      }
+    } message: {
+      Text(
+        "The archived sessions stay in the archive: only the reports are removed.", bundle: .module)
+    }
   }
 }

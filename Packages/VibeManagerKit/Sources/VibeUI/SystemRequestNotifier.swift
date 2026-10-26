@@ -27,6 +27,8 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   nonisolated static let dictationKey = "dictation"
   /// Marks the notification that the voice reading the answers is ready (#357).
   nonisolated static let speechKey = "speech"
+  /// The batch an archive's notification opens the report of (#408).
+  nonisolated static let archiveBatchKey = "archiveBatch"
 
   private let center: UNUserNotificationCenter
   private weak var model: AppModel?
@@ -158,7 +160,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   }
 
   /// Without a sound: nothing waits on the user, it only says what left the list.
-  public func postArchiveRun(ruleName: String, count: Int) {
+  public func postArchiveRun(ruleName: String, count: Int, batchID: UUID?) {
     let identifier = "archive-run|\(UUID().uuidString)"
     wanted.insert(identifier)
     Task {
@@ -168,6 +170,7 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
         localized: "“\(ruleName)” archived \(count) sessions.", bundle: .module,
         comment: "A notification: an automatic archive rule, by its name, archived sessions.")
       content.sound = nil
+      if let batchID { content.userInfo = [Self.archiveBatchKey: batchID.uuidString] }
       deliver(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
     }
   }
@@ -339,6 +342,15 @@ public final class SystemRequestNotifier: NSObject, RequestNotifying {
   }
 }
 
+extension SystemRequestNotifier {
+  /// Opens the report of the batch a notification said.
+  @MainActor
+  fileprivate func showArchiveReport(_ id: UUID) {
+    NSApp.activate()
+    model?.showArchiveReport(id)
+  }
+}
+
 extension SystemRequestNotifier: UNUserNotificationCenterDelegate {
   public nonisolated func userNotificationCenter(
     _ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse
@@ -351,6 +363,10 @@ extension SystemRequestNotifier: UNUserNotificationCenterDelegate {
     }
     if userInfo[Self.dictationKey] as? Bool == true {
       await NSApp.activate()
+      return
+    }
+    if let batch = (userInfo[Self.archiveBatchKey] as? String).flatMap(UUID.init(uuidString:)) {
+      await showArchiveReport(batch)
       return
     }
     guard let id = Self.requestID(from: userInfo) else {
