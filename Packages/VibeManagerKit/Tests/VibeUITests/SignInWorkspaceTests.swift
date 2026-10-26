@@ -22,7 +22,9 @@ struct SignInWorkspaceTests {
     return path
   }
 
-  private func running() async throws -> (AppModel, WorkSession) {
+  private func running(
+    supervisor: WorkspaceSupervisor = WorkspaceSupervisor()
+  ) async throws -> (AppModel, WorkSession) {
     let subject = WorkSession(
       name: "Audit deps",
       initialPrompt: "Audit the dependencies.",
@@ -36,7 +38,7 @@ struct SignInWorkspaceTests {
     let repository = WorkspaceRepository(sessions: [subject])
     let registry = WorkspaceRegistry(providers: [WorkspaceProvider()])
     let launcher = SessionLauncher(
-      supervisor: WorkspaceSupervisor(), repository: repository, agents: registry,
+      supervisor: supervisor, repository: repository, agents: registry,
       viewportTimeout: .zero)
     let model = AppModel(repository: repository, agents: registry, launcher: launcher)
     await model.refreshAgents()
@@ -77,8 +79,53 @@ struct SignInWorkspaceTests {
     // so it is not resumed by itself. It waits, Resume offered.
     await model.signInEnded(AgentProviderID("stub"), outcome: .signedIn)
     #expect(
-      model.signInNotice(for: subject.id)?.state == .signedIn(canResume: true, textWaiting: true))
+      model.signInNotice(for: subject.id)?.state
+        == .signedIn(canResume: true, waiting: .text(nil)))
     #expect(model.resumingAfterSignIn.isEmpty)
+  }
+
+  /// Claude Code's prompt as it draws it, holding what the user typed before signing in again.
+  private static let promptHoldingText = Array(
+    """
+    ────────────────────────────────────────\r
+    ❯ c'est déployé\r
+    ────────────────────────────────────────\r
+      ⏵⏵ auto mode on (shift+tab to cycle)\r
+
+    """.utf8)
+
+  @Test("Text left in the prompt is shown, and Resume sends it once the agent is restarted")
+  func textWaitingIsSent() async throws {
+    let supervisor = WorkspaceSupervisor(history: Self.promptHoldingText)
+    let (model, subject) = try await running(supervisor: supervisor)
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+
+    // Not sent by itself: the user may not be done with it.
+    await model.signInEnded(AgentProviderID("stub"), outcome: .signedIn)
+    #expect(
+      model.signInNotice(for: subject.id)?.state
+        == .signedIn(canResume: true, waiting: .text("c'est déployé")))
+    #expect(await supervisor.startCount == 1)
+
+    // Text other than the one shown is not sent: the notice shows what the prompt holds now.
+    model.resumingAfterSignIn.insert(subject.id)
+    await model.resumeSignedIn(subject.id, sending: "c'est fait")
+    #expect(
+      model.signInNotice(for: subject.id)?.state
+        == .signedIn(canResume: true, waiting: .text("c'est déployé")))
+    #expect(await supervisor.startCount == 1)
+
+    model.resumeAfterSignIn(subject.id)
+    #expect(model.signInNotice(for: subject.id)?.state == .resuming)
+    let deadline = ContinuousClock.now + .seconds(30)
+    while await supervisor.startCount < 2, ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(await supervisor.startCount == 2)
+    let arguments = await supervisor.lastSpec?.arguments.joined(separator: " ") ?? ""
+    #expect(arguments.contains("kept-identifier"))
+    // The restarted agent is not waited for: what is typed into it is the update suite's.
+    await supervisor.finish(id: subject.id, state: .exited(code: 0))
   }
 
   @Test("A failure is not shown over a sign-in that expired after it")

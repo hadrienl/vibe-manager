@@ -3515,6 +3515,107 @@
         }
       }
     },
+    "%@ stopped on its sign-in" : {
+      "comment" : "An agent's name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "توقف %@ عند تسجيل دخوله"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ wurde bei der Anmeldung angehalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ se detuvo en su inicio de sesión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ s’est arrêté sur sa connexion"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ अपने साइन-इन पर रुक गया"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ si è fermato sull’accesso"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@はサインインで停止しました"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@이(가) 로그인에서 멈췄습니다"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ is gestopt bij het aanmelden"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ zatrzymał się na logowaniu"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ parou no login"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ остановился на входе в аккаунт"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ oturum açmada durdu"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ зупинився на вході в обліковий запис"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 因登录而停止"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ 因登入而停止"
+          }
+        }
+      }
+    },
     "%@ twice gave a theme that could not be read. The theme on screen is unchanged: try again, or say it differently." : {
       "localizations" : {
         "ar" : {
@@ -26655,6 +26756,107 @@
         }
       }
     },
+    "Resume sends what waits in this session’s prompt: “%@”" : {
+      "comment" : "The text typed into an agent's prompt, sent once the agent is restarted.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يرسل «استئناف» ما ينتظر في موجّه هذه الجلسة: «%@»"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„Fortsetzen“ sendet, was in der Eingabe dieser Sitzung wartet: „%@“"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reanudar envía lo que espera en el campo de esta sesión: «%@»"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Reprendre envoie ce qui attend dans l’invite de cette session : « %@ »"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "फिर से शुरू करने पर इस सेशन के प्रॉम्प्ट में प्रतीक्षा कर रहा टेक्स्ट भेजा जाएगा: “%@”"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Riprendi invia ciò che attende nel prompt di questa sessione: «%@»"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "再開すると、このセッションのプロンプトに残っている内容を送信します:「%@」"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "재개하면 이 세션의 프롬프트에 남아 있는 내용을 보냅니다: “%@”"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hervatten verstuurt wat in de invoer van deze sessie wacht: ‘%@’"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wznów wyśle to, co czeka w polu tej sesji: „%@”"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retomar envia o que está esperando no campo desta sessão: “%@”"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Продолжить» отправит то, что ждёт в поле ввода этой сессии: «%@»"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Devam Et, bu oturumun isteminde bekleyeni gönderir: “%@”"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "«Продовжити» надішле те, що чекає в полі введення цього сеансу: «%@»"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“继续”会发送此会话提示中等待的内容：“%@”"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「繼續」會傳送此工作階段提示中等待的內容：「%@」"
+          }
+        }
+      }
+    },
     "Run" : {
       "localizations" : {
         "ar" : {
@@ -36950,6 +37152,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法轉寫你說的內容。"
+          }
+        }
+      }
+    },
+    "Work is still running in this session’s terminal. Resume once it is done." : {
+      "comment" : "A shell or a task the agent runs in the background.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يزال هناك عمل قيد التشغيل في طرفية هذه الجلسة. استأنفها عند انتهائه."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Im Terminal dieser Sitzung läuft noch Arbeit. Setzen Sie sie fort, sobald sie erledigt ist."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Todavía hay trabajo en curso en el terminal de esta sesión. Reanúdela cuando termine."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Du travail tourne encore dans le terminal de cette session. Reprenez-la une fois terminé."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इस सेशन के टर्मिनल में अभी भी काम चल रहा है। उसके पूरा होने पर फिर से शुरू करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nel terminale di questa sessione c’è ancora del lavoro in corso. Riprendila quando è finito."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このセッションのターミナルでまだ処理が実行中です。終わってから再開してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 세션의 터미널에서 아직 작업이 실행 중입니다. 끝난 뒤 재개하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "In de terminal van deze sessie loopt nog werk. Hervat de sessie zodra dat klaar is."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "W terminalu tej sesji wciąż trwa praca. Wznów ją, gdy się zakończy."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ainda há trabalho em andamento no terminal desta sessão. Retome quando terminar."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "В терминале этой сессии ещё идёт работа. Продолжите, когда она завершится."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu oturumun terminalinde hâlâ çalışan bir iş var. Bittiğinde devam edin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "У терміналі цього сеансу ще триває робота. Продовжте, коли вона завершиться."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此会话的终端中仍有工作在运行。完成后再继续。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此工作階段的終端機中仍有工作在執行。完成後再繼續。"
           }
         }
       }

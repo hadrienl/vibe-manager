@@ -629,6 +629,11 @@ struct RequestHint: View {
             comment: "Under the composer while questions wait that it does not answer.")
         } else if model.activity == .awaitingUser(.question) {
           Text("\(model.agentName) is asking you a question", bundle: .module)
+        } else if model.signIn != nil {
+          // The request is its sign-in, which the notice above the composer is about (#410).
+          Text(
+            "\(model.agentName) stopped on its sign-in", bundle: .module,
+            comment: "An agent's name.")
         } else {
           Text("\(model.agentName) asks for your permission", bundle: .module)
         }

@@ -49,12 +49,14 @@ extension AppModel {
     signInTasks[provider]?.cancel()
   }
 
-  /// Resumes a session the sign-in did not: text was waiting in its prompt, or it was busy.
+  /// Resumes a session the sign-in did not: text was waiting in its prompt, or it was busy. The
+  /// text the notice showed is sent in place of the prompt that failed.
   public func resumeAfterSignIn(_ id: SessionID) {
     guard resumingAfterSignIn.insert(id).inserted else { return }
-    signInTextWaiting.remove(id)
+    let shown: String? =
+      if case .text(let text)? = signInWaiting.removeValue(forKey: id) { text } else { nil }
     publishSignIn(for: id)
-    Task { await resumeSignedIn(id) }
+    Task { await resumeSignedIn(id, sending: shown) }
   }
 
   /// The CLI's own sign-in, in the session's terminal: for when the one run from here failed.
@@ -104,9 +106,11 @@ extension AppModel {
   /// marked as resuming by the caller.
   ///
   /// Only when nothing would be lost, as for an update (#409): no other command at work on it,
-  /// nothing typed into its prompt, nothing running behind it — a sign-in that failed stops the
-  /// turn, not a shell or an agent in the background. Asked again after every wait.
-  func resumeSignedIn(_ id: SessionID) async {
+  /// nothing running behind it — a sign-in that failed stops the turn, not a shell or an agent in
+  /// the background. Asked again after every wait. Text typed into its prompt is the user's to
+  /// send: only once the notice has shown it, `waitingText`, and it is still what the prompt
+  /// holds — typed back in place of the prompt that failed.
+  func resumeSignedIn(_ id: SessionID, sending waitingText: String? = nil) async {
     defer {
       resumingAfterSignIn.remove(id)
       publishSignIn(for: id)
@@ -117,19 +121,25 @@ extension AppModel {
     let entries = await conversations.entries(of: session)
     // A sign-in that expired once the agent was at work leaves no prompt to hand back: it is
     // told to go on from where it stopped (#419).
-    let prompt =
+    var prompt =
       entries.flatMap(ConversationEntry.promptFailedOnSignIn(in:))
       ?? (entries.map(ConversationEntry.turnFailedOnSignInMidway(in:)) == true
         ? Self.continuePrompt : nil)
     guard let screen = await launcher.screen(of: id) else { return }
     let runsInBackground = await runsBackgroundWork(id)
     guard isStillStoppedOnSignIn(id) else { return }
-    guard AgentUpdateRestartReadiness.promptIsEmpty(screen: screen), !runsInBackground,
-      !AgentUpdateRestartReadiness.runsInBackground(screen: screen)
-    else {
-      // Text the user typed, or work behind the prompt: theirs to resume when it is done.
-      signInTextWaiting.insert(id)
+    guard !runsInBackground, !AgentUpdateRestartReadiness.runsInBackground(screen: screen) else {
+      signInWaiting[id] = .work
       return
+    }
+    if !AgentUpdateRestartReadiness.promptIsEmpty(screen: screen) {
+      let typed = PromptInputRecognition.input(screen: screen).flatMap(
+        PromptInputRecognition.text(of:))
+      guard let typed, typed == waitingText else {
+        signInWaiting[id] = .text(typed)
+        return
+      }
+      prompt = typed
     }
     guard await restartInPlace(id), let prompt else { return }
     await typeBack(prompt, into: id)
@@ -231,7 +241,7 @@ extension AppModel {
         return ConversationSignIn(
           agentName: name,
           state: .signedIn(
-            canResume: canRestartInPlace(id), textWaiting: signInTextWaiting.contains(id)),
+            canResume: canRestartInPlace(id), waiting: signInWaiting[id]),
           route: route)
       }
       return ConversationSignIn(agentName: name, state: .expired, route: route)

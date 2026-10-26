@@ -50,6 +50,25 @@ public enum PromptInputRecognition {
     input.contains { $0.contains("[Pasted text") }
   }
 
+  /// The text the prompt holds, to be typed back into a process started again (#410). A line
+  /// wrapped is not told from a line break: lines are joined by a space, paragraphs kept apart.
+  /// `nil` when it holds none, or when what it shows stands for more — an image, a text pasted.
+  public static func text(of input: [String]) -> String? {
+    guard holdsText(input), !showsPastedText(input),
+      !input.contains(where: { $0.contains(/\[Image #\d+\]/) })
+    else { return nil }
+    var paragraphs: [[String]] = [[]]
+    for line in input.map({ $0.trimmingCharacters(in: .whitespaces) }) {
+      if !line.isEmpty {
+        paragraphs[paragraphs.count - 1].append(line)
+      } else if !paragraphs[paragraphs.count - 1].isEmpty {
+        paragraphs.append([])
+      }
+    }
+    return paragraphs.filter { !$0.isEmpty }.map { $0.joined(separator: " ") }
+      .joined(separator: "\n\n")
+  }
+
   /// Whether the prompt ends on an empty line: a text sent is trimmed, so such a line is a Return
   /// taken for a line break.
   public static func endsOnLineBreak(_ input: [String]) -> Bool {
