@@ -117,6 +117,32 @@ func snapshotOfActiveSessions() {
     ])
 }
 
+@Test("A waiting session carries its first request, for the phone's notification (#401)")
+func waitingSessionCarriesRequest() {
+  let asking = session("Asking", status: .active, rank: 1)
+  var state = AgentActivityState(activity: .awaitingUser(.approval))
+  state.requests = [
+    AgentRequest(
+      id: AgentRequestID(sessionID: asking.id, key: "K1"), receivedAt: Date(), kind: .approval,
+      content: .permission(
+        AgentToolPermission(
+          tool: .shell, toolName: "Bash", subject: "git push", purpose: "Publish the branch")),
+      reference: AgentToolReference(tool: "Bash"), isShown: true),
+    AgentRequest(
+      id: AgentRequestID(sessionID: asking.id, key: "K2"), receivedAt: Date(), kind: .approval,
+      content: .questions([]), reference: AgentToolReference(tool: "AskUserQuestion"),
+      isShown: false),
+  ]
+
+  let snapshot = CompanionSnapshot.make(
+    sessions: [asking], activity: { _ in state }, agentName: { $0 })
+
+  #expect(
+    snapshot.sessions.first?.request
+      == CompanionSnapshot.Request(
+        id: "K1", kind: .permission, title: "Publish the branch", subject: "git push"))
+}
+
 @Test("A burst of changes leaves as one snapshot, the last")
 @MainActor
 func burstIsCoalesced() async {

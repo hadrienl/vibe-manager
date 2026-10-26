@@ -41,6 +41,7 @@ public enum CompanionRecordCodec {
     public static let session = "session"
     public static let request = "request"
     public static let device = "device"
+    public static let answer = "answer"
     /// The debug application's test (#347), in no build that ships.
     public static let ping = "ping"
     public static let pong = "pong"
@@ -63,6 +64,7 @@ public enum CompanionRecordCodec {
     case .pong: Kind.pong
     case .request: Kind.request
     case .device: Kind.device
+    case .answer: Kind.answer
     }
   }
 
@@ -97,9 +99,9 @@ public enum CompanionRecordCodec {
     case .pong(let body): encoded(body)
     case .request(let body): encoded(body)
     case .device(let body): encoded(body)
+    case .answer(let body): encoded(body)
     }
   }
-
 
   /// `nil` for a record of another type or zone, of a kind or format this version does not know,
   /// or that does not decode: a later version may write what this one does not read, and that is
@@ -118,6 +120,7 @@ public enum CompanionRecordCodec {
       case Kind.pong: body(CompanionPong.self, payload).map(CompanionRecord.pong)
       case Kind.request: body(CompanionRequest.self, payload).map(CompanionRecord.request)
       case Kind.device: body(CompanionDevice.self, payload).map(CompanionRecord.device)
+      case Kind.answer: body(CompanionAnswer.self, payload).map(CompanionRecord.answer)
       default: nil
       }
     // The record's name is the one its value gives: anything else was not written by a companion.

@@ -71,6 +71,13 @@ their own iCloud storage — and needs no account of ours.
 Tried on the device: alerts on a locked phone, on Wi-Fi and 4G, with the application killed, the
 text decrypted by the extension.
 
+- **Answering from the alert (#401).** A permission's alert offers Allow — after Face ID or the
+  code — and Deny. iOS wakes the application in the background for a few seconds: the answer goes
+  as an `answer` record of the private database, one CloudKit write, rather than over iroh, whose
+  connection may not be made in that time. The Mac's helper hands it to the application, which
+  gives it only if that very request still waits, then deletes it; an answer more than 10 minutes
+  old is deleted unread. A question's alert opens the session.
+
 ### The live channel: iroh, direct first
 
 While the application is open, the phone and the Mac talk over [iroh](https://www.iroh.computer)

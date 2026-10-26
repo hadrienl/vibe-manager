@@ -18,7 +18,33 @@ private let records: [CompanionRecord] = [
       state: .needsAttention, updatedAt: now)),
   .ping(CompanionPing(nonce: "7F3A", deviceName: "iPhone de Hadrien", sentAt: now)),
   .pong(CompanionPong(nonce: "7F3A", macID: "A1", receivedAt: now.addingTimeInterval(2))),
+  .request(
+    CompanionRequest(
+      id: "R1", macID: "A1", sessionTitle: "#401 Notifications", agent: "Claude Code",
+      text: "waiting", createdAt: now, sessionID: "6F1C",
+      detail: CompanionRequestDetail(
+        requestID: "K", kind: .permission, title: "", subject: "git push"))),
+  .answer(
+    CompanionAnswer(
+      id: "N1", macID: "A1", sessionID: "6F1C", requestID: "K", choice: .deny, createdAt: now)),
 ]
+
+@Test("A request of the version before #401 is read, without its detail")
+func requestBeforeDetail() throws {
+  let json =
+    #"{"v":1,"body":{"id":"R0","macID":"A1","sessionTitle":"T","agent":"Codex","#
+    + #""text":"waiting","createdAt":0}}"#
+  let ckRecord = CKRecord(
+    recordType: "Envelope", recordID: CompanionCloud.recordID("request-R0"))
+  ckRecord["kind"] = "request"
+  ckRecord.encryptedValues["payload"] = Data(json.utf8)
+  guard case .request(let request)? = CompanionRecordCodec.decode(ckRecord) else {
+    Issue.record("not read")
+    return
+  }
+  #expect(request.sessionID == nil)
+  #expect(request.detail == nil)
+}
 
 @Test("Every record comes back from its CKRecord as it was", arguments: records)
 func roundTrip(record: CompanionRecord) throws {

@@ -18,12 +18,47 @@ public struct CompanionSessionInfo: Hashable, Codable, Sendable {
   public let title: String
   public let agent: String
   public let state: CompanionSessionState
+  /// What the agent waits for, while it does (#401): for the request's notification, never for the
+  /// session's record.
+  public let request: CompanionRequestDetail?
 
-  public init(id: String, title: String, agent: String, state: CompanionSessionState) {
+  public init(
+    id: String, title: String, agent: String, state: CompanionSessionState,
+    request: CompanionRequestDetail? = nil
+  ) {
     self.id = id
     self.title = title
     self.agent = agent
     self.state = state
+    self.request = request
+  }
+
+  /// The session as its record holds it: without the request.
+  public var listed: CompanionSessionInfo {
+    CompanionSessionInfo(id: id, title: title, agent: agent, state: state)
+  }
+}
+
+/// What an agent waits for, as its notification says it (#401): a permission and its command, or a
+/// question.
+public struct CompanionRequestDetail: Hashable, Codable, Sendable {
+  public enum Kind: String, Codable, Hashable, Sendable {
+    case permission, question
+  }
+
+  /// The Mac's key for the request, which an answer names.
+  public let requestID: String
+  public let kind: Kind
+  /// Why the agent asks a permission, or its question; empty when it says nothing.
+  public let title: String
+  /// The command, the file, the URL a permission is for.
+  public let subject: String?
+
+  public init(requestID: String, kind: Kind, title: String, subject: String? = nil) {
+    self.requestID = requestID
+    self.kind = kind
+    self.title = title
+    self.subject = subject
   }
 }
 
@@ -136,15 +171,50 @@ public struct CompanionRequest: Hashable, Codable, Sendable {
   public let text: String
   /// The Mac's clock.
   public let createdAt: Date
+  /// The session that waits, and what for (#401): `nil` in a request of an earlier version, and in
+  /// the trials' test.
+  public let sessionID: String?
+  public let detail: CompanionRequestDetail?
 
   public init(
-    id: String, macID: String, sessionTitle: String, agent: String, text: String, createdAt: Date
+    id: String, macID: String, sessionTitle: String, agent: String, text: String, createdAt: Date,
+    sessionID: String? = nil, detail: CompanionRequestDetail? = nil
   ) {
     self.id = id
     self.macID = macID
     self.sessionTitle = sessionTitle
     self.agent = agent
     self.text = text
+    self.createdAt = createdAt
+    self.sessionID = sessionID
+    self.detail = detail
+  }
+}
+
+/// The user's answer to a permission, from its notification (#401): the phone writes it in the
+/// private database, the Mac that asked hands it to the application, then deletes it.
+public struct CompanionAnswer: Hashable, Codable, Sendable {
+  public enum Choice: String, Codable, Hashable, Sendable {
+    case allowOnce, deny
+  }
+
+  public let id: String
+  public let macID: String
+  public let sessionID: String
+  public let requestID: String
+  public let choice: Choice
+  /// The phone's clock.
+  public let createdAt: Date
+
+  public init(
+    id: String, macID: String, sessionID: String, requestID: String, choice: Choice,
+    createdAt: Date
+  ) {
+    self.id = id
+    self.macID = macID
+    self.sessionID = sessionID
+    self.requestID = requestID
+    self.choice = choice
     self.createdAt = createdAt
   }
 }
@@ -184,6 +254,7 @@ public enum CompanionRecord: Hashable, Codable, Sendable {
   case pong(CompanionPong)
   case request(CompanionRequest)
   case device(CompanionDevice)
+  case answer(CompanionAnswer)
 
   /// Unique in the zone whatever the type, hence the prefix: a ping and its pong share a nonce.
   public var recordName: String {
@@ -194,6 +265,7 @@ public enum CompanionRecord: Hashable, Codable, Sendable {
     case .pong(let pong): CompanionRecordName.pong(pong.nonce)
     case .request(let request): CompanionRecordName.request(request.id)
     case .device(let device): CompanionRecordName.device(device.endpointID)
+    case .answer(let answer): CompanionRecordName.answer(answer.id)
     }
   }
 }
@@ -206,4 +278,5 @@ public enum CompanionRecordName {
   public static func pong(_ nonce: String) -> String { "pong-\(nonce)" }
   public static func request(_ id: String) -> String { "request-\(id)" }
   public static func device(_ endpointID: String) -> String { "device-\(endpointID)" }
+  public static func answer(_ id: String) -> String { "answer-\(id)" }
 }

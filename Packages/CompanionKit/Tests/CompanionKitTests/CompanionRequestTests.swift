@@ -119,7 +119,7 @@ func requestAlertText() throws {
     CompanionRequest(
       id: "R", macID: "A", sessionTitle: title, agent: agent, text: text, createdAt: now)
   }
-  let phrase: (String, String) -> String = { agent, code in
+  let phrase: (String, String, CompanionRequestDetail.Kind?) -> String = { agent, code, _ in
     code.isEmpty ? "" : "\(agent.isEmpty ? "Agent" : agent) [\(code)]"
   }
   let alert = try #require(
@@ -134,6 +134,108 @@ func requestAlertText() throws {
   #expect(untitled.title.isEmpty)
   #expect(untitled.body == "Agent [waiting]")
   #expect(CompanionRequestAlerts.alert(for: request("", "", ""), phrase: phrase) == nil)
+}
+
+@Test("A permission's alert says the command under the agent, and carries its answer's names")
+func permissionAlert() throws {
+  let request = CompanionRequest(
+    id: "R", macID: "A", sessionTitle: "#401 Notifications", agent: "Claude Code",
+    text: CompanionRequests.waitingText, createdAt: now, sessionID: "S",
+    detail: CompanionRequestDetail(
+      requestID: "K", kind: .permission, title: " Publier la branche ",
+      subject: "git push origin feat/401"))
+  let alert = try #require(
+    CompanionRequestAlerts.alert(for: request) { agent, _, kind in "\(agent) asks \(kind!)" })
+  #expect(alert.title == "#401 Notifications")
+  #expect(alert.subtitle == "Claude Code asks permission")
+  #expect(alert.body == "Publier la branche\ngit push origin feat/401")
+  #expect(alert.category == CompanionRequestAlerts.Category.permission)
+  #expect(
+    alert.userInfo == [
+      CompanionRequestAlerts.UserInfoKey.macID: "A",
+      CompanionRequestAlerts.UserInfoKey.sessionID: "S",
+      CompanionRequestAlerts.UserInfoKey.requestID: "K",
+    ])
+}
+
+@Test("A question's alert says the question; one without words keeps the phrase as its text")
+func questionAlert() throws {
+  func request(_ title: String) -> CompanionRequest {
+    CompanionRequest(
+      id: "R", macID: "A", sessionTitle: "Site", agent: "Codex",
+      text: CompanionRequests.waitingText, createdAt: now, sessionID: "S",
+      detail: CompanionRequestDetail(requestID: "K", kind: .question, title: title))
+  }
+  let phrase: (String, String, CompanionRequestDetail.Kind?) -> String = { agent, _, _ in
+    "\(agent) asks"
+  }
+  let question = try #require(
+    CompanionRequestAlerts.alert(for: request("Quelle police ?"), phrase: phrase))
+  #expect(question.subtitle == "Codex asks")
+  #expect(question.body == "Quelle police ?")
+  #expect(question.category == CompanionRequestAlerts.Category.question)
+  let wordless = try #require(CompanionRequestAlerts.alert(for: request(" "), phrase: phrase))
+  #expect(wordless.subtitle.isEmpty)
+  #expect(wordless.body == "Codex asks")
+  #expect(wordless.category == CompanionRequestAlerts.Category.question)
+}
+
+@Test("Allow and Deny answer the alert's request; a tap or a bare alert answers nothing")
+func answerFromAction() {
+  let info: [AnyHashable: Any] = [
+    CompanionRequestAlerts.UserInfoKey.macID: "A",
+    CompanionRequestAlerts.UserInfoKey.sessionID: "S",
+    CompanionRequestAlerts.UserInfoKey.requestID: "K",
+  ]
+  let allow = CompanionRequestAlerts.answer(
+    fromAction: CompanionRequestAlerts.Action.allow, userInfo: info, id: "N", now: now)
+  #expect(
+    allow
+      == CompanionAnswer(
+        id: "N", macID: "A", sessionID: "S", requestID: "K", choice: .allowOnce, createdAt: now))
+  #expect(
+    CompanionRequestAlerts.answer(
+      fromAction: CompanionRequestAlerts.Action.deny, userInfo: info, id: "N", now: now)?.choice
+      == .deny)
+  #expect(
+    CompanionRequestAlerts.answer(
+      fromAction: "com.apple.UNNotificationDefaultActionIdentifier", userInfo: info, id: "N",
+      now: now) == nil)
+  #expect(
+    CompanionRequestAlerts.answer(
+      fromAction: CompanionRequestAlerts.Action.allow, userInfo: [:], id: "N", now: now) == nil)
+  #expect(CompanionRequestAlerts.sessionID(fromAlert: info) == "S")
+}
+
+@Test("A request carries its session and what it waits for; the session's record does not")
+func requestDetailCarried() {
+  let detail = CompanionRequestDetail(requestID: "K", kind: .question, title: "Q")
+  let session = CompanionSessionInfo(
+    id: "S", title: "T", agent: "Codex", state: .needsAttention, request: detail)
+  let request = CompanionRequests.request(for: session, macID: "A", id: "R", now: now)
+  #expect(request.sessionID == "S")
+  #expect(request.detail == detail)
+  let stored = CompanionSession(
+    id: "S", macID: "A", title: "T", agent: "Codex", state: .needsAttention, updatedAt: now)
+  let plan = CompanionSessionMerge.plan(snapshot: [session], stored: [stored], macID: "A", now: now)
+  #expect(plan.saves.isEmpty)
+}
+
+@Test("The Mac gives each of its answers once, none too old, and deletes every one of its own")
+func answerTriage() {
+  func answer(_ id: String, mac: String = "A", age: TimeInterval) -> CompanionAnswer {
+    CompanionAnswer(
+      id: id, macID: mac, sessionID: "S", requestID: "K", choice: .allowOnce,
+      createdAt: now.addingTimeInterval(-age))
+  }
+  let triage = CompanionAnswers.triage(
+    [
+      answer("new", age: 5), answer("given", age: 10), answer("old", age: 3600),
+      answer("other", mac: "B", age: 5),
+    ],
+    macID: "A", given: ["given"], now: now)
+  #expect(triage.toGive.map(\.id) == ["new"])
+  #expect(triage.toDelete == ["answer-old", "answer-given", "answer-new"])
 }
 
 @Test("Only a push of the subscription, about the companion's zone, names a request")

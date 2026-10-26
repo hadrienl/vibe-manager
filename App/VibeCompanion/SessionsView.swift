@@ -94,6 +94,14 @@ struct SessionsView: View {
       .sheet(isPresented: $showsNewSession) {
         NewSessionSheet()
       }
+      .onChange(of: channel.notifiedSessionID, initial: true) { _, id in
+        guard let id else { return }
+        channel.notifiedSessionID = nil
+        showsSearch = false
+        showsSettings = false
+        showsNewSession = false
+        path = [id]
+      }
       .onChange(of: channel.createdSessionID) { _, id in
         guard let id else { return }
         channel.createdSessionID = nil

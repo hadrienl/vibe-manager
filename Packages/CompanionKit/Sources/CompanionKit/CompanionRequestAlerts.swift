@@ -34,6 +34,35 @@ public enum CompanionRequestAlerts {
     public static let body = "COMPANION_REQUEST_ALERT_BODY"
   }
 
+  /// The categories of the alerts the extension writes (#401): a permission's offers Allow and
+  /// Deny, a question's opens the application.
+  public enum Category {
+    public static let permission = "companion.permission"
+    public static let question = "companion.question"
+  }
+
+  /// A permission's actions.
+  public enum Action {
+    public static let allow = "companion.allow"
+    public static let deny = "companion.deny"
+  }
+
+  /// What the extension puts in the alert's `userInfo`, for the application to answer or open.
+  public enum UserInfoKey {
+    public static let macID = "companionMacID"
+    public static let sessionID = "companionSessionID"
+    public static let requestID = "companionRequestID"
+  }
+
+  /// The alert the extension writes in place of the generic one.
+  public struct Alert: Equatable, Sendable {
+    public var title: String
+    public var subtitle: String
+    public var body: String
+    public var category: String?
+    public var userInfo: [String: String]
+  }
+
   private static let logger = Logger(
     subsystem: "eu.hadrien.VibeManager.companion", category: "notify")
 
@@ -57,19 +86,73 @@ public enum CompanionRequestAlerts {
     return subscription
   }
 
-  /// What the extension writes in the alert: the session as its title, what the agent waits for
-  /// as its text, in the phone's language — `phrase` makes it of the agent's name and the request's
-  /// code (`CompanionRequests.waitingText`, `testText`). `nil` for a request with nothing to show:
-  /// the generic alert says more.
+  /// What the extension writes in the alert: the session as its title, what the agent waits for in
+  /// the phone's language — `phrase` makes it of the agent's name, the request's code
+  /// (`CompanionRequests.waitingText`, `testText`) and, since #401, what the request is.
+  ///
+  /// With the request's detail (#401), that phrase is the subtitle and the request itself the text:
+  /// why a permission is asked and its command, or the question. `nil` for a request with nothing
+  /// to show: the generic alert says more.
   public static func alert(
-    for request: CompanionRequest, phrase: (_ agent: String, _ code: String) -> String
-  ) -> (title: String, body: String)? {
-    let title = request.sessionTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-    let body = phrase(
-      request.agent.trimmingCharacters(in: .whitespacesAndNewlines),
-      request.text.trimmingCharacters(in: .whitespacesAndNewlines))
-    guard !title.isEmpty || !body.isEmpty else { return nil }
-    return (title, body)
+    for request: CompanionRequest,
+    phrase: (_ agent: String, _ code: String, _ kind: CompanionRequestDetail.Kind?) -> String
+  ) -> Alert? {
+    let title = trimmed(request.sessionTitle)
+    let phrase = phrase(trimmed(request.agent), trimmed(request.text), request.detail?.kind)
+    var alert = Alert(title: title, subtitle: "", body: phrase, category: nil, userInfo: [:])
+    if let detail = request.detail, let sessionID = request.sessionID {
+      let words = [detail.title, detail.subject ?? ""].map(trimmed).filter { !$0.isEmpty }
+      if !words.isEmpty {
+        alert.subtitle = phrase
+        alert.body = words.joined(separator: "\n")
+      }
+      alert.category = detail.kind == .permission ? Category.permission : Category.question
+      alert.userInfo = [
+        UserInfoKey.macID: request.macID, UserInfoKey.sessionID: sessionID,
+        UserInfoKey.requestID: detail.requestID,
+      ]
+    }
+    guard !alert.title.isEmpty || !alert.body.isEmpty else { return nil }
+    return alert
+  }
+
+  private static func trimmed(_ text: String) -> String {
+    text.trimmingCharacters(in: .whitespacesAndNewlines)
+  }
+
+  /// The session an alert is about, for a tap to open it.
+  public static func sessionID(fromAlert userInfo: [AnyHashable: Any]) -> String? {
+    userInfo[UserInfoKey.sessionID] as? String
+  }
+
+  /// The answer an action of a permission's alert gives, or `nil` for a tap or another alert.
+  public static func answer(
+    fromAction action: String, userInfo: [AnyHashable: Any], id: String, now: Date
+  ) -> CompanionAnswer? {
+    let choice: CompanionAnswer.Choice
+    switch action {
+    case Action.allow: choice = .allowOnce
+    case Action.deny: choice = .deny
+    default: return nil
+    }
+    guard let macID = userInfo[UserInfoKey.macID] as? String,
+      let sessionID = userInfo[UserInfoKey.sessionID] as? String,
+      let requestID = userInfo[UserInfoKey.requestID] as? String
+    else { return nil }
+    return CompanionAnswer(
+      id: id, macID: macID, sessionID: sessionID, requestID: requestID, choice: choice,
+      createdAt: now)
+  }
+
+  /// Writes an answer in the private database, at once: the application has but a few seconds in
+  /// the background, and waits for no sync engine.
+  public static func send(
+    _ answer: CompanionAnswer, containerIdentifier: String = CompanionCloud.containerIdentifier
+  ) async throws {
+    let database = CKContainer(identifier: containerIdentifier).privateCloudDatabase
+    _ = try await database.save(
+      CompanionRecordCodec.makeRecord(.answer(answer), systemFields: nil))
+    logger.notice("answer: \(answer.choice.rawValue, privacy: .public) sent")
   }
 
   /// The record a push of the subscription is about, or `nil` for any other push.

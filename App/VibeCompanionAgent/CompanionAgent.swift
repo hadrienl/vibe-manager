@@ -63,6 +63,8 @@ final class CompanionAgent {
   private var snapshot: [CompanionSessionInfo]?
   /// The tests handed to the application, so that a record fetched twice raises one alert.
   private var handled: Set<String> = []
+  /// The answers handed to the application (#401), so that an answer fetched twice is given once.
+  private var givenAnswers: Set<String> = []
   private var timers: [Timer] = []
   private var isDeparting = false
   private var isPolling = false
@@ -162,6 +164,7 @@ final class CompanionAgent {
         sendSoon()
       }
       answerTests()
+      giveAnswers()
     case .snapshot(let sessions):
       Self.logger.notice("link: snapshot of \(sessions.count, privacy: .public) session(s)")
       let entered = CompanionRequests.entered(previous: snapshot, current: sessions)
@@ -197,7 +200,7 @@ final class CompanionAgent {
         sendSoon()
       }
     case .welcome, .testReceived, .remoteReceived, .remoteClosed, .remoteOpened, .agentStatus,
-      .devices:
+      .devices, .answerReceived:
       Self.logger.notice("link: unexpected message from the application")
     }
   }
@@ -286,6 +289,31 @@ final class CompanionAgent {
       Task { await mergeSessions() }
     }
     answerTests()
+    giveAnswers()
+  }
+
+  /// The answers the phone wrote from a notification (#401): handed to the application, which
+  /// gives them if their request still waits, and deleted.
+  private func giveAnswers() {
+    guard let connection, let installation else { return }
+    let answers = records.compactMap { record -> CompanionAnswer? in
+      if case .answer(let answer) = record { return answer }
+      return nil
+    }
+    let triage = CompanionAnswers.triage(
+      answers, macID: installation.id, given: givenAnswers, now: Date())
+    for answer in triage.toGive {
+      Self.notifyLogger.notice(
+        "answer: \(answer.choice.rawValue, privacy: .public) to \(answer.requestID, privacy: .public), handed to the application"
+      )
+      givenAnswers.insert(answer.id)
+      connection.send(.answerReceived(answer))
+    }
+    guard !triage.toDelete.isEmpty else { return }
+    Task {
+      await sync.delete(triage.toDelete)
+      sendSoon()
+    }
   }
 
   private func answerTests() {

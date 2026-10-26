@@ -26,6 +26,8 @@ final class CompanionModel {
   /// When the screen last looked at the clock: what "connected" and "seen … ago" are read against.
   private(set) var now = Date()
   private var isStarted = false
+  /// The endpoint this launch already wrote.
+  private var registeredEndpointID: String?
 
   init(sync: any CompanionSyncing, deviceName: String) {
     self.sync = sync
@@ -65,9 +67,11 @@ final class CompanionModel {
   }
 
   /// This phone, admitted to the Mac's direct channel (#398): its endpoint written in the user's
-  /// private database, once — again only if the record went missing.
+  /// private database once per launch. Not from the local list alone: a record removed while
+  /// this phone missed it stays there, and the Mac then refuses a phone that thinks it is paired.
   func register(endpointID: String) async {
-    guard !devices.contains(where: { $0.endpointID == endpointID }) else { return }
+    guard registeredEndpointID != endpointID else { return }
+    registeredEndpointID = endpointID
     await sync.save([
       .device(CompanionDevice(endpointID: endpointID, name: deviceName, addedAt: Date()))
     ])
@@ -117,7 +121,7 @@ final class CompanionModel {
       case .pong(let pong): pongs.append(pong)
       case .request(let request): requests.append(request)
       case .device(let device): devices.append(device)
-      case .ping: break
+      case .ping, .answer: break
       }
     }
     self.devices = devices
