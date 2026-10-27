@@ -83,15 +83,21 @@ public enum WorktreeInstructions {
     guard let content = try? String(contentsOfFile: dotGit, encoding: .utf8),
       content.hasPrefix("gitdir:")
     else { return folder }
-    let gitDirectory = content.dropFirst("gitdir:".count)
+    var gitDirectory = content.dropFirst("gitdir:".count)
       .trimmingCharacters(in: .whitespacesAndNewlines)
+    // `worktree.useRelativePaths` writes it relative to the worktree.
+    if !gitDirectory.hasPrefix("/") {
+      gitDirectory = (folder as NSString).appendingPathComponent(gitDirectory)
+    }
+    gitDirectory = (gitDirectory as NSString).standardizingPath
     guard let range = gitDirectory.range(of: "/.git/worktrees/", options: .backwards) else {
       return folder
     }
     return String(gitDirectory[..<range.lowerBound])
   }
 
-  static func day(_ date: Date) -> String {
+  /// `2026-10-27`, in the Mac's time zone.
+  public static func day(_ date: Date) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
     formatter.calendar = Calendar(identifier: .gregorian)

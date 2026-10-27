@@ -49,14 +49,16 @@ struct WorktreeLocationExample: Hashable {
       .repository: Self.abbreviated(repository),
       .project: (repository as NSString).lastPathComponent,
       .branch: branch, .ticket: ticket, .session: session, .agent: agent,
-      .date: date.formatted(.iso8601.year().month().day()),
+      .date: WorktreeInstructions.day(date),
     ]
   }
 
   /// Two tasks: on the repositories given, the first two, or on made-up ones.
   static func examples(repositories: [String]) -> [WorktreeLocationExample] {
-    let first = repositories.first ?? (NSHomeDirectory() as NSString).appendingPathComponent(
-      "Developer/my-app")
+    let first =
+      repositories.first
+      ?? (NSHomeDirectory() as NSString).appendingPathComponent(
+        "Developer/my-app")
     let second =
       repositories.dropFirst().first
       ?? (NSHomeDirectory() as NSString).appendingPathComponent("Developer/api")

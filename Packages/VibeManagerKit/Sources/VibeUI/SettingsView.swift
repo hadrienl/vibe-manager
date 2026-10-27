@@ -409,8 +409,7 @@ struct SettingsPageView: View {
     case .coordination:
       CoordinationSettingsView(coordination: model.coordination)
     case .worktrees:
-      WorktreesSettingsView(
-        worktrees: model.worktrees, repositories: WorktreesModel.repositories(of: model.sessions))
+      WorktreesSettingsView(worktrees: model.worktrees, sessions: { model.sessions })
     case .companion:
       if let companion = model.companion {
         CompanionSettingsView(companion: companion)

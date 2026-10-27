@@ -55,5 +55,12 @@ struct WorktreeInstructionsTests {
       to: folder.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
     #expect(WorktreeInstructions.mainRepository(of: folder.path) == "/src/vibe")
     #expect(WorktreeInstructions.mainRepository(of: "/nowhere/vibe") == "/nowhere/vibe")
+    let nested = folder.appendingPathComponent("wt/feat-2", isDirectory: true)
+    try FileManager.default.createDirectory(at: nested, withIntermediateDirectories: true)
+    try "gitdir: ../../repo/.git/worktrees/feat-2\n".write(
+      to: nested.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+    #expect(
+      WorktreeInstructions.mainRepository(of: nested.path)
+        == (folder.appendingPathComponent("repo").path as NSString).standardizingPath)
   }
 }

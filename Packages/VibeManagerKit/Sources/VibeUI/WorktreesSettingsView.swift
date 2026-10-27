@@ -6,9 +6,11 @@ import VibeDomain
 /// Settings › Worktrees (#432): the path for every repository, and the repositories with their own.
 struct WorktreesSettingsView: View {
   @Bindable var worktrees: WorktreesModel
+  /// Read once the page shows: the main repositories are found on disk.
+  let sessions: @MainActor () -> [WorkSession]
   /// The main repositories of the sessions: the examples of the preview, and the choices of a new
   /// exception.
-  let repositories: [String]
+  @State private var repositories: [String] = []
   @State private var editing: WorktreeExceptionEditing?
 
   var body: some View {
@@ -50,6 +52,7 @@ struct WorktreesSettingsView: View {
       }
     }
     .formStyle(.grouped)
+    .task { repositories = WorktreesModel.repositories(of: sessions()) }
     .sheet(item: $editing) { editing in
       WorktreeExceptionSheet(
         editing: editing, repositories: repositories,
@@ -114,13 +117,17 @@ struct WorktreeLocationEditor: View {
         Picker(
           selection: Binding(
             get: { location.preset.map(Choice.preset) ?? .custom },
-            set: { if case .preset(let preset) = $0 { location = preset.location } })
+            set: { choice in
+              if case .preset(let preset) = choice { change { $0 = preset.location } }
+            })
         ) {
           ForEach(WorktreeLocation.Preset.allCases, id: \.self) { preset in
             Text(Self.name(of: preset)).tag(Choice.preset(preset))
           }
-          Text("Custom", bundle: .module, comment: "Settings › Worktrees: a path of the user's own.")
-            .tag(Choice.custom)
+          Text(
+            "Custom", bundle: .module, comment: "Settings › Worktrees: a path of the user's own."
+          )
+          .tag(Choice.custom)
         } label: {
           Text(
             "Preset", bundle: .module,
@@ -130,7 +137,7 @@ struct WorktreeLocationEditor: View {
         .accessibilityIdentifier("settings-worktrees-preset")
         Spacer()
         Button {
-          location = .default
+          change { $0 = .default }
         } label: {
           Text("Restore Default", bundle: .module, comment: "Settings › Worktrees.")
         }
@@ -146,7 +153,7 @@ struct WorktreeLocationEditor: View {
       .font(.caption)
       .foregroundStyle(.secondary)
       WorktreeVariablePalette(example: examples[0]) { variable in
-        location = WorktreeLocation(parts: location.parts + [.variable(variable)])
+        change { $0 = WorktreeLocation(parts: $0.parts + [.variable(variable)]) }
       }
       Divider()
       Text("Preview", bundle: .module, comment: "Settings › Worktrees: the path resolved.")
@@ -170,6 +177,16 @@ struct WorktreeLocationEditor: View {
       .background(.background.secondary, in: RoundedRectangle(cornerRadius: 7))
       status
     }
+  }
+
+  /// Ends the typing in the field first, so that what was typed is kept rather than overwritten.
+  private func change(_ edit: (inout WorktreeLocation) -> Void) {
+    if let window = NSApp.keyWindow, window.firstResponder is NSTextView {
+      window.makeFirstResponder(nil)
+    }
+    var edited = location
+    edit(&edited)
+    location = edited
   }
 
   private func preview(for example: WorktreeLocationExample) -> Text {
@@ -302,7 +319,8 @@ private struct WorktreeVariablePalette: View {
           .padding(.vertical, 4)
           .overlay(
             RoundedRectangle(cornerRadius: 6).strokeBorder(
-              .separator, style: StrokeStyle(lineWidth: 1, dash: [3, 2])))
+              .separator, style: StrokeStyle(lineWidth: 1, dash: [3, 2]))
+          )
           .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -388,12 +406,18 @@ private struct WorktreeExceptionSheet: View {
           Text("Choose…", bundle: .module).tag("")
         }
         ForEach(choices, id: \.self) { path in
-          Text(verbatim: "\((path as NSString).lastPathComponent) — \(WorktreeLocationExample.abbreviated(path))")
-            .tag(path)
+          Text(
+            verbatim:
+              "\((path as NSString).lastPathComponent) — \(WorktreeLocationExample.abbreviated(path))"
+          )
+          .tag(path)
         }
         Divider()
-        Text("Other…", bundle: .module, comment: "Settings › Worktrees: chooses a repository in the Finder.")
-          .tag(Self.other)
+        Text(
+          "Other…", bundle: .module,
+          comment: "Settings › Worktrees: chooses a repository in the Finder."
+        )
+        .tag(Self.other)
       } label: {
         Text("Repository", bundle: .module)
       }
@@ -415,7 +439,8 @@ private struct WorktreeExceptionSheet: View {
           dismiss()
         } label: {
           if editing.isNew {
-            Text("Add", bundle: .module, comment: "Settings › Worktrees: keeps a project's own path.")
+            Text(
+              "Add", bundle: .module, comment: "Settings › Worktrees: keeps a project's own path.")
           } else {
             Text("Save", bundle: .module)
           }

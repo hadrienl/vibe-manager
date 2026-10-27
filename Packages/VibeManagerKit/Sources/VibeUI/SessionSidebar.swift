@@ -942,7 +942,9 @@ private struct ArchiveRulesButton: View {
         openSettings()
       } label: {
         Label {
-          Text("Automatic Archive…", bundle: .module, comment: "A button at the head of the Done column.")
+          Text(
+            "Automatic Archive…", bundle: .module,
+            comment: "A button at the head of the Done column.")
         } icon: {
           Image(systemName: "archivebox.circle")
         }
@@ -952,7 +954,8 @@ private struct ArchiveRulesButton: View {
       .help(
         Text(
           "Change the automatic archive rules in the Settings", bundle: .module,
-          comment: "The help of the Automatic Archive… button of the Done column."))
+          comment: "The help of the Automatic Archive… button of the Done column.")
+      )
       .accessibilityIdentifier("done-automatic-archive")
     }
     .padding(.horizontal, 12)

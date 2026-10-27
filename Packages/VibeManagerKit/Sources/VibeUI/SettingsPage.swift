@@ -141,7 +141,8 @@ public enum SettingsPage: Hashable, Sendable {
     case .archiveRules:
       LocalizedStringResource(
         "Automatic Archive", bundle: .module,
-        comment: "A page of the Settings window: the rules that archive finished sessions on their own.")
+        comment:
+          "A page of the Settings window: the rules that archive finished sessions on their own.")
     case .tickets:
       LocalizedStringResource("Tickets", bundle: .module, comment: "A page of the Settings window.")
     case .ticketResolvers:
