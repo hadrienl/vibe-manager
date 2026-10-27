@@ -87,8 +87,8 @@ struct ReturnOnScreenTests {
       textEntry: .plain, submitDelay: .zero, shellEntry: ShellEntry(switchDelay: .zero),
       readsInputOnScreen: true)
     // Waited out only when the prompt keeps the text: lost, Return is written again at once.
-    model.sendWaitLimit = .zero
-    model.sendSettleDelay = .zero
+    model.promptReturn.sendWaitLimit = .zero
+    model.promptReturn.sendSettleDelay = .zero
     model.apply(ConversationSnapshot(entries: [], availability: .available))
     return model
   }
@@ -169,7 +169,7 @@ struct ReturnOnScreenTests {
     let agent = Agent()
     agent.effects = [.sendAfter(reads: 3)]
     let model = model(agent: agent)
-    model.sendWaitLimit = .seconds(600)
+    model.promptReturn.sendWaitLimit = .seconds(600)
     model.draft = "Bonjour ça va ?"
     #expect(await model.send())
     #expect(agent.written.filter { $0 == [0x0D] }.count == 1)
@@ -180,7 +180,7 @@ struct ReturnOnScreenTests {
     let agent = Agent()
     agent.effects = [.lineBreakThenSend]
     let model = model(agent: agent)
-    model.sendWaitLimit = .seconds(600)
+    model.promptReturn.sendWaitLimit = .seconds(600)
     model.draft = "Bonjour ça va ?"
     #expect(await model.send())
     #expect(!agent.written.contains([0x7F]))
