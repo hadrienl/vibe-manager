@@ -9,6 +9,8 @@ struct ConversationView: View {
   let sessionID: String
   @Environment(RemoteChannel.self) private var channel
   @State private var draft = ""
+  /// The screen's height: what a request's card may take of it.
+  @State private var height: CGFloat = 800
   @FocusState private var fieldFocused: Bool
   /// The files joined to the next message.
   @State private var files: [RemoteFile] = []
@@ -56,6 +58,7 @@ struct ConversationView: View {
     .environment(\.conversationPalette, palette)
     .onChange(of: conversation?.theme) { _, theme in if let theme { lastTheme = theme } }
     .scrollDismissesKeyboard(.interactively)
+    .onGeometryChange(for: CGFloat.self, of: \.size.height) { height = $0 }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 8) {
         if isWorking, conversation?.request == nil {
@@ -64,7 +67,7 @@ struct ConversationView: View {
             interrupt: { channel.interrupt(sessionID) })
         }
         if let request = conversation?.request {
-          RequestCard(request: request, sessionID: sessionID)
+          RequestCard(request: request, sessionID: sessionID, maxHeight: height * 0.6)
             .padding(.horizontal, 12)
         }
         if let session, session.activity == .stopped {
@@ -471,10 +474,14 @@ extension Binding where Value == UIImage? {
 private struct RequestCard: View {
   let request: RemoteRequest
   let sessionID: String
+  /// Past it, the questions fold up, one open at a time, and the card scrolls if need be.
+  let maxHeight: CGFloat
   @Environment(RemoteChannel.self) private var channel
   /// The choices taken and the words typed, by question.
   @State private var selections: [Int: Set<String>] = [:]
   @State private var texts: [Int: String] = [:]
+  /// The question unfolded when they fold up: the first unanswered one unless the user picks.
+  @State private var opened: Int?
 
   private var questions: [RemoteQuestion] { request.shownQuestions }
   private var isSeveral: Bool { questions.count > 1 }
@@ -512,17 +519,14 @@ private struct RequestCard: View {
             choice.id == "allowOnce" ? AnyButtonStyle(.glassProminent) : AnyButtonStyle(.glass))
         }
       } else {
-        ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
-          if isSeveral {
-            if index > 0 { Divider() }
-            VStack(alignment: .leading, spacing: 2) {
-              if let header = question.header, !header.isEmpty {
-                Text(verbatim: header).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              }
-              Text(verbatim: question.title).font(.subheadline.weight(.semibold))
-            }
+        if isSeveral {
+          ViewThatFits(in: .vertical) {
+            questionList(folded: false)
+            questionList(folded: true)
+            ScrollView { questionList(folded: true) }
           }
-          choices(of: question, at: index)
+        } else if let question = questions.first {
+          choices(of: question, at: 0)
         }
         Button {
           channel.answer(request, in: sessionID, answers: answers)
@@ -534,11 +538,59 @@ private struct RequestCard: View {
       }
     }
     .padding(14)
+    .frame(maxHeight: maxHeight)
     .glassEffect(.regular.tint(.orange.opacity(0.12)), in: .rect(cornerRadius: 20))
     .onChange(of: request.id) { _, _ in
       selections = [:]
       texts = [:]
+      opened = nil
     }
+  }
+
+  /// Every question open, or folded up to its title and answer, all but one.
+  private func questionList(folded: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
+        if index > 0 { Divider() }
+        let isOpen = !folded || index == openedIndex
+        Button {
+          withAnimation(.snappy) { opened = index }
+        } label: {
+          HStack(alignment: .top) {
+            VStack(alignment: .leading, spacing: 2) {
+              if let header = question.header, !header.isEmpty {
+                Text(verbatim: header).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+              }
+              Text(verbatim: question.title).font(.subheadline.weight(.semibold))
+              if !isOpen, let summary = summary(of: question, at: index) {
+                Text(verbatim: summary).font(.caption).foregroundStyle(.tint).lineLimit(1)
+              }
+            }
+            Spacer(minLength: 0)
+            if folded {
+              Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+            }
+          }
+          .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!folded)
+        if isOpen { choices(of: question, at: index) }
+      }
+    }
+  }
+
+  private var openedIndex: Int {
+    opened ?? answers.firstIndex { !$0.isGiven } ?? 0
+  }
+
+  /// What a folded question was answered: its choices' labels, or the words typed.
+  private func summary(of question: RemoteQuestion, at index: Int) -> String? {
+    if let text = texts[index], !text.isEmpty { return text }
+    let chosen = selections[index] ?? []
+    let labels = question.choices.filter { chosen.contains($0.id) }.map(\.label)
+    return labels.isEmpty ? nil : labels.formatted(.list(type: .and))
   }
 
   @ViewBuilder
@@ -610,6 +662,12 @@ private struct RequestCard: View {
       selection = [id]
     }
     selections[index] = selection
+    // A single choice answers its question: the next unanswered one unfolds.
+    if !question.allowsSeveral, opened == index || opened == nil {
+      withAnimation(.snappy) {
+        opened = answers.indices.first { $0 != index && !answers[$0].isGiven } ?? index
+      }
+    }
   }
 }
 
