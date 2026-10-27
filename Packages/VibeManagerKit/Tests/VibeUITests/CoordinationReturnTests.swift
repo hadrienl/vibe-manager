@@ -62,11 +62,11 @@ struct CoordinationReturnTests {
     #expect(agent.prompt.isEmpty)
   }
 
-  @Test("A message the agent never takes is said to be left in its prompt, not sent")
+  @Test("A message the agent never takes is said not taken, not sent")
   func neverTakenIsLeftInInput() async {
     let agent = Agent()
     agent.prompt = text
     agent.lostReturns = 5
-    #expect(await submit(agent) == .leftInInput)
+    #expect(await submit(agent) == .notTaken)
   }
 }

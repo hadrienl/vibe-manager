@@ -407,36 +407,27 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
   public func typeMessage(
     _ text: String, into id: SessionID, state: @MainActor () -> TypingState
   ) async -> TypingOutcome {
-    guard let pane = pane(for: id), pane.status == .running, let terminal = pane.session,
-      let providerID = ((try? await repository.session(id: id)) ?? nil)?.agent?.providerID
-    else { return .notTyped }
-    let format =
-      (await agents.provider(id: AgentProviderID(providerID)) as? any AgentConversationReporting)?
-      .promptFormat ?? AgentPromptFormat()
+    guard let input = await agentInput(of: id) else { return .notTyped }
+    let format = input.format
     let keystrokes = PromptEncoding.keystrokes(
       for: PromptSubmission(text: PromptEncoding.sanitized(text)), format: format,
       whileWorking: false)
     for (index, keys) in keystrokes.writes.enumerated() {
       if index > 0 { try? await Task.sleep(for: keystrokes.delay(before: index)) }
-      guard pane.session === terminal else { return index == 0 ? .notTyped : .leftInInput }
       if case .awaitingUser = state() { return index == 0 ? .notTyped : .leftInInput }
-      await pane.write(keys)
+      guard await input.write(keys) else { return index == 0 ? .notTyped : .leftInInput }
     }
     try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
     return await Self.submit(
       PromptEncoding.sanitized(text), keys: keystrokes.submit, format: format,
       promptReturn: promptReturn, readScreen: { [weak self] in await self?.screen(of: id) },
-      write: { bytes in
-        guard pane.session === terminal else { return false }
-        await pane.write(bytes)
-        return true
-      }, state: state)
+      write: input.write, state: state)
   }
 
   /// Presses Return on a message typed into an agent at rest, or its queue key into one at work.
   /// An agent whose prompt the screen shows is given Return once the text is in it, and again if
   /// the text is still there once it was written (#370): one written too soon was lost, and the
-  /// message stayed unsent in its prompt (#435). Still there after that, it is left in the input.
+  /// message stayed unsent in its prompt (#435). Still there after that, it was not taken.
   static func submit(
     _ text: String, keys: [UInt8], format: AgentPromptFormat, promptReturn: PromptReturn,
     readScreen: @escaping () async -> String?, write: ([UInt8]) async -> Bool,
@@ -458,31 +449,47 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     // Gone to work or to wait meanwhile, the agent took Return, or what came is not the prompt.
     guard case .atRest = state() else { return .submitted }
     await PromptReturn.submitAgain(input, submit: keys) { _ = await write($0) }
-    return await promptReturn.inputStillHolding(text, readScreen) == nil ? .submitted : .leftInInput
+    return await promptReturn.inputStillHolding(text, readScreen) == nil ? .submitted : .notTaken
   }
 
-  /// Presses Return on a message left in an agent's prompt (#435), if the prompt still holds it.
-  /// Whether it is no longer there.
-  public func submitLeftMessage(_ text: String, into id: SessionID) async -> Bool {
+  /// Presses Return on a message an agent at rest did not take (#435), if its prompt still shows
+  /// that text and nothing else — never a draft of the user's, nor into a panel. The caller has
+  /// checked the agent is at rest; `state` is asked again before each key.
+  public func submitLeftMessage(
+    _ text: String, into id: SessionID, state: @MainActor () -> TypingState
+  ) async -> LeftMessageOutcome {
+    let text = PromptEncoding.sanitized(text)
+    guard let agentInput = await agentInput(of: id), let screen = await screen(of: id),
+      !AgentPanelRecognition.showsPanel(screen: screen),
+      let input = PromptInputRecognition.input(screen: screen)
+    else { return .notYet }
+    guard PromptInputRecognition.holds(text, in: input) else { return .gone }
+    let outcome = await Self.submit(
+      text, keys: agentInput.format.submitKey, format: agentInput.format,
+      promptReturn: promptReturn, readScreen: { [weak self] in await self?.screen(of: id) },
+      write: agentInput.write, state: state)
+    return outcome == .submitted ? .sent : .notYet
+  }
+
+  /// The prompt format of a session's running agent, and what writes into its terminal as long as
+  /// it is the same process.
+  private func agentInput(of id: SessionID) async
+    -> (format: AgentPromptFormat, write: ([UInt8]) async -> Bool)?
+  {
     guard let pane = pane(for: id), pane.status == .running, let terminal = pane.session,
-      let screen = await screen(of: id), let input = PromptInputRecognition.input(screen: screen)
-    else { return false }
-    guard PromptReturn.held(PromptEncoding.sanitized(text), input) else { return true }
-    guard let providerID = ((try? await repository.session(id: id)) ?? nil)?.agent?.providerID
-    else { return false }
+      let providerID = ((try? await repository.session(id: id)) ?? nil)?.agent?.providerID
+    else { return nil }
     let format =
       (await agents.provider(id: AgentProviderID(providerID)) as? any AgentConversationReporting)?
       .promptFormat ?? AgentPromptFormat()
-    let outcome = await Self.submit(
-      PromptEncoding.sanitized(text), keys: format.submitKey, format: format,
-      promptReturn: promptReturn,
-      readScreen: { [weak self] in await self?.screen(of: id) },
-      write: { bytes in
+    return (
+      format,
+      { bytes in
         guard pane.session === terminal else { return false }
         await pane.write(bytes)
         return true
-      }, state: { .atRest })
-    return outcome == .submitted
+      }
+    )
   }
 
   /// How long Return waits for an agent's prompt to show a message, and to be taken.
@@ -1211,7 +1218,19 @@ public enum TypingOutcome: Equatable, Sendable {
   /// The agent went to wait for the user while it was typed: what was typed stays in its input,
   /// unsent, for the user to see. Typing it again would put it there twice.
   case leftInInput
+  /// Typed into an agent at rest, given Return twice, and still in its prompt (#435): Return is
+  /// written again once the agent is at rest, before anything else is typed.
+  case notTaken
 
   /// Whether the message reached the agent, or at least its input, and is not to be typed again.
   public var isDelivered: Bool { self != .notTyped }
+}
+
+/// What became of a message left in an agent's prompt, given Return again (#435).
+public enum LeftMessageOutcome: Equatable, Sendable {
+  case sent
+  /// The prompt no longer shows it: sent or taken away by the user.
+  case gone
+  /// Not now: the prompt cannot be read, a panel is open, or Return was not taken.
+  case notYet
 }

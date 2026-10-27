@@ -331,9 +331,8 @@ extension AppModel {
     await typeCoordinationMessageReporting(text, into: id).isDelivered
   }
 
-  /// What became of the message: a message left in the prompt is sent before the next one is
-  /// typed, once the agent is at rest again (#435) — never typed twice, and never in the way of
-  /// the next.
+  /// What became of the message. A message an agent at rest did not take is given Return again
+  /// before the next one is typed (#435): never typed twice, and never in the way of the next.
   func typeCoordinationMessageReporting(_ text: String, into id: SessionID) async
     -> TypingOutcome
   {
@@ -344,43 +343,64 @@ extension AppModel {
       await canTypeCoordinationMessage(into: id)
     else { return .notTyped }
     let outcome = await launcher.typeMessage(text, into: id) { [weak self] in
-      switch self?.activity(for: id)?.activity {
-      case .working: .working
-      case .awaitingUser: .awaitingUser
-      case .idle, nil: .atRest
-      }
+      self?.typingState(of: id) ?? .atRest
     }
-    if outcome == .leftInInput {
-      coordination.leftInInput[id] = text
+    switch outcome {
+    case .leftInInput:
       diagnostics.record(
         .session, .notice, "coordination.messageLeftInInput",
         ["session": diagnostics.pseudonym(id)])
+    case .notTaken:
+      coordination.leftInInput[id] = LeftMessage(text: text, since: .now)
+      diagnostics.record(
+        .session, .notice, "coordination.messageNotTaken", ["session": diagnostics.pseudonym(id)])
+    case .notTyped, .submitted, .queued: break
     }
     return outcome
   }
 
-  /// Sends the message left in a session's prompt, if any, once it can be: the agent at rest, the
-  /// user not typing. Whether the prompt no longer holds it — sent, or taken away by the user.
-  private func submitLeftCoordinationMessage(in id: SessionID, launcher: SessionLauncher) async
-    -> Bool
-  {
-    guard let text = coordination.leftInInput[id] else { return true }
-    guard launcher.isRunning(id) else {
+  private func typingState(of id: SessionID) -> TypingState {
+    switch activity(for: id)?.activity {
+    case .working: .working
+    case .awaitingUser: .awaitingUser
+    case .idle, nil: .atRest
+    }
+  }
+
+  /// Gives Return again to the message a session's agent did not take, if any, once it can be:
+  /// the agent at rest, the user not typing. Whether the next message can be typed now: not in the
+  /// tick that sent it, the agent not yet seen at work. Forgotten once the prompt no longer shows
+  /// it, the agent stopped, or after `LeftMessage.lifetime`.
+  func submitLeftCoordinationMessage(in id: SessionID, launcher: SessionLauncher) async -> Bool {
+    guard let left = coordination.leftInInput[id] else { return true }
+    guard launcher.isRunning(id), ContinuousClock.now - left.since < LeftMessage.lifetime else {
       coordination.leftInInput[id] = nil
+      diagnostics.record(
+        .session, .notice, "coordination.leftMessageDropped",
+        ["session": diagnostics.pseudonym(id)])
       return true
     }
-    switch activity(for: id)?.activity {
-    case .working, .awaitingUser: return false
-    case .idle, nil: break
-    }
+    guard case .atRest = typingState(of: id) else { return false }
     if let typed = pane(for: id)?.lastKeyboardInputAt, ContinuousClock.now - typed < .seconds(2) {
       return false
     }
-    guard await launcher.submitLeftMessage(text, into: id) else { return false }
-    coordination.leftInInput[id] = nil
-    diagnostics.record(
-      .session, .info, "coordination.leftMessageSent", ["session": diagnostics.pseudonym(id)])
-    return true
+    switch await launcher.submitLeftMessage(
+      left.text, into: id,
+      state: { [weak self] in
+        self?.typingState(of: id) ?? .atRest
+      })
+    {
+    case .sent:
+      coordination.leftInInput[id] = nil
+      diagnostics.record(
+        .session, .info, "coordination.leftMessageSent", ["session": diagnostics.pseudonym(id)])
+      return false
+    case .gone:
+      coordination.leftInInput[id] = nil
+      return true
+    case .notYet:
+      return false
+    }
   }
 
   /// Takes a session's input for the user's message once the application types nothing into it,
@@ -784,10 +804,12 @@ extension AppModel {
     if coordination.outbox[child.id] == nil {
       switch await typeCoordinationMessageReporting(message, into: child.id) {
       case .submitted, .queued: return "Sent to “\(child.name)”."
-      case .leftInInput:
+      case .notTaken:
         startCoordinationTicker()
         return
           "Typed into “\(child.name)”'s prompt, but not sent yet: it will be sent once it is at rest."
+      case .leftInInput:
+        return "Typed into “\(child.name)”'s prompt, but not sent: it waits for the user there."
       case .notTyped: break
       }
     }
