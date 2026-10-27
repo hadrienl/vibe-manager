@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import VibeApplication
 import VibeDomain
 
@@ -390,6 +391,9 @@ private struct WorktreeExceptionSheet: View {
   @State private var repository: String?
   @State private var location: WorktreeLocation = .default
   @State private var chosen: [String] = []
+  /// The Finder's panel, presented on this sheet: run modal on its own, it sent the Settings
+  /// window behind the main window when it closed.
+  @State private var choosingInFinder = false
 
   var body: some View {
     VStack(alignment: .leading, spacing: 14) {
@@ -398,7 +402,7 @@ private struct WorktreeExceptionSheet: View {
           get: { repository ?? "" },
           set: { value in
             if value == Self.other {
-              chooseInFinder()
+              choosingInFinder = true
             } else {
               repository = value.isEmpty ? nil : value
             }
@@ -453,6 +457,10 @@ private struct WorktreeExceptionSheet: View {
     }
     .padding(20)
     .frame(width: 560)
+    .fileImporter(
+      isPresented: $choosingInFinder, allowedContentTypes: [.folder],
+      onCompletion: choose
+    )
     .onAppear {
       repository = editing.repository
       location = editing.location
@@ -467,12 +475,9 @@ private struct WorktreeExceptionSheet: View {
     return paths
   }
 
-  private func chooseInFinder() {
-    let panel = NSOpenPanel()
-    panel.canChooseDirectories = true
-    panel.canChooseFiles = false
-    panel.allowsMultipleSelection = false
-    guard panel.runModal() == .OK, let url = panel.url else { return }
+  /// The folder chosen in the Finder, as the repository it belongs to.
+  private func choose(_ result: Result<URL, any Error>) {
+    guard case .success(let url) = result else { return }
     let path = WorktreeInstructions.mainRepository(of: url.path)
     if !chosen.contains(path) { chosen.append(path) }
     repository = path
