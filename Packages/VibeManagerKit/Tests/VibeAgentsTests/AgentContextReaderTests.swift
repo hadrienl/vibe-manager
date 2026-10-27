@@ -73,8 +73,33 @@ struct AgentContextReaderTests {
 
     let usage = try #require(file?.usage)
     #expect(usage.usedTokens == 92_010)
-    #expect(usage.windowSize == nil)
-    #expect(usage.percentUsed == nil)
+    // No window in the transcript: the model's default, and Claude Code's threshold, estimated.
+    #expect(usage.windowSize == 200_000)
+    #expect(usage.compactionThreshold == 167_000)
+    #expect(usage.isEstimate)
+    #expect(usage.percentUsed == 55)
+  }
+
+  @Test("Claude Code: the model the CLI says it runs gives the window, [1m] for a million")
+  func claudeLongWindow() async throws {
+    let root = home()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let id = UUID().uuidString.lowercased()
+    let session = WorkSession(
+      name: "C", agent: SessionAgentConfiguration(providerID: "claude-code", resumeIdentifier: id))
+    try write(
+      [
+        #"{"type":"user","isSidechain":false,"attachment":{"type":"model","identity":{"modelId":"claude-opus-5-5[1m]","marketingName":"Opus 5.5"},"text":"secret"}}"#,
+        claudeAnswer(input: 1, cacheRead: 99_999, cacheWrite: 0),
+      ], to: root.appendingPathComponent("projects/-repo/\(id).jsonl"))
+
+    let usage = try #require(
+      await reader(root).readContext(of: session.agent!, session: session, from: nil)?.usage)
+
+    #expect(usage.model == "claude-opus-5-5[1m]")
+    #expect(usage.windowSize == 1_000_000)
+    #expect(usage.compactionThreshold == 967_000)
+    #expect(usage.percentUsed == 10)
   }
 
   @Test("Claude Code: a compaction is said, and the next answer carries it")
@@ -119,7 +144,8 @@ struct AgentContextReaderTests {
     calendar.timeZone = .current
     let parts = calendar.dateComponents([.year, .month, .day], from: session.createdAt)
     let url = root.appendingPathComponent(
-      String(format: "sessions/%04d/%02d/%02d/rollout-x-\(id).jsonl", parts.year!, parts.month!,
+      String(
+        format: "sessions/%04d/%02d/%02d/rollout-x-\(id).jsonl", parts.year!, parts.month!,
         parts.day!))
     try write([codexCount(last: 22_556, window: nil)], to: url)
     let reader = reader(root)
@@ -137,6 +163,7 @@ struct AgentContextReaderTests {
     let usage = try #require(file?.usage)
     #expect(usage.usedTokens == 20_000)
     #expect(usage.windowSize == 272_000)
+    #expect(usage.compactionThreshold == 244_800)
     #expect(usage.source == .reportedByCLI)
     #expect(usage.lastCompaction?.tokensBefore == 100_000)
   }
@@ -145,7 +172,8 @@ struct AgentContextReaderTests {
   func otherAgent() async {
     let session = WorkSession(
       name: "M", agent: SessionAgentConfiguration(providerID: "mock", resumeIdentifier: "x"))
-    #expect(await reader(home()).readContext(of: session.agent!, session: session, from: nil) == nil)
+    #expect(
+      await reader(home()).readContext(of: session.agent!, session: session, from: nil) == nil)
   }
 
   @Test("The decoded context lines declare no content field")
@@ -155,7 +183,9 @@ struct AgentContextReaderTests {
       from: Data(claudeAnswer(input: 1, cacheRead: 1, cacheWrite: 1).utf8))
     #expect(
       Set(Mirror(reflecting: claude).children.compactMap(\.label))
-        == ["type", "subtype", "timestamp", "isSidechain", "message", "compactMetadata"])
+        == [
+          "type", "subtype", "timestamp", "isSidechain", "message", "compactMetadata", "attachment",
+        ])
     #expect(
       Set(Mirror(reflecting: try #require(claude.message)).children.compactMap(\.label))
         == ["model", "usage"])
@@ -173,36 +203,45 @@ struct AgentContextReaderTests {
 
 @Suite("The share of the context window")
 struct ContextWindowUsageTests {
-  @Test("A plain share, rounded, never above 100")
-  func plainShare() {
+  @Test("Of the way to the automatic compaction, else of the window, rounded, never above 100")
+  func share() {
     let date = Date()
-    #expect(ContextWindowUsage(usedTokens: 92_000, windowSize: 200_000, measuredAt: date).percentUsed == 46)
-    #expect(ContextWindowUsage(usedTokens: 300_000, windowSize: 200_000, measuredAt: date).percentUsed == 100)
+    #expect(
+      ContextWindowUsage(
+        usedTokens: 92_000, windowSize: 200_000, compactionThreshold: 167_000, measuredAt: date
+      ).percentUsed == 55)
+    #expect(
+      ContextWindowUsage(usedTokens: 92_000, windowSize: 200_000, measuredAt: date).percentUsed
+        == 46)
+    #expect(
+      ContextWindowUsage(usedTokens: 300_000, windowSize: 200_000, measuredAt: date).percentUsed
+        == 100)
     #expect(ContextWindowUsage(usedTokens: 92_000, measuredAt: date).percentUsed == nil)
   }
 
-  @Test("Codex: its baseline out of both, as its own “context left”")
-  func codexShare() {
-    let usage = ContextWindowUsage(
-      usedTokens: 22_556, windowSize: 475_000, measuredAt: Date(), countsLikeCodex: true)
-    // (22 556 − 12 000) / (475 000 − 12 000) = 2.3 % used: Codex says 98 % left.
-    #expect(usage.percentUsed == 2)
-    let fresh = ContextWindowUsage(
-      usedTokens: 9_000, windowSize: 475_000, measuredAt: Date(), countsLikeCodex: true)
-    #expect(fresh.percentUsed == 0)
+  @Test("The CLIs' thresholds: Claude Code's margins, Codex's nine tenths")
+  func thresholds() {
+    #expect(ContextWindowUsage.claudeCompactionThreshold(window: 200_000) == 167_000)
+    #expect(ContextWindowUsage.claudeCompactionThreshold(window: 1_000_000) == 967_000)
+    #expect(ContextWindowUsage.codexCompactionThreshold(window: 258_400) == 232_560)
+    #expect(ContextWindowUsage.claudeWindow(model: "claude-opus-5-5", seen: 150_000) == 200_000)
+    #expect(ContextWindowUsage.claudeWindow(model: "claude-opus-5-5[1m]", seen: 0) == 1_000_000)
+    // Past the default window, the conversation can only be running on a million.
+    #expect(ContextWindowUsage.claudeWindow(model: "claude-opus-5-5", seen: 250_000) == 1_000_000)
   }
 
-  @Test("The endpoint's window wins over the CLI's")
+  @Test("The endpoint's window wins, and its harness says when it compacts")
   func endpointWins() {
-    let usage = ContextWindowUsage(
-      usedTokens: 50_000, windowSize: 475_000, measuredAt: Date(), source: .reportedByCLI,
-      countsLikeCodex: true
-    ).declared(by: "Local", window: 100_000)
-    #expect(usage.windowSize == 100_000)
-    #expect(usage.source == .declaredByEndpoint("Local"))
-    #expect(usage.percentUsed == 50)
-    let undeclared = ContextWindowUsage(usedTokens: 1, measuredAt: Date())
-      .declared(by: "Local", window: nil)
-    #expect(undeclared.windowSize == nil)
+    let base = ContextWindowUsage(
+      usedTokens: 50_000, windowSize: 200_000, compactionThreshold: 167_000, isEstimate: true,
+      measuredAt: Date())
+    let claude = base.declared(by: "Local", window: 100_000, harnessIsCodex: false)
+    #expect(claude.windowSize == 100_000)
+    #expect(claude.compactionThreshold == 67_000)
+    #expect(claude.source == .declaredByEndpoint("Local"))
+    #expect(!claude.isEstimate)
+    let codex = base.declared(by: "Local", window: 100_000, harnessIsCodex: true)
+    #expect(codex.compactionThreshold == 90_000)
+    #expect(base.declared(by: "Local", window: nil, harnessIsCodex: false) == base)
   }
 }

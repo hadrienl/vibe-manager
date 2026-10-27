@@ -8,11 +8,12 @@ import VibeDomain
 ///
 /// Claude Code: the context of an answer is its input with the cache, read and written; the
 /// lines of a sub-agent (`isSidechain`) and those the CLI writes itself (`<synthetic>`) are left
-/// out. Its window is in no transcript: none is shown, but an endpoint's. A compaction is a
-/// `compact_boundary` line, with the context before it.
+/// out. Its window is in no transcript: it is deduced from the model the CLI says it runs — an
+/// `attachment` of type `model`, `[1m]` for a million — and said to be an estimate. A compaction
+/// is a `compact_boundary` line, with the context before it.
 ///
 /// Codex: the context is `last_token_usage.total_tokens` of the last `token_count`, the window its
-/// `model_context_window`; a compaction is a `compacted` line, the context before it the last
+/// `model_context_window`, compacted at nine tenths of it; a compaction is a `compacted` line, the context before it the last
 /// one read.
 extension AgentUsageReader: ContextWindowReading {
   public func readContext(
@@ -84,15 +85,23 @@ extension AgentUsageReader: ContextWindowReading {
   // MARK: - Claude Code
 
   static let claudeCompactionMarker = Data(#""compact_boundary""#.utf8)
+  static let claudeModelMarker = Data(#""modelId":"#.utf8)
 
   static func readClaudeContext(
     line: Data, into file: inout ContextWindowFile, now: Date, timestamps: TimestampParser
   ) {
-    guard line.range(of: claudeMarker) != nil || line.range(of: claudeCompactionMarker) != nil,
+    guard
+      [claudeMarker, claudeCompactionMarker, claudeModelMarker].contains(where: {
+        line.range(of: $0) != nil
+      }),
       let decoded = try? JSONDecoder().decode(ClaudeContextLine.self, from: line),
       decoded.isSidechain != true
     else { return }
     let date = decoded.timestamp.flatMap(timestamps.date) ?? now
+    if decoded.attachment?.type == "model", let model = decoded.attachment?.identity?.modelId {
+      file.model = model
+      return
+    }
     if decoded.type == "system", decoded.subtype == "compact_boundary" {
       file.compaction = .init(date: date, tokensBefore: decoded.compactMetadata?.preTokens)
       return
@@ -101,9 +110,14 @@ extension AgentUsageReader: ContextWindowReading {
       message.model != "<synthetic>", let usage = message.usage
     else { return }
     let used = (usage.input ?? 0) + (usage.cacheWrite ?? 0) + (usage.cacheRead ?? 0)
+    let model = file.model ?? message.model
+    let compaction = file.compaction ?? file.usage?.lastCompaction
+    let window = ContextWindowUsage.claudeWindow(
+      model: model, seen: max(used, compaction?.tokensBefore ?? 0))
     file.usage = ContextWindowUsage(
-      usedTokens: used, measuredAt: date,
-      lastCompaction: file.compaction ?? file.usage?.lastCompaction)
+      usedTokens: used, windowSize: window,
+      compactionThreshold: ContextWindowUsage.claudeCompactionThreshold(window: window),
+      isEstimate: true, model: model, measuredAt: date, lastCompaction: compaction)
     file.compaction = nil
   }
 
@@ -127,10 +141,12 @@ extension AgentUsageReader: ContextWindowReading {
       let info = decoded.payload?.info, let last = info.lastTokenUsage
     else { return }
     let used = last.total ?? ((last.input ?? 0) + (last.output ?? 0))
+    let window = info.modelContextWindow
     file.usage = ContextWindowUsage(
-      usedTokens: used, windowSize: info.modelContextWindow, measuredAt: date,
-      source: info.modelContextWindow == nil ? nil : .reportedByCLI,
-      lastCompaction: file.compaction ?? file.usage?.lastCompaction, countsLikeCodex: true)
+      usedTokens: used, windowSize: window,
+      compactionThreshold: window.map(ContextWindowUsage.codexCompactionThreshold(window:)),
+      isEstimate: window != nil, measuredAt: date, source: window == nil ? nil : .reportedByCLI,
+      lastCompaction: file.compaction ?? file.usage?.lastCompaction)
     file.compaction = nil
   }
 }
@@ -146,6 +162,17 @@ struct ClaudeContextLine: Decodable {
   let isSidechain: Bool?
   let message: Message?
   let compactMetadata: CompactMetadata?
+  /// The model the CLI runs, said at the start and at each change; its `text` is not declared.
+  let attachment: Attachment?
+
+  struct Attachment: Decodable {
+    let type: String?
+    let identity: Identity?
+  }
+
+  struct Identity: Decodable {
+    let modelId: String?
+  }
 
   struct Message: Decodable {
     let model: String?

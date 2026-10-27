@@ -148,7 +148,9 @@ public final class UsageModel {
     for session in shown {
       var usage = await service.contextWindow(for: session)
       if let agent = session.agent, let endpoint = endpointWindow(agent) {
-        usage = usage?.declared(by: endpoint.name, window: endpoint.window)
+        usage = usage?.declared(
+          by: endpoint.name, window: endpoint.window,
+          harnessIsCodex: agent.harnessID == "codex")
       }
       contextWindows[session.id] = usage
     }

@@ -184,12 +184,18 @@ struct SessionContextWindowLine: View {
             .progressViewStyle(.linear)
             .tint(isAlmostFull ? Color.red : Color.accentColor)
             .accessibilityHidden(true)
-          if isAlmostFull {
+          if let threshold = usage.compactionThreshold {
             caption(
-              String(
-                localized: LocalizedStringResource(
-                  "Window almost full", locale: locale, bundle: .module,
-                  comment: "The conversation fills most of its agent's context window.")))
+              isAlmostFull
+                ? String(
+                  localized: LocalizedStringResource(
+                    "Automatic compaction soon", locale: locale, bundle: .module,
+                    comment: "The conversation nears the size at which its agent compacts it."))
+                : String(
+                  localized: LocalizedStringResource(
+                    "Compacted automatically at \(UsagePresentation.tokens(threshold))",
+                    locale: locale, bundle: .module,
+                    comment: "The size at which the agent compacts the conversation: “167 k”.")))
           }
         } else {
           caption(
@@ -235,7 +241,16 @@ struct SessionContextWindowLine: View {
   }
 
   private func source(_ usage: ContextWindowUsage) -> String {
-    switch usage.source {
+    if usage.isEstimate, let window = usage.windowSize, let threshold = usage.compactionThreshold {
+      let name = usage.model ?? agentName ?? "—"
+      return String(
+        localized: LocalizedStringResource(
+          "Estimate: a window of \(UsagePresentation.tokens(window)) for \(name), compacted automatically at \(UsagePresentation.tokens(threshold))",
+          locale: locale, bundle: .module,
+          comment: "How the context share was deduced: window size, model or agent, threshold."
+        ))
+    }
+    return switch usage.source {
     case .declaredByEndpoint(let name):
       String(
         localized: LocalizedStringResource(
@@ -270,20 +285,21 @@ struct SessionContextWindowLine: View {
         comment: "When the conversation was compacted, such as “12 min ago”."))
   }
 
-  /// “92,000 tokens of 200,000, 46%”: the figures whole, for VoiceOver.
+  /// “92,000 tokens of 167,000 before compaction, 55%”: the figures whole, for VoiceOver.
   private func spoken(_ usage: ContextWindowUsage) -> String {
     let used = usage.usedTokens.formatted(.number.locale(locale))
-    guard let window = usage.windowSize, let percent = usage.percentUsed else {
+    if let threshold = usage.compactionThreshold, let percent = usage.percentUsed {
+      let size = threshold.formatted(.number.locale(locale))
       return String(
         localized: LocalizedStringResource(
-          "\(used) tokens", locale: locale, bundle: .module,
-          comment: "The context, read by VoiceOver: a number of tokens."))
+          "\(used) tokens of \(size) before compaction, \(percent)%", locale: locale,
+          bundle: .module,
+          comment: "The context, read by VoiceOver: tokens used, compaction size, share used."))
     }
-    let size = window.formatted(.number.locale(locale))
     return String(
       localized: LocalizedStringResource(
-        "\(used) tokens of \(size), \(percent)%", locale: locale, bundle: .module,
-        comment: "The context, read by VoiceOver: tokens used, window size, share used."))
+        "\(used) tokens", locale: locale, bundle: .module,
+        comment: "The context, read by VoiceOver: a number of tokens."))
   }
 }
 

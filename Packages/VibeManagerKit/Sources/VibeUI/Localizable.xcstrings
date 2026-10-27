@@ -5622,104 +5622,104 @@
         }
       }
     },
-    "%@ tokens of %@, %lld%%" : {
-      "comment" : "The context, read by VoiceOver: tokens used, window size, share used.",
+    "%@ tokens of %@ before compaction, %lld%%" : {
+      "comment" : "The context, read by VoiceOver: tokens used, compaction size, share used.",
       "extractionState" : "manual",
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ رمزًا من %2$@، %3$lld%%"
+            "value" : "%1$@ رمزًا من %2$@ قبل الضغط، %3$lld%%"
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ Tokens von %2$@, %3$lld %%"
+            "value" : "%1$@ Tokens von %2$@ vor der Komprimierung, %3$lld %%"
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ tokens de %2$@, %3$lld %%"
+            "value" : "%1$@ tokens de %2$@ antes de compactar, %3$lld %%"
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ tokens sur %2$@, %3$lld %%"
+            "value" : "%1$@ tokens sur %2$@ avant compactage, %3$lld %%"
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$@ में से %1$@ टोकन, %3$lld%%"
+            "value" : "संक्षेपण से पहले %2$@ में से %1$@ टोकन, %3$lld%%"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ token su %2$@, %3$lld%%"
+            "value" : "%1$@ token su %2$@ prima della compattazione, %3$lld%%"
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$@ 中 %1$@ トークン、%3$lld%%"
+            "value" : "圧縮まで %2$@ 中 %1$@ トークン、%3$lld%%"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$@ 중 %1$@ 토큰, %3$lld%%"
+            "value" : "압축 전 %2$@ 중 %1$@ 토큰, %3$lld%%"
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ tokens van %2$@, %3$lld%%"
+            "value" : "%1$@ tokens van %2$@ vóór compressie, %3$lld%%"
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ tokenów z %2$@, %3$lld %%"
+            "value" : "%1$@ tokenów z %2$@ przed kompaktowaniem, %3$lld %%"
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ tokens de %2$@, %3$lld%%"
+            "value" : "%1$@ tokens de %2$@ antes da compactação, %3$lld%%"
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ токенов из %2$@, %3$lld %%"
+            "value" : "%1$@ токенов из %2$@ до сжатия, %3$lld %%"
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%2$@ tokenin %1$@ tanesi, %%%3$lld"
+            "value" : "Sıkıştırmadan önce %2$@ tokenin %1$@ tanesi, %%%3$lld"
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ токенів із %2$@, %3$lld %%"
+            "value" : "%1$@ токенів із %2$@ до стиснення, %3$lld %%"
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ / %2$@ 个令牌，%3$lld%%"
+            "value" : "压缩前 %1$@ / %2$@ 个令牌，%3$lld%%"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "%1$@ / %2$@ 個權杖，%3$lld%%"
+            "value" : "壓縮前 %1$@ / %2$@ 個權杖，%3$lld%%"
           }
         }
       }
@@ -49541,6 +49541,108 @@
         }
       }
     },
+    "Automatic compaction soon" : {
+      "comment" : "The conversation nears the size at which its agent compacts it.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الضغط التلقائي وشيك"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische Komprimierung steht bevor"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compactación automática inminente"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compactage automatique imminent"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "स्वचालित संक्षेपण जल्द"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compattazione automatica imminente"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "まもなく自動圧縮"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "곧 자동 압축"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische compressie nadert"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Wkrótce automatyczne kompaktowanie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compactação automática em breve"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скоро автоматическое сжатие"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Otomatik sıkıştırma yakında"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Скоро автоматичне стиснення"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即将自动压缩"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "即將自動壓縮"
+          }
+        }
+      }
+    },
     "Automatic summary is turned off." : {
       "localizations" : {
         "ar" : {
@@ -61038,6 +61140,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "%1$@壓縮（%2$@ → %3$@）"
+          }
+        }
+      }
+    },
+    "Compacted automatically at %@" : {
+      "comment" : "The size at which the agent compacts the conversation: “167 k”.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ضغط تلقائي عند %@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische Komprimierung bei %@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compactación automática a %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compactage automatique à %@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ पर स्वचालित संक्षेपण"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compattazione automatica a %@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ で自動圧縮"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@에서 자동 압축"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatische compressie bij %@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Automatyczne kompaktowanie przy %@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compactação automática em %@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматическое сжатие при %@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@ değerinde otomatik sıkıştırma"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Автоматичне стиснення при %@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 时自动压缩"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 %@ 時自動壓縮"
           }
         }
       }
@@ -75695,6 +75899,108 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "輸入位址或 #工單"
+          }
+        }
+      }
+    },
+    "Estimate: a window of %@ for %@, compacted automatically at %@" : {
+      "comment" : "How the context share was deduced: window size, model or agent, threshold.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تقدير: نافذة %1$@ لـ %2$@، ضغط تلقائي عند %3$@"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schätzung: Fenster von %1$@ für %2$@, automatische Komprimierung bei %3$@"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimación: ventana de %1$@ para %2$@, compactación automática a %3$@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimation : fenêtre de %1$@ pour %2$@, compactage automatique à %3$@"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अनुमान: %2$@ के लिए %1$@ की विंडो, %3$@ पर स्वचालित संक्षेपण"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stima: finestra di %1$@ per %2$@, compattazione automatica a %3$@"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "推定：%2$@ のウィンドウは %1$@、%3$@ で自動圧縮"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "추정: %2$@의 창 %1$@, %3$@에서 자동 압축"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Schatting: venster van %1$@ voor %2$@, automatische compressie bij %3$@"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Szacunek: okno %1$@ dla %2$@, automatyczne kompaktowanie przy %3$@"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Estimativa: janela de %1$@ para %2$@, compactação automática em %3$@"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оценка: окно %1$@ для %2$@, автоматическое сжатие при %3$@"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tahmin: %2$@ için %1$@ pencere, %3$@ değerinde otomatik sıkıştırma"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оцінка: вікно %1$@ для %2$@, автоматичне стиснення при %3$@"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "估计：%2$@ 的窗口为 %1$@，在 %3$@ 时自动压缩"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "估計：%2$@ 的視窗為 %1$@，在 %3$@ 時自動壓縮"
           }
         }
       }
@@ -192410,108 +192716,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "完整回應"
-          }
-        }
-      }
-    },
-    "Window almost full" : {
-      "comment" : "The conversation fills most of its agent's context window.",
-      "extractionState" : "manual",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "النافذة ممتلئة تقريبًا"
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fenster fast voll"
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ventana casi llena"
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Fenêtre presque pleine"
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "विंडो लगभग भर गई"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Finestra quasi piena"
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "ウィンドウがほぼいっぱいです"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "창이 거의 찼습니다"
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Venster bijna vol"
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Okno prawie pełne"
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Janela quase cheia"
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Окно почти заполнено"
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Pencere neredeyse dolu"
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Вікно майже заповнене"
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "窗口即将用满"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "視窗即將用滿"
           }
         }
       }

@@ -144,9 +144,12 @@ enum UsagePresentation {
     return parts
   }
 
-  /// “≈ 92 k / 200 k · 46 %”, or “≈ 92 k tokens” without a window.
+  /// “≈ 92 k / 167 k · 55 %” — of the way to the automatic compaction, or to the end of the
+  /// window when it is not known — or “≈ 92 k tokens” without either.
   static func context(_ usage: ContextWindowUsage) -> String {
-    guard let window = usage.windowSize, let percent = usage.percentUsed else {
+    guard let window = usage.compactionThreshold ?? usage.windowSize,
+      let percent = usage.percentUsed
+    else {
       return "≈ "
         + String(
           localized: "\(tokens(usage.usedTokens)) tokens", bundle: .module,

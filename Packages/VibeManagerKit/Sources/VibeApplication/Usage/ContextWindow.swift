@@ -25,53 +25,83 @@ public struct ContextWindowUsage: Hashable, Sendable {
   }
 
   public var usedTokens: Int
-  /// `nil` when no reliable source gives it.
+  /// `nil` when no source gives it.
   public var windowSize: Int?
+  /// When the CLI compacts the conversation on its own: what the share is measured against.
+  public var compactionThreshold: Int?
+  /// The window and threshold are deduced from the model, not reported.
+  public var isEstimate: Bool
+  /// The model the window was deduced from.
+  public var model: String?
   public var measuredAt: Date
   /// Where `windowSize` comes from; `nil` without one.
   public var source: Source?
   public var lastCompaction: Compaction?
-  /// Whether the share is computed as Codex computes its own “context left”.
-  public var countsLikeCodex: Bool
 
   public init(
-    usedTokens: Int, windowSize: Int? = nil, measuredAt: Date, source: Source? = nil,
-    lastCompaction: Compaction? = nil, countsLikeCodex: Bool = false
+    usedTokens: Int, windowSize: Int? = nil, compactionThreshold: Int? = nil,
+    isEstimate: Bool = false, model: String? = nil, measuredAt: Date, source: Source? = nil,
+    lastCompaction: Compaction? = nil
   ) {
     self.usedTokens = usedTokens
     self.windowSize = windowSize
+    self.compactionThreshold = compactionThreshold
+    self.isEstimate = isEstimate
+    self.model = model
     self.measuredAt = measuredAt
     self.source = source
     self.lastCompaction = lastCompaction
-    self.countsLikeCodex = countsLikeCodex
   }
 
-  /// What Codex keeps for its own instructions and tools, out of both the window and the context
-  /// when it says how much is left (codex-rs `TokenUsage::percent_of_context_window_remaining`).
-  public static let codexBaselineTokens = 12_000
-
-  /// The share of the window used, from 0 to 100; `nil` without a window.
+  /// The share of the way to the automatic compaction, from 0 to 100 — of the window when the
+  /// threshold is unknown; `nil` without either.
   public var percentUsed: Int? {
-    guard let windowSize, windowSize > 0 else { return nil }
-    if countsLikeCodex {
-      let baseline = Self.codexBaselineTokens
-      guard windowSize > baseline else { return 100 }
-      let effective = Double(windowSize - baseline)
-      let used = Double(max(usedTokens - baseline, 0))
-      let remaining = Int((max(effective - used, 0) / effective * 100).rounded())
-      return 100 - min(max(remaining, 0), 100)
-    }
-    return min(Int((Double(usedTokens) / Double(windowSize) * 100).rounded()), 100)
+    guard let limit = compactionThreshold ?? windowSize, limit > 0 else { return nil }
+    return min(Int((Double(usedTokens) / Double(limit) * 100).rounded()), 100)
   }
 
-  /// The window declared by an endpoint wins over the one the CLI reports: the CLI's describes
-  /// another model.
-  public func declared(by endpoint: String, window: Int?) -> ContextWindowUsage {
+  // MARK: - The CLIs' own rules
+
+  /// Codex compacts at nine tenths of the window when its model catalogue sets no limit
+  /// (`auto_compact_token_limit`), as every model of Codex 0.164's does.
+  public static func codexCompactionThreshold(window: Int) -> Int {
+    window * 9 / 10
+  }
+
+  /// Claude Code 2.1 compacts at its window, less the output it keeps for the answer (at most
+  /// 20 000) and a margin of 13 000.
+  public static func claudeCompactionThreshold(window: Int) -> Int {
+    max(window - claudeOutputReserve - claudeCompactionMargin, 0)
+  }
+
+  static let claudeOutputReserve = 20_000
+  static let claudeCompactionMargin = 13_000
+  public static let claudeDefaultWindow = 200_000
+  public static let claudeLongWindow = 1_000_000
+
+  /// The window of a Claude model: a million for its `[1m]` variant, or when the conversation
+  /// already went past the default; 200 000 otherwise.
+  public static func claudeWindow(model: String?, seen tokens: Int) -> Int {
+    if model?.hasSuffix("[1m]") == true || tokens > claudeDefaultWindow {
+      return claudeLongWindow
+    }
+    return claudeDefaultWindow
+  }
+
+  /// The window declared by an endpoint wins over the one the CLI reports or the one deduced:
+  /// they describe another model. The CLI is told to compact by it at launch (ADR 0035).
+  public func declared(by endpoint: String, window: Int?, harnessIsCodex: Bool)
+    -> ContextWindowUsage
+  {
     guard let window, window > 0 else { return self }
     var usage = self
     usage.windowSize = window
+    usage.compactionThreshold =
+      harnessIsCodex
+      ? Self.codexCompactionThreshold(window: window)
+      : Self.claudeCompactionThreshold(window: window)
+    usage.isEstimate = false
     usage.source = .declaredByEndpoint(endpoint)
-    usage.countsLikeCodex = false
     return usage
   }
 }
@@ -92,6 +122,8 @@ public struct ContextWindowFile: Hashable, Sendable {
   public var usage: ContextWindowUsage?
   /// A compaction read after the last answer, for the next one to carry.
   public var compaction: ContextWindowUsage.Compaction?
+  /// The model the CLI said it runs, the last time it said it (Claude Code).
+  public var model: String?
 
   public init(inode: UInt64? = nil, offset: UInt64 = 0) {
     self.inode = inode
