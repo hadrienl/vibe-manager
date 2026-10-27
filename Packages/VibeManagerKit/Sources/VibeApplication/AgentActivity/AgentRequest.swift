@@ -516,10 +516,17 @@ public protocol AgentAnswerKeymap: Sendable {
   /// Whether the screen shows the CLI's prompt waiting for words, no dialog over it: hooks silent
   /// past a start then wait on nothing — a resumed Codex says nothing until its first turn.
   func showsPromptAtRest(onScreen text: String) -> Bool
-  /// Whether each key of `answer` after the first waits for the screen to ask for it: its keys
-  /// read off the dialog again must be the ones left to type. Return, which takes the option
-  /// pointed at, must not reach a dialog the key before has not moved yet.
-  func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool
+  /// Whether the key at `step` of `answer` waits for the screen to ask for it: the keys left,
+  /// read off the dialog again, must be the ones still to type. Return, which takes the option
+  /// pointed at, must not reach a dialog the key before has not moved yet; a question's answer must
+  /// not reach the question before it.
+  func rereadsScreen(beforeStep step: Int, of answer: AgentAnswer, to content: AgentRequestContent)
+    -> Bool
+  /// The keys left to give `answer`, read off the dialog as drawn midway through typing them: from
+  /// the question it shows on, among several. `nil` when the screen shows none of its steps.
+  func keystrokesLeft(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]?
 }
 
 extension AgentAnswerKeymap {
@@ -545,8 +552,18 @@ extension AgentAnswerKeymap {
     false
   }
 
-  public func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool {
+  public func rereadsScreen(
+    beforeStep step: Int, of answer: AgentAnswer, to content: AgentRequestContent
+  ) -> Bool {
     false
+  }
+
+  /// Most answers are typed from a dialog that only their last key changes: what is left is what
+  /// it takes from the start.
+  public func keystrokesLeft(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
+    keystrokes(for: answer, to: content, screen: screen)
   }
 }
 

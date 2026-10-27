@@ -66,9 +66,52 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
   }
 
   /// The folder's trust is taken by Return once the down arrow has moved the pointer onto it: a
-  /// Return read before the arrow would exit instead.
-  public func rereadsScreenBetweenKeys(of answer: AgentAnswer) -> Bool {
-    answer == .trustFolder
+  /// Return read before the arrow would exit instead. Each question of several, and their review,
+  /// is answered once drawn: keys typed ahead of it were seen lost, one question answered and the
+  /// next still asked while the card said all were.
+  public func rereadsScreen(
+    beforeStep step: Int, of answer: AgentAnswer, to content: AgentRequestContent
+  ) -> Bool {
+    switch (answer, content) {
+    case (.trustFolder, _):
+      return true
+    case (.answers(let answers), .questions(let questions)):
+      guard let groups = Self.keystrokeGroups(for: answers, to: questions) else { return false }
+      var start = 0
+      for group in groups.dropLast() {
+        start += group.count
+        if start == step { return true }
+      }
+      return false
+    default:
+      return false
+    }
+  }
+
+  /// Midway through several questions, the keys left run from the question drawn — the first
+  /// whose tab is not ticked, every one before it ticked, its own boxes all empty — or from the
+  /// review that submits them, every tab ticked.
+  public func keystrokesLeft(
+    for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
+  ) -> [[UInt8]]? {
+    guard case .answers(let answers) = answer, case .questions(let questions) = content else {
+      return keystrokes(for: answer, to: content, screen: screen)
+    }
+    guard let screen, let tabs = screen.questionTabs, tabs.count == questions.count,
+      let groups = Self.keystrokeGroups(for: answers, to: questions)
+    else { return nil }
+    let shown = tabs.firstIndex(of: false) ?? questions.count
+    guard tabs[shown...].allSatisfy({ !$0 }) else { return nil }
+    if shown == questions.count {
+      guard let submit = screen.options.first, submit.number == 1,
+        submit.label == "Submit answers"
+      else { return nil }
+      return groups.last
+    }
+    guard Self.isDrawn(questions[shown], on: screen), !Self.hasTickedBox(screen) else {
+      return nil
+    }
+    return groups[shown...].flatMap { $0 }
   }
 
   public func startupDialog(onScreen text: String) -> AgentTerminalPrompt? {
@@ -127,25 +170,43 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
       guard let first = questions.first, Self.isDrawn(first, on: screen) else { return nil }
       return Self.digit(of: screen?.option { $0 == "Chat about this" })
     case (.answers(let answers), .questions(let questions)):
-      // The question on screen must be this one, its options where its report puts them: past
-      // them come "Type something", then "Chat about this", which a digit one off would take.
-      guard answers.count == questions.count, let first = questions.first,
-        Self.isDrawn(first, on: screen)
+      // The question on screen must be the first, its options where its report puts them: past
+      // them come "Type something", then "Chat about this", which a digit one off would take. Its
+      // tabs, when drawn, must have no answer yet: one given in the terminal has moved on to a
+      // question whose options may be the same. Nor may a box be ticked: its digit would untick it.
+      guard let first = questions.first, Self.isDrawn(first, on: screen),
+        screen?.questionTabs?.contains(true) != true, screen.map(Self.hasTickedBox) != true,
+        let groups = Self.keystrokeGroups(for: answers, to: questions)
       else { return nil }
-      var steps: [[UInt8]] = []
-      for (answer, question) in zip(answers, questions) {
-        guard let keys = Self.keystrokes(for: answer, to: question) else { return nil }
-        steps += keys
-      }
-      // Several questions, or one of several choices, end on a review of the answers: its first
-      // option submits them.
-      if questions.count > 1 || questions.contains(where: \.allowsMultipleChoices) {
-        steps.append(Array("1".utf8))
-      }
-      return steps
+      return groups.flatMap { $0 }
     default:
       return nil
     }
+  }
+
+  /// The keys of each question, then the review's when there is one: its first option submits
+  /// them all.
+  static func keystrokeGroups(for answers: [AgentQuestionAnswer], to questions: [AgentQuestion])
+    -> [[[UInt8]]]?
+  {
+    guard answers.count == questions.count, !questions.isEmpty else { return nil }
+    var groups: [[[UInt8]]] = []
+    for (answer, question) in zip(answers, questions) {
+      guard let keys = Self.keystrokes(for: answer, to: question) else { return nil }
+      groups.append(keys)
+    }
+    if hasReview(questions) { groups.append([Array("1".utf8)]) }
+    return groups
+  }
+
+  /// Whether a box of the options is ticked already: a digit typed for it would untick it.
+  static func hasTickedBox(_ screen: AgentDialogScreen) -> Bool {
+    screen.options.contains { $0.label.hasPrefix("[") && !$0.label.hasPrefix("[ ]") }
+  }
+
+  /// Several questions, or one of several choices, end on a review of the answers.
+  static func hasReview(_ questions: [AgentQuestion]) -> Bool {
+    questions.count > 1 || questions.contains(where: \.allowsMultipleChoices)
   }
 
   /// Whether the dialog on screen draws `question`: each option at its number — words read on,
