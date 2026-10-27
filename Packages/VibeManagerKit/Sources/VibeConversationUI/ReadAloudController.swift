@@ -67,6 +67,10 @@ public final class ReadAloudController {
   @ObservationIgnored private var task: Task<Void, Never>?
   @ObservationIgnored private var isWarm = false
   @ObservationIgnored private var warming: Task<Void, Never>?
+  /// Counts the downloads: one cancelled that ends all the same is told apart from the next.
+  @ObservationIgnored private var downloadGeneration = 0
+  /// The files of a cancelled download, being removed.
+  @ObservationIgnored private var removal: Task<Void, Never>?
   /// The answers the audio mode will read next, in their order, with their conversation.
   @ObservationIgnored private var queue: [(id: String, text: String, conversation: ObjectIdentifier)] = []
   /// The answers each conversation already had: only the ones after are new.
@@ -246,15 +250,27 @@ public final class ReadAloudController {
     guard phase == .idle else { return }
     problem = nil
     phase = .downloading(fraction: 0)
-    task = Task {
+    downloadGeneration += 1
+    let generation = downloadGeneration
+    task = Task { [removal] in
+      // A download cancelled a moment ago: its files go before the new one writes its own.
+      await removal?.value
       do {
         try await synthesizer.download { fraction in
           Task { @MainActor in self.downloadProgressed(fraction) }
         }
       } catch {
+        guard generation == downloadGeneration else { return }
         installedSize = synthesizer.installedSize()
         phase = .idle
         problem = .downloadFailed
+        return
+      }
+      guard generation == downloadGeneration else {
+        // Cancelled, it went to its end all the same: what it wrote goes, unless the model is
+        // being downloaded again.
+        if phase == .idle { try? await synthesizer.remove() }
+        installedSize = synthesizer.installedSize()
         return
       }
       installedSize = synthesizer.installedSize()
@@ -266,6 +282,24 @@ public final class ReadAloudController {
   private func downloadProgressed(_ fraction: Double) {
     guard case .downloading = phase else { return }
     phase = fraction >= 1 ? .preparing : .downloading(fraction: fraction)
+  }
+
+  /// Settings: the download stopped, or the preparation that follows it. What was downloaded is
+  /// not kept: it would take a gigabyte nobody sees.
+  public func cancelDownload() {
+    switch phase {
+    case .downloading, .preparing: break
+    case .idle, .loading, .reading: return
+    }
+    task?.cancel()
+    task = nil
+    downloadGeneration += 1
+    phase = .idle
+    problem = nil
+    removal = Task { [synthesizer] in
+      try? await synthesizer.remove()
+      installedSize = synthesizer.installedSize()
+    }
   }
 
   public func removeModel() async {

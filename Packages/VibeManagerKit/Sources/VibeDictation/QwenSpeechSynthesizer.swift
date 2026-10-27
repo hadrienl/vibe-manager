@@ -52,6 +52,8 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
       let folder = try await TTSKit.download(variant: .qwen3TTS_0_6b, downloadBase: directory) {
         value in progress(value.fractionCompleted)
       }
+      // Cancelled at the end of the download: not compiled for nothing.
+      try Task.checkCancellation()
       // Loaded once now: the compilation for this Mac is the preparation the user waits for, and
       // the first reading starts at once.
       _ = try await loaded(from: folder)

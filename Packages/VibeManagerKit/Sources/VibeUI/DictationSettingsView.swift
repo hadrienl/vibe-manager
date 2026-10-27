@@ -145,9 +145,15 @@ private struct ReadAloudSettingsSection: View {
       LabeledContent {
         switch readAloud.phase {
         case .downloading(let fraction):
-          ProgressView(value: fraction).frame(width: 120)
+          HStack {
+            ProgressView(value: fraction).frame(width: 120)
+            cancelDownload
+          }
         case .preparing:
-          ProgressView().controlSize(.small)
+          HStack {
+            ProgressView().controlSize(.small)
+            cancelDownload
+          }
         case .idle, .reading, .loading:
           if readAloud.isModelInstalled {
             Button(role: .destructive) {
@@ -188,6 +194,15 @@ private struct ReadAloudSettingsSection: View {
       )
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
+    }
+  }
+
+  /// Stops the download, or the preparation after it; nothing of it is kept.
+  private var cancelDownload: some View {
+    Button {
+      readAloud.cancelDownload()
+    } label: {
+      Text("Cancel", bundle: .module)
     }
   }
 

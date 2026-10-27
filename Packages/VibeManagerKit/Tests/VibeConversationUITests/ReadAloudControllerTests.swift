@@ -26,7 +26,22 @@ final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
   func installedSize() -> Int64? { lock.withLock { installed ? 900 : nil } }
   var downloadSize: Int64 { 1_000 }
 
+  /// Whether a download lasts until it is cancelled, or until `finishDownload` when it ignores
+  /// the cancellation.
+  var holdsDownload = false
+  var ignoresCancellation = false
+  private var downloadFinished = false
+  private var removeCount = 0
+  var removed: Int { lock.withLock { removeCount } }
+
+  func finishDownload() { lock.withLock { downloadFinished = true } }
+
   func download(progress: @escaping @Sendable (Double) -> Void) async throws {
+    progress(0.5)
+    while holdsDownload, !lock.withLock({ downloadFinished }) {
+      if Task.isCancelled, !ignoresCancellation { throw CancellationError() }
+      await Task.yield()
+    }
     progress(1)
     lock.withLock { installed = true }
   }
@@ -49,7 +64,12 @@ final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
   private var prepareCount = 0
   var prepared: Int { lock.withLock { prepareCount } }
 
-  func remove() async throws { lock.withLock { installed = false } }
+  func remove() async throws {
+    lock.withLock {
+      installed = false
+      removeCount += 1
+    }
+  }
 }
 
 @MainActor
@@ -125,6 +145,47 @@ struct ReadAloudControllerTests {
 
     await readAloud.removeModel()
     #expect(!readAloud.isModelInstalled)
+  }
+
+  @Test("A download cancelled stops, and nothing of it is kept")
+  func cancelDownload() async {
+    let synthesizer = FakeSynthesizer(installed: false)
+    synthesizer.holdsDownload = true
+    let readAloud = ReadAloudController(
+      synthesizer: synthesizer, store: InMemorySpeechSettingsStore())
+    var ready = 0
+    readAloud.modelDidBecomeReady = { ready += 1 }
+
+    readAloud.downloadModel()
+    await until { readAloud.phase == .downloading(fraction: 0.5) }
+    readAloud.cancelDownload()
+    #expect(readAloud.phase == .idle)
+    await until { synthesizer.removed == 1 }
+    #expect(synthesizer.removed == 1)
+    #expect(!readAloud.isModelInstalled)
+    #expect(readAloud.problem == nil)
+    #expect(ready == 0)
+  }
+
+  @Test("A download cancelled that ends all the same is removed, and said ready to no one")
+  func cancelledDownloadEnds() async {
+    let synthesizer = FakeSynthesizer(installed: false)
+    synthesizer.holdsDownload = true
+    synthesizer.ignoresCancellation = true
+    let readAloud = ReadAloudController(
+      synthesizer: synthesizer, store: InMemorySpeechSettingsStore())
+    var ready = 0
+    readAloud.modelDidBecomeReady = { ready += 1 }
+
+    readAloud.downloadModel()
+    await until { readAloud.phase == .downloading(fraction: 0.5) }
+    readAloud.cancelDownload()
+    synthesizer.finishDownload()
+    await until { synthesizer.removed == 2 }
+    #expect(synthesizer.removed == 2)
+    #expect(!readAloud.isModelInstalled)
+    #expect(readAloud.phase == .idle)
+    #expect(ready == 0)
   }
 
   @Test("The voice is loaded once in the background, when a conversation comes on screen")
