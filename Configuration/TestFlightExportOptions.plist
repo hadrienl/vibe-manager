@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Exporting Vibe Companion for TestFlight, uploaded straight to App Store Connect, signed by Apple.
+  `teamID` is filled in by Scripts/testflight.sh; a dry run sets `destination` to `export`.
+-->
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<key>teamID</key>
+	<string>TEAM_ID</string>
+	<key>destination</key>
+	<string>upload</string>
+	<key>testFlightInternalTestingOnly</key>
+	<false/>
+	<key>manageAppVersionAndBuildNumber</key>
+	<false/>
+</dict>
+</plist>

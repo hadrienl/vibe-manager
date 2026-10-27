@@ -53,3 +53,27 @@ jobs:
           COMPANION_PROVISIONING_PROFILE: ${{ secrets.COMPANION_PROVISIONING_PROFILE }}
           GH_TOKEN: ${{ github.token }}
         run: Scripts/release.sh "${GITHUB_REF_NAME#v}"
+
+  # The mobile companion's iOS application, on TestFlight for the same tag: built while the Mac
+  # application is notarized. Signed by Apple with an App Store Connect API key (role App Manager).
+  testflight:
+    runs-on: xcode-27
+    timeout-minutes: 45
+    environment: release
+    steps:
+      - name: Check out the tagged commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The build number is the number of commits, as the Mac application's.
+          fetch-depth: 0
+
+      - name: Select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_27.app
+
+      - name: Archive and upload to TestFlight
+        env:
+          VIBE_TEAM_ID: ${{ vars.VIBE_TEAM_ID }}
+          ASC_API_KEY_P8: ${{ secrets.ASC_API_KEY_P8 }}
+          ASC_API_KEY_ID: ${{ secrets.ASC_API_KEY_ID }}
+          ASC_API_ISSUER_ID: ${{ secrets.ASC_API_ISSUER_ID }}
+        run: Scripts/testflight.sh "${GITHUB_REF_NAME#v}"

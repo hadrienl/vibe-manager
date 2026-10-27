@@ -85845,6 +85845,107 @@
         }
       }
     },
+    "How to install the alpha…" : {
+      "comment" : "Settings › iPhone Companion: opens the alpha test's instructions on GitHub.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "كيفية تثبيت نسخة ألفا…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alpha installieren – so geht’s…"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cómo instalar la alfa…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Installer l’alpha…"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "अल्फ़ा कैसे इंस्टॉल करें…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Come installare l’alpha…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アルファ版のインストール方法…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "알파 버전 설치 방법…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De alfa installeren…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Jak zainstalować wersję alfa…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Como instalar a alfa…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Как установить альфа-версию…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Alfa sürümü nasıl yüklenir…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Як установити альфа-версію…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何安装 Alpha 版…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "如何安裝 Alpha 版…"
+          }
+        }
+      }
+    },
     "Identical — skipped" : {
       "comment" : "An imported template the library already has as it is.",
       "localizations" : {
@@ -160735,6 +160836,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "夥伴功能無法啟動"
+          }
+        }
+      }
+    },
+    "The companion is in alpha test: the Vibe Companion app is not on the App Store yet. Install it on your iPhone through TestFlight." : {
+      "comment" : "Settings › iPhone Companion: the alpha test's notice, under the switch.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "المرافق في مرحلة اختبار ألفا: تطبيق Vibe Companion غير متوفر بعد على App Store. ثبّته على iPhone عبر TestFlight."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Begleiter ist im Alphatest: Die App Vibe Companion ist noch nicht im App Store. Installiere sie über TestFlight auf deinem iPhone."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El acompañante está en fase alfa: la app Vibe Companion aún no está en el App Store. Instálala en tu iPhone con TestFlight."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le compagnon est en alpha test : l’app Vibe Companion n’est pas encore sur l’App Store. Installez-la sur votre iPhone avec TestFlight."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कम्पैनियन अल्फ़ा परीक्षण में है: Vibe Companion ऐप अभी App Store पर नहीं है। इसे TestFlight के ज़रिए अपने iPhone पर इंस्टॉल करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il companion è in alpha test: l’app Vibe Companion non è ancora sull’App Store. Installala sul tuo iPhone con TestFlight."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "コンパニオンはアルファテスト中です。Vibe Companion アプリはまだ App Store にありません。TestFlight から iPhone にインストールしてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "컴패니언은 알파 테스트 중입니다. Vibe Companion 앱은 아직 App Store에 없습니다. TestFlight로 iPhone에 설치하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De companion is in alfatest: de app Vibe Companion staat nog niet in de App Store. Installeer hem via TestFlight op je iPhone."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aplikacja towarzysząca jest w fazie testów alfa: Vibe Companion nie ma jeszcze w App Store. Zainstaluj ją na iPhonie przez TestFlight."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O companion está em teste alfa: o app Vibe Companion ainda não está na App Store. Instale-o no seu iPhone pelo TestFlight."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Компаньон находится на альфа-тестировании: приложения Vibe Companion пока нет в App Store. Установите его на iPhone через TestFlight."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yardımcı uygulama alfa testinde: Vibe Companion henüz App Store’da değil. iPhone’unuza TestFlight ile yükleyin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Компаньйон на альфа-тестуванні: застосунку Vibe Companion ще немає в App Store. Установіть його на iPhone через TestFlight."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伴侣应用正处于 Alpha 测试阶段：Vibe Companion 尚未上架 App Store。请通过 TestFlight 安装到你的 iPhone。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "伴侶 App 正處於 Alpha 測試階段：Vibe Companion 尚未上架 App Store。請透過 TestFlight 安裝到你的 iPhone。"
           }
         }
       }

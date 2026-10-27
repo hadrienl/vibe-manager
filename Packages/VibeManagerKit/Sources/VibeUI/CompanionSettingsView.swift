@@ -1,4 +1,5 @@
 import SwiftUI
+import VibeApplication
 
 /// Settings › iPhone Companion (#397): the companion turned on, what its agent says, and the
 /// iPhones that may connect (#398).
@@ -28,6 +29,25 @@ struct CompanionSettingsView: View {
           } label: {
             Text("Status", bundle: .module, comment: "Settings › iPhone Companion: a row.")
           }
+        }
+      } footer: {
+        // The alpha test: the app is on TestFlight, not on the App Store yet. The README's section
+        // holds the invitation, which exists only once Apple has reviewed a first build.
+        VStack(alignment: .leading, spacing: 6) {
+          Text(
+            "The companion is in alpha test: the Vibe Companion app is not on the App Store yet. Install it on your iPhone through TestFlight.",
+            bundle: .module
+          )
+          .foregroundStyle(.secondary)
+          .fixedSize(horizontal: false, vertical: true)
+          Button {
+            ExternalOpening.open(Self.alphaInstructions)
+          } label: {
+            Text(
+              "How to install the alpha…", bundle: .module,
+              comment: "Settings › iPhone Companion: opens the alpha test's instructions on GitHub.")
+          }
+          .buttonStyle(.link)
         }
       }
       if companion.isEnabled {
@@ -95,6 +115,9 @@ struct CompanionSettingsView: View {
         bundle: .module)
     }
   }
+
+  private static let alphaInstructions = URL(
+    string: "https://github.com/hadrienl/vibe-manager/blob/main/README.md#iphone-companion-alpha")!
 
   private var unavailable: String? {
     switch companion.availability {
