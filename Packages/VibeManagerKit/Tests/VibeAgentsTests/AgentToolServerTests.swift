@@ -124,4 +124,24 @@ struct CoordinatorLaunchTests {
       provider: ClaudeCodeAgentProvider.id)
     #expect(result.arguments == plan(ClaudeCodeAgentProvider.id).arguments)
   }
+
+  @Test("A child is told where to create its worktrees, the coordinator too, in one instruction")
+  func worktrees() async throws {
+    let registry = AgentProviderRegistry(providers: [ClaudeCodeAgentProvider.make(environment: [:])])
+    let tools = ProvideAgentTools(
+      agents: registry, setup: { nil },
+      coordination: { [coordinationServer] in coordinationServer },
+      worktrees: { WorktreeLocationSettings() })
+    let child = await tools(
+      plan(ClaudeCodeAgentProvider.id),
+      for: WorkSession(name: "#351", coordination: .child(of: SessionID())))
+    let childIndex = try #require(child.arguments.firstIndex(of: "--append-system-prompt"))
+    #expect(child.arguments[childIndex + 1].contains("/.claude/worktrees/{branch}"))
+    let coordinator = await tools(
+      plan(ClaudeCodeAgentProvider.id), for: WorkSession(name: "V2", coordination: .coordinator))
+    #expect(coordinator.arguments.filter { $0 == "--append-system-prompt" }.count == 1)
+    let index = try #require(coordinator.arguments.firstIndex(of: "--append-system-prompt"))
+    #expect(coordinator.arguments[index + 1].hasPrefix(CoordinatorInstructions.text))
+    #expect(coordinator.arguments[index + 1].contains("{repo}/.claude/worktrees/{branch}"))
+  }
 }

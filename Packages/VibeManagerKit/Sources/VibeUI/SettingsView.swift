@@ -250,6 +250,7 @@ struct SettingsSidebarContent {
     if model.browser != nil { tools.append(.webView) }
     tools.append(.templates)
     tools.append(.coordination)
+    tools.append(.worktrees)
     if model.companion != nil { tools.append(.companion) }
     if model.dictation != nil { tools.append(.dictation) }
     if model.ticketTitles.canReadPages { tools.append(.tickets) }
@@ -407,6 +408,9 @@ struct SettingsPageView: View {
       }
     case .coordination:
       CoordinationSettingsView(coordination: model.coordination)
+    case .worktrees:
+      WorktreesSettingsView(
+        worktrees: model.worktrees, repositories: WorktreesModel.repositories(of: model.sessions))
     case .companion:
       if let companion = model.companion {
         CompanionSettingsView(companion: companion)

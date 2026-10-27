@@ -28,6 +28,8 @@ public enum SettingsPage: Hashable, Sendable {
   case webView
   /// Coordinator sessions and their children (#352): how many children may run at once.
   case coordination
+  /// Where the agents create their worktrees (#432).
+  case worktrees
   /// The iPhone companion (#397): turned on, its iPhones.
   case companion
   /// The prompt templates: a list, an editor and a preview.
@@ -71,6 +73,8 @@ public enum SettingsPage: Hashable, Sendable {
     case .alertSounds: 900
     // The list of the resolvers, their editor, and the test under them.
     case .ticketResolvers: 860
+    // The field, the palette and the preview of the path.
+    case .worktrees: 700
     // A line per rule: its explanation, when it next runs and what it last did.
     case .archiveRules: 760
     default: Self.standardDetailWidth
@@ -121,6 +125,10 @@ public enum SettingsPage: Hashable, Sendable {
       LocalizedStringResource(
         "Coordination", bundle: .module,
         comment: "A page of the Settings window: coordinator sessions and their children.")
+    case .worktrees:
+      LocalizedStringResource(
+        "Worktrees", bundle: .module,
+        comment: "A page of the Settings window: where the agents create their git worktrees.")
     case .companion:
       LocalizedStringResource(
         "iPhone Companion", bundle: .module, comment: "A page of the Settings window.")
@@ -159,6 +167,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .newEndpoint: "plus"
     case .webView: "globe"
     case .coordination: "person.2.fill"
+    case .worktrees: "arrow.triangle.branch"
     case .companion: "iphone"
     case .templates: "text.badge.plus"
     case .dictation: "mic.fill"
@@ -181,6 +190,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .newEndpoint: .secondary
     case .webView: .cyan
     case .coordination: .teal
+    case .worktrees: .brown
     case .companion: .indigo
     case .templates: .purple
     case .dictation: .red
