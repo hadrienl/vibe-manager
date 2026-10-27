@@ -73,7 +73,10 @@ public final class DictationController {
     }
   }
 
-  public private(set) var phase = Phase.idle
+  public private(set) var phase = Phase.idle {
+    // The microphone open on a dictation: the voice reading the answers would be dictated with it.
+    didSet { readAloud?.isSuspended = phase == .recording }
+  }
   public private(set) var problem: Problem?
   /// The composer the phase or the problem belongs to; `nil` for a download asked from Settings.
   public private(set) var owner: ObjectIdentifier?
@@ -101,7 +104,7 @@ public final class DictationController {
       store.settings = settings
       if settings.variant != oldValue.variant {
         isModelReady = false
-        isWarming = false
+        loading = nil
       }
     }
   }
@@ -129,7 +132,8 @@ public final class DictationController {
   @ObservationIgnored private var listening: Task<Void, Never>?
   /// The level of a dictation, read for its wave.
   @ObservationIgnored private var metering: Task<Void, Never>?
-  @ObservationIgnored private var isWarming = false
+  /// The model being loaded: a transcription's time limit counts from its end.
+  @ObservationIgnored private var loading: Task<Void, Never>?
   @ObservationIgnored private var ticks = 0
   private static let log = Logger(subsystem: "eu.hadrien.VibeManager", category: "voice")
   /// The sentences of the discussion, transcribed and sent one after the other.
@@ -141,6 +145,9 @@ public final class DictationController {
   @ObservationIgnored var holdThreshold: TimeInterval = 0.3
   /// How often a discussion reads the microphone. Shortened by the tests only.
   @ObservationIgnored var listenInterval = Duration.milliseconds(100)
+  /// How long a transcription may take, once the model is loaded, before it is given up on.
+  /// Shortened by the tests only.
+  @ObservationIgnored var transcriptionLimit = Duration.seconds(60)
 
   public init(
     transcriber: any SpeechTranscribing, recorder: any AudioRecording,
@@ -193,18 +200,45 @@ public final class DictationController {
   /// Loads the model in the background, once, when a conversation comes on screen: its first
   /// load in a copy of the application compiles it for this Mac, which takes minutes (#357).
   public func warmUp() {
-    guard isModelInstalled, !isWarming, !isModelReady else { return }
-    isWarming = true
+    guard isModelInstalled else { return }
+    loadModel()
+  }
+
+  /// Loads the model chosen, unless it is loaded or loading: once loaded, it is said ready.
+  private func loadModel() {
+    guard !isModelReady, loading == nil else { return }
     let variant = settings.variant
-    Task {
-      do {
-        try await transcriber.prepare(variant)
-      } catch {
-        isWarming = false
-        return
-      }
+    var task: Task<Void, Never>?
+    task = Task {
+      let isLoaded = (try? await transcriber.prepare(variant)) != nil
       // Another model chosen meanwhile is not the one loaded.
-      if settings.variant == variant { isModelReady = true }
+      guard loading == task else { return }
+      loading = nil
+      if isLoaded { isModelReady = true }
+    }
+    loading = task
+  }
+
+  /// The transcription of `samples`, or `nil` once it took longer than its limit — counted once
+  /// the model is loaded, whose first load takes minutes. Whisper may never come back: what comes
+  /// back after the limit is dropped.
+  private func transcribe(_ samples: [Float], prompt: String) async -> String? {
+    let loading = loading
+    let limit = transcriptionLimit
+    let (variant, language) = (settings.variant, settings.language)
+    return await withCheckedContinuation { continuation in
+      let result = FirstResult(continuation)
+      Task { [transcriber] in
+        let text = try? await transcriber.transcribe(
+          samples, with: variant, language: language, prompt: prompt)
+        if text != nil { self.isModelReady = true }
+        result.give(text)
+      }
+      Task {
+        await loading?.value
+        try? await Task.sleep(for: limit)
+        result.give(nil)
+      }
     }
   }
 
@@ -294,7 +328,7 @@ public final class DictationController {
     // removes what this engine plays — the voice is played by another. The Mac's own voice is
     // kept out by the detector instead.
     do {
-      try recorder.start(cancellingEcho: false)
+      try recorder.start()
     } catch {
       return fail(.noMicrophone)
     }
@@ -303,8 +337,7 @@ public final class DictationController {
     detector = UtteranceDetector()
     readAloud?.readsConversation = request.owner
     readAloud?.readsNextAnswerOnly = false
-    let variant = settings.variant
-    Task { try? await transcriber.prepare(variant) }
+    loadModel()
     vocabulary = Task { await request.vocabulary() }
     listening = Task {
       while !Task.isCancelled {
@@ -374,10 +407,7 @@ public final class DictationController {
   /// - Returns: whether a sentence was sent, an answer to come.
   private func say(_ samples: [Float], for request: Request, prompt: String) async -> Bool {
     guard DictationTranscript.containsSpeech(samples) else { return false }
-    guard
-      let text = try? await transcriber.transcribe(
-        samples, with: settings.variant, language: settings.language, prompt: prompt)
-    else { return false }
+    guard let text = await transcribe(samples, prompt: prompt) else { return false }
     let sentence = DictationTranscript.cleaned(text)
     guard !sentence.isEmpty else { return false }
     if UtteranceDetector.isStop(sentence) {
@@ -458,6 +488,8 @@ public final class DictationController {
       }
       download = nil
       refreshInstalledSizes()
+      // Loaded by its download: the first transcription does not wait for it.
+      if settings.variant == variant { isModelReady = true }
       phase = .idle
       request = nil
       // Never a recording started by itself: the composer that asked says the model is ready.
@@ -539,6 +571,11 @@ public final class DictationController {
     guard phase == .idle else { return }
     try? await transcriber.remove(variant)
     refreshInstalledSizes()
+    // Downloaded again, it is loaded again.
+    if settings.variant == variant {
+      isModelReady = false
+      loading = nil
+    }
   }
 
   /// - Parameter attempt: the click it answers, counted when it was made.
@@ -582,36 +619,24 @@ public final class DictationController {
     }
     // Loaded, and the prompt read, while the user speaks: both are ready, or nearly, when they
     // stop.
-    let variant = settings.variant
-    Task { try? await transcriber.prepare(variant) }
+    loadModel()
     vocabulary = Task { await request.vocabulary() }
   }
 
   private func finishRecording(_ samples: [Float]) async {
     Self.log.notice(
       "Dictation ended: \(Double(samples.count) / 16_000, format: .fixed(precision: 1)) s heard")
-    // A transcription that never ends is said, rather than shown under way for ever — counted
-    // once the model is loaded, whose first load takes minutes.
-    let watchdog = Task { [attempt] in
-      while !isModelReady, !Task.isCancelled { try? await Task.sleep(for: .seconds(1)) }
-      try? await Task.sleep(for: .seconds(60))
-      guard !Task.isCancelled, phase == .transcribing, self.attempt == attempt else { return }
-      fail(.transcriptionFailed)
-    }
-    defer { watchdog.cancel() }
     let attempt = attempt
     let prompt = await vocabulary?.value ?? ""
     vocabulary = nil
     guard let request else { return end() }
     // Nothing said is nothing inserted: a silence given to Whisper comes back as a made-up line.
     guard DictationTranscript.containsSpeech(samples) else { return fail(.nothingHeard) }
-    let text = try? await transcriber.transcribe(
-      samples, with: settings.variant, language: settings.language, prompt: prompt)
-    // Given up on by the watchdog, and the microphone perhaps open again since: what comes back
-    // this late is not inserted, and ends nothing.
+    // A transcription that never ends is said, rather than shown under way for ever.
+    let text = await transcribe(samples, prompt: prompt)
+    // The composer put away, or another dictation started meanwhile: what comes back ends nothing.
     guard attempt == self.attempt, phase == .transcribing else { return }
     guard let text else { return fail(.transcriptionFailed) }
-    isModelReady = true
     let cleaned = DictationTranscript.cleaned(text)
     if !cleaned.isEmpty { request.insert(cleaned) }
     end()
@@ -636,5 +661,20 @@ public final class DictationController {
       uniqueKeysWithValues: DictationModelVariant.allCases.compactMap { variant in
         transcriber.installedSize(of: variant).map { (variant, $0) }
       })
+  }
+}
+
+/// Gives a continuation the first value it is given, and drops the others.
+@MainActor
+private final class FirstResult<Value: Sendable> {
+  private var continuation: CheckedContinuation<Value, Never>?
+
+  init(_ continuation: CheckedContinuation<Value, Never>) {
+    self.continuation = continuation
+  }
+
+  func give(_ value: Value) {
+    continuation?.resume(returning: value)
+    continuation = nil
   }
 }

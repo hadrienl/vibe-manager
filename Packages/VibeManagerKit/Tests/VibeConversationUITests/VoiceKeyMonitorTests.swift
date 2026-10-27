@@ -1,5 +1,6 @@
 import AppKit
 import Testing
+import WebKit
 
 @testable import VibeConversationUI
 
@@ -17,5 +18,17 @@ struct VoiceKeyMonitorTests {
     #expect(VoiceKeyMonitor.usesSpace(NSOutlineView()))
     #expect(!VoiceKeyMonitor.usesSpace(NSView()))
     #expect(!VoiceKeyMonitor.usesSpace(nil))
+  }
+
+  @Test("The terminal and the web view keep Escape; the composer's field does not")
+  func whereEscapeIsUsed() {
+    final class FakeTerminalView: NSView {}
+    #expect(VoiceKeyMonitor.usesEscape(FakeTerminalView()))
+    let page = WKWebView()
+    let inPage = NSView()
+    page.addSubview(inPage)
+    #expect(VoiceKeyMonitor.usesEscape(inPage))
+    #expect(!VoiceKeyMonitor.usesEscape(NSTextView()))
+    #expect(!VoiceKeyMonitor.usesEscape(nil))
   }
 }

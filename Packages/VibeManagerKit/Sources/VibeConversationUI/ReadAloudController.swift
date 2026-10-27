@@ -54,8 +54,16 @@ public final class ReadAloudController {
   /// The conversation in a discussion (#357): its answers are read as they arrive, whatever the
   /// audio mode.
   public var readsConversation: ObjectIdentifier?
-  /// The discussion ended on a sentence sent: the answer to it is read, then nothing more.
-  public var readsNextAnswerOnly = false
+  /// The discussion ended on a sentence sent: the answer to it is read — the whole turn of the
+  /// agent's, its text before and after its tools — then nothing more.
+  public var readsNextAnswerOnly = false {
+    didSet { if !readsNextAnswerOnly { isAnswered = false } }
+  }
+  /// The microphone records a dictation: the audio mode reads nothing — the voice would be
+  /// dictated — and reads what arrived meanwhile once it is closed.
+  public var isSuspended = false {
+    didSet { if !isSuspended, oldValue, !isReading { readNext() } }
+  }
 
   /// Opens Settings on the page where the model is downloaded: asked to read without it.
   @ObservationIgnored public var showSettings: (() -> Void)?
@@ -80,6 +88,8 @@ public final class ReadAloudController {
   @ObservationIgnored private var shownSince: [ObjectIdentifier: Date] = [:]
   /// The conversation whose answer the audio mode reads now; `nil` for one read by hand.
   @ObservationIgnored private var readsFor: ObjectIdentifier?
+  /// An answer arrived after the discussion ended on a sentence: the agent's turn over, it ends.
+  @ObservationIgnored private var isAnswered = false
 
   public init(synthesizer: any SpeechSynthesizing, store: any SpeechSettingsStore) {
     self.synthesizer = synthesizer
@@ -133,14 +143,8 @@ public final class ReadAloudController {
     let known = seen[conversation]
     seen[conversation, default: []].formUnion(answers.map(\.id))
     let arrived = known.map { known in answers.filter { !known.contains($0.id) } } ?? []
-    // A discussion ended on a sentence: its next answer ends it, read or not.
-    let endsDiscussion =
-      readsNextAnswerOnly && readsConversation == conversation && !arrived.isEmpty
-    defer {
-      if endsDiscussion {
-        readsConversation = nil
-        readsNextAnswerOnly = false
-      }
+    if readsNextAnswerOnly, readsConversation == conversation, !arrived.isEmpty {
+      isAnswered = true
     }
     guard isOnScreen else {
       shownSince[conversation] = nil
@@ -153,12 +157,20 @@ public final class ReadAloudController {
       return
     }
     for answer in arrived where (answer.date ?? now) >= since {
-      if isReading || !queue.isEmpty {
+      if isReading || !queue.isEmpty || isSuspended {
         queue.append((answer.id, answer.text, conversation))
       } else {
         start(answer.text, id: answer.id, for: conversation)
       }
     }
+  }
+
+  /// The agent's turn is over in this conversation: a discussion ended on a sentence, answered, is
+  /// over — what was to be read of its answer still is.
+  public func turnEnded(in conversation: ObjectIdentifier) {
+    guard readsNextAnswerOnly, readsConversation == conversation, isAnswered else { return }
+    readsConversation = nil
+    readsNextAnswerOnly = false
   }
 
   /// The conversation is let go of: what it had is forgotten with it.
@@ -225,7 +237,7 @@ public final class ReadAloudController {
 
   /// The next answer the audio mode waits to read, if any.
   private func readNext() {
-    guard !queue.isEmpty else { return }
+    guard !queue.isEmpty, !isSuspended else { return }
     let next = queue.removeFirst()
     start(next.text, id: next.id, for: next.conversation)
   }
@@ -302,6 +314,11 @@ public final class ReadAloudController {
     }
   }
 
+  /// The message of a reading that failed, put away.
+  public func dismissProblem() {
+    problem = nil
+  }
+
   public func removeModel() async {
     guard phase == .idle else { return }
     // The model loaded in the background is dropped with it, and loaded again once downloaded.
@@ -351,6 +368,54 @@ struct ReadingAloudPill: View {
     .buttonStyle(.plain)
     .accessibilityLabel(Text("Stop Reading", bundle: .module))
     .help(Text("Stop Reading", bundle: .module))
+    .padding(.top, 10)
+  }
+}
+
+/// A reading that failed, above the conversation: what to do about it, and the way to Settings.
+struct ReadingFailedNotice: View {
+  let readAloud: ReadAloudController
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
+  @Environment(\.openSettings) private var openSettings
+
+  var body: some View {
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
+      Image(systemName: "exclamationmark.triangle.fill")
+        .foregroundStyle(theme.secondaryText.color)
+      VStack(alignment: .leading, spacing: 2) {
+        Text("The answer could not be read aloud.", bundle: .module)
+          .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5), weight: .semibold))
+        Text(
+          "Try again. If it keeps failing, delete the model in Settings › Voice and download it again.",
+          bundle: .module
+        )
+        .font(theme.interfaceFont(size: appearance.textSize.scaled(11.5)))
+        .foregroundStyle(theme.secondaryText.color)
+        .fixedSize(horizontal: false, vertical: true)
+      }
+      Button {
+        readAloud.dismissProblem()
+        readAloud.showSettings?()
+        openSettings()
+      } label: {
+        Text("Settings", bundle: .module)
+      }
+      Button {
+        readAloud.dismissProblem()
+      } label: {
+        Image(systemName: "xmark").font(.system(size: 10, weight: .semibold))
+      }
+      .buttonStyle(.plain)
+      .accessibilityLabel(Text("Dismiss", bundle: .module))
+    }
+    .foregroundStyle(theme.text.color)
+    .padding(.horizontal, 14)
+    .padding(.vertical, 8)
+    .frame(maxWidth: 460)
+    .background(theme.raised.color, in: RoundedRectangle(cornerRadius: 10))
+    .overlay(RoundedRectangle(cornerRadius: 10).stroke(theme.border.color))
+    .shadow(color: .black.opacity(0.2), radius: 6, y: 2)
     .padding(.top, 10)
   }
 }

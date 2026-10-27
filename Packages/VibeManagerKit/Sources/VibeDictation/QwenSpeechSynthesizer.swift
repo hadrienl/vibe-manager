@@ -11,6 +11,9 @@ import VibeApplication
 @available(macOS 15.0, *)
 public actor QwenSpeechSynthesizer: SpeechSynthesizing {
   private static let completeMark = ".vibe-complete"
+  /// What the model weighs, measured once: walking its gigabyte of files at each launch, on the
+  /// main thread, would hold the window back.
+  private static let sizeFile = ".vibe-size"
 
   private let directory: URL
   private var tts: TTSKit?
@@ -35,6 +38,18 @@ public actor QwenSpeechSynthesizer: SpeechSynthesizing {
 
   nonisolated public func installedSize() -> Int64? {
     guard installedFolder() != nil else { return nil }
+    let sizeFile = directory.appendingPathComponent(Self.sizeFile, isDirectory: false)
+    if let data = FileManager.default.contents(atPath: sizeFile.path),
+      let size = Int64(String(decoding: data, as: UTF8.self))
+    {
+      return size
+    }
+    let size = measuredSize()
+    FileManager.default.createFile(atPath: sizeFile.path, contents: Data(String(size).utf8))
+    return size
+  }
+
+  nonisolated private func measuredSize() -> Int64 {
     var total: Int64 = 0
     let files = FileManager.default.enumerator(
       at: directory, includingPropertiesForKeys: [.totalFileAllocatedSizeKey])

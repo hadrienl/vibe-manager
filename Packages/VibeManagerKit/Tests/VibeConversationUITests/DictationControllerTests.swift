@@ -22,12 +22,10 @@ private final class FakeRecorder: AudioRecording {
   var level: Float = 0
   /// What the microphone hears next in a discussion, a tenth of a second at a time.
   var stream: [[Float]] = []
-  private(set) var cancelsEcho = false
 
-  func start(cancellingEcho: Bool) throws {
+  func start() throws {
     if failsToStart { throw CocoaError(.featureUnsupported) }
     isRecording = true
-    cancelsEcho = cancellingEcho
   }
 
   func takeSamples() -> [Float] {
@@ -63,6 +61,12 @@ private final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
   var requests: [(samples: Int, language: String?, prompt: String)] {
     lock.withLock { _requests }
   }
+  /// Whether a transcription never comes back, as Whisper stuck; until the test lets it go.
+  private var _hangs = false
+  var hangs: Bool {
+    get { lock.withLock { _hangs } }
+    set { lock.withLock { _hangs = newValue } }
+  }
 
   func installedSize(of variant: DictationModelVariant) -> Int64? {
     lock.withLock { installed[variant] }
@@ -82,7 +86,8 @@ private final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
   func transcribe(
     _ samples: [Float], with variant: DictationModelVariant, language: String?, prompt: String
   ) async throws -> String {
-    lock.withLock {
+    while hangs { try? await Task.sleep(for: .milliseconds(5)) }
+    return lock.withLock {
       _requests.append((samples.count, language, prompt))
       return _transcript
     }
@@ -178,6 +183,33 @@ struct DictationControllerTests {
     await until { dictation.phase == .recording }
     #expect(recorder.isRecording)
     #expect(!dictation.isReadyToDictate)
+    // Loaded by its download: no transcription waits for its preparation.
+    #expect(dictation.isModelReady)
+  }
+
+  @Test("A transcription that never comes back is said failed, and what comes late is dropped")
+  func transcriptionGivenUp() async {
+    let recorder = FakeRecorder()
+    recorder.heard = speech
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Late."
+    transcriber.hangs = true
+    let dictation = DictationController(
+      transcriber: transcriber, recorder: recorder, store: InMemoryDictationSettingsStore())
+    dictation.transcriptionLimit = .milliseconds(50)
+    let composer = Composer()
+
+    dictation.toggle(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.toggle(request(composer))
+    await eventually { dictation.problem != nil }
+    #expect(dictation.problem == .transcriptionFailed)
+    #expect(dictation.phase == .idle)
+
+    transcriber.hangs = false
+    await eventually { transcriber.requests.count == 1 }
+    for _ in 0..<100 { await Task.yield() }
+    #expect(composer.inserted.isEmpty)
   }
 
   @Test("Declined, the offer goes and nothing is downloaded")
@@ -490,6 +522,35 @@ struct DiscussionTests {
     dictation.endDiscussion()
   }
 
+  @Test("A sentence whose transcription never comes back does not hold back the next")
+  func stuckSentenceGivenUp() async {
+    let recorder = FakeRecorder()
+    let sentence =
+      Array(repeating: voicedTenth, count: 8) + Array(repeating: silentTenth, count: 14)
+    recorder.stream = Array(repeating: silentTenth, count: 5) + sentence + sentence
+    let transcriber = FakeTranscriber(installed: [.largeTurbo])
+    transcriber.transcript = "Ouvre la PR."
+    transcriber.hangs = true
+    let dictation = controller(recorder, transcriber)
+    dictation.transcriptionLimit = .milliseconds(50)
+    let composer = Composer()
+
+    dictation.pressBegan(request(composer))
+    await until { dictation.phase == .recording }
+    dictation.pressEnded(request(composer))
+    // Both sentences given up on, one after the other, Whisper still stuck: the discussion
+    // listens again rather than show them under way for ever.
+    await eventually { recorder.stream.isEmpty && dictation.discussion == .listening }
+    #expect(dictation.discussion == .listening)
+    #expect(dictation.phase == .discussing)
+    dictation.endDiscussion()
+    // What comes back this late is not sent.
+    transcriber.hangs = false
+    await eventually { transcriber.requests.count == 2 }
+    for _ in 0..<100 { await Task.yield() }
+    #expect(composer.sent.isEmpty)
+  }
+
   @Test("« Stop » said in a discussion interrupts the agent instead of being sent")
   func stopInterrupts() async {
     let recorder = FakeRecorder()
@@ -552,7 +613,6 @@ struct DiscussionTests {
     await until { dictation.phase == .discussing }
     #expect(dictation.phase == .discussing)
     #expect(recorder.isRecording)
-    #expect(!recorder.cancelsEcho)
 
     dictation.toggleDiscussion(request(composer))
     #expect(dictation.phase == .idle)

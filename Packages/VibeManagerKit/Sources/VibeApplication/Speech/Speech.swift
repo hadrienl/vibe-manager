@@ -116,6 +116,10 @@ public enum SpeechText {
   public static func readable(fromMarkdown markdown: String) -> String {
     var lines: [String] = []
     var inFence = false
+    // A block indented by four spaces after a blank line, out of a list: code as well.
+    var inIndentedCode = false
+    var afterBlank = true
+    var inList = false
     for rawLine in markdown.components(separatedBy: .newlines) {
       let line = rawLine.trimmingCharacters(in: .whitespaces)
       if line.hasPrefix("```") || line.hasPrefix("~~~") {
@@ -123,6 +127,22 @@ public enum SpeechText {
         continue
       }
       guard !inFence else { continue }
+      let isIndented = rawLine.hasPrefix("    ") || rawLine.hasPrefix("\t")
+      if line.isEmpty {
+        afterBlank = true
+      } else {
+        inIndentedCode = isIndented && (inIndentedCode || (afterBlank && !inList))
+        afterBlank = false
+        if !isIndented {
+          inList = line.range(of: #"^([-*+]|\d+[.)])\s"#, options: .regularExpression) != nil
+        }
+        if inIndentedCode { continue }
+      }
+      // A horizontal rule: a pause between paragraphs, nothing to say.
+      if line.range(of: #"^([-*_]\s*){3,}$"#, options: .regularExpression) != nil {
+        if lines.last?.isEmpty == false { lines.append("") }
+        continue
+      }
       // A table's separator row, and the pipes of the others.
       if line.hasPrefix("|"), line.allSatisfy({ "|-: ".contains($0) }) { continue }
       var text = line

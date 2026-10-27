@@ -422,6 +422,15 @@ public final class ConversationModel {
     }
   }
 
+  /// The last of the agent's answers: it changes when one arrives. Read from the end, at each
+  /// change of the conversation, rather than all the answers gathered.
+  public var lastAgentAnswerID: String? {
+    for case .entry(let entry) in blocks.reversed() {
+      if case .agentText = entry.content { return entry.id }
+    }
+    return nil
+  }
+
   /// The application's reading aloud (#357); `nil` before macOS 15.
   @ObservationIgnored public var readAloud: ReadAloudController?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.

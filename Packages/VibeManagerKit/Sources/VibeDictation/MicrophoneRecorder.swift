@@ -23,14 +23,9 @@ public final class MicrophoneRecorder: AudioRecording {
     await AVCaptureDevice.requestAccess(for: .audio)
   }
 
-  public func start(cancellingEcho: Bool) throws {
+  public func start() throws {
     buffer.reset()
     let input = engine.inputNode
-    // The system's voice processing: echo cancellation, against what this Mac plays. Turned on
-    // before the format is read — it changes it.
-    if input.isVoiceProcessingEnabled != cancellingEcho {
-      try? input.setVoiceProcessingEnabled(cancellingEcho)
-    }
     // A recording that was not stopped leaves its tap: a second one on the bus raises.
     input.removeTap(onBus: 0)
     let format = input.outputFormat(forBus: 0)

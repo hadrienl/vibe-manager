@@ -4,8 +4,9 @@ import WebKit
 
 /// Space as the microphone (#357): pressed, it listens; let go of, a short press starts or ends
 /// the discussion, a long one inserts what was dictated — but only where Space does nothing else:
-/// not in a field being written, the terminal or the web view, nor on a focused button or list. Escape ends a discussion wherever the
-/// keyboard is. One monitor, installed by the conversation on screen, for its own window.
+/// not in a field being written, the terminal or the web view, nor on a focused button or list.
+/// Escape ends a discussion wherever the keyboard is, but in the terminal and the web view, whose
+/// own key it is — the agent interrupted, a page's dialog closed. One monitor, installed by the conversation on screen, for its own window.
 @MainActor
 final class VoiceKeyMonitor {
   private var monitor: Any?
@@ -58,7 +59,7 @@ final class VoiceKeyMonitor {
   private func handle(_ event: NSEvent, _ actions: Actions) -> Bool {
     guard let window, event.window === window else { return false }
     if event.keyCode == Self.escape, event.type == .keyDown {
-      return actions.escape()
+      return !Self.usesEscape(window.firstResponder) && actions.escape()
     }
     guard event.keyCode == Self.space else { return false }
     if event.type == .keyUp {
@@ -83,6 +84,12 @@ final class VoiceKeyMonitor {
     guard let responder else { return false }
     if let text = responder as? NSTextView, text.isEditable { return true }
     if responder is NSControl || responder is NSTableView { return true }
+    return usesEscape(responder)
+  }
+
+  /// Where Escape is a key of the agent's or of a page: the terminal, the web view.
+  static func usesEscape(_ responder: NSResponder?) -> Bool {
+    guard let responder else { return false }
     // A page — its own fields, or keys it listens to — has the keyboard: the web view, or one of
     // its subviews.
     if let view = responder as? NSView,

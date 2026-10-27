@@ -46,7 +46,11 @@ final class FakeSynthesizer: SpeechSynthesizing, @unchecked Sendable {
     lock.withLock { installed = true }
   }
 
+  /// Whether a reading fails, as a model that cannot load would.
+  var speakingFails = false
+
   func speak(_ text: String, voice: SpeechVoice, language: SpeechLanguage) async throws {
+    if speakingFails { throw CancellationError() }
     lock.withLock { spokenLog.append((text, voice, language)) }
     guard readsUntilCancelled else { return }
     while !Task.isCancelled { await Task.yield() }
@@ -286,7 +290,7 @@ struct AudioModeTests {
     #expect(synthesizer.spoken.map(\.text) == ["Shown."])
   }
 
-  @Test("A discussion ended on a sentence reads the answer to it, then nothing more")
+  @Test("A discussion ended on a sentence reads the agent's whole turn, then nothing more")
   func readsTheLastAnswer() async {
     let synthesizer = FakeSynthesizer(installed: true, readsUntilCancelled: false)
     let readAloud = controller(synthesizer, on: false)
@@ -295,12 +299,53 @@ struct AudioModeTests {
     readAloud.follow([], in: conversation, isOnScreen: true)
     readAloud.readsConversation = conversation
     readAloud.readsNextAnswerOnly = true
-    readAloud.follow([("a", "The answer.", nil)], in: conversation, isOnScreen: true)
-    await until { synthesizer.spoken.count == 1 && readAloud.phase == .idle }
-    readAloud.follow([("a", "The answer.", nil), ("b", "Another.", nil)], in: conversation, isOnScreen: true)
-    for _ in 0..<100 { await Task.yield() }
-    #expect(synthesizer.spoken.map(\.text) == ["The answer."])
+    // The turn ends before anything was answered: the discussion waits for its answer.
+    readAloud.turnEnded(in: conversation)
+    #expect(readAloud.readsConversation == conversation)
+    readAloud.follow([("a", "Let me look.", nil)], in: conversation, isOnScreen: true)
+    // Its tools, then its answer: the same turn.
+    readAloud.follow(
+      [("a", "Let me look.", nil), ("b", "Fixed.", nil)], in: conversation, isOnScreen: true)
+    await until { synthesizer.spoken.count == 2 && readAloud.phase == .idle }
+    readAloud.turnEnded(in: conversation)
     #expect(readAloud.readsConversation == nil)
+    readAloud.follow(
+      [("a", "Let me look.", nil), ("b", "Fixed.", nil), ("c", "Another.", nil)],
+      in: conversation, isOnScreen: true)
+    for _ in 0..<100 { await Task.yield() }
+    #expect(synthesizer.spoken.map(\.text) == ["Let me look.", "Fixed."])
+  }
+
+  @Test("While a dictation records, the audio mode reads nothing; it reads what came once closed")
+  func suspended() async {
+    let synthesizer = FakeSynthesizer(installed: true, readsUntilCancelled: false)
+    let readAloud = controller(synthesizer)
+    let conversation = ObjectIdentifier(Conversation())
+
+    readAloud.follow([], in: conversation, isOnScreen: true)
+    readAloud.isSuspended = true
+    readAloud.follow([("a", "Meanwhile.", nil)], in: conversation, isOnScreen: true)
+    for _ in 0..<100 { await Task.yield() }
+    #expect(synthesizer.spoken.isEmpty)
+    #expect(readAloud.phase == .idle)
+
+    readAloud.isSuspended = false
+    await until { synthesizer.spoken.count == 1 && readAloud.phase == .idle }
+    #expect(synthesizer.spoken.map(\.text) == ["Meanwhile."])
+  }
+
+  @Test("A reading that fails is said, until put away")
+  func readingFails() async {
+    let synthesizer = FakeSynthesizer(installed: true, readsUntilCancelled: false)
+    synthesizer.speakingFails = true
+    let readAloud = controller(synthesizer)
+
+    readAloud.read("An answer.", id: "a")
+    await until { readAloud.problem != nil }
+    #expect(readAloud.problem == .readingFailed)
+    #expect(readAloud.phase == .idle)
+    readAloud.dismissProblem()
+    #expect(readAloud.problem == nil)
   }
 
   @Test("Stop, an answer read by hand, or the mode turned off clears what was to be read")

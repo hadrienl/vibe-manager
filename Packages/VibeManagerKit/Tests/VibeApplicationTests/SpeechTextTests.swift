@@ -38,6 +38,28 @@ struct SpeechTextTests {
     #expect(SpeechText.readable(fromMarkdown: "```\nrm -rf build\n```") == "")
   }
 
+  @Test("A horizontal rule and an indented block of code are not read; a list's indented lines are")
+  func rulesAndIndentedCode() {
+    let markdown = """
+      First part.
+
+      ---
+
+      Run this:
+
+          swift build
+
+      - A point
+          that goes on.
+      """
+    #expect(
+      SpeechText.readable(fromMarkdown: markdown) == """
+        First part.
+        Run this:
+        A point that goes on.
+        """)
+  }
+
   @Test("The language read by default is the user's, when the voice reads it")
   func preferredLanguage() {
     #expect(SpeechLanguage.preferred(for: Locale(identifier: "fr_FR")) == .french)

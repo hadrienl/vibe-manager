@@ -125,7 +125,8 @@ public struct ConversationView: View {
     .onChange(of: window) { updateVoiceKeys() }
     .onDisappear { voiceKeys.stop() }
     // The audio mode (#357): the answers that arrive are read, in the conversation on screen.
-    .onChange(of: model.agentAnswers.map(\.id), initial: true) { followAnswers() }
+    .onChange(of: model.lastAgentAnswerID, initial: true) { followAnswers() }
+    .onChange(of: model.isAgentWorking) { endTurn() }
     .onChange(of: isActive) { followAnswers() }
     .onChange(of: model.snapshot.availability == .loading) { followAnswers() }
     .environment(\.colorScheme, theme.colorScheme)
@@ -276,6 +277,8 @@ public struct ConversationView: View {
       .overlay(alignment: .top) {
         if let readAloud = model.readAloud, readAloud.isReading {
           ReadingAloudPill(readAloud: readAloud)
+        } else if let readAloud = model.readAloud, readAloud.problem == .readingFailed {
+          ReadingFailedNotice(readAloud: readAloud)
         }
       }
       .overlay(alignment: .bottom) {
@@ -643,6 +646,12 @@ extension ConversationView {
     guard model.snapshot.availability != .loading else { return }
     model.readAloud?.follow(
       model.agentAnswers, in: ObjectIdentifier(model), isOnScreen: isActive)
+  }
+
+  /// The agent's turn over: a discussion ended on a sentence has had its whole answer.
+  fileprivate func endTurn() {
+    guard !model.isAgentWorking else { return }
+    model.readAloud?.turnEnded(in: ObjectIdentifier(model))
   }
 }
 
