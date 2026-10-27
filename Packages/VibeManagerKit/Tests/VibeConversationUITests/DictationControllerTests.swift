@@ -62,10 +62,10 @@ private final class FakeTranscriber: SpeechTranscribing, @unchecked Sendable {
     lock.withLock { _requests }
   }
   /// Whether a transcription never comes back, as Whisper stuck; until the test lets it go.
-  private var _hangs = false
+  private var isHanging = false
   var hangs: Bool {
-    get { lock.withLock { _hangs } }
-    set { lock.withLock { _hangs = newValue } }
+    get { lock.withLock { isHanging } }
+    set { lock.withLock { isHanging = newValue } }
   }
 
   func installedSize(of variant: DictationModelVariant) -> Int64? {

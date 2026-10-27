@@ -105,6 +105,7 @@ public final class DictationController {
       if settings.variant != oldValue.variant {
         isModelReady = false
         loading = nil
+        loadGeneration += 1
       }
     }
   }
@@ -134,6 +135,8 @@ public final class DictationController {
   @ObservationIgnored private var metering: Task<Void, Never>?
   /// The model being loaded: a transcription's time limit counts from its end.
   @ObservationIgnored private var loading: Task<Void, Never>?
+  /// Which loading is the current one: one given up on that still ends is told apart.
+  @ObservationIgnored private var loadGeneration = 0
   @ObservationIgnored private var ticks = 0
   private static let log = Logger(subsystem: "eu.hadrien.VibeManager", category: "voice")
   /// The sentences of the discussion, transcribed and sent one after the other.
@@ -208,15 +211,15 @@ public final class DictationController {
   private func loadModel() {
     guard !isModelReady, loading == nil else { return }
     let variant = settings.variant
-    var task: Task<Void, Never>?
-    task = Task {
+    loadGeneration += 1
+    let generation = loadGeneration
+    loading = Task {
       let isLoaded = (try? await transcriber.prepare(variant)) != nil
       // Another model chosen meanwhile is not the one loaded.
-      guard loading == task else { return }
+      guard generation == loadGeneration else { return }
       loading = nil
       if isLoaded { isModelReady = true }
     }
-    loading = task
   }
 
   /// The transcription of `samples`, or `nil` once it took longer than its limit — counted once
@@ -575,6 +578,7 @@ public final class DictationController {
     if settings.variant == variant {
       isModelReady = false
       loading = nil
+      loadGeneration += 1
     }
   }
 
