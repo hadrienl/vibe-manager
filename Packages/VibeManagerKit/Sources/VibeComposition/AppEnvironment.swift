@@ -240,6 +240,14 @@ public final class AppEnvironment {
     // The web view (#69): its tabs and trace beside the store, its choices in the user defaults,
     // its cookies in a website data store of this copy's own.
     let hostLocation = TerminalHostLocation(dataDirectory: dataFolder)
+    // The runtime directories earlier launches, tests and copies left behind (#437): this one is
+    // claimed first, so that no other instance sweeps it, and the sweep leaves live ones alone.
+    hostLocation.claim()
+    let runtimeRoot = hostLocation.directory.deletingLastPathComponent()
+    let ownRuntime = hostLocation.directory
+    Task.detached(priority: .background) {
+      TerminalHostCleanup.removeAbandoned(in: runtimeRoot, keeping: ownRuntime)
+    }
     let browserSettings = UserDefaultsBrowserSettings(suiteName: data.defaultsSuite)
     // The sites always allowed in the web view, in the keychain where no script can add one
     // (#239); the list the user defaults held is forgotten.
