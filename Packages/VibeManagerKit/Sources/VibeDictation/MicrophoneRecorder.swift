@@ -26,6 +26,8 @@ public final class MicrophoneRecorder: AudioRecording {
   public func start() throws {
     buffer.reset()
     let input = engine.inputNode
+    // A recording that was not stopped leaves its tap: a second one on the bus raises.
+    input.removeTap(onBus: 0)
     let format = input.outputFormat(forBus: 0)
     guard format.sampleRate > 0,
       let target = AVAudioFormat(
@@ -45,7 +47,14 @@ public final class MicrophoneRecorder: AudioRecording {
     }
   }
 
+  public var level: Float { buffer.level }
+
+  public func takeSamples() -> [Float] {
+    buffer.take()
+  }
+
   public func stop() -> [Float] {
+    defer { buffer.reset() }
     engine.inputNode.removeTap(onBus: 0)
     engine.stop()
     return buffer.take()
@@ -95,13 +104,26 @@ public final class MicrophoneRecorder: AudioRecording {
 private final class SampleBuffer: @unchecked Sendable {
   private let lock = NSLock()
   private var samples: [Float] = []
+  private var lastLevel: Float = 0
+
+  /// The loudness of the last buffer heard.
+  var level: Float { lock.withLock { lastLevel } }
 
   func reset() {
-    lock.withLock { samples = [] }
+    lock.withLock {
+      samples = []
+      lastLevel = 0
+    }
   }
 
   func append(_ more: [Float]) {
-    lock.withLock { samples.append(contentsOf: more) }
+    var sum: Float = 0
+    for sample in more { sum += sample * sample }
+    let level = more.isEmpty ? 0 : (sum / Float(more.count)).squareRoot()
+    lock.withLock {
+      samples.append(contentsOf: more)
+      lastLevel = level
+    }
   }
 
   func take() -> [Float] {

@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 import VibeApplication
@@ -27,6 +28,9 @@ public struct ConversationView: View {
         _ onScreen: @escaping (String) -> Void
       ) -> AnyView
     )?
+  /// Space as the microphone (#357), for the window this conversation is in.
+  @State private var voiceKeys = VoiceKeyMonitor()
+  @State private var window: NSWindow?
   @State private var contentFrame = CGRect.zero
   @State private var viewportHeight = 0.0
   @State private var pager = ConversationPager()
@@ -108,6 +112,23 @@ public struct ConversationView: View {
     .environment(\.conversationTheme, theme)
     .environment(\.conversationAppearance, appearance)
     .environment(\.conversationIsLive, isActive)
+    .environment(\.readAloud, model.readAloud)
+    // The models loaded while the conversation is read, the dictation's first (#357): their
+    // first load compiles them for this Mac, which takes minutes. One at a time.
+    .task {
+      model.dictation?.warmUp()
+      model.readAloud?.warmUp()
+    }
+    // Space as the microphone, in the conversation on screen (#357).
+    .background(WindowReader { window = $0 })
+    .onChange(of: isActive, initial: true) { updateVoiceKeys() }
+    .onChange(of: window) { updateVoiceKeys() }
+    .onDisappear { voiceKeys.stop() }
+    // The audio mode (#357): the answers that arrive are read, in the conversation on screen.
+    .onChange(of: model.lastAgentAnswerID, initial: true) { followAnswers() }
+    .onChange(of: model.isAgentWorking) { endTurn() }
+    .onChange(of: isActive) { followAnswers() }
+    .onChange(of: model.snapshot.availability == .loading) { followAnswers() }
     .environment(\.colorScheme, theme.colorScheme)
     // Coming on screen is when the composer takes the keyboard, as the terminal does (#105): only
     // then, never for a message that arrives or a state that changes. Asked of the model rather
@@ -115,7 +136,10 @@ public struct ConversationView: View {
     .onAppear { if isActive { claimKeyboardOnActivation() } }
     // Every conversation shown lately stays mounted: only the one on screen is laid out (#250).
     .onChange(of: isActive, initial: true) { _, isActive in model.setShown(isActive) }
-    .onDisappear { model.setShown(false) }
+    .onDisappear {
+      model.setShown(false)
+      model.readAloud?.forget(ObjectIdentifier(model))
+    }
     .onChange(of: isActive) { _, isActive in
       if isActive {
         claimKeyboardOnActivation()
@@ -249,6 +273,13 @@ public struct ConversationView: View {
       .onChange(of: model.revealRequest) {
         guard let id = model.revealedBlockID else { return }
         withAnimation(.easeOut(duration: 0.2)) { proxy.scrollTo(id, anchor: .top) }
+      }
+      .overlay(alignment: .top) {
+        if let readAloud = model.readAloud, readAloud.isReading {
+          ReadingAloudPill(readAloud: readAloud)
+        } else if let readAloud = model.readAloud, readAloud.problem == .readingFailed {
+          ReadingFailedNotice(readAloud: readAloud)
+        }
       }
       .overlay(alignment: .bottom) {
         if model.scroll.unseenCount > 0 {
@@ -477,7 +508,7 @@ struct BlockView: View {
         UserPromptView(text: text, attachments: attachments, date: entry.date)
           .environment(\.selectionBlock, selectionBlock)
       case .agentText(let text):
-        AgentTextView(text: text)
+        AgentTextView(text: text, id: entry.id, readAloud: model.readAloud)
           .environment(\.selectionBlock, selectionBlock)
       case .reasoning(let text):
         ReasoningRow(id: entry.id, text: text, model: model)
@@ -605,5 +636,50 @@ extension ConversationSelection.Source {
           return []
         }
       })
+  }
+}
+
+extension ConversationView {
+  /// Tells the reading aloud the answers this conversation has now, and whether it is on screen.
+  fileprivate func followAnswers() {
+    // Not before the conversation is read: its history would be taken for answers just arrived.
+    guard model.snapshot.availability != .loading else { return }
+    model.readAloud?.follow(
+      model.agentAnswers, in: ObjectIdentifier(model), isOnScreen: isActive)
+  }
+
+  /// The agent's turn over: a discussion ended on a sentence has had its whole answer.
+  fileprivate func endTurn() {
+    guard !model.isAgentWorking else { return }
+    model.readAloud?.turnEnded(in: ObjectIdentifier(model))
+  }
+}
+
+extension ConversationView {
+  /// Installs Space as the microphone while this conversation is on screen, and takes it away
+  /// when it is not.
+  fileprivate func updateVoiceKeys() {
+    guard isActive, let dictation = model.dictation, window != nil else {
+      voiceKeys.stop()
+      return
+    }
+    let model = model
+    voiceKeys.start(
+      in: window,
+      VoiceKeyMonitor.Actions(
+        press: {
+          guard model.acceptsInput || dictation.phase == .discussing else { return false }
+          model.readAloud?.stop()
+          dictation.pressBegan(model.dictationRequest())
+          return true
+        },
+        release: { dictation.pressEnded(model.dictationRequest()) },
+        escape: {
+          guard dictation.concerns(ObjectIdentifier(model)),
+            dictation.phase == .discussing || dictation.phase == .recording
+          else { return false }
+          dictation.cancel()
+          return true
+        }))
   }
 }

@@ -412,6 +412,27 @@ public final class ConversationModel {
   /// until the closure it returns is called (#352): a message it types and the user's would
   /// interleave.
   @ObservationIgnored public var claimTyping: (() async -> @MainActor () -> Void)?
+  /// The agent's answers, in their order: what the audio mode reads as they arrive (#357).
+  public var agentAnswers: [(id: String, text: String, date: Date?)] {
+    blocks.compactMap { block in
+      guard case .entry(let entry) = block, case .agentText(let text) = entry.content else {
+        return nil
+      }
+      return (entry.id, text, entry.date)
+    }
+  }
+
+  /// The last of the agent's answers: it changes when one arrives. Read from the end, at each
+  /// change of the conversation, rather than all the answers gathered.
+  public var lastAgentAnswerID: String? {
+    for case .entry(let entry) in blocks.reversed() {
+      if case .agentText = entry.content { return entry.id }
+    }
+    return nil
+  }
+
+  /// The application's reading aloud (#357); `nil` before macOS 15.
+  @ObservationIgnored public var readAloud: ReadAloudController?
   /// The words a prompt to this session is likely to use: its project, its branch, its files.
   @ObservationIgnored public var dictationVocabulary: @MainActor () async -> String = { "" }
   /// Shows a file in the session's web view. `automatically` when the agent just produced it,
@@ -1448,6 +1469,24 @@ public final class ConversationModel {
 
   public func removeAttachment(_ file: URL) {
     attachments.removeAll { $0 == file }
+  }
+
+  /// Sends a sentence said in a discussion (#357), as if it were typed and sent, without
+  /// touching the draft being written: it is put back once the sentence is sent. A sentence that
+  /// could not be sent — a request awaits an answer — is added to the draft rather than lost.
+  @discardableResult
+  public func sendSpoken(_ text: String) async -> Bool {
+    let kept = draft
+    let keptAttachments = attachments
+    attachments = []
+    draft = text
+    let sent = await send()
+    // What is in the field now — typed or attached while the sentence was on its way, the field
+    // keeping the keyboard under the wave, and the sentence itself if it was not sent — follows
+    // the draft it interrupted.
+    draft = [kept, draft].filter { !$0.isEmpty }.joined(separator: " ")
+    attachments = keptAttachments + attachments
+    return sent
   }
 
   /// Sends the draft through the terminal. Returns whether it was sent.
