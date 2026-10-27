@@ -220,12 +220,14 @@ public final class AppEnvironment {
     let usageLedger = FileUsageLedger(directory: data.usage)
     let usageTracking = FileUsageTrackingStore(directory: data.usage)
     let usageRecorder = UsageRecorder(ledger: usageLedger, tracking: usageTracking)
+    let usageReader = AgentUsageReader()
     let usage = UsageService(
       recorder: usageRecorder,
       ledger: usageLedger,
       tracking: usageTracking,
       tokenStore: FileTokenUsageStore(directory: data.usage),
-      reader: AgentUsageReader()
+      reader: usageReader,
+      contextReader: usageReader
     )
     // What each agent is doing (#45): its hooks append to a log per session, beside the store.
     let dataFolder = data.store.deletingLastPathComponent()

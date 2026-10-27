@@ -9,7 +9,12 @@ public actor UsageService {
   private let tracking: any UsageTrackingStore
   private let tokenStore: any TokenUsageStore
   private let reader: (any TokenUsageReading)?
+  private let contextReader: (any ContextWindowReading)?
   private let clock: any SessionClock
+
+  /// Where each current conversation's transcript was left, for its context (#407). In memory
+  /// only: the context is a value of the moment, not a counter.
+  private var contextFiles: [String: ContextWindowFile] = [:]
 
   private var snapshot: TokenUsageSnapshot?
   private var isRefreshing = false
@@ -26,8 +31,10 @@ public actor UsageService {
     tracking: any UsageTrackingStore,
     tokenStore: any TokenUsageStore,
     reader: (any TokenUsageReading)?,
+    contextReader: (any ContextWindowReading)? = nil,
     clock: any SessionClock = SystemSessionClock()
   ) {
+    self.contextReader = contextReader
     self.recorder = recorder
     self.ledger = ledger
     self.tracking = tracking
@@ -54,6 +61,26 @@ public actor UsageService {
     snapshot = next
     try? await tokenStore.save(next)
     return true
+  }
+
+  /// The context of the session's current conversation, read from what its transcript added
+  /// since the last time. `nil` while tracking is off — no transcript is read then — and when
+  /// no answer of it was read.
+  public func contextWindow(for session: WorkSession) async -> ContextWindowUsage? {
+    guard let contextReader, let conversation = session.agent,
+      let identifier = conversation.resumeIdentifier, !identifier.isEmpty,
+      await recorder.isTracking()
+    else { return nil }
+    let key = "\(session.id)|\(conversation.providerID)|\(identifier)"
+    guard
+      let file = await contextReader.readContext(
+        of: conversation, session: session, from: contextFiles[key])
+    else { return nil }
+    contextFiles[key] = file
+    guard var usage = file.usage else { return nil }
+    // A compaction read after the last answer is said at once; its figure follows at the next.
+    if let compaction = file.compaction { usage.lastCompaction = compaction }
+    return usage
   }
 
   public func tokens() async -> TokenUsageSnapshot {
@@ -145,6 +172,7 @@ public actor UsageService {
     generation += 1
     changesUnderWay += 1
     defer { changesUnderWay -= 1 }
+    contextFiles = [:]
     await recorder.setTracking(enabled)
   }
 

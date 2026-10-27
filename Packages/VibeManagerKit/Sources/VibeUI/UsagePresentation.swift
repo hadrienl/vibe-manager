@@ -1,4 +1,5 @@
 import Foundation
+import VibeApplication
 import VibeDomain
 
 /// How usage figures read. Pure, so the wording can be held to in tests.
@@ -141,6 +142,17 @@ enum UsagePresentation {
             comment: "Tokens written to the cache, abbreviated: “80.0 k cache write”.")))
     }
     return parts
+  }
+
+  /// “≈ 92 k / 200 k · 46 %”, or “≈ 92 k tokens” without a window.
+  static func context(_ usage: ContextWindowUsage) -> String {
+    guard let window = usage.windowSize, let percent = usage.percentUsed else {
+      return "≈ "
+        + String(
+          localized: "\(tokens(usage.usedTokens)) tokens", bundle: .module,
+          comment: "The context, read by VoiceOver: a number of tokens.")
+    }
+    return "≈ \(tokens(usage.usedTokens)) / \(tokens(window)) · \(percent)\u{00A0}%"
   }
 
   static func unavailable(_ reason: UsageUnavailability, locale: Locale = .current) -> String {

@@ -151,3 +151,37 @@ it. The agents' transcripts are never touched.
   a contract.
 - Reading `~/.claude.json`'s `lastCost`: it describes only the last session of a folder and sits next
   to data the application has no business reading.
+
+## Amendment — the context window of the current conversation (#407)
+
+Measured on Claude Code 2.1.311 and Codex 0.131 to 0.164, 2026-10-27.
+
+- **What is shown.** In the Usage section only, a **Context** line: the context of the last answer
+  of the current conversation, its window when a reliable source gives one, a bar and a share. Above
+  80 % the bar turns red and says the window is almost full — never orange, which means an agent
+  waits (ADR 0024). The last compaction is said with the context before and after it.
+- **Codex.** Every `token_count` event of the rollouts measured carries
+  `info.last_token_usage.total_tokens` (the context) and `info.model_context_window` (the window).
+  The share is Codex's own: it keeps 12 000 tokens for its instructions out of both, as
+  `TokenUsage::percent_of_context_window_remaining` does, so the share matches its
+  “% context left”. A compaction is a `compacted` line; only its type and date are decoded, never
+  its payload, which holds the history it replaced. The context before it is the last one read.
+- **Claude Code.** The context of the last main answer is
+  `input_tokens + cache_creation_input_tokens + cache_read_input_tokens`; lines with
+  `isSidechain` and the `<synthetic>` model are left out. A compaction is a
+  `system`/`compact_boundary` line with `compactMetadata.preTokens`. The transcript says nothing of
+  the window — it depends on the model and on the 1M option — and the only other source, the input
+  of `statusLine`, would mean replacing the user's status line: the tokens are shown alone, and the
+  line says the window is unknown for this model.
+- **Endpoints.** The window an endpoint model declares (`contextWindow`, ADR 0035) wins over the
+  CLI's, which describes another model, and the share is then a plain ratio.
+- **No table of models.** As ADR 0005 and 0006: no window is ever guessed from a model's name.
+- **The same guarantees.** A line is decoded only when its bytes hold `"usage":`,
+  `"compact_boundary"`, `"token_count"` or `"type":"compacted"`, into types that declare counters,
+  a model, dates and markers. A test holds the list of their fields.
+- **Nothing on disk.** The context is a value of the moment: where each transcript was left is
+  kept in memory, never in `tokens.json`. It is read only for the sessions shown, at each end of
+  turn of their agent (#45) and every thirty seconds otherwise, and not at all while tracking is
+  off — the line then says so.
+- **Never a zero.** Before any answer, for the mock agent or an agent that writes nothing, the line
+  shows a dash and the reason.

@@ -967,7 +967,15 @@ public final class AppModel {
       for draft in self.newSessionDrafts { draft.templatesChanged(library.templates) }
     }
 
-    usage?.connect { [weak self] in self?.sessions ?? [] }
+    usage?.connect(
+      sessions: { [weak self] in self?.sessions ?? [] },
+      endpointWindow: { [weak self] agent in
+        guard let id = EndpointID(providerID: agent.providerID),
+          let endpoint = self?.endpoints?.endpoints.first(where: { $0.id == id })
+        else { return nil }
+        let model = agent.modelID ?? endpoint.agentModels.first?.id
+        return (endpoint.name, endpoint.models.first(where: { $0.id == model })?.contextWindow)
+      })
 
     journal?.showSettingsTab = { [weak self] in self?.settingsPage = .general }
     quickOpen.opened = { [weak self] result in self?.goToSession(result.sessionID) }
