@@ -159,6 +159,26 @@ struct ClaudeCodeSubagentTests {
       ]).isEmpty)
   }
 
+  @Test("Work stopped by TaskStop is not waited for: no notification follows (#430)")
+  func taskStopEndsBackgroundWork() {
+    let command =
+      #"{"type":"assistant","uuid":"a4","message":{"content":[{"type":"tool_use","id":"b2","name":"Bash","input":{"command":"sleep 30","run_in_background":true}}]}}"#
+    let started =
+      #"{"type":"user","uuid":"u4","message":{"content":[{"type":"tool_result","tool_use_id":"b2","content":"Command running in background with ID: bg1."}]},"toolUseResult":{"backgroundTaskId":"bg1"}}"#
+    func stop(_ task: String, uuid: String) -> String {
+      #"{"type":"assistant","uuid":"s\#(uuid)","message":{"content":[{"type":"tool_use","id":"k\#(uuid)","name":"TaskStop","input":{"task_id":"\#(task)"}}]}}"#
+        + "\n"
+        + #"{"type":"user","uuid":"r\#(uuid)","message":{"content":[{"type":"tool_result","tool_use_id":"k\#(uuid)","content":"stopped"}]},"toolUseResult":{"message":"Successfully stopped task: \#(task)","task_id":"\#(task)","task_type":"local_bash"}}"#
+    }
+    let decoder = ClaudeCodeConversationDecoder()
+    let lines = [launch, launched, command, started, stop("bg1", uuid: "1"), stop("a1", uuid: "2")]
+    for line in lines.flatMap({ $0.split(separator: "\n") }) {
+      decoder.consume(Data(line.utf8))
+    }
+    #expect(decoder.backgroundWork.isEmpty)
+    #expect(call(decoder.entries)?.state == .interrupted)
+  }
+
   @Test("Stopping the turn leaves a sub-agent in the background running")
   func interruptKeepsBackground() {
     let bash =

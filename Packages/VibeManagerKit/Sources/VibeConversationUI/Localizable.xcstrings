@@ -18738,6 +18738,107 @@
         }
       }
     },
+    "It takes effect when the session restarts: as soon as %@ is done, its conversation resumed." : {
+      "comment" : "Under the notice of an agent's update: an agent's name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يسري التحديث عند إعادة تشغيل الجلسة: فور انتهاء %@، مع استئناف المحادثة."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sie wird beim Neustart der Sitzung wirksam: sobald %@ fertig ist, mit fortgesetzter Unterhaltung."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se aplicará cuando se reinicie la sesión: en cuanto %@ termine, retomando su conversación."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La mise à jour prendra effet à la relance de la session : dès que %@ aura fini, sa conversation reprise."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह सत्र के पुनः आरंभ होने पर लागू होगा: जैसे ही %@ काम पूरा करे, बातचीत फिर से शुरू होगी।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Avrà effetto al riavvio della sessione: appena %@ avrà finito, riprendendo la conversazione."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "セッションの再起動時に適用されます。%@ の処理が終わりしだい、会話を再開して再起動します。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "세션이 다시 시작될 때 적용됩니다. %@ 작업이 끝나는 대로 대화를 이어서 다시 시작합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit wordt van kracht wanneer de sessie herstart: zodra %@ klaar is, met het gesprek hervat."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zacznie działać po ponownym uruchomieniu sesji: gdy tylko %@ skończy, z wznowioną rozmową."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ela entra em vigor quando a sessão reiniciar: assim que %@ terminar, retomando a conversa."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обновление вступит в силу при перезапуске сеанса: как только %@ закончит, с продолжением беседы."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oturum yeniden başladığında geçerli olur: %@ işini bitirir bitirmez, sohbet kaldığı yerden sürer."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оновлення набуде чинності після перезапуску сеансу: щойно %@ закінчить, із продовженням розмови."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "将在会话重启时生效：%@ 一完成就会重启，并恢复其对话。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "將在工作階段重新啟動時生效：%@ 一完成就會重新啟動，並恢復其對話。"
+          }
+        }
+      }
+    },
     "Its activity was not found" : {
       "localizations" : {
         "ar" : {
@@ -26350,107 +26451,6 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "重新啟動以協調"
-          }
-        }
-      }
-    },
-    "Restarts as soon as %@ is done, its conversation resumed." : {
-      "comment" : "Under the notice of an agent's update: an agent's name.",
-      "localizations" : {
-        "ar" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "سيُعاد التشغيل فور انتهاء %@، مع استئناف المحادثة."
-          }
-        },
-        "de" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Startet neu, sobald %@ fertig ist, und setzt die Unterhaltung fort."
-          }
-        },
-        "es" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Se reinicia en cuanto %@ termine, retomando su conversación."
-          }
-        },
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Relance dès que %@ aura fini, sa conversation reprise."
-          }
-        },
-        "hi" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ का काम पूरा होते ही फिर से शुरू होगा, और बातचीत जारी रहेगी।"
-          }
-        },
-        "it" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Si riavvia appena %@ ha finito, riprendendo la conversazione."
-          }
-        },
-        "ja" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ の作業が終わりしだい再起動し、会話を再開します。"
-          }
-        },
-        "ko" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@의 작업이 끝나는 대로 재시작되고 대화가 이어집니다."
-          }
-        },
-        "nl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Herstart zodra %@ klaar is, met het gesprek hervat."
-          }
-        },
-        "pl" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Uruchomi się ponownie, gdy tylko %@ skończy, wznawiając rozmowę."
-          }
-        },
-        "pt-BR" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Reinicia assim que %@ terminar, retomando a conversa."
-          }
-        },
-        "ru" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Перезапустится, как только %@ закончит, и продолжит разговор."
-          }
-        },
-        "tr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ işini bitirir bitirmez yeniden başlar ve konuşmayı sürdürür."
-          }
-        },
-        "uk" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Перезапуститься, щойно %@ завершить роботу, і продовжить розмову."
-          }
-        },
-        "zh-Hans" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 完成后将立即重新启动，并继续对话。"
-          }
-        },
-        "zh-Hant" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "%@ 完成後將立即重新啟動，並繼續對話。"
           }
         }
       }

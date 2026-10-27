@@ -345,7 +345,7 @@ public final class ConversationModel {
   /// Restarts the agent onto its update: `true` for every open session that has one.
   @ObservationIgnored public var restartForUpdate: ((Bool) -> Void)?
   /// Drops the restart waiting for the agent to be done.
-  @ObservationIgnored public var cancelUpdateRestart: (() -> Void)?
+  @ObservationIgnored public var closeUpdateNotice: (() -> Void)?
   /// The agent's sign-in expired, and where signing in again stands (#410).
   public var signIn: ConversationSignIn?
   @ObservationIgnored public var startSignIn: (() -> Void)?

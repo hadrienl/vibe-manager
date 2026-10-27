@@ -137,11 +137,13 @@ extension AppModel {
     Task { await restartPendingUpdates() }
   }
 
-  /// The restart waiting for this session is dropped. The setting does not queue it again for
-  /// the same update.
-  public func cancelUpdateRestart(_ id: SessionID) {
-    guard pendingUpdateRestarts.remove(id) != nil else { return }
-    declinedUpdateRestarts[id] = agentUpdates[id]
+  /// The notice is closed (#430): the restart waiting for this session is dropped, and nothing
+  /// is shown of this update again — the setting does not queue it either. The update takes
+  /// effect at the session's next restart.
+  public func closeUpdateNotice(_ id: SessionID) {
+    guard let update = agentUpdates[id] else { return }
+    pendingUpdateRestarts.remove(id)
+    declinedUpdateRestarts[id] = update
     publishAgentUpdates()
   }
 
@@ -245,7 +247,9 @@ extension AppModel {
   }
 
   func agentUpdateNotice(for id: SessionID) -> ConversationAgentUpdate? {
-    guard let update = agentUpdates[id], canRestartInPlace(id) else { return nil }
+    guard let update = agentUpdates[id], canRestartInPlace(id),
+      declinedUpdateRestarts[id] != update
+    else { return nil }
     let provider = agentProvider(of: id)
     let agentName =
       agentDescriptors.first { $0.id == provider }?.displayName

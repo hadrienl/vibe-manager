@@ -15,7 +15,7 @@ struct AgentUpdateNotice: View {
           Text(title)
           if update.isPending {
             Text(
-              "Restarts as soon as \(update.agentName) is done, its conversation resumed.",
+              "It takes effect when the session restarts: as soon as \(update.agentName) is done, its conversation resumed.",
               bundle: .module, comment: "Under the notice of an agent's update: an agent's name.")
             .foregroundStyle(theme.secondaryText.color)
           }
@@ -26,11 +26,7 @@ struct AgentUpdateNotice: View {
       .font(theme.interfaceFont(size: appearance.textSize.scaled(12.5)))
       Spacer()
       if update.isPending {
-        Button {
-          model.cancelUpdateRestart?()
-        } label: {
-          Text("Cancel", bundle: .module)
-        }
+        closeButton
       } else if update.otherSessionCount > 0 {
         Menu {
           Button {
@@ -56,6 +52,16 @@ struct AgentUpdateNotice: View {
           Text("Restart", bundle: .module)
         }
       }
+      if !update.isPending { closeButton }
+    }
+  }
+
+  /// Whatever happens, the notice can be put away (#430).
+  private var closeButton: some View {
+    Button {
+      model.closeUpdateNotice?()
+    } label: {
+      Text("Close", bundle: .module, comment: "Puts away the notice of an agent's update.")
     }
   }
 
