@@ -204,8 +204,8 @@ extension AppModel {
       model.restartForUpdate = { [weak self] everySession in
         if everySession { self?.restartAllForUpdate() } else { self?.restartForUpdate(id) }
       }
-      model.cancelUpdateRestart = { [weak self] in
-        self?.cancelUpdateRestart(id)
+      model.closeUpdateNotice = { [weak self] in
+        self?.closeUpdateNotice(id)
       }
       model.signIn = self?.signInNotice(for: id)
       model.startSignIn = { [weak self] in self?.signIn(from: id) }

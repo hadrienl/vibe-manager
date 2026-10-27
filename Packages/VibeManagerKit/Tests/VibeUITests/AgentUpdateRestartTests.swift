@@ -77,9 +77,10 @@ struct AgentUpdateRestartTests {
     await model.restartPendingUpdates()
     #expect(await supervisor.startCount == 1)
 
-    model.cancelUpdateRestart(subject.id)
+    model.closeUpdateNotice(subject.id)
     #expect(model.pendingUpdateRestarts.isEmpty)
-    #expect(model.agentUpdateNotice(for: subject.id)?.isPending == false)
+    // Closed (#430): the notice is gone for this update.
+    #expect(model.agentUpdateNotice(for: subject.id) == nil)
   }
 
   @Test("The restart stops the agent and resumes its conversation under an update separator")
@@ -119,7 +120,7 @@ struct AgentUpdateRestartTests {
     model.noteAgentUpdates([subject.id: update])
     #expect(model.pendingUpdateRestarts == [subject.id])
 
-    model.cancelUpdateRestart(subject.id)
+    model.closeUpdateNotice(subject.id)
     model.noteAgentUpdates([subject.id: update])
     #expect(model.pendingUpdateRestarts.isEmpty)
 

@@ -151,6 +151,7 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
     if let task = (object["toolUseResult"] as? [String: Any])?["backgroundTaskId"] as? String {
       backgroundCommands[task] = date ?? .distantPast
     }
+    if let stopped = Self.stoppedTask(object["toolUseResult"]) { readStop(of: stopped) }
     readBlocks(content, in: ["message", "content"], uuid: uuid, date: date) { block in
       apply(result: block, extra: object["toolUseResult"], denial: object["toolDenialKind"])
     }
@@ -517,6 +518,24 @@ public final class ClaudeCodeConversationDecoder: ConversationDecoding {
       duration: Self.tag("duration_ms", in: text).flatMap { Int($0) }.map { .milliseconds($0) },
       tokens: Self.tag("subagent_tokens", in: text).flatMap { Int($0) })
     call.subagent = run
+    entries[index].content = .tool(call)
+  }
+
+  /// The task `TaskStop` stopped: `{"message": "Successfully stopped task: …", "task_id": …}`. No
+  /// notification follows (#430): without this, the command or the sub-agent ran for ever.
+  static func stoppedTask(_ result: Any?) -> String? {
+    guard let result = result as? [String: Any], let task = result["task_id"] as? String,
+      (result["message"] as? String)?.hasPrefix("Successfully stopped") == true
+    else { return nil }
+    return task
+  }
+
+  private func readStop(of task: String) {
+    backgroundCommands[task] = nil
+    guard let index = indexByAgentID[task], case .tool(var call) = entries[index].content,
+      call.kind == .subagent, !call.state.isFinished
+    else { return }
+    call.state = .interrupted
     entries[index].content = .tool(call)
   }
 
