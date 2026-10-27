@@ -7018,6 +7018,107 @@
         }
       }
     },
+    "Only one copy can use the same sessions. To run another copy beside it, launch it with VIBE_DATA_DIRECTORY set to a folder of its own." : {
+      "comment" : "Body of the alert shown when a second copy is launched on the same data. VIBE_DATA_DIRECTORY is an environment variable, not translated.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن إلا لنسخة واحدة استخدام الجلسات نفسها. لتشغيل نسخة أخرى بجانبها، شغّلها مع تعيين VIBE_DATA_DIRECTORY إلى مجلد خاص بها."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nur eine Kopie kann dieselben Sitzungen verwenden. Um eine weitere Kopie daneben auszuführen, starte sie mit VIBE_DATA_DIRECTORY auf einen eigenen Ordner gesetzt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo una copia puede usar las mismas sesiones. Para ejecutar otra copia junto a ella, iníciala con VIBE_DATA_DIRECTORY apuntando a una carpeta propia."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Une seule copie peut utiliser les mêmes sessions. Pour en lancer une autre à côté, lancez-la avec VIBE_DATA_DIRECTORY pointant vers un dossier à elle."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "एक ही सत्रों का उपयोग केवल एक प्रति कर सकती है। इसके साथ दूसरी प्रति चलाने के लिए, उसे VIBE_DATA_DIRECTORY को उसके अपने फ़ोल्डर पर सेट करके लॉन्च करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Solo una copia può usare le stesse sessioni. Per eseguire un'altra copia accanto, avviala con VIBE_DATA_DIRECTORY impostata su una cartella propria."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同じセッションを使えるのは 1 つのコピーだけです。別のコピーを並べて実行するには、VIBE_DATA_DIRECTORY を専用のフォルダに設定して起動してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "같은 세션은 하나의 사본만 사용할 수 있습니다. 다른 사본을 함께 실행하려면 VIBE_DATA_DIRECTORY를 전용 폴더로 설정하여 실행하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Slechts één kopie kan dezelfde sessies gebruiken. Om er een andere kopie naast te draaien, start je die met VIBE_DATA_DIRECTORY ingesteld op een eigen map."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tylko jedna kopia może korzystać z tych samych sesji. Aby uruchomić obok niej inną kopię, uruchom ją z VIBE_DATA_DIRECTORY ustawioną na jej własny folder."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Só uma cópia pode usar as mesmas sessões. Para executar outra cópia ao lado, abra-a com VIBE_DATA_DIRECTORY apontando para uma pasta própria."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Одни и те же сеансы может использовать только одна копия. Чтобы запустить рядом другую копию, запустите её с VIBE_DATA_DIRECTORY, указывающей на отдельную папку."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aynı oturumları yalnızca bir kopya kullanabilir. Yanında başka bir kopya çalıştırmak için onu VIBE_DATA_DIRECTORY kendi klasörüne ayarlanmış olarak başlatın."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ті самі сеанси може використовувати лише одна копія. Щоб запустити поруч іншу копію, запустіть її з VIBE_DATA_DIRECTORY, що вказує на окрему теку."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一组会话只能由一个副本使用。要在旁边运行另一个副本，请将 VIBE_DATA_DIRECTORY 设为其专用文件夹后再启动。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "同一組工作階段只能由一個副本使用。若要在旁邊執行另一個副本，請將 VIBE_DATA_DIRECTORY 設為其專用資料夾後再啟動。"
+          }
+        }
+      }
+    },
     "Open Location…" : {
       "localizations" : {
         "ar" : {
@@ -7514,6 +7615,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "上一個工作階段"
+          }
+        }
+      }
+    },
+    "Quit" : {
+      "comment" : "Closes the second copy.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إنهاء"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Beenden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Salir"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quitter"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बंद करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esci"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "終了"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "종료"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Stop"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zakończ"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Encerrar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершить"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Çık"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Завершити"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "退出"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "結束"
           }
         }
       }
@@ -11967,6 +12169,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager 輔助說明"
+          }
+        }
+      }
+    },
+    "Vibe Manager is already running with this data." : {
+      "comment" : "Title of the alert shown when a second copy is launched on the same data.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager يعمل بالفعل بهذه البيانات."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager läuft bereits mit diesen Daten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager ya se está ejecutando con estos datos."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager tourne déjà avec ces données."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager इस डेटा के साथ पहले से चल रहा है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager è già in esecuzione con questi dati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager はすでにこのデータで実行中です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager가 이미 이 데이터로 실행 중입니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager draait al met deze gegevens."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager działa już z tymi danymi."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager já está em execução com estes dados."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager уже запущен с этими данными."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager bu verilerle zaten çalışıyor."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager уже працює з цими даними."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 已在使用这些数据运行。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager 已在使用這些資料執行。"
           }
         }
       }
