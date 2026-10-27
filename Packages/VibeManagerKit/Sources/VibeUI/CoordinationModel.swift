@@ -53,6 +53,8 @@ public final class CoordinationModel {
   @ObservationIgnored var inbox = CoordinationInbox()
   /// Messages a coordinator sent to a child busy with a turn, typed once it is at rest, in order.
   @ObservationIgnored var outbox: [SessionID: [String]] = [:]
+  /// The message typed into each session's prompt but not sent (#435): sent before the next one.
+  @ObservationIgnored var leftInInput: [SessionID: String] = [:]
   /// Sessions a message is being typed into: one at a time each, never two interleaved.
   @ObservationIgnored var typing: Set<SessionID> = []
   /// Children being created and started, per coordinator: counted against the limit before they

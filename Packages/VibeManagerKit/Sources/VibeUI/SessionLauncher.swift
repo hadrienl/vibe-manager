@@ -423,18 +423,70 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       await pane.write(keys)
     }
     try? await Task.sleep(for: format.delayBeforeSubmit(attachmentCount: 0))
-    guard pane.session === terminal else { return .leftInInput }
+    return await Self.submit(
+      PromptEncoding.sanitized(text), keys: keystrokes.submit, format: format,
+      promptReturn: promptReturn, readScreen: { [weak self] in await self?.screen(of: id) },
+      write: { bytes in
+        guard pane.session === terminal else { return false }
+        await pane.write(bytes)
+        return true
+      }, state: state)
+  }
+
+  /// Presses Return on a message typed into an agent at rest, or its queue key into one at work.
+  /// An agent whose prompt the screen shows is given Return once the text is in it, and again if
+  /// the text is still there once it was written (#370): one written too soon was lost, and the
+  /// message stayed unsent in its prompt (#435). Still there after that, it is left in the input.
+  static func submit(
+    _ text: String, keys: [UInt8], format: AgentPromptFormat, promptReturn: PromptReturn,
+    readScreen: @escaping () async -> String?, write: ([UInt8]) async -> Bool,
+    state: @MainActor () -> TypingState
+  ) async -> TypingOutcome {
+    let watched = format.readsInputOnScreen && !text.isEmpty
+    if watched { await promptReturn.waitForInput(holding: text, readScreen) }
     switch state() {
     case .awaitingUser:
       return .leftInInput
     case .working:
-      await pane.write(format.queueKey)
-      return .queued
+      return await write(format.queueKey) ? .queued : .leftInInput
     case .atRest:
-      await pane.write(keystrokes.submit)
+      guard await write(keys) else { return .leftInInput }
+    }
+    guard watched, let input = await promptReturn.inputStillHolding(text, readScreen) else {
       return .submitted
     }
+    // Gone to work or to wait meanwhile, the agent took Return, or what came is not the prompt.
+    guard case .atRest = state() else { return .submitted }
+    await PromptReturn.submitAgain(input, submit: keys) { _ = await write($0) }
+    return await promptReturn.inputStillHolding(text, readScreen) == nil ? .submitted : .leftInInput
   }
+
+  /// Presses Return on a message left in an agent's prompt (#435), if the prompt still holds it.
+  /// Whether it is no longer there.
+  public func submitLeftMessage(_ text: String, into id: SessionID) async -> Bool {
+    guard let pane = pane(for: id), pane.status == .running, let terminal = pane.session,
+      let screen = await screen(of: id), let input = PromptInputRecognition.input(screen: screen)
+    else { return false }
+    guard PromptReturn.held(PromptEncoding.sanitized(text), input) else { return true }
+    guard let providerID = ((try? await repository.session(id: id)) ?? nil)?.agent?.providerID
+    else { return false }
+    let format =
+      (await agents.provider(id: AgentProviderID(providerID)) as? any AgentConversationReporting)?
+      .promptFormat ?? AgentPromptFormat()
+    let outcome = await Self.submit(
+      PromptEncoding.sanitized(text), keys: format.submitKey, format: format,
+      promptReturn: promptReturn,
+      readScreen: { [weak self] in await self?.screen(of: id) },
+      write: { bytes in
+        guard pane.session === terminal else { return false }
+        await pane.write(bytes)
+        return true
+      }, state: { .atRest })
+    return outcome == .submitted
+  }
+
+  /// How long Return waits for an agent's prompt to show a message, and to be taken.
+  var promptReturn = PromptReturn()
 
   /// From the launch to the first byte the agent writes, for Instruments.
   private func signpostFirstOutput(of terminal: any TerminalSession) {

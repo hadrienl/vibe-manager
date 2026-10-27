@@ -1591,7 +1591,7 @@ public final class ConversationModel {
     // Return written before the agent took the text was seen to break the line, or to be lost
     // (#370): it waits for the prompt to show the text, and the prompt is read again after it.
     let watched = promptFormat.readsInputOnScreen && !kind.isShell && !text.isEmpty ? text : nil
-    if let watched { await waitForInput(holding: watched) }
+    if let watched, let readScreen { await promptReturn.waitForInput(holding: watched, readScreen) }
     await write(keystrokes.submit)
     markSubmitted(echoID)
     if let watched {
@@ -1604,71 +1604,19 @@ public final class ConversationModel {
 
   // MARK: - Return, once the prompt shows the text (#370)
 
-  /// How long Return waits for the agent's prompt to show the text typed, past `submitDelay`.
-  @ObservationIgnored var inputWaitLimit = Duration.seconds(3)
-  /// How long a prompt still showing the text once Return is written is given to be sent.
-  @ObservationIgnored var sendWaitLimit = Duration.milliseconds(1500)
-  /// How long after Return a reading of the screen starts for it to tell whether Return was taken:
-  /// one started sooner may show the prompt as it was before the agent read the key.
-  @ObservationIgnored var sendSettleDelay = Duration.milliseconds(300)
-  /// Between two readings of the screen: each replays the terminal's history.
-  static let screenReadInterval = Duration.milliseconds(100)
+  /// How long Return waits for the prompt to show the text, and to be taken.
+  @ObservationIgnored var promptReturn = PromptReturn()
 
-  /// Reads the agent's prompt on its screen until `done` says so, or `limit` has passed and a
-  /// reading started at `earliest` at least, and returns the last one read: nil when the screen
-  /// shows none, which tells nothing.
-  private func readInput(
-    for limit: Duration, notBefore earliest: ContinuousClock.Instant = .now,
-    until done: ([String]) -> Bool
-  ) async -> [String]? {
-    guard let readScreen else { return nil }
-    let deadline = ContinuousClock.now + limit
-    while true {
-      let started = ContinuousClock.now
-      guard let screen = await readScreen(),
-        let input = PromptInputRecognition.input(screen: screen)
-      else { return nil }
-      if done(input) || Task.isCancelled { return input }
-      if ContinuousClock.now >= deadline && started >= earliest { return input }
-      try? await Task.sleep(for: Self.screenReadInterval)
-    }
-  }
-
-  private func waitForInput(holding text: String) async {
-    _ = await readInput(for: inputWaitLimit) { input in
-      PromptInputRecognition.holds(text, in: input)
-        || PromptInputRecognition.showsPastedText(input)
-    }
-  }
-
-  /// Return written, a prompt that still shows the text is sent again, once: its line break
-  /// erased first when Return was taken for one, as it is when Return was lost. Not when the
+  /// Return written, a prompt that still shows the text is sent again, once. Not when the
   /// transcript has the prompt already, nor into a request or a panel that came meanwhile (#319).
   private func submitAgainIfHeld(
     _ text: String, echo id: UUID, submit: [UInt8], write: ([UInt8]) async -> Void
   ) async {
-    func held(_ input: [String]) -> Bool {
-      PromptInputRecognition.holds(text, in: input)
-        || PromptInputRecognition.showsPastedText(input)
-    }
-    let earliest = ContinuousClock.now + sendSettleDelay
-    var lineBreakSeen = false
-    guard
-      let input = await readInput(
-        for: sendWaitLimit, notBefore: earliest,
-        until: { input in
-          guard held(input) else { return true }
-          // Seen twice running, a line break is no prompt being redrawn: it is not waited out.
-          let lineBreak = PromptInputRecognition.endsOnLineBreak(input)
-          defer { lineBreakSeen = lineBreak }
-          return lineBreak && lineBreakSeen
-        }),
-      held(input),
+    guard let readScreen, let input = await promptReturn.inputStillHolding(text, readScreen),
       composerState == .ready, terminalPanel == nil,
       echoes.contains(where: { $0.id == id && $0.state == .sending })
     else { return }
-    if PromptInputRecognition.endsOnLineBreak(input) { await write(Self.backspace) }
-    await write(submit)
+    await PromptReturn.submitAgain(input, submit: submit, write: write)
     markSubmitted(id)
   }
 
@@ -1676,8 +1624,6 @@ public final class ConversationModel {
     guard let index = echoes.firstIndex(where: { $0.id == id }) else { return }
     echoes[index].submittedAt = Date()
   }
-
-  static let backspace: [UInt8] = [0x7F]
 
   // MARK: - A panel of the agent's terminal
 

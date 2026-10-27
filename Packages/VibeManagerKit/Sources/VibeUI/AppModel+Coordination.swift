@@ -277,7 +277,9 @@ extension AppModel {
         guard let self else { return }
         await self.deliverCoordinationMessages()
         let coordination = self.coordination
-        let hasMessages = !coordination.inbox.isEmpty || !coordination.outbox.isEmpty
+        let hasMessages =
+          !coordination.inbox.isEmpty || !coordination.outbox.isEmpty
+          || !coordination.leftInInput.isEmpty
         guard hasMessages || !coordination.wakes.isEmpty else {
           coordination.ticker = nil
           return
@@ -326,10 +328,21 @@ extension AppModel {
   /// if the agent is still at rest once the text is in: it is never what answers a dialog.
   /// Whether the message is not to be typed again.
   func typeCoordinationMessage(_ text: String, into id: SessionID) async -> Bool {
+    await typeCoordinationMessageReporting(text, into: id).isDelivered
+  }
+
+  /// What became of the message: a message left in the prompt is sent before the next one is
+  /// typed, once the agent is at rest again (#435) — never typed twice, and never in the way of
+  /// the next.
+  func typeCoordinationMessageReporting(_ text: String, into id: SessionID) async
+    -> TypingOutcome
+  {
     // Taken before the checks, which wait: two messages checked together would both be typed.
-    guard coordination.typing.insert(id).inserted else { return false }
+    guard coordination.typing.insert(id).inserted else { return .notTyped }
     defer { coordination.typing.remove(id) }
-    guard await canTypeCoordinationMessage(into: id), let launcher else { return false }
+    guard let launcher, await submitLeftCoordinationMessage(in: id, launcher: launcher),
+      await canTypeCoordinationMessage(into: id)
+    else { return .notTyped }
     let outcome = await launcher.typeMessage(text, into: id) { [weak self] in
       switch self?.activity(for: id)?.activity {
       case .working: .working
@@ -338,11 +351,36 @@ extension AppModel {
       }
     }
     if outcome == .leftInInput {
+      coordination.leftInInput[id] = text
       diagnostics.record(
         .session, .notice, "coordination.messageLeftInInput",
         ["session": diagnostics.pseudonym(id)])
     }
-    return outcome.isDelivered
+    return outcome
+  }
+
+  /// Sends the message left in a session's prompt, if any, once it can be: the agent at rest, the
+  /// user not typing. Whether the prompt no longer holds it — sent, or taken away by the user.
+  private func submitLeftCoordinationMessage(in id: SessionID, launcher: SessionLauncher) async
+    -> Bool
+  {
+    guard let text = coordination.leftInInput[id] else { return true }
+    guard launcher.isRunning(id) else {
+      coordination.leftInInput[id] = nil
+      return true
+    }
+    switch activity(for: id)?.activity {
+    case .working, .awaitingUser: return false
+    case .idle, nil: break
+    }
+    if let typed = pane(for: id)?.lastKeyboardInputAt, ContinuousClock.now - typed < .seconds(2) {
+      return false
+    }
+    guard await launcher.submitLeftMessage(text, into: id) else { return false }
+    coordination.leftInInput[id] = nil
+    diagnostics.record(
+      .session, .info, "coordination.leftMessageSent", ["session": diagnostics.pseudonym(id)])
+    return true
   }
 
   /// Takes a session's input for the user's message once the application types nothing into it,
@@ -361,6 +399,14 @@ extension AppModel {
   /// when they can be written to.
   func deliverCoordinationMessages() async {
     let now = coordination.now()
+    // A message left in a prompt with nothing behind it is sent on its own.
+    if let launcher {
+      for id in coordination.leftInInput.keys where coordination.outbox[id] == nil {
+        guard coordination.typing.insert(id).inserted else { continue }
+        _ = await submitLeftCoordinationMessage(in: id, launcher: launcher)
+        coordination.typing.remove(id)
+      }
+    }
     for (id, wake) in coordination.wakes where wake.date <= now {
       guard let coordinator = sessions.first(where: { $0.id == id }),
         coordinator.status != .archived, coordinator.coordination?.isCoordinator == true
@@ -735,10 +781,15 @@ extension AppModel {
       for: child.id)
     // Typed now only into a child at rest, and after the messages kept for it; otherwise kept,
     // and typed once it finishes its turn.
-    if coordination.outbox[child.id] == nil,
-      await typeCoordinationMessage(message, into: child.id)
-    {
-      return "Sent to “\(child.name)”."
+    if coordination.outbox[child.id] == nil {
+      switch await typeCoordinationMessageReporting(message, into: child.id) {
+      case .submitted, .queued: return "Sent to “\(child.name)”."
+      case .leftInInput:
+        startCoordinationTicker()
+        return
+          "Typed into “\(child.name)”'s prompt, but not sent yet: it will be sent once it is at rest."
+      case .notTyped: break
+      }
     }
     coordination.outbox[child.id, default: []].append(message)
     startCoordinationTicker()
