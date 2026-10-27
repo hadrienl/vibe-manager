@@ -11,6 +11,7 @@ struct ArchiveRulesSettingsView: View {
   @State private var bench: ArchiveRuleBenchModel?
   /// “Not What I Wanted” from the bench: the sheet to refine opens once the bench is gone.
   @State private var pendingRefinement: (rule: StoredArchiveRule, text: String)?
+  @State private var confirmsClearingReports = false
 
   var body: some View {
     Form {
@@ -111,6 +112,9 @@ struct ArchiveRulesSettingsView: View {
         }
         .accessibilityIdentifier("archive-rules-notifies")
       }
+      if let reports = model.archiveReports {
+        reportsSection(reports)
+      }
     }
     .formStyle(.grouped)
     .task { if !rules.loaded { await rules.load() } }
@@ -183,7 +187,11 @@ private struct ArchiveRuleRow: View {
       VStack(alignment: .leading, spacing: 3) {
         HStack(spacing: 6) {
           Text(verbatim: name).fontWeight(.semibold)
-          if let pill { pill }
+          if stored.state == .trial, stored.rule != nil {
+            trialMenu
+          } else if let pill {
+            pill
+          }
         }
         if let explanation = line.explanation {
           Text(verbatim: explanation).font(.callout).fixedSize(horizontal: false, vertical: true)
@@ -253,6 +261,51 @@ private struct ArchiveRuleRow: View {
     .padding(.vertical, 2)
   }
 
+  /// A rule on trial asks, from its badge, whether the trial was conclusive: turning it on is the
+  /// answer the badge leads to, rather than an item of the “…” menu.
+  private var trialMenu: some View {
+    Menu {
+      Section {
+        Button {
+          Task { await rules.setState(.active, of: stored.id) }
+        } label: {
+          Text(
+            "Yes, Turn It On", bundle: .module,
+            comment: "The menu of a rule on trial: the trial was conclusive, the rule archives from now on.")
+        }
+        Button(action: redo) {
+          Text(
+            "No, Refine It…", bundle: .module,
+            comment: "The menu of a rule on trial: the trial was not conclusive, describe a change.")
+        }
+        Button {
+          Task { await rules.setState(.paused, of: stored.id) }
+        } label: {
+          Text("Pause", bundle: .module, comment: "A menu of an archive rule.")
+        }
+      } header: {
+        Text(
+          "Was the trial conclusive?", bundle: .module,
+          comment: "The menu of a rule on trial, which archives nothing yet.")
+      }
+    } label: {
+      HStack(spacing: 2) {
+        Text("On Trial", bundle: .module, comment: "A badge of an archive rule that archives nothing yet.")
+        Image(systemName: "chevron.down").imageScale(.small)
+      }
+      .font(.caption2.bold())
+      .foregroundStyle(.blue)
+      .padding(.horizontal, 6)
+      .padding(.vertical, 2)
+      .background(.blue.opacity(0.12), in: .capsule)
+    }
+    .menuStyle(.button)
+    .buttonStyle(.plain)
+    .menuIndicator(.hidden)
+    .fixedSize()
+    .accessibilityIdentifier("archive-rule-trial")
+  }
+
   private var pill: Text? {
     switch (stored.state, stored.rule == nil) {
     case (_, true), (.paused, _):
@@ -303,5 +356,49 @@ private struct ArchiveRuleRow: View {
     return String(
       localized: "Last: \(date) · \(last.archived) archived, \(last.skipped) skipped",
       bundle: .module, comment: "Settings › Automatic Archive: what a rule's last run did.")
+  }
+}
+
+extension ArchiveRulesSettingsView {
+  /// What was archived, batch by batch (#408): the window, and clearing it all. Whether an agent
+  /// summarizes is asked with each rule.
+  @ViewBuilder
+  func reportsSection(_ reports: ArchiveReportsModel) -> some View {
+    Section {
+      HStack {
+        Button {
+          model.showArchiveReports()
+        } label: {
+          Text("Show Reports", bundle: .module, comment: "Opens Window › Archive Reports.")
+        }
+        Spacer()
+        Button(role: .destructive) {
+          confirmsClearingReports = true
+        } label: {
+          Text("Clear Reports…", bundle: .module, comment: "Removes every archive report.")
+        }
+        .disabled(reports.batches.isEmpty)
+      }
+    } header: {
+      Text("Reports", bundle: .module, comment: "Settings › Automatic Archive: a section.")
+    } footer: {
+      Text(
+        "Each archive keeps a report of what its sessions did, for twelve months.", bundle: .module,
+        comment: "Settings › Automatic Archive: the reports' section.")
+    }
+    .task { if !reports.loaded { await reports.load() } }
+    .confirmationDialog(
+      Text("Clear every archive report?", bundle: .module),
+      isPresented: $confirmsClearingReports
+    ) {
+      Button(role: .destructive) {
+        Task { await reports.clear() }
+      } label: {
+        Text("Clear Reports", bundle: .module, comment: "Confirms removing every archive report.")
+      }
+    } message: {
+      Text(
+        "The archived sessions stay in the archive: only the reports are removed.", bundle: .module)
+    }
   }
 }

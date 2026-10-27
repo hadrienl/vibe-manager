@@ -180,6 +180,7 @@ extension AppModel {
         rule: run.rule, protections: protections, candidates: candidates, now: now,
         calendar: calendar)
       var archived: [SessionID] = []
+      var photos: [ArchivedSessionSnapshot] = []
       if !run.isTrial, !plan.archived.isEmpty {
         // Reading Git and archiving take time: the user may have started, moved or protected a
         // session since the plan. Each is looked at again, as it stands now, right before.
@@ -197,12 +198,35 @@ extension AppModel {
             archivingSessionIDs.insert(id).inserted
           else { continue }
           defer { archivingSessionIDs.remove(id) }
-          if await archiveByRule(id, run: run) { archived.append(id) }
+          // Photographed as it stands right before, for the batch's report (#408).
+          let photo = await archiveSnapshot(of: live.session, at: now)
+          if await archiveByRule(id, run: run) {
+            archived.append(id)
+            photos.append(photo)
+          }
         }
         archivedAny = archivedAny || !archived.isEmpty
         let gone = Set(archived)
         candidates.removeAll { gone.contains($0.id) }
       }
+      if run.isTrial {
+        for id in plan.archived {
+          guard let candidate = candidates.first(where: { $0.id == id }) else { continue }
+          photos.append(await archiveSnapshot(of: candidate.session, at: now))
+        }
+      }
+      let batch = await archiveReports?.recordRun(
+        kind: run.isTrial
+          ? .trial(id: run.ruleID, name: run.rule.name)
+          : .rule(id: run.ruleID, name: run.rule.name),
+        date: now, sessions: photos,
+        skipped: plan.skipped.compactMap { id, verdict in
+          guard let reason = SkippedSession.Reason(verdict),
+            let name = candidates.first(where: { $0.id == id })?.session.name
+          else { return nil }
+          return SkippedSession(sessionID: id, name: name, reason: reason)
+        }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending },
+        summarizing: model.set.rules.first { $0.id == run.ruleID }?.summarizes ?? false)
       let count = run.isTrial ? plan.archived.count : archived.count
       let result = ArchiveRunResult(
         date: now, archived: count, skipped: plan.skipped.count, isTrial: run.isTrial)
@@ -215,7 +239,7 @@ extension AppModel {
           "duration": .duration(ContinuousClock.now - started),
         ])
       if !run.isTrial, count > 0, model.set.notifies {
-        requestNotifier?.postArchiveRun(ruleName: run.rule.name, count: count)
+        requestNotifier?.postArchiveRun(ruleName: run.rule.name, count: count, batchID: batch?.id)
       }
     }
     if let set = try? await model.store.load() { model.replace(set) }
@@ -270,6 +294,18 @@ extension ArchiveCondition {
     case .test(let test): test.field == .gitBranch || test.field == .gitDirty
     case .not(let inner): inner.readsGit
     case .all(let parts), .any(let parts): parts.contains(where: \.readsGit)
+    }
+  }
+}
+
+extension SkippedSession.Reason {
+  /// The reason a report keeps of a verdict that skipped a session; `nil` for one it does not.
+  init?(_ verdict: ArchiveVerdict) {
+    switch verdict {
+    case .running: self = .running
+    case .unarchived: self = .unarchived
+    case .overLimit: self = .overLimit
+    default: return nil
     }
   }
 }

@@ -569,6 +569,13 @@ public final class AppEnvironment {
       gitReader: GitStatusReader(
         git: ProcessGitCommandRunner(timeout: .seconds(30), diagnostics: diagnostics.log)),
       diagnostics: diagnostics)
+    // The archive's reports (#408): a file per batch beside the rules, the paragraph written by
+    // the first agent that answers to a schema.
+    appModel.archiveReports = ArchiveReportsModel(
+      store: FileArchiveReportStore(
+        directory: FileArchiveReportStore.defaultDirectory(dataFolder: dataFolder)),
+      synthesizers: AgentArchiveSynthesizers(agents: registry),
+      diagnostics: diagnostics)
     let backgroundWork = BackgroundWorkProbe(
       agents: registry, hint: { [activityTracker] id in await activityTracker.sourceEvent(for: id) }
     )

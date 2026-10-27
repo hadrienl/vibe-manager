@@ -792,6 +792,12 @@ public struct RootView: View {
       Button(confirmation.confirmTitle) {
         Task { await model.confirmBatch(confirmation) }
       }
+      // Several archived together (#408): an agent may write a paragraph over their batch.
+      if let summarizeTitle = confirmation.summarizeTitle {
+        Button(summarizeTitle) {
+          Task { await model.confirmBatch(confirmation, summarizing: true) }
+        }
+      }
       Button(LocalizedStringResource("Cancel", bundle: .module), role: .cancel) {
         model.cancelBatch()
       }

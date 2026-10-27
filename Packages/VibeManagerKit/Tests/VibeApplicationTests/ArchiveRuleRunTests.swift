@@ -35,6 +35,19 @@ struct ArchiveRuleSchedulerTests {
     #expect(ArchiveRuleScheduler.decision(for: handled, now: paris("2026-10-29 09:00"), calendar: calendar) == .none)
   }
 
+  @Test("A rule kept before the summary was asked about summarizes; one that said no does not")
+  func summarizesByDefault() throws {
+    var rule = stored(friday, activatedAt: start)
+    rule.summarizes = false
+    let data = try JSONEncoder().encode(rule)
+    #expect(try JSONDecoder().decode(StoredArchiveRule.self, from: data).summarizes == false)
+    var object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    #expect(object["summary"] as? Bool == false)
+    object["summary"] = nil
+    let older = try JSONSerialization.data(withJSONObject: object)
+    #expect(try JSONDecoder().decode(StoredArchiveRule.self, from: older).summarizes)
+  }
+
   @Test("Times missed are caught up once, standing for the last one; or passed with no catch-up")
   func catchUp() {
     let rule = stored(friday, activatedAt: start)

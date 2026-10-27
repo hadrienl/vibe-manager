@@ -54,6 +54,7 @@ struct VibeManagerApp: App {
 
   /// The workspace's window, opened again by ⌘N once closed (#247).
   static let workspaceWindowID = "workspace"
+  static let archiveReportsWindowID = "archive-reports"
 
   /// How long a help tag waits before showing, in milliseconds. The system's own delay is long
   /// enough that the small buttons of the sidebar's foot read as unlabelled. Registered as a
@@ -91,6 +92,7 @@ struct VibeManagerApp: App {
           }
         }
         .background(WorkspaceWindowReader(focus: windowFocus))
+        .background(ArchiveReportsOpener(model: environment.appModel))
     }
     .defaultSize(width: 1_180, height: 760)
     .commands {
@@ -392,6 +394,12 @@ struct VibeManagerApp: App {
     }
     .defaultSize(width: 820, height: 560)
     .keyboardShortcut("u", modifiers: [.command, .option])
+
+    // The archive's reports (#408), beside Usage: one window, reopened rather than duplicated.
+    Window("Archive Reports", id: Self.archiveReportsWindowID) {
+      ArchiveReportsWindow(model: environment.appModel)
+    }
+    .defaultSize(width: 900, height: 620)
   }
 }
 
@@ -1421,5 +1429,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     hasRepliedToTermination = true
     environment?.diagnostics.flush()
     NSApplication.shared.reply(toApplicationShouldTerminate: true)
+  }
+}
+
+/// Gives the model a way to open the archive's reports (#408): a notification of a batch, the
+/// archive's button and the Settings open the window the scene declares.
+private struct ArchiveReportsOpener: View {
+  let model: AppModel
+  @Environment(\.openWindow) private var openWindow
+
+  var body: some View {
+    Color.clear
+      .onAppear {
+        model.showArchiveReportsWindow = { [openWindow] in
+          openWindow(id: VibeManagerApp.archiveReportsWindowID)
+        }
+      }
   }
 }

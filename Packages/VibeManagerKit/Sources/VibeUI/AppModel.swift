@@ -164,6 +164,11 @@ public final class AppModel {
   /// The automatic archive's rules (#405). Set by the composition: a workspace assembled without
   /// it archives nothing on its own and has no tab.
   public var archiveRules: ArchiveRulesModel?
+  /// The archive's reports (#408). Set by the composition: a workspace assembled without it forms
+  /// no batch.
+  public var archiveReports: ArchiveReportsModel?
+  /// Opens the window of the archive's reports. Set by the application, which has the scene.
+  @ObservationIgnored public var showArchiveReportsWindow: (@MainActor () -> Void)?
   /// The updater (#92). Set by the application, which has the bundle an update replaces: a
   /// workspace assembled without it has no Updates tab.
   public var updates: UpdatesModel?
@@ -1451,10 +1456,11 @@ public final class AppModel {
     }
   }
 
-  /// One session of a batch archive (#77).
-  func archiveInBatch(_ id: SessionID) async -> SessionBatchItemResult {
+  /// One session of a batch archive (#77). `recordsByHand: false` when the batch forms its own
+  /// report (#408).
+  func archiveInBatch(_ id: SessionID, recordsByHand: Bool = true) async -> SessionBatchItemResult {
     do {
-      let archival = try await archiveProcess(id)
+      let archival = try await archiveProcess(id, recordsByHand: recordsByHand)
       return Self.result(of: archival.detachment, for: archival.session, action: .archived)
     } catch {
       return .failed(message: Self.message(for: error), suggestion: nil)
@@ -1624,9 +1630,12 @@ public final class AppModel {
   }
 
   func archiveProcess(
-    _ id: SessionID, cause: SessionStatusChange.Cause = .user
+    _ id: SessionID, cause: SessionStatusChange.Cause = .user, recordsByHand: Bool = true
   ) async throws -> SessionArchival {
+    let before = sessions.first { $0.id == id }
     let archival = try await archiveSession(id: id, cause: cause)
+    // An archive by hand joins the day's batch (#408); a rule's, or a selection's, forms its own.
+    if cause == .user, recordsByHand, let before { await recordArchiveByHand(before) }
     await activityTracker?.forget(id)
     ticketTitles.forget(id)
     browser?.release(id)
@@ -2842,6 +2851,7 @@ public final class AppModel {
     await startCoordination()
     // Once the sessions are read and the running agents adopted: a time missed while the
     // application was closed is caught up now, on what runs (#405).
+    await startArchiveReports()
     await startArchiveRules()
     await settleUsage()
     // Now that the host is known: one kept from before the access was granted is restarted here

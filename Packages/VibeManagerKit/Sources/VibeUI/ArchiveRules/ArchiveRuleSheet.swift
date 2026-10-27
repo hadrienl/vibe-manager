@@ -23,6 +23,9 @@ struct ArchiveRuleSheet: View {
           if let current = model.current {
             explanation(current)
             preview
+            if model.purpose != .protection {
+              summaryToggle
+            }
           }
         }
         .padding(24)
@@ -315,6 +318,22 @@ struct ArchiveRuleSheet: View {
     default:
       return ""
     }
+  }
+
+  /// Asked with the rule (#408): whether its batches get an agent's paragraph.
+  private var summaryToggle: some View {
+    Toggle(isOn: $model.summarizes) {
+      Text(
+        "Summarize each batch with an agent", bundle: .module,
+        comment:
+          "The sheet of a new archive rule: an agent writes a paragraph over each batch the rule archives."
+      )
+      Text(
+        "Its journal's sentences and resources only, never a conversation.", bundle: .module,
+        comment: "The sheet of a new archive rule: what the agent is given to summarize a batch.")
+    }
+    .toggleStyle(.checkbox)
+    .accessibilityIdentifier("archive-rule-summarizes")
   }
 
   // MARK: The foot
