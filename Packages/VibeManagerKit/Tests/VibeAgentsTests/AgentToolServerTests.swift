@@ -124,4 +124,51 @@ struct CoordinatorLaunchTests {
       provider: ClaudeCodeAgentProvider.id)
     #expect(result.arguments == plan(ClaudeCodeAgentProvider.id).arguments)
   }
+
+  @Test("A child is told where to create its worktrees, the coordinator too, in one instruction")
+  func worktrees() async throws {
+    let registry = AgentProviderRegistry(providers: [ClaudeCodeAgentProvider.make(environment: [:])]
+    )
+    let tools = ProvideAgentTools(
+      agents: registry, setup: { nil },
+      coordination: { [coordinationServer] in coordinationServer },
+      worktrees: { WorktreeLocationSettings() })
+    let child = await tools(
+      plan(ClaudeCodeAgentProvider.id),
+      for: WorkSession(name: "#351", coordination: .child(of: SessionID())))
+    let childIndex = try #require(child.arguments.firstIndex(of: "--append-system-prompt"))
+    #expect(child.arguments[childIndex + 1].contains("/.claude/worktrees/{branch}"))
+    let coordinator = await tools(
+      plan(ClaudeCodeAgentProvider.id), for: WorkSession(name: "V2", coordination: .coordinator))
+    #expect(coordinator.arguments.filter { $0 == "--append-system-prompt" }.count == 1)
+    let index = try #require(coordinator.arguments.firstIndex(of: "--append-system-prompt"))
+    #expect(coordinator.arguments[index + 1].hasPrefix(CoordinatorInstructions.text))
+    #expect(coordinator.arguments[index + 1].contains("{repo}/.claude/worktrees/{branch}"))
+  }
+
+  @Test("Codex keeps the developer instructions of the user's configuration, in front")
+  func codexKeepsOwnInstructions() throws {
+    let home = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: home) }
+    try "model = \"x\"\ndeveloper_instructions = \"\"\"\nBe brief.\n\"\"\"\n[tools]\n".write(
+      to: home.appendingPathComponent("config.toml"), atomically: true, encoding: .utf8)
+    var codexPlan = plan(CodexAgentProvider.id)
+    codexPlan = codexPlan.adding(options: [], environment: ["CODEX_HOME": home.path])
+    let result = CodexAgentProvider.make(environment: [:]).instructing(
+      "Worktrees here.", to: codexPlan)
+    #expect(
+      result.arguments.contains("developer_instructions=\"Be brief.\\n\\n\\nWorktrees here.\""))
+  }
+
+  @Test("A configuration's developer instructions are read in each TOML form")
+  func developerInstructionsForms() {
+    #expect(
+      CodexToolOptions.developerInstructions(in: "developer_instructions = \"a\\nb\"") == "a\nb")
+    #expect(
+      CodexToolOptions.developerInstructions(in: "developer_instructions='lit\\n'") == "lit\\n")
+    #expect(
+      CodexToolOptions.developerInstructions(in: "[x]\ndeveloper_instructions = \"no\"") == nil)
+    #expect(CodexToolOptions.developerInstructions(in: "model = \"m\"") == nil)
+  }
 }

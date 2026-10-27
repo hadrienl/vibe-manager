@@ -633,7 +633,9 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     let stamp = date.formatted(date: .abbreviated, time: .shortened)
     let title = String(
       localized: "separator.update", defaultValue: "Update", bundle: .module,
-      comment: "The title of the line a terminal shows above an agent restarted onto its updated CLI: a noun.")
+      comment:
+        "The title of the line a terminal shows above an agent restarted onto its updated CLI: a noun."
+    )
     let what = String(
       localized: "resumed conversation", bundle: .module,
       comment: "In the line a terminal shows above a restarted agent: how it was started.")

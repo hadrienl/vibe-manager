@@ -261,6 +261,8 @@ public final class AppEnvironment {
       at: hostLocation, executable: configuration.browserBridgeExecutable)
     let bridge = configuration.browserBridgeExecutable
     let socketPath = hostLocation.browserSocketPath
+    // Where the agents create their worktrees (#432), read at each launch.
+    let worktreeLocations = UserDefaultsWorktreeLocationPreferences(suiteName: data.defaultsSuite)
     let provideTools = ProvideAgentTools(
       agents: registry,
       setup: { [browserSettings] in
@@ -285,7 +287,8 @@ public final class AppEnvironment {
             name: CoordinationToolCatalog.serverName, executablePath: $0,
             arguments: BrowserBridge.arguments(socketPath: socketPath, server: .coordination))
         }
-      })
+      },
+      worktrees: { worktreeLocations.worktreeLocations })
     let launcher = SessionLauncher(
       supervisor: supervisor,
       repository: repository,
@@ -485,6 +488,7 @@ public final class AppEnvironment {
         store: FileCoordinationStore(
           directory: dataFolder.appendingPathComponent("Coordination", isDirectory: true)),
         preferences: UserDefaultsCoordinationPreferences(suiteName: data.defaultsSuite)),
+      worktrees: WorktreesModel(preferences: worktreeLocations),
       beep: { NSSound.beep() }
     )
     // The coordination tools are answered on the web view's channel (#352), for the processes of

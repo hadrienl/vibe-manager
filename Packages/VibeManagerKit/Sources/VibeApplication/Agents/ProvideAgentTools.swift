@@ -28,34 +28,49 @@ public struct ProvideAgentTools {
   /// The coordination tool server (#352), given to every session but a child; `nil` when there is
   /// none.
   private let coordination: @MainActor () -> AgentToolServer?
+  /// Where the agents create their worktrees (#432): Settings › Worktrees.
+  private let worktrees: @MainActor () -> WorktreeLocationSettings?
 
   public init(
     agents: any AgentProviderResolving, setup: @escaping @MainActor () -> Setup?,
-    coordination: @escaping @MainActor () -> AgentToolServer? = { nil }
+    coordination: @escaping @MainActor () -> AgentToolServer? = { nil },
+    worktrees: @escaping @MainActor () -> WorktreeLocationSettings? = { nil }
   ) {
     self.agents = agents
     self.setup = setup
     self.coordination = coordination
+    self.worktrees = worktrees
   }
 
   /// - Parameter session: the session launched. Every session but a child gets the coordination
   ///   tools on top of the web view's (#352), whether or not agents are given the web view: they
   ///   serve once the user turns coordination on, without a restart. A session it is on for is
-  ///   given the coordinator's instructions as well.
+  ///   given the coordinator's instructions as well. Every session is told where to create its
+  ///   worktrees (#432), in the same instructions: an agent takes them once.
   public func callAsFunction(_ plan: AgentLaunchPlan, for session: WorkSession? = nil) async
     -> AgentLaunchPlan
   {
     var plan = plan
+    var instructions: [String] = []
     if let session, CoordinationPolicy.mayCoordinate(session), let server = coordination() {
       let provider = await agents.provider(id: plan.providerID)
       if let serving = provider as? any AgentToolServing {
         plan = serving.providingTools([server], to: plan)
       }
-      if session.coordination?.isCoordinator == true,
-        let instructing = provider as? any AgentInstructing
-      {
-        plan = instructing.instructing(CoordinatorInstructions.text, to: plan)
+      if session.coordination?.isCoordinator == true {
+        instructions.append(CoordinatorInstructions.text)
       }
+    }
+    if let session, let settings = worktrees(),
+      let text = WorktreeInstructions.text(
+        for: session, agent: plan.providerID, settings: settings)
+    {
+      instructions.append(text)
+    }
+    if !instructions.isEmpty,
+      let instructing = await agents.provider(id: plan.providerID) as? any AgentInstructing
+    {
+      plan = instructing.instructing(instructions.joined(separator: "\n\n"), to: plan)
     }
     guard let setup = setup() else { return plan }
     var environment = setup.environment

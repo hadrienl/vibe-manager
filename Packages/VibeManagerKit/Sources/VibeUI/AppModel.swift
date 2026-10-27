@@ -745,6 +745,8 @@ public final class AppModel {
   public let appearancePalette: SessionAppearancePaletteModel
   /// Coordinators and their children (#352): settings, traces, wake-ups, who calls the user.
   public let coordination: CoordinationModel
+  /// Where the agents create their worktrees (#432): Settings › Worktrees.
+  public let worktrees: WorktreesModel
   /// The iPhone companion (#397), when this build carries it.
   public var companion: MobileCompanionModel?
 
@@ -843,12 +845,15 @@ public final class AppModel {
     appearancePalette: any SessionAppearancePaletteStore = InMemorySessionAppearancePaletteStore(),
     /// Coordinators and their children (#352). In memory by default.
     coordination: CoordinationModel = CoordinationModel(),
+    /// Settings › Worktrees (#432). In memory by default.
+    worktrees: WorktreesModel = WorktreesModel(),
     /// Says that a gesture did nothing. Silent in a workspace assembled without it: the tests run
     /// while the user works, and are not to be heard.
     beep: @escaping @MainActor () -> Void = {}
   ) {
     self.beep = beep
     self.coordination = coordination
+    self.worktrees = worktrees
     self.appearancePalette = SessionAppearancePaletteModel(store: appearancePalette)
     self.dropStore = dropStore
     self.journal = journal
