@@ -94,6 +94,8 @@ struct WorktreesSettingsView: View {
         worktrees.settings.exceptions[repository] = nil
       } label: {
         Image(systemName: "minus")
+          .frame(width: 20, height: 20)
+          .contentShape(Rectangle())
       }
       .buttonStyle(.borderless)
       .accessibilityLabel(Text("Remove", bundle: .module))
