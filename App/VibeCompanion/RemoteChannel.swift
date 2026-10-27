@@ -112,6 +112,8 @@ final class RemoteChannel {
     }
     if phase == .connecting || phase == .connected { phase = .idle }
     path = .unknown
+    // The next Mac says its own in its welcome.
+    macProtocolVersion = nil
   }
 
   private func connect(endpointID: String, relay: String?, attempt: Int) async {

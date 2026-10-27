@@ -58,7 +58,12 @@ struct ConversationView: View {
     .environment(\.conversationPalette, palette)
     .onChange(of: conversation?.theme) { _, theme in if let theme { lastTheme = theme } }
     .scrollDismissesKeyboard(.interactively)
-    .onGeometryChange(for: CGFloat.self, of: \.size.height) { height = $0 }
+    // The whole screen's, keyboard and request card aside: what the card may take of it does
+    // not move with the card itself.
+    .background {
+      Color.clear.ignoresSafeArea()
+        .onGeometryChange(for: CGFloat.self, of: \.size.height) { height = $0 }
+    }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 8) {
         if isWorking, conversation?.request == nil {
@@ -67,7 +72,7 @@ struct ConversationView: View {
             interrupt: { channel.interrupt(sessionID) })
         }
         if let request = conversation?.request {
-          RequestCard(request: request, sessionID: sessionID, maxHeight: height * 0.6)
+          RequestCard(request: request, sessionID: sessionID, maxHeight: height * 0.5)
             .padding(.horizontal, 12)
         }
         if let session, session.activity == .stopped {
@@ -474,7 +479,7 @@ extension Binding where Value == UIImage? {
 private struct RequestCard: View {
   let request: RemoteRequest
   let sessionID: String
-  /// Past it, the questions fold up, one open at a time, and the card scrolls if need be.
+  /// Past it, several questions fold up, one open at a time, and scroll if need be.
   let maxHeight: CGFloat
   @Environment(RemoteChannel.self) private var channel
   /// The choices taken and the words typed, by question.
@@ -482,6 +487,10 @@ private struct RequestCard: View {
   @State private var texts: [Int: String] = [:]
   /// The question unfolded when they fold up: the first unanswered one unless the user picks.
   @State private var opened: Int?
+  /// The questions' height, all open: measured off screen, so the card folds before it overflows.
+  @State private var openHeight: CGFloat = 0
+
+  private var isFolded: Bool { isSeveral && openHeight > maxHeight }
 
   private var questions: [RemoteQuestion] { request.shownQuestions }
   private var isSeveral: Bool { questions.count > 1 }
@@ -519,12 +528,12 @@ private struct RequestCard: View {
             choice.id == "allowOnce" ? AnyButtonStyle(.glassProminent) : AnyButtonStyle(.glass))
         }
       } else {
-        if isSeveral {
-          ViewThatFits(in: .vertical) {
-            questionList(folded: false)
-            questionList(folded: true)
-            ScrollView { questionList(folded: true) }
-          }
+        if isFolded {
+          ScrollView { questionList(folded: true) }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxHeight: maxHeight)
+        } else if isSeveral {
+          questionList(folded: false)
         } else if let question = questions.first {
           choices(of: question, at: 0)
         }
@@ -538,7 +547,15 @@ private struct RequestCard: View {
       }
     }
     .padding(14)
-    .frame(maxHeight: maxHeight)
+    .background {
+      if isSeveral {
+        questionList(folded: false)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(14)
+          .hidden()
+          .onGeometryChange(for: CGFloat.self, of: \.size.height) { openHeight = $0 }
+      }
+    }
     .glassEffect(.regular.tint(.orange.opacity(0.12)), in: .rect(cornerRadius: 20))
     .onChange(of: request.id) { _, _ in
       selections = [:]
@@ -553,32 +570,40 @@ private struct RequestCard: View {
       ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
         if index > 0 { Divider() }
         let isOpen = !folded || index == openedIndex
-        Button {
-          withAnimation(.snappy) { opened = index }
-        } label: {
-          HStack(alignment: .top) {
-            VStack(alignment: .leading, spacing: 2) {
-              if let header = question.header, !header.isEmpty {
-                Text(verbatim: header).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-              }
-              Text(verbatim: question.title).font(.subheadline.weight(.semibold))
-              if !isOpen, let summary = summary(of: question, at: index) {
-                Text(verbatim: summary).font(.caption).foregroundStyle(.tint).lineLimit(1)
-              }
-            }
-            Spacer(minLength: 0)
-            if folded {
+        if folded {
+          Button {
+            withAnimation(.snappy) { opened = index }
+          } label: {
+            HStack(alignment: .top) {
+              heading(of: question, at: index, isOpen: isOpen)
+              Spacer(minLength: 0)
               Image(systemName: isOpen ? "chevron.up" : "chevron.down")
                 .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
+            .contentShape(Rectangle())
           }
-          .contentShape(Rectangle())
+          .buttonStyle(.plain)
+        } else {
+          heading(of: question, at: index, isOpen: true)
         }
-        .buttonStyle(.plain)
-        .disabled(!folded)
         if isOpen { choices(of: question, at: index) }
       }
     }
+  }
+
+  /// A question's header and title, and its answer once folded.
+  private func heading(of question: RemoteQuestion, at index: Int, isOpen: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      if let header = question.header, !header.isEmpty {
+        Text(verbatim: header).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+      }
+      Text(verbatim: question.title).font(.subheadline.weight(.semibold))
+      if !isOpen, let summary = summary(of: question, at: index) {
+        Text(verbatim: summary).font(.caption).foregroundStyle(.tint).lineLimit(1)
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(.isHeader)
   }
 
   private var openedIndex: Int {
@@ -616,7 +641,8 @@ private struct RequestCard: View {
       .buttonStyle(.plain)
       .accessibilityAddTraits(selection.contains(choice.id) ? .isSelected : [])
     }
-    if question.allowsText {
+    // A question of several choices has no field on the Mac's dialog: words would not reach it.
+    if question.allowsText, !question.allowsSeveral {
       TextField(
         "Another answer…",
         text: Binding(get: { texts[index] ?? "" }, set: { texts[index] = $0 })

@@ -476,12 +476,15 @@ final class CompanionRemoteServer {
       var given: [AgentQuestionAnswer] = []
       for (question, answer) in zip(questions, answers) {
         let indices = answer.choiceIDs.compactMap(Int.init).filter(question.options.indices.contains)
-        if let text = answer.text, !text.isEmpty {
-          given.append(.text(text))
-        } else if question.allowsMultipleChoices, !indices.isEmpty {
+        let text = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        // The choices taken win over stray words; a question of several choices takes no words,
+        // its dialog has no field for them.
+        if question.allowsMultipleChoices, !indices.isEmpty {
           given.append(.options(Set(indices)))
         } else if let index = indices.first {
           given.append(.option(index))
+        } else if !text.isEmpty, !question.allowsMultipleChoices {
+          given.append(.text(text))
         } else {
           return nil
         }

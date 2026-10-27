@@ -118,12 +118,13 @@ func protocolOneRequest() throws {
   #expect(!CompanionRemote.takesAnswers(1))
   #expect(!CompanionRemote.takesAnswers(nil))
   #expect(CompanionRemote.takesAnswers(CompanionRemote.protocolVersion))
-  // A phone of protocol 1 skips the newer message rather than failing on it.
-  var bytes = RemoteFrame.encode(
-    .answers(sessionID: "S", requestID: "R", answers: [RemoteAnswer(choiceIDs: ["0"])]))
+  // A message the decoder does not know — as `answers` is to a phone of protocol 1 — is skipped
+  // rather than failing the stream.
+  let unknown = Data(#"{"futureCase":{"x":1}}"#.utf8)
+  var bytes = Data([0, 0, 0, UInt8(unknown.count)]) + unknown
   bytes.append(RemoteFrame.encode(.failure(.requestGone)))
   var decoder = RemoteFrame.Decoder()
-  #expect(try decoder.append(bytes).count == 2)
+  #expect(try decoder.append(bytes) == [.failure(.requestGone)])
 }
 
 @Test("An answer counts once it takes a choice or words")
