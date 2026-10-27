@@ -34,6 +34,8 @@ enum Entry {
       fullDiskAccess: TCCFullDiskAccessProbe())
     // The gateway between Claude Code or Codex and a model endpoint (#107).
     EndpointGatewayCommand.runIfRequested()
+    // A second application on the same data leaves here, before it touches anything (#436).
+    MainActor.assumeIsolated { SingleInstance.claim() }
     VibeManagerApp.main()
   }
 }

@@ -876,6 +876,14 @@ public final class AppEnvironment {
     let defaultsSuite: String?
   }
 
+  /// The runtime directory of the data this process would open: where its instance lock is (#436).
+  public static func hostLocation(
+    environment: [String: String] = ProcessInfo.processInfo.environment
+  ) -> TerminalHostLocation {
+    let data = dataLocation(environment: environment, defaultsSuite: nil)
+    return TerminalHostLocation(dataDirectory: data.store.deletingLastPathComponent())
+  }
+
   /// Where this copy of the application keeps what it writes.
   ///
   /// `VIBE_DATA_DIRECTORY` points a second copy at a folder of its own — its own store, its own
