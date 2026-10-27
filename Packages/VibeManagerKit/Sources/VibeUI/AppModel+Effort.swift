@@ -33,6 +33,11 @@ extension AppModel {
     let report = await provider.effortReport(
       resumeIdentifier: agent.resumeIdentifier, since: session.createdAt)
     let levels = await provider.effortLevels(modelID: agent.modelID ?? report.modelID)
+    // A model that offers no choice has no menu, as an agent without effort.
+    guard levels.count >= 2 else {
+      effortCells.set(nil, for: id)
+      return
+    }
     // What the transcript said before the process was started — with the level kept — or before
     // a level was given from here, is out of date.
     var said = report.effort

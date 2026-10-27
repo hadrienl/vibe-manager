@@ -164,6 +164,13 @@ struct CodexEffortReadingTests {
     #expect(await catalog.effortLevels(modelID: "gpt-old") == [])
     #expect(await catalog.models().map(\.id) == ["gpt-6", "gpt-old"])
   }
+
+  @Test("A model listing a single level offers no choice: no menu, /model never driven")
+  func singleLevel() {
+    #expect(CodexAgentProvider.offeredLevels(["high"]) == [])
+    #expect(CodexAgentProvider.offeredLevels(["low", "high"]) == ["low", "high"])
+    #expect(CodexAgentProvider.offeredLevels([]) == CodexAgentProvider.fallbackEffortLevels)
+  }
 }
 
 @Suite("Reasoning effort: the keys sent (#411)")

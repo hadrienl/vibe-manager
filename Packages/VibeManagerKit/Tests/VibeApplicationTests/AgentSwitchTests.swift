@@ -12,6 +12,10 @@ struct AgentSwitchTests {
     displayName: "Claude Code",
     models: [
       AgentModel(id: "opus", displayName: "Opus"), AgentModel(id: "sonnet", displayName: "Sonnet"),
+    ],
+    levels: [
+      "opus": ["low", "medium", "high", "xhigh", "max"],
+      "sonnet": ["low", "medium", "high", "xhigh"],
     ]
   )
   private static let codex = RestorationProvider(
@@ -108,6 +112,19 @@ struct AgentSwitchTests {
         "xhigh",
       ])
     #expect(planned.nextConfiguration.effort == "xhigh")
+  }
+
+  @Test("Another model that does not offer the level starts on its default effort (#411)")
+  func modelWithoutTheLevelDropsTheEffort() async throws {
+    var stored = session()
+    stored.agent?.effort = "max"
+    let (plan, _) = subject(stored)
+
+    let planned = try await plan(
+      id: stored.id, to: AgentTarget(providerID: "claude-code", modelID: "sonnet"))
+
+    #expect(!planned.plan.arguments.contains("--effort"))
+    #expect(planned.nextConfiguration.effort == nil)
   }
 
   @Test("Another agent starts on its own default effort: its levels are not the same (#411)")

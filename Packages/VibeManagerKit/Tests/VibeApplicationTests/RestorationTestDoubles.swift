@@ -132,6 +132,8 @@ struct RestorationProvider: AgentProvider {
   /// Raised only when a resume is asked for, as a CLI refusing a stored identifier would.
   let resumeFailure: AgentLaunchError?
   let catalog: [AgentModel]
+  /// The levels of reasoning effort of each model (#411).
+  let levels: [String: [String]]
 
   init(
     id: String = "stub",
@@ -144,8 +146,10 @@ struct RestorationProvider: AgentProvider {
       supportsResume: true
     ),
     launchFailure: AgentLaunchError? = nil,
-    resumeFailure: AgentLaunchError? = nil
+    resumeFailure: AgentLaunchError? = nil,
+    levels: [String: [String]] = [:]
   ) {
+    self.levels = levels
     descriptor = AgentDescriptor(
       id: AgentProviderID(id),
       displayName: displayName,
@@ -222,4 +226,13 @@ struct RestorationRegistry: AgentProviderResolving {
     }
     return result
   }
+}
+
+extension RestorationProvider: AgentEffortControlling {
+  func effortLevels(modelID: String?) async -> [String] { modelID.flatMap { levels[$0] } ?? [] }
+  var offersDefaultEffort: Bool { true }
+  func effortReport(resumeIdentifier: String?, since: Date) async -> AgentEffortReport {
+    AgentEffortReport()
+  }
+  func effortChange(to level: String?) -> AgentEffortChange? { nil }
 }

@@ -30,8 +30,14 @@ extension CodexAgentProvider: AgentEffortControlling {
     guard let model = modelID ?? effortReader.configuredReport().modelID else {
       return Self.fallbackEffortLevels
     }
-    let levels = await catalog.effortLevels(modelID: model)
-    return levels.isEmpty ? Self.fallbackEffortLevels : levels
+    return Self.offeredLevels(await catalog.effortLevels(modelID: model))
+  }
+
+  /// The levels offered for the levels the cache lists: none to choose between when it lists a
+  /// single one — no menu, and `/model` is never driven.
+  static func offeredLevels(_ listed: [String]) -> [String] {
+    if listed.isEmpty { return fallbackEffortLevels }
+    return listed.count < 2 ? [] : listed
   }
 
   public var offersDefaultEffort: Bool { false }
