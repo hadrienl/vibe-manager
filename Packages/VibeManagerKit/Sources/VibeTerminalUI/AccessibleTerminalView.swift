@@ -505,3 +505,34 @@ public enum TerminalText {
 private final class SilentTerminalDelegate: TerminalDelegate {
   func send(source: Terminal, data: ArraySlice<UInt8>) {}
 }
+
+/// Reads a terminal's screen again and again, as `TerminalText.screen(replaying:size:)` does,
+/// without replaying its whole history each time (#411): the history — megabytes, for an agent
+/// that worked a while — is replayed once, then only the output that followed it is fed.
+public actor TerminalScreenFollower {
+  private var terminal: Terminal?
+  private var size: TerminalSize?
+  /// Where the stream of output stands once what was fed is counted.
+  private var fedThrough = 0
+
+  public init() {}
+
+  public func screen(of history: TerminalHistorySnapshot, size: TerminalSize) -> String {
+    let start = fedThrough - history.startOffset
+    let terminal: Terminal
+    if let followed = self.terminal, self.size == size, (0...history.bytes.count).contains(start) {
+      terminal = followed
+      terminal.feed(byteArray: Array(history.bytes[start...]))
+    } else {
+      // The first read, a new size, or output dropped since: the history is replayed whole.
+      terminal = Terminal(
+        delegate: SilentTerminalDelegate(),
+        options: TerminalOptions(cols: size.columns, rows: size.rows, scrollback: 0))
+      terminal.feed(byteArray: history.bytes)
+      self.terminal = terminal
+      self.size = size
+    }
+    fedThrough = history.endOffset
+    return TerminalText.visibleScreen(of: terminal, keepingIndent: true)
+  }
+}

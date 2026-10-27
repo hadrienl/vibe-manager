@@ -15,6 +15,8 @@ public struct SessionDraft: Hashable, Sendable {
   /// `nil` means "let the agent decide", which is a real answer: both CLIs read a default from
   /// their own configuration, and neither guarantees a model catalogue exists to choose from.
   public var modelID: String?
+  /// The reasoning effort the agent is started with (#411); `nil` keeps its own default.
+  public var effort: String?
   /// `nil` means "not chosen yet", so the identity keeps following the name.
   public var appearance: SessionAppearance?
   public var workingDirectoryPath: String?
@@ -39,6 +41,7 @@ public struct SessionDraft: Hashable, Sendable {
     attachments: [URL] = [],
     providerID: String? = nil,
     modelID: String? = nil,
+    effort: String? = nil,
     appearance: SessionAppearance? = nil,
     workingDirectoryPath: String? = nil,
     templateFill: PromptTemplateFill? = nil,
@@ -53,6 +56,7 @@ public struct SessionDraft: Hashable, Sendable {
     self.attachments = attachments
     self.providerID = providerID
     self.modelID = modelID
+    self.effort = effort
     self.appearance = appearance
     self.workingDirectoryPath = workingDirectoryPath
     self.templateFill = templateFill
@@ -206,7 +210,9 @@ public struct SessionDraft: Hashable, Sendable {
       id: id,
       name: trimmedName,
       initialPrompt: effectivePrompt,
-      agent: providerID.map { SessionAgentConfiguration(providerID: $0, modelID: modelID) },
+      agent: providerID.map {
+        SessionAgentConfiguration(providerID: $0, modelID: modelID, effort: effort)
+      },
       appearance: effectiveAppearance,
       status: .closed,
       createdAt: createdAt,

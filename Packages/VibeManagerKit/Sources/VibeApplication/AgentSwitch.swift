@@ -200,19 +200,23 @@ public struct AgentSwitchPlan: Sendable {
   public let targetName: String
   public let plan: AgentLaunchPlan
   public let mode: AgentSwitchMode
+  /// The level of reasoning effort the session goes on with (#411), `nil` for the default.
+  public let effort: String?
 
   public init(
     session: WorkSession,
     target: AgentTarget,
     targetName: String,
     plan: AgentLaunchPlan,
-    mode: AgentSwitchMode
+    mode: AgentSwitchMode,
+    effort: String? = nil
   ) {
     self.session = session
     self.target = target
     self.targetName = targetName
     self.plan = plan
     self.mode = mode
+    self.effort = effort
   }
 
   /// The configuration the session will carry: the resumed conversation's identifier when it goes
@@ -232,8 +236,22 @@ public struct AgentSwitchPlan: Sendable {
       providerID: target.providerID,
       modelID: target.modelID,
       resumeIdentifier: identifier,
-      harnessID: harness
+      harnessID: harness,
+      effort: effort
     )
+  }
+
+  /// The effort the session goes on with (#411): the level it was given, when the new model
+  /// takes it — as the new session's draft keeps it. Another agent has levels of its own, and
+  /// another model may not offer that one: the session starts on its default.
+  static func carriedEffort(
+    from current: SessionAgentConfiguration?, to target: AgentTarget,
+    provider: any AgentProvider
+  ) async -> String? {
+    guard let current, current.providerID == target.providerID, let effort = current.effort,
+      let control = provider as? any AgentEffortControlling
+    else { return nil }
+    return await control.effortLevels(modelID: target.modelID).contains(effort) ? effort : nil
   }
 }
 
@@ -345,12 +363,15 @@ public struct PlanAgentSwitch: Sendable {
       throw AgentSwitchRefusal.workingDirectoryUnusable(path: path, status: status)
     }
 
+    let effort = await AgentSwitchPlan.carriedEffort(
+      from: current, to: target, provider: provider)
     func plan(prompt: String?, resume: AgentResumeRequest) async throws -> AgentLaunchPlan {
       do {
         return try await provider.launchPlan(
           for: AgentLaunchRequest(
             workingDirectoryPath: path,
             modelID: target.modelID,
+            effort: effort,
             initialPrompt: prompt,
             resume: resume
           )
@@ -365,7 +386,8 @@ public struct PlanAgentSwitch: Sendable {
         target: target,
         targetName: descriptor.displayName,
         plan: launch,
-        mode: mode
+        mode: mode,
+        effort: effort
       )
     }
 
@@ -388,6 +410,7 @@ public struct PlanAgentSwitch: Sendable {
           for: AgentLaunchRequest(
             workingDirectoryPath: path,
             modelID: target.modelID,
+            effort: effort,
             initialPrompt: nil,
             resume: .identifier(identifier),
             harnessID: current.harnessID

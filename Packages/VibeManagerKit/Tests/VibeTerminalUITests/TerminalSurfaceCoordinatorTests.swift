@@ -178,3 +178,45 @@ func hiddenPaneDoesNotPassTheKeyboardOn() {
   #expect(view.isHidden)
   #expect(window.firstResponder === window)
 }
+
+/// Waits for the pane to have been written to, however long a busy runner takes.
+@MainActor
+private func received(_ pane: TerminalPaneModel) async {
+  while !pane.hasReceivedInput { try? await Task.sleep(for: .milliseconds(5)) }
+}
+
+@MainActor
+@Test(
+  "What the terminal answers the program is not the user typing; a key is (#411)",
+  .timeLimit(.minutes(1))
+)
+func terminalRepliesAreNotKeystrokes() async {
+  let pane = makePaneModel(terminalID: TerminalID())
+  let coordinator = TerminalSurfaceCoordinator(pane: pane)
+  let view = TerminalView(frame: NSRect(x: 0, y: 0, width: 400, height: 200))
+  view.terminalDelegate = coordinator
+  // What Claude Code sends once a command is typed at its prompt: the terminal answers.
+  view.getTerminal().feed(text: "\u{1B}[?1004h\u{1B}[>0q\u{1B}[c")
+  view.getTerminal().setTerminalFocus(false)
+  await received(pane)
+  try? await Task.sleep(for: .milliseconds(50))
+  #expect(pane.lastKeyboardInputAt == nil)
+
+  coordinator.send(source: view, data: Array("a".utf8)[...])
+  while pane.lastKeyboardInputAt == nil { try? await Task.sleep(for: .milliseconds(5)) }
+}
+
+@Test(
+  "Answers and focus reports are told from keys",
+  arguments: [
+    ("\u{1B}[I", true), ("\u{1B}[O\u{1B}[I", true), ("\u{1B}[?62;22c", true),
+    ("\u{1B}[>0;276;0c", true), ("\u{1B}P>|SwiftTerm(1.2)\u{1B}\\", true),
+    ("\u{1B}]11;rgb:0000/0000/0000\u{07}", true), ("\u{1B}[?1004;1$y", true), ("\u{1B}[?0u", true),
+    ("\u{1B}[<35;102;57M", true), ("\u{1B}[<0;10;4M\u{1B}[<0;10;4m", true),
+    ("\u{1B}[M #!", true), ("\u{1B}[A", false), ("\u{1B}[M", false), ("\u{1B}", false),
+    ("a", false), ("\u{1B}[Ia", false), ("", false),
+    ("\u{1B}[1;2R", false), ("\u{1B}P>|unfinished", false),
+  ])
+func terminalReplies(_ text: String, _ isReply: Bool) {
+  #expect(TerminalReply.isReply(Array(text.utf8)) == isReply)
+}

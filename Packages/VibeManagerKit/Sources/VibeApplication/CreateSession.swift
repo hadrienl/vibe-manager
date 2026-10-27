@@ -220,6 +220,7 @@ public struct CreateSession: Sendable {
     var request = AgentLaunchRequest(
       workingDirectoryPath: path,
       modelID: draft.modelID,
+      effort: draft.effort,
       initialPrompt: prompt.isEmpty ? nil : draft.effectivePrompt,
       resume: .none
     )

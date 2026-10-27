@@ -179,6 +179,48 @@ enum DialogScreens {
     Enter to select · Tab/Arrow keys to navigate · Esc to cancel
     """
 
+  /// Codex 0.164.0's `/model`, its model chosen again, while Ultra is in force (#411): the cursor
+  /// on the last row, whose footer offers no `s`. Max in force draws the same rows.
+  static let codexLevelsUltraInForce = """
+    • Model changed to gpt-6.1-sol ultra for this session only
+
+      Select Reasoning Level for GPT-6.1-Sol
+
+      1. Low (default)              Fast responses with lighter reasoning
+      2. Medium                     Balances speed and reasoning depth for everyday tasks
+      3. High                       Greater reasoning depth for complex problems
+      4. Extra high                 Extra high reasoning depth for complex problems
+    › 5. More reasoning… (current)  Max and Ultra consume usage limits faster
+
+      enter select · esc back
+    """
+  /// While Max is in force, the cursor brought up to Medium: the footer of a level.
+  static let codexLevelsMaxInForceOnMedium = """
+    • Model changed to gpt-6.1-sol max for this session only
+
+      Select Reasoning Level for GPT-6.1-Sol
+
+      1. Low (default)              Fast responses with lighter reasoning
+    › 2. Medium                     Balances speed and reasoning depth for everyday tasks
+      3. High                       Greater reasoning depth for complex problems
+      4. Extra high                 Extra high reasoning depth for complex problems
+      5. More reasoning… (current)  Max and Ultra consume usage limits faster
+
+      enter default · s session · esc back
+    """
+  /// The panel behind More reasoning, while Max is in force.
+  static let codexAdvancedMaxInForce = """
+    • Model changed to gpt-6.1-sol max for this session only
+
+      Advanced Reasoning
+      ⚠ Consumes usage limits faster
+
+    › 1. Max (current)  For difficult problems when quality matters more than speed · higher usage
+      2. Ultra          For demanding work using multiple agents · highest usage
+
+      enter default · s session · esc back
+    """
+
   static func dialog(_ text: String) -> AgentDialogScreen? { AgentDialogScreen(screen: text) }
 }
 

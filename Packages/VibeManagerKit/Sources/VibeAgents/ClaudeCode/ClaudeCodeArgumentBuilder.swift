@@ -38,6 +38,10 @@ public struct ClaudeCodeArgumentBuilder: CommandLineAgentArgumentBuilder {
       arguments.append(contentsOf: ["--model", try Self.validatedModelID(modelID)])
     }
 
+    if let effort = request.effort.flatMap(AgentEffortLevel.argument) {
+      arguments.append(contentsOf: ["--effort", effort])
+    }
+
     switch promptDelivery {
     case .none, .typedOnceReady:
       break

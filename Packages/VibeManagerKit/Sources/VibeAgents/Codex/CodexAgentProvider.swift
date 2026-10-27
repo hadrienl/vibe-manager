@@ -54,25 +54,29 @@ public struct CodexAgentProvider: AgentProvider {
   )
 
   private let base: CommandLineAgentProvider
-  private let catalog: any CodexModelCatalogSource
+  let catalog: any CodexModelCatalogSource
   private let discovery: any CodexSessionDiscovering
   /// Asks the CLI for its skills (#219).
   let appServer: any CodexAppServerConnecting
   /// Where its rollouts were found, shared with the branch report (#276).
   let transcriptLocations: TranscriptLocationCache
+  /// What its rollouts and `config.toml` say of the reasoning effort (#411).
+  let effortReader: CodexEffortReader
 
   public init(
     base: CommandLineAgentProvider,
     catalog: any CodexModelCatalogSource,
     discovery: any CodexSessionDiscovering,
     appServer: any CodexAppServerConnecting = CodexAppServerProcess(),
-    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
+    effortReader: CodexEffortReader = CodexEffortReader()
   ) {
     self.base = base
     self.catalog = catalog
     self.discovery = discovery
     self.appServer = appServer
     self.transcriptLocations = transcriptLocations
+    self.effortReader = effortReader
   }
 
   /// Wires the provider to the real file system, the real process probe and the user's
@@ -111,7 +115,8 @@ public struct CodexAgentProvider: AgentProvider {
       ),
       catalog: CodexModelCatalog(environment: environment),
       discovery: CodexRolloutSessionDiscovery(environment: environment),
-      transcriptLocations: transcriptLocations
+      transcriptLocations: transcriptLocations,
+      effortReader: CodexEffortReader(environment: environment)
     )
   }
 

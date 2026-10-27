@@ -175,15 +175,19 @@ public struct SessionAgentConfiguration: Hashable, Codable, Sendable {
   /// at launch rather than looked up in the endpoint's settings, which may have changed since.
   /// `nil` for Claude Code, Codex and every conversation stored before it existed.
   public var harnessID: String?
+  /// The reasoning effort the application last gave the agent (#411), passed again at each launch.
+  /// `nil` is the agent's own default, as for the model: nothing is passed.
+  public var effort: String?
 
   public init(
     providerID: String, modelID: String? = nil, resumeIdentifier: String? = nil,
-    harnessID: String? = nil
+    harnessID: String? = nil, effort: String? = nil
   ) {
     self.providerID = providerID
     self.modelID = modelID
     self.resumeIdentifier = resumeIdentifier
     self.harnessID = harnessID
+    self.effort = effort
   }
 
   /// The agent whose transcripts this conversation left: the harness of an endpoint, the agent

@@ -687,3 +687,21 @@ func endpointHarnessIsStored() async throws {
   #expect(reloaded.first?.agent?.harnessID == "codex")
   #expect(reloaded.first?.agent?.transcriptProviderID == "codex")
 }
+
+@Test("The effort given to a session's agent is kept in the store, and absent when none was (#411)")
+func agentEffortIsStored() async throws {
+  let storeURL = try makeStoreURL()
+  defer { try? FileManager.default.removeItem(at: storeURL.deletingLastPathComponent()) }
+  let given = WorkSession(
+    name: "Effort",
+    agent: SessionAgentConfiguration(providerID: "claude-code", effort: "xhigh"))
+  let untouched = WorkSession(
+    name: "Default", agent: SessionAgentConfiguration(providerID: "claude-code"))
+  try await FileSessionRepository(storeURL: storeURL).save(given)
+  try await FileSessionRepository(storeURL: storeURL).save(untouched)
+  let reloaded = try await FileSessionRepository(storeURL: storeURL).sessions()
+  #expect(reloaded.first { $0.id == given.id }?.agent?.effort == "xhigh")
+  #expect(reloaded.first { $0.id == untouched.id }?.agent?.effort == nil)
+  let text = try String(contentsOf: storeURL, encoding: .utf8)
+  #expect(text.components(separatedBy: "\"effort\"").count == 2)
+}

@@ -231,8 +231,9 @@ public final class TerminalSurfaceCoordinator: NSObject, TerminalViewDelegate {
         let pane = self.pane
         switch command {
         case .write(let bytes):
-          // Typed by the user in the terminal: nothing is typed over it meanwhile (#352).
-          pane.noteKeyboardInput()
+          // Typed by the user in the terminal: nothing is typed over it meanwhile (#352). What
+          // the terminal answers the program on its own is not the user's (#411).
+          if !TerminalReply.isReply(bytes) { pane.noteKeyboardInput() }
           await pane.write(bytes)
         case .answer(let bytes):
           await pane.write(bytes)

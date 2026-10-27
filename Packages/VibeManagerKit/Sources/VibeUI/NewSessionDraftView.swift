@@ -207,6 +207,9 @@ public struct NewSessionDraftView: View {
       }
       onboarding?.send(.folderChosen)
     }
+    .onChange(of: model.draft.modelID) {
+      Task { await model.loadEffortLevels() }
+    }
     .onChange(of: model.draft.initialPrompt) {
       if !model.draft.trimmedPrompt.isEmpty { onboarding?.send(.promptTyped) }
     }
@@ -284,6 +287,7 @@ public struct NewSessionDraftView: View {
       VStack(alignment: .leading, spacing: 14) {
         agentField
         modelField
+        effortField
         moreOptions
       }
       .tourAnchor(.draftOptions)
@@ -520,6 +524,33 @@ public struct NewSessionDraftView: View {
       .labelsHidden()
       .frame(maxWidth: 280, alignment: .leading)
       .disabled(model.models.isEmpty)
+    }
+  }
+
+  /// The agent's reasoning effort at launch (#411), its levels for the chosen model.
+  @ViewBuilder
+  private var effortField: some View {
+    if !model.effortLevels.isEmpty {
+      LabeledField(
+        Text("Reasoning effort", bundle: .module, comment: "The status bar's menu, for VoiceOver."),
+        issues: []
+      ) {
+        Picker(selection: $model.draft.effort) {
+          Text(
+            "Default", bundle: .module,
+            comment: "The agent's own reasoning effort, in the status bar's menu."
+          )
+          .tag(String?.none)
+          ForEach(model.effortLevels, id: \.self) { level in
+            EffortStatusMenu.name(of: level).tag(String?.some(level))
+          }
+        } label: {
+          Text(
+            "Reasoning effort", bundle: .module, comment: "The status bar's menu, for VoiceOver.")
+        }
+        .labelsHidden()
+        .frame(maxWidth: 280, alignment: .leading)
+      }
     }
   }
 
