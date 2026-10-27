@@ -24,6 +24,8 @@ final class RemoteChannel {
 
   private(set) var phase = Phase.idle
   private(set) var macName: String?
+  /// The protocol the Mac said it speaks, at its welcome.
+  private(set) var macProtocolVersion: Int?
   private(set) var sessions: [RemoteSession] = []
   private(set) var conversation: RemoteConversation?
   private(set) var searchResults: [RemoteSearchResult] = []
@@ -110,6 +112,8 @@ final class RemoteChannel {
     }
     if phase == .connecting || phase == .connected { phase = .idle }
     path = .unknown
+    // The next Mac says its own in its welcome.
+    macProtocolVersion = nil
   }
 
   private func connect(endpointID: String, relay: String?, attempt: Int) async {
@@ -181,8 +185,9 @@ final class RemoteChannel {
   private func apply(_ message: RemoteMessage, attempt: Int) {
     guard self.attempt == attempt else { return }
     switch message {
-    case .welcome(_, let macName):
+    case .welcome(let version, let macName):
       self.macName = macName
+      macProtocolVersion = version
     case .sessions(let sessions):
       self.sessions = sessions
     case .conversation(let conversation):
@@ -218,7 +223,7 @@ final class RemoteChannel {
       createdSessionID = id
     case .failure(let reason):
       failure = reason
-    case .hello, .show, .send, .sendFiles, .answer, .setStatus, .search, .newSessionOptions,
+    case .hello, .show, .send, .sendFiles, .answer, .answers, .setStatus, .search, .newSessionOptions,
       .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart,
       .httpRequest, .folderIcon, .close:
       break
@@ -255,6 +260,16 @@ final class RemoteChannel {
 
   func answer(_ request: RemoteRequest, in sessionID: String, choiceIDs: [String], text: String?) {
     write(.answer(sessionID: sessionID, requestID: request.id, choiceIDs: choiceIDs, text: text))
+  }
+
+  /// One answer per question (#428); to a Mac of protocol 1, which shows a single question, the
+  /// first only.
+  func answer(_ request: RemoteRequest, in sessionID: String, answers: [RemoteAnswer]) {
+    if CompanionRemote.takesAnswers(macProtocolVersion) {
+      write(.answers(sessionID: sessionID, requestID: request.id, answers: answers))
+    } else if let first = answers.first {
+      answer(request, in: sessionID, choiceIDs: first.choiceIDs, text: first.text)
+    }
   }
 
   func setStatus(_ status: RemoteTaskStatus, of sessionID: String) {

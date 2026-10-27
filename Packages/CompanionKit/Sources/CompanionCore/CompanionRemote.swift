@@ -3,8 +3,14 @@ import Foundation
 /// What the phone and the Mac say over the direct channel (#399, #400): the phone drives the Mac's
 /// sessions as the Mac's own window does. Plain values, framed as the application's link is.
 public enum CompanionRemote {
-  public static let protocolVersion = 1
-  /// The channel's protocol, offered at the iroh handshake beside the trials' echo.
+  /// 2: a request carries all its questions, and `answers` answers each (#428). Both ends still
+  /// read version 1: a Mac of version 1 gets `answer`, which it knows, and the phone shows a
+  /// version 1 request's single question.
+  public static let protocolVersion = 2
+  /// Whether a Mac speaking `version` reads `answers`.
+  public static func takesAnswers(_ version: Int?) -> Bool { (version ?? 1) >= 2 }
+  /// The channel's protocol, offered at the iroh handshake beside the trials' echo. Unchanged by
+  /// `protocolVersion`: both ends read the other's older messages.
   public static let alpn = "vibe-manager/remote/1"
 }
 
@@ -128,7 +134,49 @@ public struct RemoteChoice: Codable, Hashable, Sendable, Identifiable {
   }
 }
 
+/// One question of a request: the agent may ask several at once (#428).
+public struct RemoteQuestion: Codable, Hashable, Sendable {
+  /// The agent's short tag for it — "Action", "Checks".
+  public var header: String?
+  public var title: String
+  public var choices: [RemoteChoice]
+  /// The agent takes several of the choices at once.
+  public var allowsSeveral: Bool
+  /// The agent takes words of the user's own besides the choices.
+  public var allowsText: Bool
+
+  public init(
+    header: String? = nil, title: String, choices: [RemoteChoice], allowsSeveral: Bool = false,
+    allowsText: Bool = false
+  ) {
+    self.header = header
+    self.title = title
+    self.choices = choices
+    self.allowsSeveral = allowsSeveral
+    self.allowsText = allowsText
+  }
+}
+
+/// The answer to one question: the choices taken, or the user's own words.
+public struct RemoteAnswer: Codable, Hashable, Sendable {
+  public var choiceIDs: [String]
+  public var text: String?
+
+  public init(choiceIDs: [String], text: String? = nil) {
+    self.choiceIDs = choiceIDs
+    self.text = text
+  }
+
+  /// Whether it answers anything.
+  public var isGiven: Bool {
+    !choiceIDs.isEmpty || !(text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+  }
+}
+
 /// What the agent waits for the user on, with the choices to answer it.
+///
+/// A question's `title`, `subject`, `choices`, `allowsSeveral` and `allowsText` say its first
+/// question, for a phone of protocol 1; `questions` says them all.
 public struct RemoteRequest: Codable, Hashable, Sendable {
   public enum Kind: String, Codable, Hashable, Sendable {
     case permission, question
@@ -146,10 +194,12 @@ public struct RemoteRequest: Codable, Hashable, Sendable {
   public var allowsSeveral: Bool
   /// The agent takes words of the user's own besides the choices.
   public var allowsText: Bool
+  /// Every question, in order; empty for a permission, and from a Mac of protocol 1.
+  public var questions: [RemoteQuestion]
 
   public init(
     id: String, kind: Kind, title: String, subject: String? = nil, choices: [RemoteChoice],
-    allowsSeveral: Bool = false, allowsText: Bool = false
+    allowsSeveral: Bool = false, allowsText: Bool = false, questions: [RemoteQuestion] = []
   ) {
     self.id = id
     self.kind = kind
@@ -158,6 +208,43 @@ public struct RemoteRequest: Codable, Hashable, Sendable {
     self.choices = choices
     self.allowsSeveral = allowsSeveral
     self.allowsText = allowsText
+    self.questions = questions
+  }
+
+  /// A question request of its questions: the first one's words also said the way protocol 1 does.
+  public init(id: String, questions: [RemoteQuestion]) {
+    let first = questions.first
+    self.init(
+      id: id, kind: .question, title: first?.title ?? "", subject: first?.header,
+      choices: first?.choices ?? [], allowsSeveral: first?.allowsSeveral ?? false,
+      allowsText: first?.allowsText ?? false, questions: questions)
+  }
+
+  /// The questions to show: those listed, or the single one a Mac of protocol 1 says.
+  public var shownQuestions: [RemoteQuestion] {
+    guard kind == .question else { return [] }
+    if !questions.isEmpty { return questions }
+    return [
+      RemoteQuestion(
+        header: subject, title: title, choices: choices, allowsSeveral: allowsSeveral,
+        allowsText: allowsText)
+    ]
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case id, kind, title, subject, choices, allowsSeveral, allowsText, questions
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.container(keyedBy: CodingKeys.self)
+    id = try container.decode(String.self, forKey: .id)
+    kind = try container.decode(Kind.self, forKey: .kind)
+    title = try container.decode(String.self, forKey: .title)
+    subject = try container.decodeIfPresent(String.self, forKey: .subject)
+    choices = try container.decode([RemoteChoice].self, forKey: .choices)
+    allowsSeveral = try container.decode(Bool.self, forKey: .allowsSeveral)
+    allowsText = try container.decode(Bool.self, forKey: .allowsText)
+    questions = try container.decodeIfPresent([RemoteQuestion].self, forKey: .questions) ?? []
   }
 }
 
@@ -570,7 +657,10 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case send(sessionID: String, text: String)
   /// A message with files: they join the conversation's composer on the Mac, as dropped there.
   case sendFiles(sessionID: String, text: String, files: [RemoteFile])
+  /// Protocol 1's answer: a permission's choice, or a single question's.
   case answer(sessionID: String, requestID: String, choiceIDs: [String], text: String?)
+  /// One answer per question, in order, for a Mac of protocol 2 (#428).
+  case answers(sessionID: String, requestID: String, answers: [RemoteAnswer])
   case setStatus(sessionID: String, status: RemoteTaskStatus)
   case search(query: String, token: Int)
   case newSessionOptions

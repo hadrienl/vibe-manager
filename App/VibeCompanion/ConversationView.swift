@@ -9,6 +9,8 @@ struct ConversationView: View {
   let sessionID: String
   @Environment(RemoteChannel.self) private var channel
   @State private var draft = ""
+  /// The screen's height: what a request's card may take of it.
+  @State private var height: CGFloat = 800
   @FocusState private var fieldFocused: Bool
   /// The files joined to the next message.
   @State private var files: [RemoteFile] = []
@@ -56,6 +58,12 @@ struct ConversationView: View {
     .environment(\.conversationPalette, palette)
     .onChange(of: conversation?.theme) { _, theme in if let theme { lastTheme = theme } }
     .scrollDismissesKeyboard(.interactively)
+    // The whole screen's, keyboard and request card aside: what the card may take of it does
+    // not move with the card itself.
+    .background {
+      Color.clear.ignoresSafeArea()
+        .onGeometryChange(for: CGFloat.self, of: \.size.height) { height = $0 }
+    }
     .safeAreaInset(edge: .bottom, spacing: 0) {
       VStack(spacing: 8) {
         if isWorking, conversation?.request == nil {
@@ -64,7 +72,7 @@ struct ConversationView: View {
             interrupt: { channel.interrupt(sessionID) })
         }
         if let request = conversation?.request {
-          RequestCard(request: request, sessionID: sessionID)
+          RequestCard(request: request, sessionID: sessionID, maxHeight: height * 0.5)
             .padding(.horizontal, 12)
         }
         if let session, session.activity == .stopped {
@@ -467,19 +475,31 @@ extension Binding where Value == UIImage? {
   }
 }
 
-/// A permission or a question, answered here as on the Mac.
+/// A permission or questions, answered here as on the Mac: one answer per question, sent together.
 private struct RequestCard: View {
   let request: RemoteRequest
   let sessionID: String
+  /// Past it, several questions fold up, one open at a time, and scroll if need be.
+  let maxHeight: CGFloat
   @Environment(RemoteChannel.self) private var channel
-  @State private var selection: Set<String> = []
-  @State private var text = ""
+  /// The choices taken and the words typed, by question.
+  @State private var selections: [Int: Set<String>] = [:]
+  @State private var texts: [Int: String] = [:]
+  /// The question unfolded when they fold up: the first unanswered one unless the user picks.
+  @State private var opened: Int?
+  /// The questions' height, all open: measured off screen, so the card folds before it overflows.
+  @State private var openHeight: CGFloat = 0
+
+  private var isFolded: Bool { isSeveral && openHeight > maxHeight }
+
+  private var questions: [RemoteQuestion] { request.shownQuestions }
+  private var isSeveral: Bool { questions.count > 1 }
 
   var body: some View {
     VStack(alignment: .leading, spacing: 12) {
       Label {
         Group {
-          if request.title.isEmpty {
+          if isSeveral || request.title.isEmpty {
             Text(request.kind == .permission ? "Allow this command?" : "The agent asks you")
           } else {
             Text(verbatim: request.title)
@@ -490,7 +510,7 @@ private struct RequestCard: View {
         Image(systemName: request.kind == .permission ? "checkmark.shield" : "questionmark.bubble")
       }
       .foregroundStyle(.orange)
-      if let subject = request.subject {
+      if !isSeveral, let subject = request.subject {
         Text(verbatim: subject)
           .font(.footnote.monospaced())
           .padding(10)
@@ -508,45 +528,145 @@ private struct RequestCard: View {
             choice.id == "allowOnce" ? AnyButtonStyle(.glassProminent) : AnyButtonStyle(.glass))
         }
       } else {
-        ForEach(request.choices) { choice in
+        if isFolded {
+          ScrollView { questionList(folded: true) }
+            .scrollBounceBehavior(.basedOnSize)
+            .frame(maxHeight: maxHeight)
+        } else if isSeveral {
+          questionList(folded: false)
+        } else if let question = questions.first {
+          choices(of: question, at: 0)
+        }
+        Button {
+          channel.answer(request, in: sessionID, answers: answers)
+        } label: {
+          Text(isSeveral ? "Send Answers" : "Answer").frame(maxWidth: .infinity, minHeight: 30)
+        }
+        .buttonStyle(.glassProminent)
+        .disabled(!answers.allSatisfy(\.isGiven))
+      }
+    }
+    .padding(14)
+    .background {
+      if isSeveral {
+        questionList(folded: false)
+          .fixedSize(horizontal: false, vertical: true)
+          .padding(14)
+          .hidden()
+          .onGeometryChange(for: CGFloat.self, of: \.size.height) { openHeight = $0 }
+      }
+    }
+    .glassEffect(.regular.tint(.orange.opacity(0.12)), in: .rect(cornerRadius: 20))
+    .onChange(of: request.id) { _, _ in
+      selections = [:]
+      texts = [:]
+      opened = nil
+    }
+  }
+
+  /// Every question open, or folded up to its title and answer, all but one.
+  private func questionList(folded: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 12) {
+      ForEach(Array(questions.enumerated()), id: \.offset) { index, question in
+        if index > 0 { Divider() }
+        let isOpen = !folded || index == openedIndex
+        if folded {
           Button {
-            toggle(choice.id)
+            withAnimation(.snappy) { opened = index }
           } label: {
-            HStack(alignment: .top, spacing: 10) {
-              Image(systemName: selection.contains(choice.id) ? "checkmark.circle.fill" : "circle")
-                .foregroundStyle(.tint)
-              VStack(alignment: .leading, spacing: 2) {
-                Text(verbatim: choice.label).font(.subheadline.weight(.semibold))
-                if let detail = choice.detail {
-                  Text(verbatim: detail).font(.caption).foregroundStyle(.secondary)
-                }
-              }
+            HStack(alignment: .top) {
+              heading(of: question, at: index, isOpen: isOpen)
               Spacer(minLength: 0)
+              Image(systemName: isOpen ? "chevron.up" : "chevron.down")
+                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
             }
             .contentShape(Rectangle())
           }
           .buttonStyle(.plain)
+        } else {
+          heading(of: question, at: index, isOpen: true)
         }
-        if request.allowsText {
-          TextField("Another answer…", text: $text)
-            .textFieldStyle(.roundedBorder)
-        }
-        Button {
-          channel.answer(
-            request, in: sessionID, choiceIDs: Array(selection),
-            text: text.isEmpty ? nil : text)
-        } label: {
-          Text("Answer").frame(maxWidth: .infinity, minHeight: 30)
-        }
-        .buttonStyle(.glassProminent)
-        .disabled(selection.isEmpty && text.isEmpty)
+        if isOpen { choices(of: question, at: index) }
       }
     }
-    .padding(14)
-    .glassEffect(.regular.tint(.orange.opacity(0.12)), in: .rect(cornerRadius: 20))
-    .onChange(of: request.id) { _, _ in
-      selection = []
-      text = ""
+  }
+
+  /// A question's header and title, and its answer once folded.
+  private func heading(of question: RemoteQuestion, at index: Int, isOpen: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 2) {
+      if let header = question.header, !header.isEmpty {
+        Text(verbatim: header).font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+      }
+      Text(verbatim: question.title).font(.subheadline.weight(.semibold))
+      if !isOpen, let summary = summary(of: question, at: index) {
+        Text(verbatim: summary).font(.caption).foregroundStyle(.tint).lineLimit(1)
+      }
+    }
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(.isHeader)
+  }
+
+  private var openedIndex: Int {
+    opened ?? answers.firstIndex { !$0.isGiven } ?? 0
+  }
+
+  /// What a folded question was answered: its choices' labels, or the words typed.
+  private func summary(of question: RemoteQuestion, at index: Int) -> String? {
+    if let text = texts[index], !text.isEmpty { return text }
+    let chosen = selections[index] ?? []
+    let labels = question.choices.filter { chosen.contains($0.id) }.map(\.label)
+    return labels.isEmpty ? nil : labels.formatted(.list(type: .and))
+  }
+
+  @ViewBuilder
+  private func choices(of question: RemoteQuestion, at index: Int) -> some View {
+    let selection = selections[index] ?? []
+    ForEach(question.choices) { choice in
+      Button {
+        toggle(choice.id, of: question, at: index)
+      } label: {
+        HStack(alignment: .top, spacing: 10) {
+          Image(systemName: Self.symbol(chosen: selection.contains(choice.id), of: question))
+            .foregroundStyle(.tint)
+          VStack(alignment: .leading, spacing: 2) {
+            Text(verbatim: choice.label).font(.subheadline.weight(.semibold))
+            if let detail = choice.detail {
+              Text(verbatim: detail).font(.caption).foregroundStyle(.secondary)
+            }
+          }
+          Spacer(minLength: 0)
+        }
+        .contentShape(Rectangle())
+      }
+      .buttonStyle(.plain)
+      .accessibilityAddTraits(selection.contains(choice.id) ? .isSelected : [])
+    }
+    // A question of several choices has no field on the Mac's dialog: words would not reach it.
+    if question.allowsText, !question.allowsSeveral {
+      TextField(
+        "Another answer…",
+        text: Binding(get: { texts[index] ?? "" }, set: { texts[index] = $0 })
+      )
+      .textFieldStyle(.roundedBorder)
+    }
+  }
+
+  /// Rounds for a single choice, boxes for several, as on the Mac.
+  static func symbol(chosen: Bool, of question: RemoteQuestion) -> String {
+    switch (question.allowsSeveral, chosen) {
+    case (true, true): "checkmark.square.fill"
+    case (true, false): "square"
+    case (false, true): "checkmark.circle.fill"
+    case (false, false): "circle"
+    }
+  }
+
+  /// One per question, in order.
+  private var answers: [RemoteAnswer] {
+    questions.indices.map { index in
+      let text = texts[index] ?? ""
+      return RemoteAnswer(
+        choiceIDs: Array(selections[index] ?? []).sorted(), text: text.isEmpty ? nil : text)
     }
   }
 
@@ -560,11 +680,19 @@ private struct RequestCard: View {
     }
   }
 
-  private func toggle(_ id: String) {
-    if request.allowsSeveral {
+  private func toggle(_ id: String, of question: RemoteQuestion, at index: Int) {
+    var selection = selections[index] ?? []
+    if question.allowsSeveral {
       if selection.contains(id) { selection.remove(id) } else { selection.insert(id) }
     } else {
       selection = [id]
+    }
+    selections[index] = selection
+    // A single choice answers its question: the next unanswered one unfolds.
+    if !question.allowsSeveral, opened == index || opened == nil {
+      withAnimation(.snappy) {
+        opened = answers.indices.first { $0 != index && !answers[$0].isGiven } ?? index
+      }
     }
   }
 }
