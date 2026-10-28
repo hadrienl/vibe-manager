@@ -503,17 +503,29 @@ public actor TrackAgentActivity {
     return named == id && tracked.state.requests.first?.id == id
   }
 
+  /// Whether the request is still a dialog of the session's start: guessed, or read off its screen.
+  public func waitsOnStartupDialog(_ id: AgentRequestID) -> Bool {
+    guard let request = sessions[id.sessionID]?.state.requests.first(where: { $0.id == id }),
+      case .inTerminal(let prompt) = request.content
+    else { return false }
+    return Self.startupKinds.contains(prompt.kind)
+  }
+
+  private static let startupKinds: Set<AgentTerminalPrompt.Kind> = [.startup, .update, .trust]
+
   /// The dialog a session's start waits on, read off its screen: one the keymap answers —
   /// an update offered, a folder to trust — takes the place of the request that only guessed a dialog is there; the
-  /// prompt at rest says there is none.
+  /// prompt at rest says there is none, or none any more — a resumed session restores its
+  /// conversation, a dialog answered in the terminal goes.
   public func startupDialogOnScreen(_ text: String, isFor id: AgentRequestID) {
     guard var tracked = sessions[id.sessionID], let keymap = tracked.decoder?.answerKeymap,
       let index = tracked.state.requests.firstIndex(where: { $0.id == id }),
       case .inTerminal(let guessed) = tracked.state.requests[index].content,
-      guessed.kind == .startup
+      Self.startupKinds.contains(guessed.kind)
     else { return }
     let previous = tracked.state
     if let prompt = keymap.startupDialog(onScreen: text) {
+      guard prompt != guessed else { return }
       tracked.state.requests[index].content = .inTerminal(prompt)
     } else if keymap.showsPromptAtRest(onScreen: text) {
       tracked.state.requests.remove(at: index)

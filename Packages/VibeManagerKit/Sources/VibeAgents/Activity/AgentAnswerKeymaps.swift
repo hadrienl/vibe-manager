@@ -120,6 +120,13 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
     }
   }
 
+  /// Its prompt between two rules, no panel over it: a resumed Claude Code waits on nothing, its
+  /// hooks silent until the first turn.
+  public func showsPromptAtRest(onScreen text: String) -> Bool {
+    !AgentPanelRecognition.showsPanel(screen: text)
+      && PromptInputRecognition.input(screen: text) != nil
+  }
+
   public func keystrokes(
     for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
   ) -> [[UInt8]]? {

@@ -14,6 +14,8 @@ struct RequestPalette: View {
   @FocusState private var focusedRequest: AgentRequestID?
   /// ⌥⌘P was pressed, and no card has taken the keyboard yet: the palette may still be unfolding.
   @State private var wantsFocus = false
+  /// The height of the cards, laid out whole.
+  @State private var cardsHeight: CGFloat = 0
   @Namespace private var rotor
   @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -83,19 +85,20 @@ struct RequestPalette: View {
     VStack(spacing: 0) {
       header(count: requests.count)
       Divider()
-      ViewThatFits(in: .vertical) {
-        cards(requests)
-        ScrollViewReader { proxy in
-          ScrollView {
-            cards(requests)
-          }
-          .onChange(of: focusedRequest) { _, id in
-            guard let id else { return }
-            withAnimation(reduceMotion ? nil : .snappy) { proxy.scrollTo(id) }
-          }
+      // As tall as its cards, up to `maxHeight`: offered all the height it may take, a lazy stack
+      // took it, its one card adrift in the middle.
+      ScrollViewReader { proxy in
+        ScrollView {
+          cards(requests)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { cardsHeight = $0 }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .onChange(of: focusedRequest) { _, id in
+          guard let id else { return }
+          withAnimation(reduceMotion ? nil : .snappy) { proxy.scrollTo(id) }
         }
       }
-      .frame(maxHeight: maxHeight)
+      .frame(height: min(cardsHeight, maxHeight))
       if let outcome = model.requestOutcome { OutcomeLine(model: model, outcome: outcome) }
     }
     .background(.regularMaterial)
