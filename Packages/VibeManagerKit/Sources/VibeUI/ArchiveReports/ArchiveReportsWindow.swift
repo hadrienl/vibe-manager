@@ -434,8 +434,9 @@ private struct SessionReportRow: View {
       }
       .accessibilityElement(children: .contain)
       ForEach(session.entries) { entry in
+        // Not selectable: selectable lines were at times drawn upside down (#443). Copy and
+        // Export give the text.
         Text(verbatim: "• \(entry.text)")
-          .textSelection(.enabled)
       }
       if session.olderEntryCount > 0 {
         Text(text.olderEntries(session.olderEntryCount))
