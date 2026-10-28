@@ -341,6 +341,23 @@ struct DialogScreenKeymapTests {
       codex.answers(for: .inTerminal(AgentTerminalPrompt(kind: .startup, message: nil))).isEmpty)
   }
 
+  @Test("Claude Code's prompt at rest, between its rules: no dialog of its start waits")
+  func claudePromptAtRest() {
+    let resumed = """
+      ⏺ Le déploiement est terminé.
+
+      ────────────────────────────────────────────────────────────────
+      ❯\u{0020}
+      ────────────────────────────────────────────────────────────────
+        ? for shortcuts
+      """
+    #expect(claude.showsPromptAtRest(onScreen: resumed))
+    #expect(claude.startupDialog(onScreen: resumed) == nil)
+    #expect(!claude.showsPromptAtRest(onScreen: DialogScreens.claudeTrust))
+    #expect(!claude.showsPromptAtRest(onScreen: DialogScreens.claudeBash))
+    #expect(!claude.showsPromptAtRest(onScreen: "Resuming conversation…"))
+  }
+
   @Test("Codex's prompt at rest: no dialog of its start waits; a dialog's pointer is not it")
   func codexPromptAtRest() {
     #expect(codex.showsPromptAtRest(onScreen: DialogScreens.codexAtRest))

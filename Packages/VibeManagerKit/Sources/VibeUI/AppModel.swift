@@ -201,6 +201,9 @@ public final class AppModel {
   @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var postedRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var announcedRequestIDs: Set<AgentRequestID> = []
+  /// The guesses of a dialog at a start whose screen has been read once: shown only then, a
+  /// resumed session's prompt at rest taking the guess away before anyone sees it.
+  var readStartupGuesses: Set<AgentRequestID> = []
   /// While the requests read back at launch, or replayed, are taken in: they were there before,
   /// and make no alert sound (#393).
   @ObservationIgnored var isReadingRestoredRequests = false
@@ -495,7 +498,7 @@ public final class AppModel {
   }
 
   /// A restoration under way, from the first session to the last.
-  public private(set) var restoration: Restoration?
+  public internal(set) var restoration: Restoration?
   /// Sessions an unexpected stop left behind, offered rather than resumed.
   public private(set) var restoreOffer: RestoreOffer?
   /// Another copy of the application holds these sessions. Nothing was reconciled, nothing taken.
@@ -2740,6 +2743,8 @@ public final class AppModel {
   func finishRestore(with outcomes: [SessionRestoreOutcome]) async {
     restoration = nil
     restoreTask = nil
+    // The dialogs of the starts held back meanwhile come together.
+    requestsDidChange()
 
     let lines = outcomes.compactMap { outcome -> RestoreReport.Line? in
       guard let sentence = outcome.sentence else { return nil }

@@ -104,6 +104,13 @@ private struct ScreenKeymap: AgentAnswerKeymap {
     return paths.isEmpty ? nil : AgentDrawnDialog(.patch(Set(paths)))
   }
 
+  /// `trust: <folder>`: the folder's trust, asked as the CLI starts.
+  func startupDialog(onScreen text: String) -> AgentTerminalPrompt? {
+    text.split(separator: "\n").last(where: { $0.hasPrefix("trust: ") }).map {
+      AgentTerminalPrompt(kind: .trust, message: String($0.dropFirst(7)))
+    }
+  }
+
   /// `› ` alone on the last line: the prompt, waiting for words.
   func showsPromptAtRest(onScreen text: String) -> Bool {
     text.split(separator: "\n").last == "› "
@@ -206,6 +213,27 @@ struct DialogOnScreenTests {
     let state = await fixture.tracker.state(for: fixture.id)
     #expect(state?.requests.isEmpty == true)
     #expect(state?.activity == .idle)
+  }
+
+  @Test("A dialog of the start is read while it waits: drawn late, then gone once answered")
+  func startupDialogFollowed() async throws {
+    let clock = TestClock(t1)
+    let fixture = Fixture(clock: clock)
+    await fixture.tracker.processStarted(fixture.id, decoder: CodexLikeDecoder())
+    clock.advance(11)
+    await fixture.tracker.tick()
+    let guessed = try #require(await fixture.tracker.state(for: fixture.id)?.requests.first)
+    // Nothing drawn yet, as a resumed session restores its conversation.
+    await fixture.screen.show("Resuming…")
+    let following = Task { await fixture.answer.followStartupDialog(guessed.id) }
+    await fixture.screen.show("trust: /p")
+    let trust = AgentRequestContent.inTerminal(AgentTerminalPrompt(kind: .trust, message: "/p"))
+    #expect(await eventually(fixture.tracker, fixture.id) { $0?.requests.first?.content == trust })
+    // Answered in the terminal, by a key the tracker never saw: the prompt takes the card away.
+    await fixture.screen.show("Resumed.\n› ")
+    await following.value
+    #expect(await fixture.tracker.state(for: fixture.id)?.requests.isEmpty == true)
+    #expect(await !fixture.tracker.waitsOnStartupDialog(guessed.id))
   }
 
   @Test("A wrapped command is the command, however the terminal broke its lines")

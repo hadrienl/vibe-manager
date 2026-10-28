@@ -69,12 +69,24 @@ extension AppModel {
 
   /// Every request waiting, the session on screen's included: the Dock counts them all, the user
   /// may be in another application.
+  /// A dialog of a start shows once its screen was read — a guess only, the prompt at rest may
+  /// take it away — and once every session to restore has started: they come together, not one
+  /// after the other as the queue reaches them.
+  private func showsStartupDialog(_ request: AgentRequest) -> Bool {
+    guard case .inTerminal(let prompt) = request.content,
+      [.startup, .update, .trust].contains(prompt.kind)
+    else { return true }
+    guard restoration == nil else { return false }
+    return prompt.kind != .startup || readStartupGuesses.contains(request.id)
+  }
+
   var allPendingRequests: [PendingRequest] {
     var result: [PendingRequest] = []
     for session in sessions where session.taskStatus != .archived {
       guard let requests = activity(for: session.id)?.requests, !requests.isEmpty else { continue }
       let folder = RestartSession.workingDirectoryPath(of: session)
       for (position, request) in requests.enumerated() {
+        guard showsStartupDialog(request) else { continue }
         result.append(
           PendingRequest(
             request: request,

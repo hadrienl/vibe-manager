@@ -125,6 +125,22 @@ public struct AnswerAgentRequest: Sendable {
     await tracker.startupDialogOnScreen(text, isFor: id)
   }
 
+  /// Reads the dialog of a session's start again and again, as long as it waits: it may be drawn
+  /// after the guess, and it goes when answered in the terminal — the card with it.
+  public func followStartupDialog(_ id: AgentRequestID) async {
+    while await tracker.waitsOnStartupDialog(id), !Task.isCancelled {
+      await readStartupDialog(id)
+      do {
+        try await sleep(Self.startupDialogPollInterval)
+      } catch {
+        return
+      }
+    }
+  }
+
+  /// How often the screen of a start that waits is read again.
+  public static let startupDialogPollInterval: Duration = .seconds(1)
+
   /// Whether the dialog, read again, asks for `keys` and nothing else — waited for up to
   /// `settleLimit`, the key before having to be read and drawn first.
   private func screenAsks(_ keys: [[UInt8]], of answer: AgentAnswer, to id: AgentRequestID) async

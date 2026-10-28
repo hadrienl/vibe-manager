@@ -57,8 +57,9 @@ extension AppModel {
   }
 
   /// A dialog of the start is guessed to wait: its screen says which, when it is one that can be
-  /// answered from here — Codex's update offered, Claude Code's folder to trust — or that there is none, the prompt at rest. Read
-  /// once, as the guess is made: by then the dialog is drawn.
+  /// answered from here — Codex's update offered, Claude Code's folder to trust — or that there is
+  /// none, the prompt at rest. Read as the guess is made, then again while it waits: a dialog
+  /// drawn late is read, one answered in the terminal goes.
   private func readStartupDialog(of state: AgentActivityState, previous: AgentActivityState?) {
     func startup(_ state: AgentActivityState?) -> AgentRequestID? {
       guard let request = state?.requests.first, case .inTerminal(let prompt) = request.content,
@@ -67,7 +68,13 @@ extension AppModel {
       return request.id
     }
     guard let id = startup(state), startup(previous) != id, let answerRequest else { return }
-    Task { await answerRequest.readStartupDialog(id) }
+    Task { [weak self] in
+      await answerRequest.readStartupDialog(id)
+      self?.readStartupGuesses.insert(id)
+      self?.requestsDidChange()
+      await answerRequest.followStartupDialog(id)
+      self?.readStartupGuesses.remove(id)
+    }
   }
 
   /// Follows the application coming to the front and leaving it. Not the scene's phase: on macOS
