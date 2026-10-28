@@ -10,7 +10,8 @@
 #
 # Signed by Apple: `-allowProvisioningUpdates` with an App Store Connect API key creates the
 # distribution certificate and the profiles of the application and of its notification extension
-# in the cloud. The key needs the role App Manager (the notarization key's Developer is not enough):
+# in the cloud. The key needs the role Admin, the only one allowed cloud-managed distribution
+# signing (App Manager fails with "Cloud signing permission error"; the notarization key is Developer):
 #   ASC_API_KEY_P8                  the key, as base64
 #   ASC_API_KEY_ID, ASC_API_ISSUER_ID
 # By hand, without them, Xcode's signed-in account does the same.

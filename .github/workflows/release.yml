@@ -57,7 +57,7 @@ jobs:
         run: Scripts/release.sh "${GITHUB_REF_NAME#v}"
 
   # The mobile companion's iOS application, on TestFlight for the same tag: built while the Mac
-  # application is notarized. Signed by Apple with an App Store Connect API key (role App Manager).
+  # application is notarized. Signed by Apple with an App Store Connect API key (role Admin).
   testflight:
     runs-on: xcode-27
     timeout-minutes: 45
