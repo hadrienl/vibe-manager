@@ -824,6 +824,17 @@ private struct ArchivedSessionsBar: View {
   }
 }
 
+/// The band under the archived sessions: glass on macOS 26, the bar's fill before (#443).
+private struct ReportsBandGlass: ViewModifier {
+  func body(content: Content) -> some View {
+    if #available(macOS 26, *) {
+      content.glassEffect(.regular, in: .rect)
+    } else {
+      content.background(.bar)
+    }
+  }
+}
+
 private struct ArchivedSessionsList: View {
   let model: AppModel
   /// Several archived sessions can be unarchived at once (#77). A click on one alone shows it.
@@ -831,90 +842,91 @@ private struct ArchivedSessionsList: View {
 
   var body: some View {
     let archived = model.archivedSessions
-    Group {
-      if archived.isEmpty {
-        ContentUnavailableView {
-          Label(
-            LocalizedStringResource("No archived session", bundle: .module),
-            systemImage: SessionTaskStatus.archived.symbolName)
-        } description: {
-          Text(
-            "Sessions archived from Done land here. Nothing is ever deleted.", bundle: .module)
-        }
-      } else {
-        VStack(spacing: 0) {
-          // No gesture on the rows: it would keep the clicks the list needs to select (#96).
-          List(archived, selection: $selection) { session in
-            HStack(spacing: 8) {
-              SessionBadge(
-                appearance: session.appearance,
-                icon: model.icons.image(for: session.appearance.iconID))
-              VStack(alignment: .leading, spacing: 1) {
-                Text(session.name)
-                  .lineLimit(1)
-                if let archivedAt = session.archivedAt {
-                  Text(archivedAt, style: .date)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+    VStack(spacing: 0) {
+      Group {
+        if archived.isEmpty {
+          ContentUnavailableView {
+            Label(
+              LocalizedStringResource("No archived session", bundle: .module),
+              systemImage: SessionTaskStatus.archived.symbolName)
+          } description: {
+            Text(
+              "Sessions archived from Done land here. Nothing is ever deleted.", bundle: .module)
+          }
+        } else {
+          VStack(spacing: 0) {
+            // No gesture on the rows: it would keep the clicks the list needs to select (#96).
+            List(archived, selection: $selection) { session in
+              HStack(spacing: 8) {
+                SessionBadge(
+                  appearance: session.appearance,
+                  icon: model.icons.image(for: session.appearance.iconID))
+                VStack(alignment: .leading, spacing: 1) {
+                  Text(session.name)
+                    .lineLimit(1)
+                  if let archivedAt = session.archivedAt {
+                    Text(archivedAt, style: .date)
+                      .font(.caption)
+                      .foregroundStyle(.secondary)
+                  }
+                }
+                Spacer(minLength: 6)
+                Button(LocalizedStringResource("Unarchive", bundle: .module)) {
+                  Task { await model.restore(session.id) }
+                }
+                .controlSize(.small)
+              }
+              .contentShape(Rectangle())
+              .accessibilityAction(named: Text("Show", bundle: .module)) {
+                model.showArchived(session.id)
+              }
+            }
+            .listStyle(.plain)
+            .contextMenu(forSelectionType: SessionID.self) { ids in
+              let plan = model.batchPlan(.unarchive, for: ordered(ids, in: archived))
+              if ids.count > 1, !plan.isEmpty {
+                Button(model.batchTitle(for: plan)) { Task { await model.requestBatch(plan) } }
+              } else if let id = ids.first {
+                // Shown in the main area, and edited in the inspector's header (#183).
+                Button(
+                  LocalizedStringResource("Rename", bundle: .module, comment: "Renames a session.")
+                ) {
+                  editArchived(id) { model.beginRename(id, in: .inspector) }
+                }
+                Button(LocalizedStringResource("Change Icon…", bundle: .module)) {
+                  editArchived(id) { model.beginAppearanceEditing(id, in: .inspector) }
+                }
+                Button(LocalizedStringResource("Change Conversation Theme…", bundle: .module)) {
+                  editArchived(id) { model.beginThemeEditing(id, in: .inspector) }
+                }
+                Divider()
+                Button(LocalizedStringResource("Unarchive", bundle: .module)) {
+                  Task { await model.restore(id) }
                 }
               }
-              Spacer(minLength: 6)
-              Button(LocalizedStringResource("Unarchive", bundle: .module)) {
-                Task { await model.restore(session.id) }
-              }
-              .controlSize(.small)
             }
-            .contentShape(Rectangle())
-            .accessibilityAction(named: Text("Show", bundle: .module)) {
-              model.showArchived(session.id)
+            .onChange(of: selection) { _, ids in
+              if ids.count == 1, let id = ids.first { model.showArchived(id) }
             }
-          }
-          .listStyle(.plain)
-          .contextMenu(forSelectionType: SessionID.self) { ids in
-            let plan = model.batchPlan(.unarchive, for: ordered(ids, in: archived))
-            if ids.count > 1, !plan.isEmpty {
-              Button(model.batchTitle(for: plan)) { Task { await model.requestBatch(plan) } }
-            } else if let id = ids.first {
-              // Shown in the main area, and edited in the inspector's header (#183).
-              Button(
-                LocalizedStringResource("Rename", bundle: .module, comment: "Renames a session.")
-              ) {
-                editArchived(id) { model.beginRename(id, in: .inspector) }
-              }
-              Button(LocalizedStringResource("Change Icon…", bundle: .module)) {
-                editArchived(id) { model.beginAppearanceEditing(id, in: .inspector) }
-              }
-              Button(LocalizedStringResource("Change Conversation Theme…", bundle: .module)) {
-                editArchived(id) { model.beginThemeEditing(id, in: .inspector) }
-              }
+            let plan = model.batchPlan(.unarchive, for: ordered(selection, in: archived))
+            if selection.count > 1, !plan.isEmpty {
               Divider()
-              Button(LocalizedStringResource("Unarchive", bundle: .module)) {
-                Task { await model.restore(id) }
+              HStack {
+                Spacer()
+                Button(model.batchTitle(for: plan)) {
+                  Task { await model.requestBatch(plan) }
+                  selection = []
+                }
+                .controlSize(.small)
+                .accessibilityIdentifier("unarchive-selection")
               }
+              .padding(8)
             }
-          }
-          .onChange(of: selection) { _, ids in
-            if ids.count == 1, let id = ids.first { model.showArchived(id) }
-          }
-          let plan = model.batchPlan(.unarchive, for: ordered(selection, in: archived))
-          if selection.count > 1, !plan.isEmpty {
-            Divider()
-            HStack {
-              Spacer()
-              Button(model.batchTitle(for: plan)) {
-                Task { await model.requestBatch(plan) }
-                selection = []
-              }
-              .controlSize(.small)
-              .accessibilityIdentifier("unarchive-selection")
-            }
-            .padding(8)
           }
         }
       }
-    }
-    .safeAreaInset(edge: .bottom, spacing: 0) {
-      // What was archived, batch by batch (#408).
+      // What was archived, batch by batch (#408). Below the list rather than over it: the rows
+      // no longer scroll under the button (#443).
       if model.archiveReports != nil {
         VStack(spacing: 0) {
           Divider()
@@ -933,6 +945,7 @@ private struct ArchivedSessionsList: View {
           }
           .padding(8)
         }
+        .modifier(ReportsBandGlass())
       }
     }
     .frame(width: 320, height: 300)

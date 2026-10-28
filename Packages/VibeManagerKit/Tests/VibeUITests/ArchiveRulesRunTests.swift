@@ -310,8 +310,13 @@ struct ArchiveRulesRunTests {
     let ids = sessions.map(\.id)
     let confirmation = try #require(model.confirmation(for: model.batchPlan(.archive, for: ids)))
     #expect(confirmation.summarizeTitle != nil)
+    var opened = 0
+    model.showArchiveReportsWindow = { opened += 1 }
     await model.confirmBatch(confirmation, summarizing: true)
     let batch = try #require(reports.batches.first)
+    // The paragraph is written in the background: its report opens, where it appears (#443).
+    #expect(opened == 1)
+    #expect(reports.selection == .batch(batch.id))
     #expect(reports.batches.count == 1)
     #expect(batch.kind == .selection)
     #expect(Set(batch.sessions.map(\.name)) == ["Red", "Blue"])
@@ -326,7 +331,10 @@ struct ArchiveRulesRunTests {
     let reports = try #require(model.archiveReports)
     let confirmation = try #require(
       model.confirmation(for: model.batchPlan(.archive, for: sessions.map(\.id))))
+    var opened = 0
+    model.showArchiveReportsWindow = { opened += 1 }
     await model.confirmBatch(confirmation)
+    #expect(opened == 0)
     #expect(reports.batches.first?.kind == .selection)
     #expect(reports.synthesizing.isEmpty)
     #expect(reports.batches.first?.synthesis == nil)

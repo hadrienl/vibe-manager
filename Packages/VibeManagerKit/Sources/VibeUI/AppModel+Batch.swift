@@ -399,8 +399,10 @@ extension AppModel {
         let archived = current.eligible.filter { results[$0]?.isDone == true }.compactMap {
           photos[$0]
         }
-        _ = await archiveReports?.recordRun(
+        let batch = await archiveReports?.recordRun(
           kind: .selection, date: date, sessions: archived, summarizing: summarizing)
+        // The paragraph is written in the background: its report opens, where it appears (#443).
+        if summarizing, let batch { showArchiveReport(batch.id) }
       }
       // One ⌘Z brings the whole batch back, the session on screen selected again (#242).
       sidebarHistory.record(
