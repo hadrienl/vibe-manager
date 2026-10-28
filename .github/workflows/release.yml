@@ -7,10 +7,8 @@ on:
   push:
     tags: ["v*"]
 
-permissions:
-  contents: write
-  # To check that CI went green on the tagged commit.
-  actions: read
+# Each job asks for what it needs.
+permissions: {}
 
 concurrency:
   group: release-${{ github.ref }}
@@ -20,6 +18,10 @@ jobs:
   release:
     runs-on: xcode-27
     timeout-minutes: 60
+    permissions:
+      contents: write
+      # To check that CI went green on the tagged commit.
+      actions: read
     # The signing secrets live in this environment only. Protect it with a required reviewer and
     # restrict it to `v*` tags (Settings → Environments → release): no job reads them without that
     # approval.
@@ -59,6 +61,8 @@ jobs:
   testflight:
     runs-on: xcode-27
     timeout-minutes: 45
+    permissions:
+      contents: read
     environment: release
     steps:
       - name: Check out the tagged commit
