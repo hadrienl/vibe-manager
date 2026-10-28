@@ -23,6 +23,8 @@ public final class UsageModel {
   public private(set) var report = UsageReport()
   /// The whole usage of each session shown in the inspector.
   public private(set) var sessionUsage: [SessionID: SessionUsage] = [:]
+  /// The context of the current conversation of each session shown in the inspector (#407).
+  public private(set) var contextWindows: [SessionID: ContextWindowUsage] = [:]
   public private(set) var isReading = false
   public private(set) var isTrackingEnabled = true
   /// When the first run was recorded: running time and runs start there, tokens do not.
@@ -34,6 +36,10 @@ public final class UsageModel {
 
   private let service: UsageService
   private var sessions: () -> [WorkSession] = { [] }
+  /// The name and declared window of the endpoint a conversation went through, if any.
+  private var endpointWindow: (SessionAgentConfiguration) -> (name: String, window: Int?)? = {
+    _ in nil
+  }
   /// How many views show every session (the window), and how many show each one.
   private var everythingWatchers = 0
   private var sessionWatchers: [SessionID: Int] = [:]
@@ -49,8 +55,14 @@ public final class UsageModel {
   }
 
   /// Where the sessions come from: the workspace's own list, archived ones included.
-  public func connect(sessions: @escaping () -> [WorkSession]) {
+  public func connect(
+    sessions: @escaping () -> [WorkSession],
+    endpointWindow: @escaping (SessionAgentConfiguration) -> (name: String, window: Int?)? = {
+      _ in nil
+    }
+  ) {
     self.sessions = sessions
+    self.endpointWindow = endpointWindow
   }
 
   /// Settles what the previous run of the application left open, once the terminal host has
@@ -121,7 +133,27 @@ public final class UsageModel {
     isReading = true
     await service.refreshTokens(for: watchedSessions)
     isReading = false
+    await refreshContexts(sessions().filter { sessionWatchers[$0.id] != nil })
     await recompute()
+  }
+
+  /// Reads the context of a session again, if it is on screen: its agent just ended a turn.
+  public func agentTurnEnded(_ id: SessionID) {
+    guard sessionWatchers[id] != nil, let session = sessions().first(where: { $0.id == id })
+    else { return }
+    Task { await refreshContexts([session]) }
+  }
+
+  private func refreshContexts(_ shown: [WorkSession]) async {
+    for session in shown {
+      var usage = await service.contextWindow(for: session)
+      if let agent = session.agent, let endpoint = endpointWindow(agent) {
+        usage = usage?.declared(
+          by: endpoint.name, window: endpoint.window,
+          harnessIsCodex: agent.harnessID == "codex")
+      }
+      contextWindows[session.id] = usage
+    }
   }
 
   /// A change of period or grouping replaces the computation under way, so an earlier one that
@@ -154,6 +186,7 @@ public final class UsageModel {
   public func setTracking(_ enabled: Bool) async {
     await service.setTracking(enabled)
     await loadTracking()
+    if !enabled { contextWindows = [:] }
     if enabled { await refresh() } else { await recompute() }
   }
 
@@ -178,6 +211,17 @@ public final class UsageModel {
     }
     if !isTrackingEnabled { return .trackingOff }
     return .noTranscript
+  }
+
+  /// Why a session shows no context, when it shows none.
+  public func contextUnavailability(for session: WorkSession) -> ContextWindowUnavailability? {
+    if !isTrackingEnabled { return .trackingOff }
+    if let agent = session.agent, let reporting = reportingProviderIDs,
+      !reporting.contains(agent.providerID)
+    {
+      return .notReportedByAgent
+    }
+    return contextWindows[session.id] == nil ? .noResponseYet : nil
   }
 }
 

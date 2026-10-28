@@ -18,7 +18,10 @@ struct SessionUsageSection: View {
       isTrackingEnabled: usage.isTrackingEnabled,
       runsRecordedSince: usage.runsRecordedSince.flatMap { $0 > session.createdAt ? $0 : nil },
       tokenUnavailability: usage.tokenUnavailability(for: session),
-      agentNames: agentNames)
+      agentNames: agentNames,
+      context: usage.contextWindows[session.id],
+      contextUnavailability: usage.contextUnavailability(for: session),
+      contextAgentName: session.agent.flatMap { agentNames[$0.transcriptProviderID] })
   }
 }
 
@@ -35,12 +38,19 @@ struct SessionUsageFigures: View {
   /// Why the session shows no tokens, when it has figures but no reported token.
   let tokenUnavailability: UsageUnavailability?
   let agentNames: [String: String]
+  /// The context of the current conversation (#407), or why there is none.
+  var context: ContextWindowUsage?
+  var contextUnavailability: ContextWindowUnavailability?
+  /// The CLI that reported the context, for its source.
+  var contextAgentName: String?
 
   /// The labels follow it in `Text`; the values are said in the same language.
   @Environment(\.locale) private var locale
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
+      SessionContextWindowLine(
+        usage: context, unavailability: contextUnavailability, agentName: contextAgentName)
       if !isTrackingEnabled {
         InspectorLine(
           label: Text(Self.usageTitle),
@@ -149,12 +159,156 @@ struct SessionUsageFigures: View {
   }
 }
 
+/// How much of its window the current conversation fills (#407): a bar and its share when the
+/// window is known, the tokens alone when it is not, and why when there is nothing to show —
+/// never a zero.
+struct SessionContextWindowLine: View {
+  let usage: ContextWindowUsage?
+  let unavailability: ContextWindowUnavailability?
+  let agentName: String?
+
+  @Environment(\.locale) private var locale
+
+  /// Beyond it, the bar changes hue. Not orange: it says an agent waits for the user (ADR 0024).
+  static let almostFullPercent = 80
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: 3) {
+      if let usage, unavailability == nil {
+        InspectorLine(
+          label: Text(Self.title), value: UsagePresentation.context(usage),
+          help: source(usage), accessibilityValue: spoken(usage))
+        if let percent = usage.percentUsed {
+          let isAlmostFull = percent > Self.almostFullPercent
+          ProgressView(value: Double(percent), total: 100)
+            .progressViewStyle(.linear)
+            .tint(isAlmostFull ? Color.red : Color.accentColor)
+            .accessibilityHidden(true)
+          if let threshold = usage.compactionThreshold {
+            caption(
+              isAlmostFull
+                ? String(
+                  localized: LocalizedStringResource(
+                    "Automatic compaction soon", locale: locale, bundle: .module,
+                    comment: "The conversation nears the size at which its agent compacts it."))
+                : String(
+                  localized: LocalizedStringResource(
+                    "Compacted automatically at \(UsagePresentation.tokens(threshold))",
+                    locale: locale, bundle: .module,
+                    comment: "The size at which the agent compacts the conversation: “167 k”.")))
+          }
+        } else {
+          caption(
+            String(
+              localized: LocalizedStringResource(
+                "Window size unknown for this model", locale: locale, bundle: .module,
+                comment: "Why the context shows no share: the agent does not say its window.")))
+        }
+        if let compaction = usage.lastCompaction {
+          caption(compacted(compaction, now: usage))
+        }
+      } else {
+        InspectorLine(
+          label: Text(Self.title), value: "—",
+          help: reason(unavailability ?? .noResponseYet))
+        caption(reason(unavailability ?? .noResponseYet))
+      }
+    }
+  }
+
+  static var title: LocalizedStringResource {
+    LocalizedStringResource(
+      "Context", bundle: .module, comment: "A model's context window, in tokens.")
+  }
+
+  private func caption(_ text: String) -> some View {
+    Text(text)
+      .font(.caption)
+      .foregroundStyle(.secondary)
+      .fixedSize(horizontal: false, vertical: true)
+  }
+
+  private func reason(_ reason: ContextWindowUnavailability) -> String {
+    switch reason {
+    case .trackingOff: UsagePresentation.unavailable(.trackingOff, locale: locale)
+    case .notReportedByAgent: UsagePresentation.unavailable(.notReportedByAgent, locale: locale)
+    case .noResponseYet:
+      String(
+        localized: LocalizedStringResource(
+          "No answer read yet", locale: locale, bundle: .module,
+          comment: "Why the context is unknown: the conversation has not answered yet."))
+    }
+  }
+
+  private func source(_ usage: ContextWindowUsage) -> String {
+    if usage.isEstimate, let window = usage.windowSize, let threshold = usage.compactionThreshold {
+      let name = usage.model ?? agentName ?? "—"
+      return String(
+        localized: LocalizedStringResource(
+          "Estimate: a window of \(UsagePresentation.tokens(window)) for \(name), compacted automatically at \(UsagePresentation.tokens(threshold))",
+          locale: locale, bundle: .module,
+          comment: "How the context share was deduced: window size, model or agent, threshold."
+        ))
+    }
+    return switch usage.source {
+    case .declaredByEndpoint(let name):
+      String(
+        localized: LocalizedStringResource(
+          "Window size declared by the endpoint “\(name)”", locale: locale, bundle: .module,
+          comment: "Where the context window comes from: an endpoint's name."))
+    case .reportedByCLI, nil:
+      String(
+        localized: LocalizedStringResource(
+          "Reported by \(agentName ?? "—")", locale: locale, bundle: .module,
+          comment: "Where the context comes from: an agent's name, such as Codex."))
+    }
+  }
+
+  private func compacted(_ compaction: ContextWindowUsage.Compaction, now usage: ContextWindowUsage)
+    -> String
+  {
+    let formatter = RelativeDateTimeFormatter()
+    formatter.locale = locale
+    formatter.unitsStyle = .short
+    let when = formatter.localizedString(for: compaction.date, relativeTo: Date())
+    if let before = compaction.tokensBefore, usage.measuredAt > compaction.date {
+      let from = UsagePresentation.tokens(before)
+      let to = UsagePresentation.tokens(usage.usedTokens)
+      return String(
+        localized: LocalizedStringResource(
+          "Compacted \(when) (\(from) → \(to))", locale: locale, bundle: .module,
+          comment: "When the conversation was compacted, then its context before and after."))
+    }
+    return String(
+      localized: LocalizedStringResource(
+        "Compacted \(when)", locale: locale, bundle: .module,
+        comment: "When the conversation was compacted, such as “12 min ago”."))
+  }
+
+  /// “92,000 tokens of 167,000 before compaction, 55%”: the figures whole, for VoiceOver.
+  private func spoken(_ usage: ContextWindowUsage) -> String {
+    let used = usage.usedTokens.formatted(.number.locale(locale))
+    if let threshold = usage.compactionThreshold, let percent = usage.percentUsed {
+      let size = threshold.formatted(.number.locale(locale))
+      return String(
+        localized: LocalizedStringResource(
+          "\(used) tokens of \(size) before compaction, \(percent)%", locale: locale,
+          bundle: .module,
+          comment: "The context, read by VoiceOver: tokens used, compaction size, share used."))
+    }
+    return String(
+      localized: LocalizedStringResource(
+        "\(used) tokens", locale: locale, bundle: .module,
+        comment: "The context, read by VoiceOver: a number of tokens."))
+  }
+}
+
 /// A label and its value, with an explanation on hover and for VoiceOver.
 ///
 /// The value goes beside its label when both fit on one line; else, when it has parts, a part per
 /// line beside its label; else under its label. It ends on the right edge in every case, so the
 /// values of a section stay aligned whichever way each line is laid out.
-private struct InspectorLine: View {
+struct InspectorLine: View {
   let label: Text
   let value: String
   /// The value in parts, each short enough for a line of its own: runs, tokens.
@@ -164,6 +318,8 @@ private struct InspectorLine: View {
   var partPerLine = true
   var help: String?
   var font: Font = .callout
+  /// What VoiceOver says when it differs from what is shown.
+  var accessibilityValue: String?
 
   var body: some View {
     ViewThatFits(in: .horizontal) {
@@ -177,7 +333,7 @@ private struct InspectorLine: View {
     .instantTooltip(help ?? "")
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(label)
-    .accessibilityValue(value)
+    .accessibilityValue(accessibilityValue ?? value)
     .accessibilityHint(help ?? "")
   }
 

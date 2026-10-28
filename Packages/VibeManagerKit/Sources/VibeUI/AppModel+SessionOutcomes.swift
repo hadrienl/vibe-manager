@@ -32,6 +32,9 @@ extension AppModel {
   ) {
     coordinationActivityChanged(id, from: previous, to: state, isReplayed: isReplayed)
     effortActivityChanged(id, from: previous, to: state)
+    if case .working? = previous?.activity, state.activity != .working {
+      usage?.agentTurnEnded(id)
+    }
     if !isReplayed { agentUpdateActivityChanged(id, to: state) }
     guard !isReplayed, let previous, previous.unreadSince == nil, state.unreadSince != nil,
       state.requests.isEmpty

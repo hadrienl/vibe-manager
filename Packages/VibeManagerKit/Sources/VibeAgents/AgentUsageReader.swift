@@ -19,9 +19,9 @@ import VibeDomain
 /// Codex counts cached input inside its input, Claude Code beside it: both are reported here as
 /// Claude Code does, input without the cache.
 public struct AgentUsageReader: TokenUsageReading {
-  private let locator: AgentTranscriptLocator
+  let locator: AgentTranscriptLocator
   private let calendar: Calendar
-  private let now: @Sendable () -> Date
+  let now: @Sendable () -> Date
 
   public init(
     locator: AgentTranscriptLocator = AgentTranscriptLocator(),
@@ -275,10 +275,13 @@ struct CodexUsageLine: Decodable {
   struct Info: Decodable {
     let lastTokenUsage: Usage?
     let totalTokenUsage: Usage?
+    /// The size of the window, found beside the tokens from Codex 0.131 to 0.164 at least (#407).
+    let modelContextWindow: Int?
 
     enum CodingKeys: String, CodingKey {
       case lastTokenUsage = "last_token_usage"
       case totalTokenUsage = "total_token_usage"
+      case modelContextWindow = "model_context_window"
     }
   }
 
@@ -288,6 +291,7 @@ struct CodexUsageLine: Decodable {
     let cacheWrite: Int?
     let output: Int?
     let reasoning: Int?
+    let total: Int?
 
     enum CodingKeys: String, CodingKey {
       case input = "input_tokens"
@@ -295,6 +299,7 @@ struct CodexUsageLine: Decodable {
       case cacheWrite = "cache_write_input_tokens"
       case output = "output_tokens"
       case reasoning = "reasoning_output_tokens"
+      case total = "total_tokens"
     }
 
     var counts: TokenCounts {

@@ -37,7 +37,11 @@ struct SessionUsageLayoutTests {
   static func section(language: String) -> some View {
     SessionUsageFigures(
       figures: figures(), isTrackingEnabled: true, runsRecordedSince: nil,
-      tokenUnavailability: nil, agentNames: ["claude": "Claude Code"]
+      tokenUnavailability: nil, agentNames: ["claude": "Claude Code"],
+      context: ContextWindowUsage(
+        usedTokens: 182_000, windowSize: 200_000, measuredAt: Date(),
+        lastCompaction: .init(date: Date().addingTimeInterval(-720), tokensBefore: 190_000)),
+      contextAgentName: "Claude Code"
     )
     .environment(\.locale, Locale(identifier: language))
   }
@@ -129,7 +133,7 @@ struct SessionUsageLayoutTests {
     arguments: ["en", "fr"], [WorkspaceLayout.inspectorWidthRange.lowerBound, 300, 420])
   func nothingIsCut(language: String, column: Double) async throws {
     let widths = try await draw(language: language, column: column)
-    #expect(widths.count == 2 * 7)
+    #expect(widths.count == 2 * 8)
     for width in widths {
       #expect(width.drawn >= width.minimum - 0.5, "\(width.name)")
     }

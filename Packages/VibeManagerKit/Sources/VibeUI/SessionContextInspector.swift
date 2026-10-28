@@ -398,8 +398,18 @@ private struct UsageSummary: View {
   let usage: UsageModel
 
   var body: some View {
+    let percent = usage.contextWindows[session]?.percentUsed
     if let figures = usage.sessionUsage[session] {
-      Text(UsagePresentation.duration(figures.total.runningTime))
+      if let percent {
+        Text(
+          "\(UsagePresentation.duration(figures.total.runningTime)) · context \(percent)%",
+          bundle: .module,
+          comment: "The folded usage section: running time, then the share of the window used.")
+      } else {
+        Text(UsagePresentation.duration(figures.total.runningTime))
+      }
+    } else if let percent {
+      Text("context \(percent)%", bundle: .module, comment: "The share of the window used.")
     }
   }
 }
