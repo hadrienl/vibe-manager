@@ -79,5 +79,6 @@ struct SearchSheet: View {
       }
     }
     .foregroundStyle(.primary)
+    .statusSwipe(of: session) { channel.setStatus($0, of: session.id) }
   }
 }

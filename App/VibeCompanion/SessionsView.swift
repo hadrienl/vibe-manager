@@ -12,8 +12,8 @@ struct SessionsView: View {
   @State private var showsSearch = false
   @State private var showsSettings = false
   @State private var showsNewSession = false
-  /// The row whose swipe buttons are open: one at a time.
-  @State private var swipedID: String?
+  /// The folders folded away, by path.
+  @State private var collapsed: Set<String> = []
 
   var body: some View {
     NavigationStack(path: $path) {
@@ -30,23 +30,18 @@ struct SessionsView: View {
         }
         ConnectionBanner()
         ForEach(groups, id: \.path) { group in
-          Section {
+          Section(isExpanded: expansion(of: group.path)) {
             ForEach(group.rows) { row in
-              StatusSwipe(
-                id: row.session.id, leading: row.session.status.previous,
-                trailing: row.session.status.next, openID: $swipedID,
-                choose: { channel.setStatus($0, of: row.session.id) },
-                tap: { path.append(row.session.id) }
-              ) {
+              Button {
+                path.append(row.session.id)
+              } label: {
                 SessionRow(session: row.session, indented: row.indented)
-                  .padding(.horizontal, 16)
-                  .padding(.vertical, 10)
-                  .background(Color(.secondarySystemGroupedBackground))
               }
-              .listRowInsets(EdgeInsets())
+              .foregroundStyle(.primary)
+              .statusSwipe(of: row.session) { channel.setStatus($0, of: row.session.id) }
             }
           } header: {
-            Label(group.name, systemImage: "folder")
+            FolderHeader(name: group.name, isExpanded: expansion(of: group.path))
           }
         }
         if channel.phase == .connected, groups.isEmpty {
@@ -111,6 +106,14 @@ struct SessionsView: View {
     }
   }
 
+  private func expansion(of folder: String) -> Binding<Bool> {
+    Binding(
+      get: { !collapsed.contains(folder) },
+      set: { expanded in
+        if expanded { collapsed.remove(folder) } else { collapsed.insert(folder) }
+      })
+  }
+
   private func count(_ status: RemoteTaskStatus) -> Int {
     channel.sessions.filter { $0.status == status }.count
   }
@@ -156,6 +159,29 @@ struct SessionsView: View {
       }
       return Group(path: path, name: sessions.first?.folderName ?? path, rows: rows)
     }
+  }
+}
+
+/// A folder's header, which folds its sessions away: the whole line, as Mail's mailboxes.
+struct FolderHeader: View {
+  let name: String
+  @Binding var isExpanded: Bool
+
+  var body: some View {
+    Button {
+      withAnimation { isExpanded.toggle() }
+    } label: {
+      HStack {
+        Label(name, systemImage: "folder")
+        Spacer()
+        Image(systemName: "chevron.right")
+          .font(.footnote.weight(.semibold))
+          .rotationEffect(.degrees(isExpanded ? 90 : 0))
+      }
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .accessibilityValue(Text(isExpanded ? "Expanded" : "Collapsed"))
   }
 }
 
