@@ -31,8 +31,8 @@ struct CompanionSettingsView: View {
           }
         }
       } footer: {
-        // The alpha test: the app is on TestFlight, not on the App Store yet. The README's section
-        // holds the invitation, which exists only once Apple has reviewed a first build.
+        // The alpha test: the app is on TestFlight, not on the App Store yet. The public invitation
+        // opens TestFlight straight away; the README's section walks through the whole setup.
         VStack(alignment: .leading, spacing: 6) {
           Text(
             "The companion is in alpha test: the Vibe Companion app is not on the App Store yet. Install it on your iPhone through TestFlight.",
@@ -46,6 +46,14 @@ struct CompanionSettingsView: View {
             Text(
               "How to install the alpha…", bundle: .module,
               comment: "Settings › iPhone Companion: opens the alpha test's instructions on GitHub.")
+          }
+          .buttonStyle(.link)
+          Button {
+            ExternalOpening.open(Self.testFlightInvitation)
+          } label: {
+            Text(
+              "Join the TestFlight beta…", bundle: .module,
+              comment: "Settings › iPhone Companion: opens the public TestFlight invitation to Vibe Companion.")
           }
           .buttonStyle(.link)
         }
@@ -118,6 +126,7 @@ struct CompanionSettingsView: View {
 
   private static let alphaInstructions = URL(
     string: "https://github.com/hadrienl/vibe-manager/blob/main/README.md#iphone-companion-alpha")!
+  private static let testFlightInvitation = URL(string: "https://testflight.apple.com/join/DsJgybUh")!
 
   private var unavailable: String? {
     switch companion.availability {

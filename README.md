@@ -12,7 +12,7 @@ Vibe Companion, the iPhone app that follows this Mac's sessions, is in alpha tes
 App Store yet. Testers install it through TestFlight:
 
 1. On the iPhone, install [TestFlight](https://apps.apple.com/app/testflight/id899247664), then
-   open the public invitation: **link coming with the first beta build**.
+   open the public invitation: <https://testflight.apple.com/join/DsJgybUh>.
 2. Sign the iPhone in to the same iCloud account as the Mac.
 3. On the Mac, turn on Settings › iPhone Companion (Vibe Manager 1.1.0 or later, Apple silicon),
    then open Vibe Companion: the iPhone appears in the list and connects.
