@@ -64,7 +64,7 @@ final class RemoteChannel {
 
   private var endpoint: Endpoint?
   private var connection: Connection?
-  private var sending: SendStream?
+  private var sending: RemoteFrameQueue?
   private var tasks: [Task<Void, Never>] = []
   private var attempt = 0
   private var shownSessionID: String?
@@ -105,6 +105,7 @@ final class RemoteChannel {
     let (endpoint, connection) = (endpoint, connection)
     self.endpoint = nil
     self.connection = nil
+    sending?.finish()
     sending = nil
     Task.detached {
       try? connection?.close(errorCode: 0, reason: Data("background".utf8))
@@ -135,7 +136,8 @@ final class RemoteChannel {
       self.connection = connection
       let stream = try await connection.openBi()
       guard self.attempt == attempt else { return }
-      sending = stream.send()
+      let send = stream.send()
+      sending = RemoteFrameQueue { try await send.writeAll(buf: $0) }
       phase = .connected
       path = CompanionIroh.pathKind(connection.paths())
       CompanionIroh.logger.notice(
@@ -239,8 +241,7 @@ final class RemoteChannel {
 
   private func write(_ message: RemoteMessage) {
     guard let sending else { return }
-    let frame = RemoteFrame.encode(message)
-    Task.detached { try? await sending.writeAll(buf: frame) }
+    sending.enqueue(RemoteFrame.encode(message))
   }
 
   // MARK: - What the user does

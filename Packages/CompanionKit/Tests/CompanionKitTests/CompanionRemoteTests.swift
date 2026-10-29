@@ -134,3 +134,22 @@ func answerGiven() {
   #expect(!RemoteAnswer(choiceIDs: [], text: "  ").isGiven)
   #expect(!RemoteAnswer(choiceIDs: []).isGiven)
 }
+
+@Test("Frames asked one after the other are written in that order, one at a time (#452)")
+func frameQueueOrder() async {
+  let (written, output) = AsyncStream.makeStream(of: Data.self)
+  let queue = RemoteFrameQueue { frame in
+    // The first write is the slowest: a write per task would let the second one pass it.
+    if frame == Data("hello".utf8) { await Task.yield(); await Task.yield() }
+    output.yield(frame)
+  }
+  let frames = ["hello", "show", "showWeb"].map { Data($0.utf8) }
+  for frame in frames { queue.enqueue(frame) }
+  var received: [Data] = []
+  for await frame in written {
+    received.append(frame)
+    if received.count == frames.count { break }
+  }
+  #expect(received == frames)
+  queue.finish()
+}
