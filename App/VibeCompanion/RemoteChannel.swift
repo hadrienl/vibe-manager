@@ -137,7 +137,11 @@ final class RemoteChannel {
       let stream = try await connection.openBi()
       guard self.attempt == attempt else { return }
       let send = stream.send()
-      sending = RemoteFrameQueue { try await send.writeAll(buf: $0) }
+      sending = RemoteFrameQueue(
+        write: { try await send.writeAll(buf: $0) },
+        failed: { [weak self] error in
+          await self?.fail(CompanionIroh.describe(error), attempt: attempt)
+        })
       phase = .connected
       path = CompanionIroh.pathKind(connection.paths())
       CompanionIroh.logger.notice(

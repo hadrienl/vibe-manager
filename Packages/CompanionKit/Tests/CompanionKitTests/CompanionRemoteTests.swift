@@ -135,14 +135,29 @@ func answerGiven() {
   #expect(!RemoteAnswer(choiceIDs: []).isGiven)
 }
 
-@Test("Frames asked one after the other are written in that order, one at a time (#452)")
+/// The writes running at once, and the most ever seen.
+private actor WriteGauge {
+  private(set) var running = 0
+  private(set) var most = 0
+  func begin() { running += 1; most = max(most, running) }
+  func end() { running -= 1 }
+}
+
+@Test(
+  "Frames asked one after the other are written in that order, one at a time (#452)",
+  .timeLimit(.minutes(1)))
 func frameQueueOrder() async {
   let (written, output) = AsyncStream.makeStream(of: Data.self)
-  let queue = RemoteFrameQueue { frame in
-    // The first write is the slowest: a write per task would let the second one pass it.
-    if frame == Data("hello".utf8) { await Task.yield(); await Task.yield() }
-    output.yield(frame)
-  }
+  let gauge = WriteGauge()
+  let queue = RemoteFrameQueue(
+    write: { frame in
+      await gauge.begin()
+      // The first write is the slowest: a write per task would let the others pass it.
+      if frame == Data("hello".utf8) { for _ in 0..<10 { await Task.yield() } }
+      await gauge.end()
+      output.yield(frame)
+    },
+    failed: { _ in Issue.record("no write fails") })
   let frames = ["hello", "show", "showWeb"].map { Data($0.utf8) }
   for frame in frames { queue.enqueue(frame) }
   var received: [Data] = []
@@ -151,5 +166,31 @@ func frameQueueOrder() async {
     if received.count == frames.count { break }
   }
   #expect(received == frames)
+  #expect(await gauge.most == 1)
   queue.finish()
+}
+
+private struct BrokenStream: Error {}
+
+@Test("A failed write ends the queue and says so, once (#452)", .timeLimit(.minutes(1)))
+func frameQueueFailure() async {
+  let (events, output) = AsyncStream.makeStream(of: String.self)
+  let queue = RemoteFrameQueue(
+    write: { frame in
+      output.yield(String(decoding: frame, as: UTF8.self))
+      throw BrokenStream()
+    },
+    failed: { error in output.yield(error is BrokenStream ? "failed" : "other") })
+  queue.enqueue(Data("hello".utf8))
+  var seen: [String] = []
+  for await event in events {
+    seen.append(event)
+    if event == "failed" { break }
+  }
+  // Asked after the failure: never written.
+  queue.enqueue(Data("show".utf8))
+  queue.finish()
+  output.finish()
+  for await event in events { seen.append(event) }
+  #expect(seen == ["hello", "failed"])
 }
