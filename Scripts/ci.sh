@@ -105,3 +105,16 @@ xcodebuild \
   -skipPackagePluginValidation \
   CODE_SIGNING_ALLOWED=NO \
   build
+
+echo "Building the mobile companion in Release for the iPhone"
+# What Scripts/testflight.sh archives at a release, first compiled on a pull request. Unsigned.
+xcodebuild \
+  -project VibeManager.xcodeproj \
+  -scheme VibeCompanion \
+  -configuration Release \
+  -destination 'generic/platform=iOS' \
+  -derivedDataPath "$derived_data_path" \
+  -clonedSourcePackagesDirPath "$source_packages_path" \
+  -skipPackagePluginValidation \
+  CODE_SIGNING_ALLOWED=NO \
+  build

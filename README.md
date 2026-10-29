@@ -6,6 +6,20 @@ their terminals, repositories and tasks organized in one place.
 The application launches a SwiftUI state backed by an atomic, versioned local session store.
 Claude, Codex, terminal and live Git integrations are tracked as separate V1 issues.
 
+## iPhone companion (alpha)
+
+Vibe Companion, the iPhone app that follows this Mac's sessions, is in alpha test and not on the
+App Store yet. Testers install it through TestFlight:
+
+1. On the iPhone, install [TestFlight](https://apps.apple.com/app/testflight/id899247664), then
+   open the public invitation: **link coming with the first beta build**.
+2. Sign the iPhone in to the same iCloud account as the Mac.
+3. On the Mac, turn on Settings › iPhone Companion (Vibe Manager 1.1.0 or later, Apple silicon),
+   then open Vibe Companion: the iPhone appears in the list and connects.
+
+Every release tag uploads a build of the same version to TestFlight
+(`Scripts/testflight.sh`, run by `.github/workflows/release.yml`).
+
 ## Requirements
 
 - macOS 14 or later
