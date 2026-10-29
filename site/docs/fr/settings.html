@@ -37,6 +37,8 @@
   <dd><strong>Afficher les demandes au-dessus des autres applications</strong> active le <a href="requests.html#background">panneau flottant</a>. Choisissez son avatar, s’il masque ou garde l’avatar à l’écran <strong>Sans demande en attente</strong>, et <strong>Remettre à sa place</strong> s’il s’est perdu. Son raccourci est <kbd>⌃⌥⌘P</kbd>.</dd>
   <dt>Notifications</dt>
   <dd><strong>Me notifier des demandes</strong>, en montrant <strong>Le type de demande</strong> ou <strong>La commande ou la question</strong>. Indisponible tant que le panneau flottant est actif, puisqu’il les signale déjà.</dd>
+  <dt id="sound">Son</dt>
+  <dd>Le son joué quand une session que vous ne regardez pas a besoin de vous, avec ▶ pour l’écouter. <strong>Gérer les sons…</strong> ouvre la page <strong>Sons</strong> : décrivez un son à un agent pour qu’il le compose, ou importez un fichier audio de 30 secondes au plus.</dd>
   <dt>Palette</dt>
   <dd>Afficher le nombre de demandes sur l’icône du Dock ; déplier la palette à l’arrivée d’une demande.</dd>
   <dt>Gérer les avatars…</dt>
@@ -61,6 +63,21 @@
   <dt>Sites toujours autorisés</dt><dd>Les sites pour lesquels vous avez choisi <strong>Toujours autoriser</strong> ; <strong>Retirer</strong> revient sur ce choix.</dd>
   <dt>Données de navigation › Effacer…</dt><dd>Efface les cookies et les données de la vue web, ce qui vous déconnecte de tous les sites dans toutes les sessions.</dd>
 </dl>
+
+<h2 id="voice">Voix</h2>
+<p>Le modèle de dictée, la langue de la dictée, et la voix de la lecture à voix haute : voir <a href="voice.html#settings">Dictée et lecture à voix haute</a>.</p>
+
+<h2 id="coordination">Coordination</h2>
+<p><strong>Enfants en même temps</strong> : combien de sessions enfants une coordinatrice fait tourner à la fois. Voir <a href="coordination.html">Session coordinatrice</a>.</p>
+
+<h2 id="archive">Archivage automatique</h2>
+<p>Les règles d’archivage et les protections : voir <a href="archive.html">Archivage automatique</a>.</p>
+
+<h2 id="worktrees">Worktrees</h2>
+<p>Où les agents créent leurs worktrees : <code>{repo}/.claude/worktrees/{branch}</code> par défaut, à côté du dépôt, dans <code>~/Worktrees/{project}/{branch}</code>, ou un chemin personnalisé construit avec des variables, avec un aperçu. Des exceptions se règlent projet par projet (<strong>Ajouter…</strong>), et <strong>Rétablir le défaut</strong> revient au chemin par défaut. Vibe Manager ne crée rien dans Git : il indique ce chemin à l’agent, pour ses nouveaux worktrees seulement.</p>
+
+<h2 id="companion">Compagnon iPhone</h2>
+<p>L’assistant du compagnon et les iPhone appairés : voir <a href="companion.html">Compagnon iPhone</a>.</p>
 
 <h2 id="templates">Gabarits</h2>
 <p>L’éditeur de gabarits de session : voir <a href="templates.html">Gabarits de session</a>.</p>

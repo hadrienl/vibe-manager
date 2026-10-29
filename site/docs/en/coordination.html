@@ -1,0 +1,24 @@
+<h1>Coordinator session</h1>
+<p class="lede">A session can drive others: it creates child sessions, each in its own folder, writes to them, reads their replies and moves them along, while you follow everything in the sidebar.</p>
+
+<vm-shot name="coordination" alt="A coordinator session in the sidebar, linked by a thin line to three child sessions, and its conversation where it shares out the work.">A coordinator and its three child sessions.</vm-shot>
+
+<h2 id="turn-on">Make a session a coordinator</h2>
+<p>Turn on the <strong>Coordinate</strong> chip in the composer, the one of an open conversation or of a new session. It is offered for Claude Code and Codex, on their service or on an endpoint. Turned on while the agent is running, it restarts nothing: your next message tells it that it can now coordinate. An agent started before version 1.1 lacks the tools it needs; <strong>Restart to Coordinate</strong> starts it again with them.</p>
+<p>Then ask for what you want in plain words: “Take the three tickets of milestone 4, one worktree and one session per ticket, and tell me when they are ready for review.”</p>
+
+<h2 id="children">Child sessions</h2>
+<p>A child session is a session like any other: its agent, its folder or worktree, its terminal, its notes, its status. You can open it, write to it and answer its requests yourself. The coordinator can:</p>
+<ul>
+  <li>create a child session, with its name, folder, agent and first prompt;</li>
+  <li>send it a message, read its conversation and wait for the end of its turn;</li>
+  <li>change its status, and close or restart it.</li>
+</ul>
+<p>A coordinator never answers a child's permissions and questions for you: they wait for you in the <a href="requests.html">Pending Requests</a> palette, like those of any session.</p>
+<p>Coordination has only one level: a child session does not coordinate in turn. What a coordinator did in a child shows in that child's history, under “Coordinated by…”.</p>
+
+<h2 id="sidebar">In the sidebar</h2>
+<p>Children show under their coordinator, indented, linked to it by a thin line. Collapse the coordinator to hide its children. When a search or a filter singles out a child, it shows on its own, without the line.</p>
+
+<h2 id="settings">Settings</h2>
+<p><strong>Settings › Coordination › Children running at once</strong> limits how many agents a coordinator runs at the same time: each takes memory and tokens. An <a href="archive.html">automatic archive</a> rule can target coordinators or children with <code>coordination</code>.</p>
