@@ -182,5 +182,6 @@
   "new.more_send": "«إرسال الآن» أثناء دور",
   "new.more_zip": "سمات مستوردة من ملف ‎.zip",
   "new.more_worktrees": "موقع الـ worktrees حسب اختيارك",
-  "coord.shot_alt": "جلسة منسِّقة في الشريط الجانبي لـ Vibe Manager، يربطها خط بجلساتها الفرعية الثلاث."
+  "coord.shot_alt": "جلسة منسِّقة في الشريط الجانبي لـ Vibe Manager، يربطها خط بجلساتها الفرعية الثلاث.",
+  "card.companion.cta": "انضم إلى النسخة التجريبية على TestFlight"
 }

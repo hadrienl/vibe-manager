@@ -182,5 +182,6 @@
   "new.more_send": "輪次進行中「立即傳送」",
   "new.more_zip": "從 .zip 匯入主題",
   "new.more_worktrees": "worktree 位置自由選擇",
-  "coord.shot_alt": "Vibe Manager 側邊欄中的協調工作階段，以一條線連接著它的三個子工作階段。"
+  "coord.shot_alt": "Vibe Manager 側邊欄中的協調工作階段，以一條線連接著它的三個子工作階段。",
+  "card.companion.cta": "加入 TestFlight 測試版"
 }

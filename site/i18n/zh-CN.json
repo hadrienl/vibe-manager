@@ -182,5 +182,6 @@
   "new.more_send": "轮次进行中“立即发送”",
   "new.more_zip": "从 .zip 导入主题",
   "new.more_worktrees": "worktree 位置自由选择",
-  "coord.shot_alt": "Vibe Manager 侧边栏中的协调会话，用一条线连接着它的三个子会话。"
+  "coord.shot_alt": "Vibe Manager 侧边栏中的协调会话，用一条线连接着它的三个子会话。",
+  "card.companion.cta": "加入 TestFlight 测试版"
 }

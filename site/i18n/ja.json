@@ -182,5 +182,6 @@
   "new.more_send": "ターン中の「今すぐ送信」",
   "new.more_zip": ".zip から読み込んだテーマ",
   "new.more_worktrees": "worktree の保存場所を自由に選択",
-  "coord.shot_alt": "Vibe Manager のサイドバーにあるコーディネーターセッション。3 つの子セッションと線でつながっている。"
+  "coord.shot_alt": "Vibe Manager のサイドバーにあるコーディネーターセッション。3 つの子セッションと線でつながっている。",
+  "card.companion.cta": "TestFlight ベータに参加"
 }

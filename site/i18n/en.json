@@ -182,5 +182,6 @@
   "card.context.text": "Set the agent’s effort from the status bar, and see how much of the context window the conversation fills before compaction.",
   "new.more_send": "“Send Now” during a turn",
   "new.more_zip": "Themes imported from a .zip",
-  "new.more_worktrees": "Worktree location of your choice"
+  "new.more_worktrees": "Worktree location of your choice",
+  "card.companion.cta": "Join the TestFlight beta"
 }

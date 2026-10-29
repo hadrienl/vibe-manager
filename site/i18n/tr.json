@@ -182,5 +182,6 @@
   "new.more_send": "Bir tur sırasında \"Şimdi gönder\"",
   "new.more_zip": "Bir .zip'ten içe aktarılan temalar",
   "new.more_worktrees": "Worktree konumu dilediğin gibi",
-  "coord.shot_alt": "Vibe Manager kenar çubuğunda, bir çizgiyle üç alt oturumuna bağlı bir koordinatör oturum."
+  "coord.shot_alt": "Vibe Manager kenar çubuğunda, bir çizgiyle üç alt oturumuna bağlı bir koordinatör oturum.",
+  "card.companion.cta": "TestFlight betasına katıl"
 }

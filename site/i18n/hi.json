@@ -182,5 +182,6 @@
   "new.more_send": "टर्न के दौरान “अभी भेजें”",
   "new.more_zip": "एक .zip से इम्पोर्ट की गई थीम",
   "new.more_worktrees": "worktrees की जगह आपकी पसंद से",
-  "coord.shot_alt": "Vibe Manager के साइडबार में एक कोऑर्डिनेटर सेशन, जो एक लाइन से अपने तीन चाइल्ड सेशनों से जुड़ा है।"
+  "coord.shot_alt": "Vibe Manager के साइडबार में एक कोऑर्डिनेटर सेशन, जो एक लाइन से अपने तीन चाइल्ड सेशनों से जुड़ा है।",
+  "card.companion.cta": "TestFlight बीटा से जुड़ें"
 }

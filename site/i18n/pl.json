@@ -182,5 +182,6 @@
   "new.more_send": "„Wyślij teraz” w trakcie tury",
   "new.more_zip": "Motywy importowane z pliku .zip",
   "new.more_worktrees": "Dowolna lokalizacja worktree",
-  "coord.shot_alt": "Sesja koordynująca na pasku bocznym Vibe Manager, połączona linią z trzema sesjami podrzędnymi."
+  "coord.shot_alt": "Sesja koordynująca na pasku bocznym Vibe Manager, połączona linią z trzema sesjami podrzędnymi.",
+  "card.companion.cta": "Dołącz do bety w TestFlight"
 }

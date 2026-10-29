@@ -182,5 +182,6 @@
   "new.more_send": "„Jetzt senden“ während eines Zugs",
   "new.more_zip": "Themes aus einer .zip importieren",
   "new.more_worktrees": "Speicherort der Worktrees frei wählbar",
-  "coord.shot_alt": "Eine Koordinator-Session in der Seitenleiste von Vibe Manager, durch eine Linie mit ihren drei Kind-Sessions verbunden."
+  "coord.shot_alt": "Eine Koordinator-Session in der Seitenleiste von Vibe Manager, durch eine Linie mit ihren drei Kind-Sessions verbunden.",
+  "card.companion.cta": "TestFlight-Beta beitreten"
 }

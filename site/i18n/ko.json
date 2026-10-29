@@ -182,5 +182,6 @@
   "new.more_send": "턴 중에 \"지금 보내기\"",
   "new.more_zip": ".zip에서 가져온 테마",
   "new.more_worktrees": "worktree 위치를 원하는 대로",
-  "coord.shot_alt": "Vibe Manager 사이드바의 코디네이터 세션. 세 개의 하위 세션과 선으로 연결되어 있어요."
+  "coord.shot_alt": "Vibe Manager 사이드바의 코디네이터 세션. 세 개의 하위 세션과 선으로 연결되어 있어요.",
+  "card.companion.cta": "TestFlight 베타 참여"
 }

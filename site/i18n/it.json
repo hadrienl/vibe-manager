@@ -182,5 +182,6 @@
   "new.more_send": "«Invia ora» durante un turno",
   "new.more_zip": "Temi importati da un .zip",
   "new.more_worktrees": "Posizione dei worktree a scelta",
-  "coord.shot_alt": "Una sessione coordinatrice nella barra laterale di Vibe Manager, collegata da una linea alle sue tre sessioni figlie."
+  "coord.shot_alt": "Una sessione coordinatrice nella barra laterale di Vibe Manager, collegata da una linea alle sue tre sessioni figlie.",
+  "card.companion.cta": "Partecipa alla beta TestFlight"
 }
