@@ -60,6 +60,8 @@ public final class ArchiveRulesModel {
   @ObservationIgnored var wakeObserver: NSObjectProtocol?
   /// A run under way: another tick waits for the next one rather than running the same rules.
   @ObservationIgnored var isRunning = false
+  /// A tick refused by the run under way: it runs once that one ends.
+  @ObservationIgnored var tickPending = false
   /// A run of the continuous rules waiting for the end of the minute the last one used.
   @ObservationIgnored var continuousRun: Task<Void, Never>?
   /// Off in tests, which tick by hand.

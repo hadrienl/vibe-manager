@@ -372,6 +372,77 @@ struct ArchiveRulesRunTests {
     #expect(rules.lines.first?.wouldArchive == 1)
   }
 
+  /// A rule daily at `hours` after `friday`'s time, turned on the day before — or at `friday` when
+  /// its first time is later, so that nothing before it is caught up.
+  private func daily(_ name: String, color: String, after hours: Int, git: Bool) -> StoredArchiveRule {
+    let time = calendar().dateComponents(
+      [.hour, .minute], from: friday.addingTimeInterval(TimeInterval(hours * 3600)))
+    let text = String(
+      format: "rule \"%@\" archive done sessions where badge.color = %@%@ on daily at %02d:%02d",
+      name, color, git ? " and not git.dirty" : "", time.hour ?? 0, time.minute ?? 0)
+    let activated = hours > 0 ? friday : friday.addingTimeInterval(-86_400)
+    return StoredArchiveRule(
+      text: text, state: .active, sentence: "", agent: "claude", createdAt: activated,
+      activatedAt: activated)
+  }
+
+  @Test("A folder changed between the plan and the archive keeps its session")
+  func gitReadAgain() async throws {
+    let (model, repository, _, sessions, store) = await model()
+    let rules = try #require(model.archiveRules)
+    let stored = [daily("Clean reds", color: "#B42318", after: 0, git: true)]
+    try await store.update { set in set.rules = stored }
+    await rules.load()
+    let reads = Counter()
+    // Clean when the plan is made, changed by the user right after.
+    rules.readGitFacts = { candidates in
+      reads.value += 1
+      let dirty = reads.value > 1
+      return candidates.map { candidate in
+        var candidate = candidate
+        candidate.isDirty = dirty
+        return candidate
+      }
+    }
+    await model.runArchiveRules()
+    #expect(reads.value == 2)
+    #expect(await repository.session(id: sessions[0].id)?.status == .closed)
+    #expect(await store.load().rules.first?.lastRun?.archived == 0)
+  }
+
+  @Test("A tick that comes during a run runs once it ends, its time still due")
+  func tickDuringRun() async throws {
+    let (model, repository, _, sessions, store) = await model()
+    let rules = try #require(model.archiveRules)
+    let stored = [
+      daily("Reds", color: "#B42318", after: 0, git: true),
+      daily("Blues", color: "#0B63E5", after: 1, git: false),
+    ]
+    try await store.update { set in set.rules = stored }
+    await rules.load()
+    let clock = Counter()
+    rules.now = { [friday] in friday.addingTimeInterval(TimeInterval(clock.value * 3600)) }
+    // The first run is still reading Git when the Blues' time comes, and its tick with it.
+    rules.readGitFacts = { candidates in
+      if clock.value == 0 {
+        clock.value = 1
+        await model.runArchiveRules()
+        #expect(rules.tickPending)
+      }
+      return candidates.map { candidate in
+        var candidate = candidate
+        candidate.isDirty = false
+        return candidate
+      }
+    }
+    await model.runArchiveRules()
+    #expect(!rules.tickPending)
+    #expect(await repository.session(id: sessions[0].id)?.status == .archived)
+    #expect(await repository.session(id: sessions[1].id)?.status == .archived)
+    let blues = try #require(await store.load().rules.first { $0.rule?.name == "Blues" }?.lastRun)
+    #expect(blues.archived == 1)
+  }
+
   @Test("A change within the minute a continuous rule just used runs at its end, not later")
   func continuousChange() async throws {
     let (model, repository, _, sessions, store) = await model()
@@ -400,4 +471,9 @@ struct ArchiveRulesRunTests {
     model.showArchiveRulesSettings()
     #expect(model.settingsPage == .archiveRules)
   }
+}
+
+@MainActor
+private final class Counter {
+  var value = 0
 }
