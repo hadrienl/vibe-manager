@@ -135,15 +135,26 @@ extension AppModel {
     }
   }
 
-  /// One tick: the rules due now claimed, then run in the order of the list.
+  /// One tick: the rules due now claimed, then run in the order of the list. A tick that comes
+  /// during a run is not lost: it runs again once that one ends, while its time is still due.
   func runArchiveRules() async {
-    // A write of the Settings that failed does not stop the rules: only a file that cannot be
-    // read does.
-    guard let model = archiveRules, !model.isRunning, model.problem != .unreadable,
-      case .loaded = state
-    else { return }
+    guard let model = archiveRules else { return }
+    guard !model.isRunning else {
+      model.tickPending = true
+      return
+    }
     model.isRunning = true
     defer { model.isRunning = false }
+    repeat {
+      model.tickPending = false
+      await runArchiveRulesOnce(model)
+    } while model.tickPending
+  }
+
+  private func runArchiveRulesOnce(_ model: ArchiveRulesModel) async {
+    // A write of the Settings that failed does not stop the rules: only a file that cannot be
+    // read does.
+    guard model.problem != .unreadable, case .loaded = state else { return }
     // A protection that no longer reads keeps every rule from running: what it was meant to
     // protect cannot be told. Nothing is claimed, so that the times due catch up once it reads.
     guard model.set.readableProtections != nil else {
@@ -170,8 +181,9 @@ extension AppModel {
     }
     var candidates = archiveCandidates()
     let conditions = runs.compactMap(\.rule.condition) + protections.map(\.condition)
-    if conditions.contains(where: \.readsGit) {
-      candidates = await withGitFacts(candidates)
+    let readsGit = conditions.contains(where: \.readsGit)
+    if readsGit {
+      candidates = await model.readGitFacts(candidates)
     }
     var archivedAny = false
     for run in runs {
@@ -187,9 +199,10 @@ extension AppModel {
         await reload()
         for id in plan.archived {
           guard var live = archiveCandidates().first(where: { $0.id == id }) else { continue }
-          if let planned = candidates.first(where: { $0.id == id }) {
-            live.branch = planned.branch
-            live.isDirty = planned.isDirty
+          // Its folder too: a file changed since the plan keeps a session with changes.
+          if readsGit {
+            guard let read = await model.readGitFacts([live]).first else { continue }
+            live = read
           }
           guard
             ArchiveRuleEvaluation.verdict(
