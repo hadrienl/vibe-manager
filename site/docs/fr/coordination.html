@@ -1,0 +1,24 @@
+<h1>Session coordinatrice</h1>
+<p class="lede">Une session peut en piloter d’autres : elle crée des sessions enfants, chacune dans son dossier, leur écrit, lit leurs réponses et les fait avancer, pendant que vous suivez tout dans la barre latérale.</p>
+
+<vm-shot name="coordination" alt="Une session coordinatrice dans la barre latérale, reliée par un filet à trois sessions enfants, et sa conversation où elle répartit le travail.">Une coordinatrice et ses trois sessions enfants.</vm-shot>
+
+<h2 id="turn-on">Faire d’une session une coordinatrice</h2>
+<p>Allumez la puce <strong>Coordonner</strong> dans la zone de saisie, celle d’une conversation ouverte ou celle d’une nouvelle session. Elle est proposée pour Claude Code et Codex, sur leur service ou sur un endpoint. Allumée pendant que l’agent tourne, elle ne relance rien : votre message suivant lui dit qu’il peut maintenant coordonner. Un agent démarré avant la version 1.1 n’a pas les outils nécessaires ; <strong>Relancer pour coordonner</strong> le redémarre avec eux.</p>
+<p>Demandez ensuite ce que vous voulez en langage courant : « Prends les trois tickets de la milestone 4, un worktree et une session par ticket, et fais-moi un point quand ils sont prêts à relire. »</p>
+
+<h2 id="children">Les sessions enfants</h2>
+<p>Une session enfant est une session comme une autre : son agent, son dossier ou son worktree, son terminal, ses notes, son statut. Vous pouvez l’ouvrir, lui écrire et répondre à ses demandes vous-même. La coordinatrice, elle, peut :</p>
+<ul>
+  <li>créer une session enfant, avec son nom, son dossier, son agent et son premier prompt ;</li>
+  <li>lui envoyer un message, lire sa conversation et attendre la fin de son tour ;</li>
+  <li>changer son statut, et la fermer ou la relancer.</li>
+</ul>
+<p>Une coordinatrice ne répond jamais à votre place aux autorisations et aux questions d’un enfant : elles vous attendent dans la palette <a href="requests.html">Demandes en attente</a>, comme celles de toute session.</p>
+<p>La coordination n’a qu’un niveau : une session enfant ne coordonne pas à son tour. Ce qu’une coordinatrice a fait dans un enfant s’affiche dans l’historique de cet enfant, sous « Coordonnée par… ».</p>
+
+<h2 id="sidebar">Dans la barre latérale</h2>
+<p>Les enfants s’affichent sous leur coordinatrice, en retrait, reliés à elle par un filet. Repliez la coordinatrice pour masquer ses enfants. Quand une recherche ou un filtre isole un enfant, il s’affiche seul, sans le filet.</p>
+
+<h2 id="settings">Réglages</h2>
+<p><strong>Réglages › Coordination › Enfants en même temps</strong> limite le nombre d’agents qu’une coordinatrice fait tourner en même temps : chacun prend de la mémoire et des jetons. Une règle d’<a href="archive.html">archivage automatique</a> peut viser les coordinatrices ou les enfants avec <code>coordination</code>.</p>

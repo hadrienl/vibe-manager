@@ -1,0 +1,22 @@
+<h1>Archivage automatique</h1>
+<p class="lede">Décrivez en une phrase les sessions à archiver et quand le faire : un agent en tire une règle, que vous testez avant de l’activer. Chaque archivage forme un lot, et les rapports disent ce que contenaient les sessions rangées.</p>
+
+<vm-shot name="archive-rules" alt="Réglages, page Archivage automatique : deux règles décrites en une phrase avec leur prochaine exécution, et une protection.">Des règles en une phrase, et ce qu’elles ne doivent jamais toucher.</vm-shot>
+
+<h2 id="rules">Écrire une règle</h2>
+<p><strong>Réglages › Archivage automatique › Nouvelle règle…</strong> demande une phrase : « Tous les vendredis à 18 h, archive les sessions terminées depuis plus de deux jours, sauf celles de billing-api. » Un agent la traduit dans un langage strict ; l’app vous la relit en clair, avec ses prochaines exécutions. <strong>Affiner</strong> la corrige par une autre phrase.</p>
+<p>Seules les sessions <strong>Terminé</strong> sont concernées. Une session où quelque chose tourne est toujours sautée, une session que vous avez sortie de l’archive n’y est pas renvoyée, et un fait que l’app ne connaît pas n’archive rien.</p>
+<ul>
+  <li><strong>Tester</strong> ouvre le banc d’essai : il montre les sessions que la règle archiverait maintenant, sans rien toucher.</li>
+  <li><strong>Essayer d’abord</strong> la met à l’essai : elle tourne à blanc et note ce qu’elle aurait archivé.</li>
+  <li><strong>Activer</strong> la met en service ; <strong>Pause</strong> la suspend.</li>
+</ul>
+<p>Les <strong>protections</strong>, décrites de la même façon, désignent les sessions qu’aucune règle ne doit jamais archiver.</p>
+
+<h2 id="batches">Les lots</h2>
+<p>Chaque exécution d’une règle forme un <strong>lot</strong> : les sessions archivées, et celles sautées avec leur raison. Une sélection archivée d’un coup forme son propre lot, et les sessions archivées une à une forment un lot par jour. Un archivage par règle ne s’annule pas avec <kbd>⌘Z</kbd> : désarchivez depuis les archives.</p>
+<p>Dans la feuille d’une règle, <strong>Résumer chaque lot avec un agent</strong> fait écrire ce qui a été fait dans les sessions du lot. Pour une sélection, la confirmation d’archivage propose <strong>Archiver et résumer</strong>, qui ouvre ensuite le rapport du lot.</p>
+
+<h2 id="reports">Les rapports</h2>
+<vm-shot name="archive-reports" alt="La fenêtre Rapports d’archivage : la liste des lots à gauche, et le résumé d’un lot avec ses sessions par projet.">Ce qui a été rangé, lot par lot.</vm-shot>
+<p><strong>Fenêtre › Rapports d’archivage</strong>, ou <strong>Afficher les rapports</strong> sous la liste des archives, les lit par lot ou par période — aujourd’hui, hier, 7 jours, ce mois-ci, ou des dates choisies —, par projet, avec les totaux. Un agent peut en faire la synthèse, et un rapport s’exporte en Markdown.</p>

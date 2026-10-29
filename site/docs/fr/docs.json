@@ -8,7 +8,7 @@
   "pagerLabel": "Pages de la documentation",
   "groups": [
     { "title": "Premiers pas", "pages": ["index", "install"] },
-    { "title": "Au quotidien", "pages": ["sessions", "organize", "conversation", "requests", "inspector", "terminals"] },
-    { "title": "Aller plus loin", "pages": ["templates", "agents", "personalize", "settings", "shortcuts", "troubleshooting"] }
+    { "title": "Au quotidien", "pages": ["sessions", "organize", "archive", "conversation", "voice", "requests", "inspector", "terminals"] },
+    { "title": "Aller plus loin", "pages": ["templates", "agents", "coordination", "companion", "personalize", "settings", "shortcuts", "troubleshooting"] }
   ]
 }

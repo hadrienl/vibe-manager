@@ -37,6 +37,8 @@
   <dd><strong>Show requests above other applications</strong> turns on the <a href="requests.html#background">floating panel</a>. Choose its avatar, whether it hides or keeps the avatar on screen <strong>With no pending request</strong>, and <strong>Put Back in Place</strong> if it got lost. Its shortcut is <kbd>⌃⌥⌘P</kbd>.</dd>
   <dt>Notifications</dt>
   <dd><strong>Notify me of requests</strong>, showing <strong>The kind of request</strong> or <strong>The command or the question</strong>. Unavailable while the floating panel is on, which already signals them.</dd>
+  <dt id="sound">Sound</dt>
+  <dd>The sound played when a session you are not looking at needs you, with ▶ to hear it. <strong>Manage Sounds…</strong> opens the <strong>Sounds</strong> page: describe a sound to an agent for it to compose, or import an audio file of 30 seconds at most.</dd>
   <dt>Palette</dt>
   <dd>Show the number of requests on the Dock icon; unfold the palette when a request arrives.</dd>
   <dt>Manage Avatars…</dt>
@@ -61,6 +63,21 @@
   <dt>Always allowed sites</dt><dd>The sites where you chose <strong>Always Allow</strong>; <strong>Remove</strong> takes one back.</dd>
   <dt>Browsing data › Clear…</dt><dd>Erases the cookies and data of the web view, which signs you out of every site in every session.</dd>
 </dl>
+
+<h2 id="voice">Voice</h2>
+<p>The speech model, the dictation language, and the voice for reading aloud: see <a href="voice.html#settings">Dictation and reading aloud</a>.</p>
+
+<h2 id="coordination">Coordination</h2>
+<p><strong>Children running at once</strong>: how many child sessions a coordinator runs at a time. See <a href="coordination.html">Coordinator session</a>.</p>
+
+<h2 id="archive">Automatic Archive</h2>
+<p>The archive rules and the protections: see <a href="archive.html">Automatic archive</a>.</p>
+
+<h2 id="worktrees">Worktrees</h2>
+<p>Where agents create their worktrees: <code>{repo}/.claude/worktrees/{branch}</code> by default, beside the repository, in <code>~/Worktrees/{project}/{branch}</code>, or a custom path built from variables, with a preview. Exceptions are set project by project (<strong>Add…</strong>), and <strong>Restore Default</strong> goes back to the default path. Vibe Manager creates nothing in Git: it tells the agent this path, for its new worktrees only.</p>
+
+<h2 id="companion">iPhone Companion</h2>
+<p>The companion helper and the paired iPhones: see <a href="companion.html">iPhone companion</a>.</p>
 
 <h2 id="templates">Templates</h2>
 <p>The prompt template editor: see <a href="templates.html">Prompt templates</a>.</p>

@@ -136,6 +136,8 @@ section.block { padding-block: 96px; }
 .card .ico svg { width: 21px; height: 21px; }
 @media (max-width: 900px) { .grid3 { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 580px) { .grid3 { grid-template-columns: 1fr; } }
+.new-more { justify-content: center; margin-top: 28px; }
+.card h3 .badge { vertical-align: middle; margin-left: 4px; padding: 4px 8px; }
 
 kbd { font: 500 .8em/1 var(--f-mono); padding: 3px 7px; border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--surface); color: var(--ink); white-space: nowrap; }
 

@@ -1,0 +1,25 @@
+<h1>iPhone companion (alpha)</h1>
+<p class="lede">Follow your sessions from the iPhone and answer your agents' requests, even away from the Mac. The companion is in alpha: the iPhone app is distributed through TestFlight, and it needs an Apple silicon Mac.</p>
+
+<vm-shot name="companion" alt="Settings, iPhone Companion page: the Use Vibe Manager from your iPhone setting, and the alpha notice with the link to install the alpha.">The iPhone Companion page of the settings.</vm-shot>
+
+<p><a class="btn btn-primary" href="https://testflight.apple.com/join/DsJgybUh">Join the TestFlight beta</a></p>
+
+<h2 id="install">Install the alpha</h2>
+<ol>
+  <li>On the Mac, open <strong>Settings › iPhone Companion</strong> and turn on <strong>Use Vibe Manager from your iPhone</strong>; the helper ships with Vibe Manager and is off by default.</li>
+  <li><strong>How to install the alpha…</strong> opens the instructions to join the TestFlight test and install the app on the iPhone.</li>
+  <li>Open the app on the iPhone, with the same iCloud account as the Mac: it shows in the list of iPhones. <strong>Remove…</strong> takes it off.</li>
+</ol>
+<p>On an Intel Mac, the page says the companion is not available.</p>
+
+<h2 id="use">What the companion does</h2>
+<ul>
+  <li>The list of your sessions, their status and what each agent is doing, grouped as on the Mac.</li>
+  <li>Notifications when an agent needs you: <strong>Allow</strong> (after Face ID or the passcode) or <strong>Deny</strong> without opening the app.</li>
+  <li>Questions, including those that ask several at once, which you answer from the iPhone.</li>
+</ul>
+
+<h2 id="privacy">No server</h2>
+<p>The Mac and the iPhone talk through CloudKit, in your private iCloud: no Vibe Manager server between them. Only iPhones whose key is published in your iCloud are let in.</p>
+<div class="callout"><p>Alpha: expect changes and a few bugs. Report them in an <a href="https://github.com/hadrienl/vibe-manager/issues">issue</a>.</p></div>

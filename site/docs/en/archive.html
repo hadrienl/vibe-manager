@@ -1,0 +1,22 @@
+<h1>Automatic archive</h1>
+<p class="lede">Describe in one sentence which sessions to archive and when: an agent turns it into a rule, which you test before turning it on. Each archiving forms a batch, and the reports tell what the sessions put away contained.</p>
+
+<vm-shot name="archive-rules" alt="Settings, Automatic Archive page: two rules described in one sentence with their next run, and a protection.">Rules in one sentence, and what they must never touch.</vm-shot>
+
+<h2 id="rules">Write a rule</h2>
+<p><strong>Settings › Automatic Archive › New Rule…</strong> asks for a sentence: “Every Friday at 6 pm, archive the sessions done for more than two days, except those of billing-api.” An agent translates it into a strict language; the app reads it back to you in plain words, with its next runs. <strong>Refine</strong> corrects it with another sentence.</p>
+<p>Only <strong>Done</strong> sessions are concerned. A session where something is running is always skipped, a session you took out of the archive is not sent back there, and a fact the app does not know archives nothing.</p>
+<ul>
+  <li><strong>Test</strong> opens the bench: it shows the sessions the rule would archive now, without touching anything.</li>
+  <li><strong>Try First</strong> puts it on trial: it runs dry and notes what it would have archived.</li>
+  <li><strong>Turn On</strong> puts it in service; <strong>Pause</strong> suspends it.</li>
+</ul>
+<p>The <strong>protections</strong>, described the same way, name the sessions no rule must ever archive.</p>
+
+<h2 id="batches">Batches</h2>
+<p>Each run of a rule forms a <strong>batch</strong>: the sessions archived, and those skipped with their reason. A selection archived at once forms its own batch, and sessions archived one by one form one batch a day. Archiving by a rule is not undone with <kbd>⌘Z</kbd>: unarchive from the archive.</p>
+<p>In a rule's sheet, <strong>Summarize each batch with an agent</strong> has an agent write what was done in the batch's sessions. For a selection, the archive confirmation offers <strong>Archive and Summarize</strong>, which then opens the batch's report.</p>
+
+<h2 id="reports">Reports</h2>
+<vm-shot name="archive-reports" alt="The Archive Reports window: the list of batches on the left, and the summary of a batch with its sessions by project.">What was put away, batch by batch.</vm-shot>
+<p><strong>Window › Archive Reports</strong>, or <strong>Show Reports</strong> under the archive list, reads them by batch or by period — today, yesterday, 7 days, this month, or chosen dates —, by project, with the totals. An agent can summarize them, and a report exports to Markdown.</p>
