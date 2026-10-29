@@ -407,7 +407,7 @@ struct ArchiveRulesRunTests {
     await model.runArchiveRules()
     #expect(reads.value == 2)
     #expect(await repository.session(id: sessions[0].id)?.status == .closed)
-    #expect(try await store.load().rules.first?.lastRun?.archived == 0)
+    #expect(await store.load().rules.first?.lastRun?.archived == 0)
   }
 
   @Test("A tick that comes during a run runs once it ends, its time still due")
