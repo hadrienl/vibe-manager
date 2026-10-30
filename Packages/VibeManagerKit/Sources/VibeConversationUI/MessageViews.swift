@@ -48,6 +48,7 @@ struct UserPromptView: View {
             if !attachments.isEmpty {
               AttachmentStrip(attachments: attachments, alignment: .trailing)
             }
+            MessageTime(date: date)
           }
           // Files without text: the heading VoiceOver goes to is the group of them.
           .modifier(EmptyPromptHeading(isEmpty: shown.isEmpty))
@@ -66,6 +67,7 @@ struct UserPromptView: View {
             if !attachments.isEmpty {
               AttachmentStrip(attachments: attachments).padding(.top, 4)
             }
+            MessageTime(date: date)
           }
           Spacer(minLength: 0)
         }
@@ -132,6 +134,8 @@ struct AgentTextView: View {
   var id: String?
   /// `nil` before macOS 15, or in a sub-agent's result: no button.
   var readAloud: ReadAloudController?
+  /// When it was said: shown under it, beside the button (#458).
+  var date: Date?
   @Environment(\.openSettings) private var openSettings
 
   var body: some View {
@@ -153,8 +157,13 @@ struct AgentTextView: View {
             }
           }
         }
-      if let readAloud {
-        ReadAloudButton(text: text, id: id ?? text, readAloud: readAloud) { openSettings() }
+      if readAloud != nil || date != nil {
+        HStack(spacing: 8) {
+          if let readAloud {
+            ReadAloudButton(text: text, id: id ?? text, readAloud: readAloud) { openSettings() }
+          }
+          MessageTime(date: date)
+        }
       }
     }
   }
@@ -344,4 +353,67 @@ struct NoticeRow: View {
 func copy(_ text: String) {
   NSPasteboard.general.clearContents()
   NSPasteboard.general.setString(text, forType: .string)
+}
+
+/// The time a message was sent, small under it, and its full date in a tooltip (#458). Nothing for
+/// a message without a date. Not part of the conversation's selection: a copy takes the messages
+/// alone.
+struct MessageTime: View {
+  let date: Date?
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
+
+  var body: some View {
+    if let date {
+      Text(date, format: .dateTime.hour().minute())
+        .font(theme.interfaceFont(size: appearance.textSize.pointSize * 0.7))
+        .foregroundStyle(theme.secondaryText.color.opacity(0.8))
+        .instantTooltip(Self.fullDate(date))
+    }
+  }
+
+  /// « Thursday, October 30, 2026 at 09:14:32 », as the locale writes it.
+  static func fullDate(_ date: Date) -> String {
+    date.formatted(date: .complete, time: .standard)
+  }
+}
+
+/// Above the first message of a day: « Today », « Yesterday » or the date (#458).
+struct DaySeparator: View {
+  let day: Date
+  @Environment(\.conversationTheme) private var theme
+  @Environment(\.conversationAppearance) private var appearance
+
+  var body: some View {
+    HStack(spacing: 10) {
+      line
+      Self.label(for: day)
+        .font(theme.interfaceFont(size: appearance.textSize.pointSize * 0.72, weight: .medium))
+        .foregroundStyle(theme.secondaryText.color)
+        .fixedSize()
+      line
+    }
+    .padding(.vertical, 4)
+    .accessibilityElement(children: .combine)
+    .accessibilityAddTraits(.isHeader)
+  }
+
+  private var line: some View {
+    Rectangle().fill(theme.secondaryText.color.opacity(0.2)).frame(height: 1)
+  }
+
+  static func label(
+    for day: Date, now: Date = .now, calendar: Calendar = .autoupdatingCurrent
+  ) -> Text {
+    if calendar.isDate(day, inSameDayAs: now) { return Text("Today", bundle: .module) }
+    if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+      calendar.isDate(day, inSameDayAs: yesterday)
+    {
+      return Text("Yesterday", bundle: .module)
+    }
+    var style = Date.FormatStyle(date: .complete, time: .omitted)
+    style.calendar = calendar
+    style.timeZone = calendar.timeZone
+    return Text(day.formatted(style))
+  }
 }

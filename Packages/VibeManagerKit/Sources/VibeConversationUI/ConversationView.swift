@@ -186,6 +186,7 @@ public struct ConversationView: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: spacing) {
           ForEach(model.blocks) { block in
+            if let day = model.days.day(opening: block.id) { DaySeparator(day: day) }
             BlockView(block: block, model: model)
               .id(block.id)
           }
@@ -508,7 +509,8 @@ struct BlockView: View {
         UserPromptView(text: text, attachments: attachments, date: entry.date)
           .environment(\.selectionBlock, selectionBlock)
       case .agentText(let text):
-        AgentTextView(text: text, id: entry.id, readAloud: model.readAloud)
+        AgentTextView(
+          text: text, id: entry.id, readAloud: model.readAloud, date: entry.date)
           .environment(\.selectionBlock, selectionBlock)
       case .reasoning(let text):
         ReasoningRow(id: entry.id, text: text, model: model)
