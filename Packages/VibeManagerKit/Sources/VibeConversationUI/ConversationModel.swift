@@ -831,7 +831,10 @@ public final class ConversationModel {
     blocks = rebuilt
     layoutState.starts = starts
     rotor.update(blocks, from: restart)
+    // Written only when they differ: every row reads them, and a write redraws them all (#462).
+    var days = self.days
     days.update(blocks, from: restart)
+    if days != self.days { self.days = days }
     layoutCount += 1
     lastLayoutWork = LayoutWork(entries: changed.count, blocks: rebuilt.count - restart)
     if wasEmpty || scroll.blocksAppended(appended) { scrollToBottomRequest += 1 }

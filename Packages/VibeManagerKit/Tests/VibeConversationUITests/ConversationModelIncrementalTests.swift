@@ -139,6 +139,29 @@ struct ConversationModelIncrementalTests {
     }
   }
 
+  @Test("A layout that changes no day leaves the days unwritten, and their readers undrawn (#462)")
+  func daysUnwritten() {
+    let model = ConversationModel(sessionID: SessionID())
+    model.processRunning = { true }
+    let date = Date(timeIntervalSince1970: 1_000_000)
+    var entries = [
+      ConversationEntry(id: "p", date: date, content: .userPrompt("prompt", attachments: []))
+    ]
+    model.apply(Self.snapshot(entries, revision: 1, unchangedPrefix: 0))
+    #expect(model.days.day(opening: "p") != nil)
+    final class Flag: @unchecked Sendable { var changed = false }
+    let flag = Flag()
+    withObservationTracking {
+      _ = model.days
+    } onChange: {
+      flag.changed = true
+    }
+    entries.append(ConversationEntry(id: "a", date: date, content: .agentText("answer")))
+    model.apply(Self.snapshot(entries, revision: 2, unchangedPrefix: 1))
+    #expect(model.blocks.count == 2)
+    #expect(!flag.changed)
+  }
+
   @Test("One entry added to ten thousand lays out a handful of entries and blocks")
   func boundedWork() {
     let model = ConversationModel(sessionID: SessionID())
