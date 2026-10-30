@@ -159,7 +159,6 @@ func signInPages() throws {
     "https://git.example.org/users/two_factor_auth", "https://gitlab.com/users/auth/saml",
     "https://accounts.google.com/v3/signin", "https://login.microsoftonline.com/common/oauth2",
     "https://example.com/signin", "https://example.com/sso/start",
-    "https://example.com/oauth/authorize",
   ] {
     #expect(RemoteWebAddress.isSignIn(try #require(URL(string: page))), "\(page)")
   }
@@ -197,4 +196,67 @@ func webViewReplaced() {
   #expect(follower.macShows("https://github.com/o/r", isLoading: false) == "https://github.com/o/r")
   let next = follower.takeTyped(2)
   #expect(next)
+}
+
+@Test("A Mac that never loads what it was told does not swallow its user's next page")
+func unansweredNavigation() {
+  var follower = following()
+  #expect(go(&follower, .user, to: "https://github.com/o/r/issues") != nil)
+  // The Mac never loads it: its user goes elsewhere, and the phone follows.
+  #expect(follower.macShows("https://github.com/o/r", isLoading: false) == nil)
+  #expect(
+    follower.macShows("https://example.com/a", isLoading: true) == "https://example.com/a")
+
+  // Nor does a page its user asks next on the phone wait for the old answer.
+  #expect(go(&follower, .user, to: "https://example.com/b") != nil)
+  follower.phoneWillNavigate(.user, to: URL(string: "https://example.com/c"))
+  _ = follower.phoneMoved(to: "https://example.com/c")
+  _ = follower.phoneStoppedLoading()
+  #expect(follower.macShows("https://example.com/c", isLoading: true) == nil)
+  #expect(follower.macShows("https://example.com/c", isLoading: false) == nil)
+  #expect(follower.macShows("https://example.com/d", isLoading: false) == "https://example.com/d")
+}
+
+@Test("Auth0, Keycloak, Apple, Okta and the usual sign-in paths are told (#456)")
+func moreSignInPages() throws {
+  for page in [
+    "https://example.com/auth/login", "https://example.com/accounts/login/?next=/",
+    "https://acme.eu.auth0.com/u/login",
+    "https://id.example.com/realms/acme/protocol/openid-connect/auth",
+    "https://appleid.apple.com/auth/authorize", "https://idmsa.apple.com/appleauth/auth/signin",
+    "https://acme.okta.com/app/x/sso/saml",
+  ] {
+    #expect(RemoteWebAddress.isSignIn(try #require(URL(string: page))), "\(page)")
+  }
+}
+
+@Test(
+  "Sessions, OAuth and authorize pages are no sign-in off GitHub and GitLab, nor any on the Mac")
+func fewerSignInPages() throws {
+  for page in [
+    "https://example.com/sessions/42", "https://example.com/oauth/apps",
+    "https://example.com/apps/123/authorize", "https://docs.example.com/oauth/authorize",
+    "http://localhost:3000/login", "http://127.0.0.1:4000/users/sign_in",
+    "http://studio.local/sessions",
+  ] {
+    #expect(!RemoteWebAddress.isSignIn(try #require(URL(string: page))), "\(page)")
+  }
+  #expect(
+    RemoteWebAddress.isSignIn(try #require(URL(string: "https://github.com/sessions/two-factor"))))
+  #expect(
+    RemoteWebAddress.isSignIn(try #require(URL(string: "https://gitlab.com/oauth/authorize?x"))))
+}
+
+@Test("A sign-in through other hosts attaches the tab only back on its own site")
+func signInThroughOtherHosts() {
+  var follower = following("https://gitlab.com/g/p")
+  _ = go(&follower, .user, to: "https://gitlab.com/users/auth/google_oauth2")
+  _ = go(&follower, .redirect, to: "https://accounts.google.com/o/oauth2/v2/auth")
+  // A host met on the way, no identity provider's yet no page of the site's.
+  _ = go(&follower, .redirect, to: "https://accounts.youtube.com/accounts/SetSID")
+  #expect(follower.isDetached)
+  _ = go(&follower, .redirect, to: "https://accounts.google.com/signin/continue")
+  #expect(follower.isDetached)
+  _ = go(&follower, .redirect, to: "https://gitlab.com/dashboard/projects")
+  #expect(!follower.isDetached)
 }
