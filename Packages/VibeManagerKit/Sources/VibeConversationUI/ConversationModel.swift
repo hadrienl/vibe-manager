@@ -254,6 +254,57 @@ struct EchoTallies {
   }
 }
 
+/// The messages that open a day of the conversation, the first of the transcript among them: a
+/// separator, « Today », « Yesterday » or the date, goes above each (#458). Only the prompts and
+/// the answers count, the ones that show their time; a message without a date opens nothing.
+/// Brought up to date with the blocks, like the rotors.
+public struct ConversationDays: Equatable, Sendable {
+  struct Opening: Equatable, Sendable {
+    let index: Int
+    let id: String
+    let day: Date
+  }
+  private var openings: [Opening] = []
+  private var days: [String: Date] = [:]
+  var calendar = Calendar.autoupdatingCurrent
+
+  /// The start of the day the block opens, `nil` when it opens none.
+  public func day(opening id: String) -> Date? { days[id] }
+
+  mutating func update(_ blocks: [ConversationBlock], from start: Int) {
+    while let last = openings.last, last.index >= start {
+      openings.removeLast()
+      days[last.id] = nil
+    }
+    // The day of the last dated message before the restart, which may come after its opening.
+    var current: Date?
+    for index in blocks.indices.prefix(start).reversed() {
+      if let date = Self.messageDate(blocks[index]) {
+        current = calendar.startOfDay(for: date)
+        break
+      }
+    }
+    for index in blocks.indices.dropFirst(start) {
+      guard let date = Self.messageDate(blocks[index]) else { continue }
+      let day = calendar.startOfDay(for: date)
+      guard day != current else { continue }
+      current = day
+      let id = blocks[index].id
+      openings.append(Opening(index: index, id: id, day: day))
+      days[id] = day
+    }
+  }
+
+  /// The date a prompt or an answer shows; the others show none.
+  static func messageDate(_ block: ConversationBlock) -> Date? {
+    guard case .entry(let entry) = block else { return nil }
+    switch entry.content {
+    case .userPrompt, .agentText: return entry.date
+    default: return nil
+    }
+  }
+}
+
 /// The blocks the accessibility rotors go through, by their place among the blocks: brought up to
 /// date with them, rather than looked for among thousands at each drawing (#250).
 public struct ConversationRotor: Equatable, Sendable {
@@ -302,6 +353,8 @@ public final class ConversationModel {
   public var promptBlocks: [ConversationBlock] { rotor.prompts.map { blocks[$0] } }
   public var failureBlocks: [ConversationBlock] { rotor.failures.map { blocks[$0] } }
   public var subagentBlocks: [ConversationBlock] { rotor.subagents.map { blocks[$0] } }
+  /// The messages that open a day, and which day (#458).
+  public private(set) var days = ConversationDays()
   public private(set) var scroll = ConversationScrollState()
   /// Bumped when the view should scroll to the end: a counter, so that twice in a row still moves.
   public private(set) var scrollToBottomRequest = 0
@@ -475,8 +528,23 @@ public final class ConversationModel {
   /// Where ↑ and ↓ stand in the messages sent (#123).
   @ObservationIgnored private var historyNavigation = PromptHistoryNavigation()
 
-  public init(sessionID: SessionID) {
+  /// Today and the calendar the days are read in (#458).
+  @ObservationIgnored public let clock: CalendarClock
+
+  public init(sessionID: SessionID, clock: CalendarClock = .shared) {
     self.sessionID = sessionID
+    self.clock = clock
+    days.calendar = clock.calendar
+    clock.onTimeZoneChange { [weak self] in self?.rereadDays() }
+  }
+
+  /// The days cut again at the midnights of the new time zone: those read before were the old
+  /// one's.
+  private func rereadDays() {
+    var days = ConversationDays()
+    days.calendar = clock.calendar
+    days.update(blocks, from: 0)
+    self.days = days
   }
 
   /// Reads the stream of a `FollowConversation` until it ends or the model is released.
@@ -763,6 +831,7 @@ public final class ConversationModel {
     blocks = rebuilt
     layoutState.starts = starts
     rotor.update(blocks, from: restart)
+    days.update(blocks, from: restart)
     layoutCount += 1
     lastLayoutWork = LayoutWork(entries: changed.count, blocks: rebuilt.count - restart)
     if wasEmpty || scroll.blocksAppended(appended) { scrollToBottomRequest += 1 }

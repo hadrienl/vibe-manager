@@ -76,6 +76,7 @@ struct ConversationModelIncrementalTests {
       "\(step)")
     #expect(Set(incremental.trayItems) == Set(full.trayItems), "\(step)")
     #expect(incremental.rotor == full.rotor, "\(step)")
+    #expect(incremental.days == full.days, "\(step)")
     #expect(incremental.scrollToBottomRequest == full.scrollToBottomRequest, "\(step)")
   }
 
