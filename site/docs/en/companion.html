@@ -20,6 +20,16 @@
   <li>Questions, including those that ask several at once, which you answer from the iPhone.</li>
 </ul>
 
+<h2 id="web">The web view</h2>
+<p>In a conversation, the <strong>Web View</strong> button opens the session's web view. It shows the Mac's active page and follows it, and the tabs menu switches between the Mac's tabs. The subtitle says <strong>In sync with the Mac</strong>. The Mac and the iPhone don't share a session: each has its own cookies.</p>
+<ul>
+  <li>Only your own navigations are sent to the Mac, meaning an address you type or a link you touch. Redirects, reloads and form answers stay on the iPhone.</li>
+  <li>On a sign-in page (GitHub, GitLab, Google, Microsoft, Apple, Okta, Auth0, Keycloak…), the view detaches by itself: the <strong>Not Synced</strong> badge shows in the address bar, and the iPhone stops following the Mac and sends it nothing. It attaches again by itself when the sign-in lands back on a page of the site. Touch the badge to attach it sooner.</li>
+  <li><strong>Stop Syncing</strong> detaches the view by hand. It stays detached until you touch <strong>Not Synced</strong> or pick a tab.</li>
+  <li><strong>Open in Safari</strong> opens the page shown in Safari, or in the app its address opens, such as GitHub. It is dimmed on the Mac's own pages, which only the Mac can reach.</li>
+</ul>
+<div class="callout"><p>Passkeys don't work in the web view. Sign in with a password, or open the page in Safari.</p></div>
+
 <h2 id="privacy">No server</h2>
 <p>The Mac and the iPhone talk through CloudKit, in your private iCloud: no Vibe Manager server between them. Only iPhones whose key is published in your iCloud are let in.</p>
 <div class="callout"><p>Alpha: expect changes and a few bugs. Report them in an <a href="https://github.com/hadrienl/vibe-manager/issues">issue</a>.</p></div>
