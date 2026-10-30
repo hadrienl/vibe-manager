@@ -130,14 +130,7 @@ final class CompanionWebMirror {
   /// What was typed in the address field: an address with its scheme, `localhost:4000` or a
   /// host, as Safari takes them.
   static func url(from address: String) -> URL? {
-    let text = address.trimmingCharacters(in: .whitespacesAndNewlines)
-    guard !text.isEmpty else { return nil }
-    if text.contains("://") { return URL(string: text) }
-    let isLocal =
-      text.hasPrefix("localhost") || text.hasPrefix("127.")
-      || text.range(
-        of: #"^[\w.-]+:\d+"#, options: .regularExpression) != nil
-    return URL(string: (isLocal ? "http://" : "https://") + text)
+    RemoteWebAddress.typed(address)
   }
 
   // MARK: - The phone's requests
