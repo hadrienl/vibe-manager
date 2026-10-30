@@ -39,11 +39,40 @@ public struct RemoteWebFollower: Sendable {
   /// since.
   private var awaiting: (from: String?, started: Bool)?
 
+  /// The number of the last address typed that was loaded: the view keeps typing's count, which
+  /// a new web view must not take for a new address.
+  private var typedLoaded = 0
+
   public init() {}
+
+  /// Whether the address typed as number `number` is still to load: once, whatever the web views.
+  public mutating func takeTyped(_ number: Int) -> Bool {
+    guard number > typedLoaded else { return false }
+    typedLoaded = number
+    return true
+  }
+
+  /// A new web view, blank, replaced the phone's: it follows the Mac from its next state, attached,
+  /// as on its first.
+  public mutating func webViewReplaced() {
+    self = RemoteWebFollower(typedLoaded: typedLoaded)
+  }
+
+  private init(typedLoaded: Int) {
+    self.typedLoaded = typedLoaded
+  }
 
   /// The phone's web view starts going to `url`: a sign-in page detaches it, the page a sign-in
   /// ends on attaches it again.
+  ///
+  /// A link to an anchor of the page shown loads nothing — no navigation starts or ends — and
+  /// leaves the phone as it was.
   public mutating func phoneWillNavigate(_ navigation: Navigation, to url: URL?) {
+    if let url, url.fragment != nil, navigation != .page,
+      let phoneURL, RemoteWebAddress.same(phoneURL, url.absoluteString)
+    {
+      return
+    }
     isPhoneLoading = true
     userNavigating = navigation == .user
     guard let url else { return }

@@ -171,3 +171,30 @@ func signInPages() throws {
     #expect(!RemoteWebAddress.isSignIn(try #require(URL(string: page))), "\(page)")
   }
 }
+
+@Test("A link to an anchor of the page shown leaves the phone following the Mac")
+func anchorLinkLoadsNothing() {
+  var follower = following("https://example.com/docs")
+  follower.phoneWillNavigate(.user, to: URL(string: "https://example.com/docs#install"))
+  #expect(follower.phoneMoved(to: "https://example.com/docs#install") == nil)
+  #expect(!follower.isPhoneLoading)
+  #expect(
+    follower.macShows("https://example.com/blog", isLoading: false) == "https://example.com/blog")
+}
+
+@Test("A new web view loads no address typed before, and follows the Mac, attached")
+func webViewReplaced() {
+  var follower = following()
+  let first = follower.takeTyped(1)
+  #expect(first)
+  _ = go(&follower, .user, to: "https://github.com/login")
+  #expect(follower.isDetached)
+  follower.webViewReplaced()
+  let again = follower.takeTyped(1)
+  #expect(!again)
+  #expect(!follower.isDetached)
+  #expect(follower.phoneURL == nil)
+  #expect(follower.macShows("https://github.com/o/r", isLoading: false) == "https://github.com/o/r")
+  let next = follower.takeTyped(2)
+  #expect(next)
+}
