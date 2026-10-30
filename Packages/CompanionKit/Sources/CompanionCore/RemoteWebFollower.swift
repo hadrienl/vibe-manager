@@ -7,12 +7,18 @@ import Foundation
 /// does is told to the Mac — an address typed, a link touched — never a redirect, a reload or a
 /// form's answer. And where the Mac lands after loading what it was told — a sign-in page sends a
 /// Mac already signed in back where it came from — is the Mac's answer, not a page for the phone.
+///
+/// A sign-in page detaches the phone from the Mac altogether: nothing told, nothing followed, until
+/// the sign-in ends on a page of the site's — reached by a redirect or a form — or its user attaches
+/// it again.
 public struct RemoteWebFollower: Sendable {
   /// Why the phone's web view goes to a page.
   public enum Navigation: Sendable {
     /// Its user typed an address or touched a link.
     case user
-    /// A redirect, a reload, a form sent, a script: the page's doing, not its user's.
+    /// A redirect, a form sent, a script: where a sign-in ends.
+    case redirect
+    /// A reload, the history.
     case page
   }
 
@@ -21,6 +27,10 @@ public struct RemoteWebFollower: Sendable {
   /// The Mac's active page, as last told.
   public private(set) var macURL: String?
   public private(set) var isPhoneLoading = false
+  /// Whether the phone neither tells the Mac nor follows it.
+  public private(set) var isDetached = false
+  /// Whether its user detached it, for it to stay so until they attach it.
+  private var detachedByUser = false
   /// A page of the Mac's to load once the phone's own loading ends.
   private var pendingMacURL: String?
   /// Whether the navigation under way is its user's.
@@ -31,10 +41,31 @@ public struct RemoteWebFollower: Sendable {
 
   public init() {}
 
-  /// The phone's web view starts going somewhere.
-  public mutating func phoneWillNavigate(_ navigation: Navigation) {
+  /// The phone's web view starts going to `url`: a sign-in page detaches it, the page a sign-in
+  /// ends on attaches it again.
+  public mutating func phoneWillNavigate(_ navigation: Navigation, to url: URL?) {
     isPhoneLoading = true
     userNavigating = navigation == .user
+    guard let url else { return }
+    if RemoteWebAddress.isSignIn(url) {
+      if !isDetached { detach(byUser: false) }
+    } else if isDetached, !detachedByUser, navigation == .redirect {
+      attach()
+    }
+  }
+
+  /// Neither tells the Mac nor follows it, until attached again.
+  public mutating func detach(byUser: Bool = true) {
+    isDetached = true
+    detachedByUser = byUser
+    awaiting = nil
+    pendingMacURL = nil
+  }
+
+  /// Follows the Mac again from its next move, without loading anything now.
+  public mutating func attach() {
+    isDetached = false
+    detachedByUser = false
   }
 
   /// The phone's page changed: the address to tell the Mac, if its user went there.
@@ -43,7 +74,7 @@ public struct RemoteWebFollower: Sendable {
   public mutating func phoneMoved(to url: String) -> String? {
     guard phoneURL.map({ !RemoteWebAddress.same($0, url) }) ?? true else { return nil }
     phoneURL = url
-    guard userNavigating || !isPhoneLoading else { return nil }
+    guard !isDetached, userNavigating || !isPhoneLoading else { return nil }
     userNavigating = false
     pendingMacURL = nil
     if let macURL, RemoteWebAddress.same(macURL, url) { return nil }
@@ -62,6 +93,10 @@ public struct RemoteWebFollower: Sendable {
 
   /// What the Mac shows: the address the phone should load, if any.
   public mutating func macShows(_ url: String, isLoading: Bool) -> String? {
+    if isDetached {
+      macURL = url
+      return nil
+    }
     if let awaiting {
       // The Mac loads what it was told, and where that load ends — the page asked, or wherever
       // the Mac's session sent it — is its answer. A state it sent before beginning is not.
@@ -84,5 +119,29 @@ public struct RemoteWebFollower: Sendable {
     }
     phoneURL = url
     return url
+  }
+}
+
+extension RemoteWebAddress {
+  /// Hosts that only sign people in.
+  static let signInHosts: Set<String> = [
+    "accounts.google.com", "login.microsoftonline.com", "login.live.com", "login.microsoft.com",
+  ]
+  /// Paths, segment by segment, of a sign-in: GitHub's, GitLab's, and the usual ones.
+  static let signInPaths: [[String]] = [
+    ["login"], ["signin"], ["sign-in"], ["session"], ["sessions"], ["oauth"], ["sso"],
+    ["users", "sign_in"], ["users", "two_factor_auth"], ["users", "auth"], ["users", "password"],
+  ]
+  /// Segments that, last in a path, make it a sign-in: `/login/oauth/authorize`.
+  static let signInLastSegments: Set<String> = ["authorize"]
+
+  /// Whether `url` is a page for signing in: its host is an identity provider's, or its path
+  /// starts with one of a sign-in's, segment by segment — `/login`, not `/docs/login-help`.
+  public static func isSignIn(_ url: URL) -> Bool {
+    let host = url.host?.lowercased() ?? ""
+    if signInHosts.contains(host) { return true }
+    let segments = url.pathComponents.filter { $0 != "/" }.map { $0.lowercased() }
+    if let last = segments.last, signInLastSegments.contains(last) { return true }
+    return signInPaths.contains { segments.starts(with: $0) }
   }
 }
