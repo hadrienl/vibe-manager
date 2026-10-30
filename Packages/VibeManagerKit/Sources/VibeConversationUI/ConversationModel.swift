@@ -528,8 +528,23 @@ public final class ConversationModel {
   /// Where ↑ and ↓ stand in the messages sent (#123).
   @ObservationIgnored private var historyNavigation = PromptHistoryNavigation()
 
-  public init(sessionID: SessionID) {
+  /// Today and the calendar the days are read in (#458).
+  @ObservationIgnored public let clock: CalendarClock
+
+  public init(sessionID: SessionID, clock: CalendarClock = .shared) {
     self.sessionID = sessionID
+    self.clock = clock
+    days.calendar = clock.calendar
+    clock.onTimeZoneChange { [weak self] in self?.rereadDays() }
+  }
+
+  /// The days cut again at the midnights of the new time zone: those read before were the old
+  /// one's.
+  private func rereadDays() {
+    var days = ConversationDays()
+    days.calendar = clock.calendar
+    days.update(blocks, from: 0)
+    self.days = days
   }
 
   /// Reads the stream of a `FollowConversation` until it ends or the model is released.

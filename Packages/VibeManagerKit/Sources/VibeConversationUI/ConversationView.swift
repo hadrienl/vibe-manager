@@ -186,8 +186,7 @@ public struct ConversationView: View {
       ScrollView {
         LazyVStack(alignment: .leading, spacing: spacing) {
           ForEach(model.blocks) { block in
-            if let day = model.days.day(opening: block.id) { DaySeparator(day: day) }
-            BlockView(block: block, model: model)
+            BlockRow(block: block, model: model, spacing: spacing)
               .id(block.id)
           }
           ForEach(model.echoes) { echo in
@@ -484,6 +483,25 @@ public struct ConversationView: View {
       return block.id
     }
     return String(text.prefix(80))
+  }
+}
+
+/// A block of the conversation and, above the first message of a day, its separator: one element
+/// of the list, so that scrolling to the message shows the day it opens (#458).
+struct BlockRow: View {
+  let block: ConversationBlock
+  let model: ConversationModel
+  let spacing: Double
+
+  var body: some View {
+    if let day = model.days.day(opening: block.id) {
+      VStack(alignment: .leading, spacing: spacing) {
+        DaySeparator(day: day, clock: model.clock)
+        BlockView(block: block, model: model)
+      }
+    } else {
+      BlockView(block: block, model: model)
+    }
   }
 }
 

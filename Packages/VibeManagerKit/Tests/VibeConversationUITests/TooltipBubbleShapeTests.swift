@@ -118,6 +118,20 @@ struct TooltipPlacementTests {
     #expect(window.contains(low.frame))
   }
 
+  @Test("Pushed along the view by the window, the side arrow stays clear of the corners")
+  func sideArrowClearOfCorners() {
+    let atTheBottom = CGRect(x: 400, y: 96, width: 40, height: 8)
+    let low = TooltipPlacement(
+      size: size, anchor: atTheBottom, window: window, screen: screen, edge: .right)
+    #expect(low.frame.minY == window.minY + TooltipPlacement.margin)
+    #expect(low.arrowX == size.height - TooltipBubbleShape.arrowClearance)
+
+    let atTheTop = CGRect(x: 400, y: 696, width: 40, height: 8)
+    let high = TooltipPlacement(
+      size: size, anchor: atTheTop, window: window, screen: screen, edge: .right)
+    #expect(high.arrowX == TooltipBubbleShape.arrowClearance)
+  }
+
   @Test("Leading and trailing follow the layout's direction")
   func sidesInTheDirection() {
     #expect(TooltipSide.leading.edge(in: .leftToRight) == .left)

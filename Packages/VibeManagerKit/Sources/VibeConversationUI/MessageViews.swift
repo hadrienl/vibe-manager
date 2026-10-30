@@ -48,7 +48,7 @@ struct UserPromptView: View {
             if !attachments.isEmpty {
               AttachmentStrip(attachments: attachments, alignment: .trailing)
             }
-            MessageTime(date: date, tooltipSide: .leading)
+            MessageTime(date: date, tooltipSide: Self.tooltipSide(.bubbles))
           }
           // Files without text: the heading VoiceOver goes to is the group of them.
           .modifier(EmptyPromptHeading(isEmpty: shown.isEmpty))
@@ -67,7 +67,7 @@ struct UserPromptView: View {
             if !attachments.isEmpty {
               AttachmentStrip(attachments: attachments).padding(.top, 4)
             }
-            MessageTime(date: date, tooltipSide: .leading)
+            MessageTime(date: date, tooltipSide: Self.tooltipSide(.lines))
           }
           Spacer(minLength: 0)
         }
@@ -82,6 +82,12 @@ struct UserPromptView: View {
         Text("Copy Message", bundle: .module)
       }
     }
+  }
+
+  /// Where its time opens the full date: towards the conversation's middle, from a bubble on the
+  /// trailing side or a line on the leading one.
+  static func tooltipSide(_ style: ConversationAppearance.UserMessageStyle) -> TooltipSide {
+    style == .bubbles ? .leading : .trailing
   }
 
   private func content(_ shown: String, size: Double) -> some View {
@@ -383,13 +389,15 @@ struct MessageTime: View {
 /// Above the first message of a day: « Today », « Yesterday » or the date (#458).
 struct DaySeparator: View {
   let day: Date
+  /// Read again at midnight: « Today » becomes « Yesterday » on a conversation left open.
+  let clock: CalendarClock
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
   var body: some View {
     HStack(spacing: 10) {
       line
-      Self.label(for: day)
+      Self.label(for: day, now: clock.now, calendar: clock.calendar)
         .font(theme.interfaceFont(size: appearance.textSize.pointSize * 0.72, weight: .medium))
         .foregroundStyle(theme.secondaryText.color)
         .fixedSize()
@@ -405,7 +413,7 @@ struct DaySeparator: View {
   }
 
   static func label(
-    for day: Date, now: Date = .now, calendar: Calendar = .autoupdatingCurrent
+    for day: Date, now: Date, calendar: Calendar
   ) -> Text {
     if calendar.isDate(day, inSameDayAs: now) { return Text("Today", bundle: .module) }
     if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),

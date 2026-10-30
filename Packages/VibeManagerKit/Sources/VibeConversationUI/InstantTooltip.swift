@@ -257,7 +257,9 @@ struct TooltipPlacement: Equatable {
       let centred = anchor.midY - size.height / 2
       let y = max(sides.minY + Self.margin, min(centred, sides.maxY - Self.margin - size.height))
       frame = CGRect(origin: CGPoint(x: x, y: y), size: size)
-      arrowX = frame.maxY - anchor.midY
+      // Clear of the bubble's corners when the window pushed it along the view.
+      let clearance = TooltipBubbleShape.arrowClearance
+      arrowX = max(clearance, min(frame.maxY - anchor.midY, size.height - clearance))
       pointsDown = false
       arrowEdge = opensOn.opposite
       return
