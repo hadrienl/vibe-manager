@@ -2,6 +2,7 @@ import AppKit
 import CompanionCore
 import Foundation
 import VibeBrowser
+import VibeCompanionLink
 import VibeDomain
 import VibeUI
 import WebKit
@@ -128,9 +129,13 @@ final class CompanionWebMirror {
   }
 
   /// What was typed in the address field: an address with its scheme, `localhost:4000` or a
-  /// host, as Safari takes them.
+  /// host, as Safari takes them. Only a web page: never a file or another application's scheme,
+  /// whatever a paired phone sends.
   static func url(from address: String) -> URL? {
-    RemoteWebAddress.typed(address)
+    guard let url = RemoteWebAddress.typed(address),
+      ["http", "https"].contains(url.scheme?.lowercased() ?? "")
+    else { return nil }
+    return url
   }
 
   // MARK: - The phone's requests
@@ -141,7 +146,7 @@ final class CompanionWebMirror {
   static func fetch(_ request: RemoteHTTPRequest) async -> RemoteHTTPResponse {
     guard let url = URL(string: request.url), RemoteWebAddress.isMacLocal(url) else {
       return RemoteHTTPResponse(
-        id: request.id, status: 0, headers: [:], body: Data(), failure: "Adresse refusée")
+        id: request.id, status: 0, headers: [:], body: Data(), failure: CompanionStrings.addressRefused)
     }
     var urlRequest = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
     urlRequest.httpMethod = request.method

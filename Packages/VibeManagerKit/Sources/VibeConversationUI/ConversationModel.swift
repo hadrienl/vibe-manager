@@ -535,7 +535,7 @@ public final class ConversationModel {
     self.sessionID = sessionID
     self.clock = clock
     days.calendar = clock.calendar
-    clock.onTimeZoneChange { [weak self] in self?.rereadDays() }
+    clock.onTimeZoneChange(of: self) { $0.rereadDays() }
   }
 
   /// The days cut again at the midnights of the new time zone: those read before were the old

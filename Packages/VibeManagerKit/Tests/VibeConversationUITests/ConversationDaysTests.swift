@@ -132,6 +132,20 @@ struct ConversationDaysTests {
         == Text("Yesterday", bundle: .module))
   }
 
+  @Test("A conversation gone leaves the clock nothing to run")
+  @MainActor
+  func closedConversation() {
+    let clock = CalendarClock(
+      center: NotificationCenter(), now: { Self.date(30, 12) }, calendar: { Self.calendar })
+    var closed: ConversationModel? = ConversationModel(sessionID: SessionID(), clock: clock)
+    #expect(clock.timeZoneChangeCount == 1)
+    closed = nil
+    let open = ConversationModel(sessionID: SessionID(), clock: clock)
+    #expect(closed == nil)
+    #expect(clock.timeZoneChangeCount == 1)
+    withExtendedLifetime(open) {}
+  }
+
   @Test("When the time zone changes, the days are cut again at its midnights")
   @MainActor
   func timeZoneChange() async {

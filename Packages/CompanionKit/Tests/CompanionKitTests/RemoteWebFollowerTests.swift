@@ -260,3 +260,11 @@ func signInThroughOtherHosts() {
   _ = go(&follower, .redirect, to: "https://gitlab.com/dashboard/projects")
   #expect(!follower.isDetached)
 }
+
+@Test("With no page open on the Mac, an address typed is told to it, not kept for later (#457)")
+func typedWithoutPage() {
+  let url = URL(string: "https://example.com")!
+  #expect(RemoteWebAddress.typed("example.com", pageOpen: false) == .tellMac(url))
+  #expect(RemoteWebAddress.typed("example.com", pageOpen: true) == .load(url))
+  #expect(RemoteWebAddress.typed("  ", pageOpen: false) == nil)
+}
