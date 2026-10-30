@@ -1,4 +1,5 @@
 import CompanionCore
+import OSLog
 import SwiftUI
 import WebKit
 
@@ -13,6 +14,10 @@ struct WebMirrorView: View {
   @Environment(RemoteChannel.self) private var channel
   @State private var address = ""
   @FocusState private var addressFocused: Bool
+  /// The last address typed here, loaded by the phone itself; its number tells each apart.
+  @State private var typed: (number: Int, url: URL)?
+  /// The phone's own web view, as the bars around it show it.
+  @State private var page = MirroredPage()
 
   private var state: RemoteWebState? {
     channel.webState?.sessionID == sessionID ? channel.webState : nil
@@ -26,7 +31,8 @@ struct WebMirrorView: View {
       addressBar
       if let tab = activeTab, let url = URL(string: tab.url) {
         SyncedWebView(
-          url: url, scroll: state?.scroll ?? 0, channel: channel,
+          url: url, isMacLoading: tab.isLoading, typed: typed, scroll: state?.scroll ?? 0,
+          channel: channel, page: page,
           navigated: { channel.web(.navigate($0.absoluteString), in: sessionID) },
           scrolled: { channel.web(.scrollTo($0), in: sessionID) })
       } else if state != nil {
@@ -40,13 +46,14 @@ struct WebMirrorView: View {
       }
     }
     .navigationTitle("Web View")
-    .navigationSubtitle("In sync with the Mac")
+    .navigationSubtitle(page.isDetached ? Text("Not Synced") : Text("In sync with the Mac"))
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
         Menu("Tabs", systemImage: "square.on.square") {
           ForEach(state?.tabs ?? []) { tab in
             Button {
+              page.attach()
               channel.web(.selectTab(tab.id), in: sessionID)
             } label: {
               if tab.id == state?.activeTabID {
@@ -61,17 +68,33 @@ struct WebMirrorView: View {
       }
       ToolbarItemGroup(placement: .bottomBar) {
         Button("Back", systemImage: "chevron.backward") {
-          channel.web(.back, in: sessionID)
+          if page.isDetached { page.webView?.goBack() } else { channel.web(.back, in: sessionID) }
         }
-        .disabled(state?.canGoBack != true)
+        .disabled(page.isDetached ? !page.canGoBack : state?.canGoBack != true)
         Button("Forward", systemImage: "chevron.forward") {
-          channel.web(.forward, in: sessionID)
+          if page.isDetached {
+            page.webView?.goForward()
+          } else {
+            channel.web(.forward, in: sessionID)
+          }
         }
-        .disabled(state?.canGoForward != true)
+        .disabled(page.isDetached ? !page.canGoForward : state?.canGoForward != true)
         Spacer()
+        Button("Open in Safari", systemImage: "safari") {
+          if let safariURL { UIApplication.shared.open(safariURL) }
+        }
+        .disabled(safariURL == nil)
+        if !page.isDetached {
+          Button("Stop Syncing", systemImage: "link.badge.minus") { page.detach() }
+            .disabled(activeTab == nil)
+        }
         Button("Reload", systemImage: "arrow.clockwise") {
-          channel.web(.reload, in: sessionID)
-          channel.reloadWeb += 1
+          if page.isDetached {
+            page.webView?.reload()
+          } else {
+            channel.web(.reload, in: sessionID)
+            channel.reloadWeb += 1
+          }
         }
       }
     }
@@ -80,6 +103,16 @@ struct WebMirrorView: View {
     .onChange(of: activeTab?.url, initial: true) { _, url in
       if !addressFocused { address = url ?? "" }
     }
+  }
+
+  /// The page shown, for Safari — or the app its address opens, such as GitHub's. Not a page of
+  /// the Mac's own, which only the Mac reaches.
+  private var safariURL: URL? {
+    guard let url = page.url,
+      ["http", "https"].contains(url.scheme?.lowercased() ?? ""),
+      !RemoteWebAddress.isMacLocal(url)
+    else { return nil }
+    return url
   }
 
   private var addressBar: some View {
@@ -92,8 +125,23 @@ struct WebMirrorView: View {
         .textInputAutocapitalization(.never)
         .autocorrectionDisabled()
         .submitLabel(.go)
-        .onSubmit { channel.web(.navigate(address), in: sessionID) }
-      if let count = state?.tabs.count, count > 1,
+        .onSubmit {
+          guard let url = RemoteWebAddress.typed(address) else { return }
+          typed = (number: (typed?.number ?? 0) + 1, url: url)
+        }
+      if page.isDetached {
+        Button {
+          page.attach()
+        } label: {
+          Label("Not Synced", systemImage: "personalhotspot.slash")
+            .font(.caption)
+            .labelStyle(.titleAndIcon)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .controlSize(.mini)
+        .accessibilityHint("Follows the Mac again")
+      } else if let count = state?.tabs.count, count > 1,
         let index = state?.tabs.firstIndex(where: { $0.id == state?.activeTabID })
       {
         Text("\(index + 1) of \(count)").font(.caption).foregroundStyle(.secondary)
@@ -107,11 +155,32 @@ struct WebMirrorView: View {
   }
 }
 
+/// The phone's web view as the bars around it show it: its page, and whether it is detached from
+/// the Mac (#456).
+@MainActor @Observable
+private final class MirroredPage {
+  fileprivate(set) var isDetached = false
+  fileprivate(set) var url: URL?
+  fileprivate(set) var canGoBack = false
+  fileprivate(set) var canGoForward = false
+  /// Kept here, not in the web view's coordinator, for a web view made anew — the channel back
+  /// after a break — not to take an address typed before for a new one.
+  @ObservationIgnored fileprivate var follower = RemoteWebFollower()
+  @ObservationIgnored fileprivate weak var webView: WKWebView?
+  @ObservationIgnored fileprivate weak var coordinator: SyncedWebView.Coordinator?
+
+  func detach() { coordinator?.detach(byUser: true) }
+  func attach() { coordinator?.attach() }
+}
+
 /// The phone's web view: it loads what the Mac shows, and says what its user does.
 private struct SyncedWebView: UIViewRepresentable {
   let url: URL
+  let isMacLoading: Bool
+  let typed: (number: Int, url: URL)?
   let scroll: Double
   let channel: RemoteChannel
+  let page: MirroredPage
   let navigated: (URL) -> Void
   let scrolled: (Double) -> Void
 
@@ -129,7 +198,7 @@ private struct SyncedWebView: UIViewRepresentable {
     let webView = WKWebView(frame: .zero, configuration: configuration)  // NOSONAR
     webView.allowsBackForwardNavigationGestures = false
     webView.navigationDelegate = context.coordinator
-    context.coordinator.attach(webView)
+    context.coordinator.observe(webView, for: page)
     return webView
   }
 
@@ -137,7 +206,10 @@ private struct SyncedWebView: UIViewRepresentable {
     let coordinator = context.coordinator
     coordinator.navigated = navigated
     coordinator.scrolled = scrolled
-    coordinator.show(url, in: webView)
+    if let typed, page.follower.takeTyped(typed.number) {
+      coordinator.load(typed.url, in: webView, byUser: true)
+    }
+    coordinator.show(url, isLoading: isMacLoading, in: webView)
     coordinator.scroll(to: scroll, in: webView)
     if coordinator.reloads != channel.reloadWeb {
       coordinator.reloads = channel.reloadWeb
@@ -159,10 +231,84 @@ private struct SyncedWebView: UIViewRepresentable {
       decisionHandler: @escaping @MainActor (WKNavigationActionPolicy) -> Void
     ) {
       let scheme = action.request.url?.scheme?.lowercased() ?? ""
-      decisionHandler(Self.allowedSchemes.contains(scheme) ? .allow : .cancel)
+      guard Self.allowedSchemes.contains(scheme) else { return decisionHandler(.cancel) }
+      if action.targetFrame?.isMainFrame == true {
+        // A server's redirect is an `.other` navigation, as a script's is.
+        let navigation: RemoteWebFollower.Navigation =
+          if loadingTyped || action.navigationType == .linkActivated {
+            .user
+          } else if [.formSubmitted, .formResubmitted, .other].contains(action.navigationType) {
+            .redirect
+          } else {
+            .page
+          }
+        let source = loadingMac ? "from the Mac" : String(describing: navigation)
+        loadingTyped = false
+        loadingMac = false
+        let wasDetached = follower.isDetached
+        follower.phoneWillNavigate(
+          navigation, to: action.request.url.map(RemoteWebAddress.unproxied))
+        Self.logger.debug(
+          "phone goes to \(action.request.url?.absoluteString ?? "-", privacy: .public) (\(source, privacy: .public))\(wasDetached == self.follower.isDetached ? "" : self.follower.isDetached ? ": detached" : ": attached", privacy: .public)"
+        )
+        publish()
+      }
+      decisionHandler(.allow)
     }
 
+    func webView(
+      _ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!
+    ) {
+      current = navigation
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+      stoppedLoading(navigation, in: webView)
+    }
+
+    func webView(
+      _ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error
+    ) {
+      stoppedLoading(navigation, in: webView)
+    }
+
+    func webView(
+      _ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!,
+      withError error: any Error
+    ) {
+      stoppedLoading(navigation, in: webView)
+    }
+
+    /// The phone's loading ended: the Mac's page, if it moved meanwhile, is loaded now. Not when
+    /// what ended is a navigation another one replaced — cancelled, -999 — which leaves that other
+    /// one loading.
+    private func stoppedLoading(_ navigation: WKNavigation?, in webView: WKWebView) {
+      publish()
+      guard navigation == nil || navigation === current else {
+        Self.logger.debug("phone: a replaced navigation ended, ignored")
+        return
+      }
+      current = nil
+      if let address = follower.phoneStoppedLoading(), let url = URL(string: address) {
+        Self.logger.debug(
+          "phone loads the Mac's \(address, privacy: .public), held while it loaded")
+        load(url, in: webView, byUser: false)
+      }
+    }
+
+    static let logger = Logger(subsystem: "eu.hadrien.VibeManager.companion", category: "web")
     var navigated: (URL) -> Void = { _ in /* Set by the view. */ }
+    private weak var page: MirroredPage?
+    private weak var webView: WKWebView?
+    /// The navigation under way, the one whose end ends the loading.
+    private var current: WKNavigation?
+    private var follower: RemoteWebFollower {
+      get { page?.follower ?? RemoteWebFollower() }
+      set { page?.follower = newValue }
+    }
+    /// Whether the load under way is of an address typed here, or of the Mac's page.
+    private var loadingTyped = false
+    private var loadingMac = false
     var scrolled: (Double) -> Void = { _ in /* Set by the view. */ }
     var reloads = 0
     private var observations: [NSKeyValueObservation] = []
@@ -171,12 +317,25 @@ private struct SyncedWebView: UIViewRepresentable {
     private var lastSentScroll: Double?
     private var pendingScroll: DispatchWorkItem?
 
-    func attach(_ webView: WKWebView) {
+    func observe(_ webView: WKWebView, for page: MirroredPage) {
+      self.page = page
+      self.webView = webView
+      page.webView = webView
+      page.coordinator = self
+      page.follower.webViewReplaced()
+      publish()
       observations.append(
         webView.observe(\.url, options: [.new]) { [weak self] webView, _ in
           MainActor.assumeIsolated {
-            guard let url = webView.url else { return }
-            self?.navigated(RemoteWebAddress.unproxied(url))
+            guard let self, let url = webView.url else { return }
+            let address = RemoteWebAddress.unproxied(url)
+            self.publish()
+            if let told = self.follower.phoneMoved(to: address.absoluteString),
+              let toldURL = URL(string: told)
+            {
+              Self.logger.debug("phone tells the Mac \(told, privacy: .public)")
+              self.navigated(toldURL)
+            }
           }
         })
       observations.append(
@@ -185,14 +344,45 @@ private struct SyncedWebView: UIViewRepresentable {
         })
     }
 
-    /// Loads the Mac's page, unless it is already the one shown.
-    func show(_ url: URL, in webView: WKWebView) {
-      if let current = webView.url,
-        RemoteWebAddress.same(
-          RemoteWebAddress.unproxied(current).absoluteString, url.absoluteString)
-      {
-        return
+    /// The Mac's page, loaded unless the phone is there already, its user went elsewhere, or it is
+    /// still loading a page of its own.
+    func show(_ url: URL, isLoading: Bool, in webView: WKWebView) {
+      let before = follower.macURL
+      let address = follower.macShows(url.absoluteString, isLoading: isLoading)
+      if address != nil || before != follower.macURL {
+        Self.logger.debug(
+          "Mac shows \(url.absoluteString, privacy: .public)\(isLoading ? " (loading)" : "", privacy: .public): \(address == nil ? (self.follower.isDetached ? "detached, not followed" : "not followed") : "followed", privacy: .public)"
+        )
       }
+      guard let address, let target = URL(string: address) else { return }
+      load(target, in: webView, byUser: false)
+    }
+
+    func detach(byUser: Bool) {
+      follower.detach(byUser: byUser)
+      Self.logger.debug("phone detached\(byUser ? " by its user" : "", privacy: .public)")
+      publish()
+    }
+
+    /// Follows the Mac again from its next move; nothing loads now.
+    func attach() {
+      follower.attach()
+      Self.logger.debug("phone attached by its user")
+      publish()
+    }
+
+    /// What the bars show of the phone's web view.
+    private func publish() {
+      guard let page, let webView else { return }
+      page.isDetached = follower.isDetached
+      page.url = webView.url.map(RemoteWebAddress.unproxied)
+      page.canGoBack = webView.canGoBack
+      page.canGoForward = webView.canGoForward
+    }
+
+    func load(_ url: URL, in webView: WKWebView, byUser: Bool) {
+      loadingTyped = byUser
+      loadingMac = !byUser
       webView.load(URLRequest(url: RemoteWebAddress.proxied(url)))
     }
 
@@ -200,7 +390,7 @@ private struct SyncedWebView: UIViewRepresentable {
     func scroll(to fraction: Double, in webView: WKWebView) {
       let scrollView = webView.scrollView
       let range = scrollView.contentSize.height - scrollView.bounds.height
-      guard range > 0, abs(Self.fraction(of: scrollView) - fraction) > 0.005,
+      guard !follower.isDetached, range > 0, abs(Self.fraction(of: scrollView) - fraction) > 0.005,
         lastSentScroll.map({ abs($0 - fraction) > 0.005 }) ?? true
       else { return }
       quietUntil = Date().addingTimeInterval(0.4)
@@ -210,7 +400,9 @@ private struct SyncedWebView: UIViewRepresentable {
 
     /// The phone's user scrolled: told to the Mac, at most every tenth of a second.
     private func userScrolled(_ scrollView: UIScrollView) {
-      guard Date() > quietUntil, scrollView.isTracking || scrollView.isDecelerating else {
+      guard !follower.isDetached, Date() > quietUntil,
+        scrollView.isTracking || scrollView.isDecelerating
+      else {
         return
       }
       pendingScroll?.cancel()
