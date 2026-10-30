@@ -5,26 +5,55 @@ extension View {
   /// A tooltip shown a quarter of a second after the pointer comes over the view, rather than the
   /// system's, which waits seconds (#352): a glass bubble above the view, its arrow on it. Said to
   /// VoiceOver as the view's hint.
-  public func instantTooltip(_ text: Text) -> some View {
-    modifier(InstantTooltip(text: text))
+  ///
+  /// With a `side`, the bubble opens beside the view rather than above it, its arrow on it: on the
+  /// other side when that one has no room in the window.
+  public func instantTooltip(_ text: Text, side: TooltipSide? = nil) -> some View {
+    modifier(InstantTooltip(text: text, side: side))
   }
 
   /// No tooltip when `text` is nil.
   @_disfavoredOverload
-  public func instantTooltip(_ text: Text?) -> some View {
-    modifier(InstantTooltip(text: text))
+  public func instantTooltip(_ text: Text?, side: TooltipSide? = nil) -> some View {
+    modifier(InstantTooltip(text: text, side: side))
   }
 
   /// A string shown as it is; none when it is empty.
   @_disfavoredOverload
-  public func instantTooltip<S: StringProtocol>(_ string: S) -> some View {
-    modifier(InstantTooltip(text: string.isEmpty ? nil : Text(string)))
+  public func instantTooltip<S: StringProtocol>(_ string: S, side: TooltipSide? = nil)
+    -> some View
+  {
+    modifier(InstantTooltip(text: string.isEmpty ? nil : Text(string), side: side))
   }
+}
+
+/// The side of the view a tooltip opens on, in the layout's direction (#458).
+public enum TooltipSide: Sendable {
+  case leading
+  case trailing
+
+  /// On screen, as `direction` lays it out.
+  func edge(in direction: LayoutDirection) -> TooltipEdge {
+    switch (self, direction) {
+    case (.leading, .leftToRight), (.trailing, .rightToLeft): .left
+    default: .right
+    }
+  }
+}
+
+/// A side of the view, on screen: the bubble opens there, its arrow on its other side.
+enum TooltipEdge: Equatable, Sendable {
+  case left
+  case right
+
+  var opposite: Self { self == .left ? .right : .left }
 }
 
 private struct InstantTooltip: ViewModifier {
   let text: Text?
+  var side: TooltipSide?
   @State private var isHovered = false
+  @Environment(\.layoutDirection) private var direction
 
   // One structure whether there is a text or not: a help that comes and goes — a status's
   // detail — never rebuilds the view it is on.
@@ -34,7 +63,7 @@ private struct InstantTooltip: ViewModifier {
       .onDisappear { isHovered = false }
       // Only while the pointer is over the view: a list of rows pays for nothing else.
       .background {
-        if isHovered, let text { TooltipAnchor(text: text) }
+        if isHovered, let text { TooltipAnchor(text: text, edge: side?.edge(in: direction)) }
       }
       .accessibilityHint(text ?? Text(verbatim: ""))
   }
@@ -44,14 +73,17 @@ private struct InstantTooltip: ViewModifier {
 /// quarter of a second later, and takes it down when it leaves.
 private struct TooltipAnchor: NSViewRepresentable {
   let text: Text
+  let edge: TooltipEdge?
 
   func makeNSView(context: Context) -> TooltipAnchorView {
     let view = TooltipAnchorView()
+    view.edge = edge
     view.text = text
     return view
   }
 
   func updateNSView(_ view: TooltipAnchorView, context: Context) {
+    view.edge = edge
     view.text = text
   }
 
@@ -64,9 +96,12 @@ private final class TooltipAnchorView: NSView {
   /// Shown again when it changes under a bubble already up: a chip's help that follows its state.
   var text = Text(verbatim: "") {
     didSet {
-      if TooltipPresenter.shared.owner === self { TooltipPresenter.shared.show(text, from: self) }
+      if TooltipPresenter.shared.owner === self {
+        TooltipPresenter.shared.show(text, from: self, edge: edge)
+      }
     }
   }
+  var edge: TooltipEdge?
   private var appearing: Task<Void, Never>?
 
   override func hitTest(_ point: NSPoint) -> NSView? { nil }
@@ -81,7 +116,7 @@ private final class TooltipAnchorView: NSView {
     appearing = Task { @MainActor [weak self] in
       try? await Task.sleep(for: .milliseconds(250))
       guard !Task.isCancelled, let self, self.window != nil else { return }
-      TooltipPresenter.shared.show(self.text, from: self)
+      TooltipPresenter.shared.show(self.text, from: self, edge: self.edge)
     }
   }
 
@@ -105,14 +140,15 @@ final class TooltipPresenter {
   private var hosting: NSHostingView<TooltipBubble>?
   private var monitor: Any?
 
-  func show(_ text: Text, from view: NSView) {
+  func show(_ text: Text, from view: NSView, edge: TooltipEdge? = nil) {
     guard let window = view.window, let screen = window.screen ?? NSScreen.main else { return }
     let anchor = window.convertToScreen(view.convert(view.bounds, to: nil))
     let placement = TooltipPlacement(
-      size: TooltipBubble.size(of: text), anchor: anchor, window: window.frame,
-      screen: screen.visibleFrame)
+      size: TooltipBubble.size(of: text, sideways: edge != nil), anchor: anchor,
+      window: window.frame, screen: screen.visibleFrame, edge: edge)
     let bubble = TooltipBubble(
-      text: text, arrowX: placement.arrowX, pointsDown: placement.pointsDown)
+      text: text, arrowX: placement.arrowX, pointsDown: placement.pointsDown,
+      arrowEdge: placement.arrowEdge)
     let hosting = hosting ?? NSHostingView(rootView: bubble)
     self.hosting = hosting
     hosting.rootView = bubble
@@ -191,7 +227,8 @@ final class TooltipPresenter {
 
 /// Where the bubble stands, in screen coordinates (origin at the bottom): above the view and
 /// centred on it, kept `margin` inside the window's sides; below it when the screen has no room
-/// above.
+/// above. Beside the view on `edge`, when there is one: centred on it, on the other side when the
+/// window has no room on that one, and kept inside the window all the same.
 struct TooltipPlacement: Equatable {
   /// Between the arrow's tip and the view.
   static let gap: CGFloat = 3
@@ -199,13 +236,33 @@ struct TooltipPlacement: Equatable {
   static let margin: CGFloat = 8
 
   let frame: CGRect
-  /// The arrow's tip, from the bubble's leading edge.
+  /// The arrow's tip, from the bubble's leading edge; from its top for an arrow on a side.
   let arrowX: CGFloat
   let pointsDown: Bool
+  /// The bubble's side the arrow stands on, `nil` for one above or below the view.
+  let arrowEdge: TooltipEdge?
 
-  init(size: CGSize, anchor: CGRect, window: CGRect, screen: CGRect) {
+  init(size: CGSize, anchor: CGRect, window: CGRect, screen: CGRect, edge: TooltipEdge? = nil) {
     let visible = window.intersection(screen)
     let sides = visible.isNull ? screen : visible
+    if let edge {
+      let fitsRight = anchor.maxX + Self.gap + size.width <= sides.maxX - Self.margin
+      let fitsLeft = anchor.minX - Self.gap - size.width >= sides.minX + Self.margin
+      let fits = edge == .right ? fitsRight : fitsLeft
+      let fitsOther = edge == .right ? fitsLeft : fitsRight
+      let opensOn = !fits && fitsOther ? edge.opposite : edge
+      let beside =
+        opensOn == .right ? anchor.maxX + Self.gap : anchor.minX - Self.gap - size.width
+      let x = max(sides.minX + Self.margin, min(beside, sides.maxX - Self.margin - size.width))
+      let centred = anchor.midY - size.height / 2
+      let y = max(sides.minY + Self.margin, min(centred, sides.maxY - Self.margin - size.height))
+      frame = CGRect(origin: CGPoint(x: x, y: y), size: size)
+      arrowX = frame.maxY - anchor.midY
+      pointsDown = false
+      arrowEdge = opensOn.opposite
+      return
+    }
+    arrowEdge = nil
     let centred = anchor.midX - size.width / 2
     let x = max(sides.minX + Self.margin, min(centred, sides.maxX - Self.margin - size.width))
     pointsDown = anchor.maxY + Self.gap + size.height <= screen.maxY
@@ -222,26 +279,34 @@ struct TooltipBubble: View {
   let text: Text
   let arrowX: CGFloat
   var pointsDown = true
+  var arrowEdge: TooltipEdge?
 
   /// The bubble's size for its text: as wide as the text, up to `maximumWidth`.
-  static func size(of text: Text) -> CGSize {
-    let fitting = NSHostingController(rootView: TooltipBubble(text: text, arrowX: 0))
+  static func size(of text: Text, sideways: Bool = false) -> CGSize {
+    let bubble = TooltipBubble(text: text, arrowX: 0, arrowEdge: sideways ? .left : nil)
+    let fitting = NSHostingController(rootView: bubble)
       .sizeThatFits(in: CGSize(width: maximumWidth, height: .greatestFiniteMagnitude))
     return CGSize(width: ceil(fitting.width), height: ceil(fitting.height))
   }
 
   var body: some View {
-    let shape = TooltipBubbleShape(arrowX: arrowX, pointsDown: pointsDown)
+    let shape = TooltipBubbleShape(arrowX: arrowX, pointsDown: pointsDown, arrowEdge: arrowEdge)
     let arrow = TooltipBubbleShape.arrowLength
+    let vertical = arrowEdge == nil ? arrow : 0
     text
       .font(.callout)
       .foregroundStyle(.primary)
       .multilineTextAlignment(.leading)
       .fixedSize(horizontal: false, vertical: true)
-      .padding(.horizontal, 11)
-      .padding(.top, 7 + (pointsDown ? 0 : arrow))
-      .padding(.bottom, 7 + (pointsDown ? arrow : 0))
-      .frame(minWidth: 2 * TooltipBubbleShape.arrowClearance, alignment: .leading)
+      // Placed by the panel, laid out left to right whatever the language.
+      .padding(.leading, 11 + (arrowEdge == .left ? arrow : 0))
+      .padding(.trailing, 11 + (arrowEdge == .right ? arrow : 0))
+      .padding(.top, 7 + (pointsDown ? 0 : vertical))
+      .padding(.bottom, 7 + (pointsDown ? vertical : 0))
+      .frame(
+        minWidth: arrowEdge == nil ? 2 * TooltipBubbleShape.arrowClearance : nil,
+        minHeight: arrowEdge == nil ? nil : 2 * TooltipBubbleShape.arrowClearance,
+        alignment: .leading)
       .modifier(TooltipGlass(shape: shape))
   }
 }
@@ -278,7 +343,7 @@ private struct BehindWindowMaterial: NSViewRepresentable {
 
 /// A rounded rectangle and its arrow, in one outline so the edge runs along the arrow rather than
 /// across its base. The arrow takes the bottom `arrowLength` of the rect, or its top when it points
-/// up.
+/// up; its left or right `arrowLength` when it stands on `arrowEdge`, `arrowX` then from the top.
 struct TooltipBubbleShape: Shape {
   static let arrowLength: CGFloat = 6
   static let cornerRadius: CGFloat = 9
@@ -286,8 +351,18 @@ struct TooltipBubbleShape: Shape {
   static let arrowClearance = cornerRadius + arrowLength
   let arrowX: CGFloat
   var pointsDown = true
+  var arrowEdge: TooltipEdge?
 
   func path(in rect: CGRect) -> Path {
+    if let arrowEdge {
+      // The bubble pointing down, its axes swapped: the arrow on its right side.
+      let swapped = CGRect(x: rect.minY, y: rect.minX, width: rect.height, height: rect.width)
+      let right = downwardPath(in: swapped)
+        .applying(CGAffineTransform(a: 0, b: 1, c: 1, d: 0, tx: 0, ty: 0))
+      guard arrowEdge == .left else { return right }
+      return right.applying(
+        CGAffineTransform(a: -1, b: 0, c: 0, d: 1, tx: rect.minX + rect.maxX, ty: 0))
+    }
     let path = downwardPath(in: rect)
     guard !pointsDown else { return path }
     return path.applying(

@@ -48,7 +48,7 @@ struct UserPromptView: View {
             if !attachments.isEmpty {
               AttachmentStrip(attachments: attachments, alignment: .trailing)
             }
-            MessageTime(date: date)
+            MessageTime(date: date, tooltipSide: .leading)
           }
           // Files without text: the heading VoiceOver goes to is the group of them.
           .modifier(EmptyPromptHeading(isEmpty: shown.isEmpty))
@@ -67,7 +67,7 @@ struct UserPromptView: View {
             if !attachments.isEmpty {
               AttachmentStrip(attachments: attachments).padding(.top, 4)
             }
-            MessageTime(date: date)
+            MessageTime(date: date, tooltipSide: .leading)
           }
           Spacer(minLength: 0)
         }
@@ -162,7 +162,7 @@ struct AgentTextView: View {
           if let readAloud {
             ReadAloudButton(text: text, id: id ?? text, readAloud: readAloud) { openSettings() }
           }
-          MessageTime(date: date)
+          MessageTime(date: date, tooltipSide: .trailing)
         }
       }
     }
@@ -360,6 +360,8 @@ func copy(_ text: String) {
 /// alone.
 struct MessageTime: View {
   let date: Date?
+  /// Where the full date opens: towards the conversation's middle, inside the window.
+  let tooltipSide: TooltipSide
   @Environment(\.conversationTheme) private var theme
   @Environment(\.conversationAppearance) private var appearance
 
@@ -368,7 +370,7 @@ struct MessageTime: View {
       Text(date, format: .dateTime.hour().minute())
         .font(theme.interfaceFont(size: appearance.textSize.pointSize * 0.7))
         .foregroundStyle(theme.secondaryText.color.opacity(0.8))
-        .instantTooltip(Self.fullDate(date))
+        .instantTooltip(Self.fullDate(date), side: tooltipSide)
     }
   }
 
