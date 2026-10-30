@@ -126,8 +126,11 @@ struct WebMirrorView: View {
         .autocorrectionDisabled()
         .submitLabel(.go)
         .onSubmit {
-          guard let url = RemoteWebAddress.typed(address) else { return }
-          typed = (number: (typed?.number ?? 0) + 1, url: url)
+          switch RemoteWebAddress.typed(address, pageOpen: activeTab != nil) {
+          case .load(let url): typed = (number: (typed?.number ?? 0) + 1, url: url)
+          case .tellMac(let url): channel.web(.navigate(url.absoluteString), in: sessionID)
+          case nil: break
+          }
         }
       if page.isDetached {
         Button {

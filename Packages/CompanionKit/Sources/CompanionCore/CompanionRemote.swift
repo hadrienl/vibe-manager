@@ -648,6 +648,21 @@ public enum RemoteWebAddress {
     return URL(string: (isLocal ? "http://" : "https://") + text)
   }
 
+  /// What an address typed on the phone does.
+  public enum Typed: Equatable, Sendable {
+    /// Loaded by the phone's own web view, over the Mac's page (#457).
+    case load(URL)
+    /// Told to the Mac, which has no page to load it over: it opens one, the phone follows.
+    case tellMac(URL)
+  }
+
+  /// What `address`, typed on the phone, does: with no page open on the Mac, the phone's web view
+  /// does not exist — the Mac opens the page, never the phone later over a page of the Mac's.
+  public static func typed(_ address: String, pageOpen: Bool) -> Typed? {
+    guard let url = typed(address) else { return nil }
+    return pageOpen ? .load(url) : .tellMac(url)
+  }
+
   /// Two addresses for the same page: a trailing slash or a fragment changes nothing.
   public static func same(_ first: String, _ second: String) -> Bool {
     func key(_ text: String) -> String {
