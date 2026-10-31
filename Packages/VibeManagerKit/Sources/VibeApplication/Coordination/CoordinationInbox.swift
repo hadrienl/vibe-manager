@@ -16,6 +16,8 @@ public struct CoordinationEvent: Hashable, Sendable {
     case wake(String)
     /// The child stopped before the messages kept for it, this many, could be typed.
     case messagesDropped(Int)
+    /// The messages kept for the child, this many, are still untyped while it is at rest (#464).
+    case messagesStuck(Int, TypingBlock)
   }
 
   public let childID: SessionID?
@@ -51,6 +53,13 @@ public struct CoordinationEvent: Hashable, Sendable {
     case .messagesDropped(let count):
       let messages = count == 1 ? "the message" : "the \(count) messages"
       return "\(child) stopped before \(messages) you sent it could be typed: they were not sent."
+    case .messagesStuck(let count, let block):
+      let messages =
+        count == 1
+        ? "The message you sent \(child) is" : "The \(count) messages you sent \(child) are"
+      let call = block.needsUser ? " Only the user can clear it: call them if it matters." : ""
+      return
+        "\(messages) still not typed: \(block.reason).\(call)"
     }
   }
 }
