@@ -7,8 +7,9 @@ import WebKit
 /// phone's own — scrolled at once under the finger — and whatever either side's user does there,
 /// the other does too: the address, the tab, the scroll.
 ///
-/// A page of the Mac's own (`localhost:4000`, its local network) is loaded through the Mac, which
-/// makes each request for the phone; any other loads as in Safari.
+/// A page of the Mac's own (`localhost:4000`, its local network, or a file such as an agent's
+/// artifact) is loaded through the Mac, which makes each request for the phone; any other loads as
+/// in Safari.
 struct WebMirrorView: View {
   let sessionID: String
   @Environment(RemoteChannel.self) private var channel
@@ -194,7 +195,7 @@ private struct SyncedWebView: UIViewRepresentable {
     // delegate below keeps it to the web and the Mac's own pages.
     let configuration = WKWebViewConfiguration()  // NOSONAR
     let handler = MacSchemeHandler(channel: channel)
-    for scheme in ["http", "https"] {
+    for scheme in RemoteWebAddress.proxiedSchemes {
       configuration.setURLSchemeHandler(
         handler, forURLScheme: RemoteWebAddress.proxiedPrefix + scheme)
     }
@@ -222,11 +223,13 @@ private struct SyncedWebView: UIViewRepresentable {
 
   @MainActor
   final class Coordinator: NSObject, WKNavigationDelegate {
-    /// The pages the web view goes to: the web, and the Mac's own through the channel. Anything
-    /// else — a file, another application's scheme — is not opened from here.
+    /// The pages the web view goes to: the web, and the Mac's own — its servers, its files —
+    /// through the channel. Anything else — a file of the phone's, another application's scheme —
+    /// is not opened from here.
     static let allowedSchemes: Set<String> = [
       "http", "https", "about", "blob", "data",
       RemoteWebAddress.proxiedPrefix + "http", RemoteWebAddress.proxiedPrefix + "https",
+      RemoteWebAddress.proxiedPrefix + "file",
     ]
 
     func webView(

@@ -144,8 +144,9 @@ final class CompanionRemoteServer {
       }
       Task { await mirror.perform(action) }
     case .httpRequest(let request):
+      let folders = peers[peer]?.web?.fileFolders ?? []
       Task {
-        let response = await CompanionWebMirror.fetch(request)
+        let response = await CompanionWebMirror.fetch(request, fileFolders: folders)
         send(peer, .httpResponse(response))
       }
     case .listFolder(let path):

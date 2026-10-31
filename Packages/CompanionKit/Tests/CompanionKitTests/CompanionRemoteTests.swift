@@ -63,8 +63,17 @@ func macLocalAddresses() throws {
     #expect(!RemoteWebAddress.isMacLocal(url), "\(remote)")
     #expect(RemoteWebAddress.proxied(url) == url)
   }
+
   #expect(RemoteWebAddress.same("http://a/b/", "http://a/b#top"))
   #expect(!RemoteWebAddress.same("http://a/b", "http://a/c"))
+}
+
+@Test("A file of the Mac's is loaded through it")
+func proxiedFile() {
+  let url = URL(fileURLWithPath: "/private/tmp/claude/scratchpad/page.html")
+  let proxied = RemoteWebAddress.proxied(url)
+  #expect(proxied.absoluteString == "vibemac-file:///private/tmp/claude/scratchpad/page.html")
+  #expect(RemoteWebAddress.unproxied(proxied) == url)
 }
 
 @Test("A request of several questions travels whole, with one answer per question (#428)")

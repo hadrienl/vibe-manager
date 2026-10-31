@@ -1,6 +1,7 @@
 import AppKit
 import CompanionCore
 import Foundation
+import UniformTypeIdentifiers
 import VibeBrowser
 import VibeCompanionLink
 import VibeDomain
@@ -111,7 +112,7 @@ final class CompanionWebMirror {
         """
       _ = try? await tab?.webView?.evaluateJavaScript(script, in: nil, contentWorld: .defaultClient)
     case .navigate(let address):
-      guard let url = Self.url(from: address) else { return }
+      guard let url = Self.url(from: address, fileFolders: fileFolders) else { return }
       if let tab {
         // The phone is already there: told back, it would load the page a second time.
         guard !RemoteWebAddress.same(tab.url.absoluteString, url.absoluteString) else { return }
@@ -131,11 +132,33 @@ final class CompanionWebMirror {
   /// What was typed in the address field: an address with its scheme, `localhost:4000` or a
   /// host, as Safari takes them. Only a web page: never a file or another application's scheme,
   /// whatever a paired phone sends.
-  static func url(from address: String) -> URL? {
-    guard let url = RemoteWebAddress.typed(address),
-      ["http", "https"].contains(url.scheme?.lowercased() ?? "")
-    else { return nil }
+  /// A file only in one of `fileFolders`: the phone follows a link from one page of an artifact to
+  /// another.
+  static func url(from address: String, fileFolders: [URL] = []) -> URL? {
+    guard let url = RemoteWebAddress.typed(address) else { return nil }
+    if url.isFileURL { return isReadable(url, in: fileFolders) ? url : nil }
+    guard ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { return nil }
     return url
+  }
+
+  /// The folders whose files the phone may read: those of the pages this session's tabs show from
+  /// a file — an artifact and the images, scripts and pages beside it. Never any other file of the
+  /// Mac's, whatever a paired phone asks for.
+  var fileFolders: [URL] {
+    (browser?.tabs ?? []).compactMap { tab in
+      tab.url.isFileURL ? tab.url.deletingLastPathComponent() : nil
+    }
+  }
+
+  /// Whether `url` is a file in one of `folders`, or below one, once links and `..` are resolved.
+  static func isReadable(_ url: URL, in folders: [URL]) -> Bool {
+    guard url.isFileURL else { return false }
+    let path = url.standardizedFileURL.resolvingSymlinksInPath().path
+    return folders.contains { folder in
+      var root = folder.standardizedFileURL.resolvingSymlinksInPath().path
+      if !root.hasSuffix("/") { root += "/" }
+      return root != "/" && path.hasPrefix(root)
+    }
   }
 
   // MARK: - The phone's requests
@@ -143,7 +166,14 @@ final class CompanionWebMirror {
   /// A request of the phone's web view for a page of the Mac's own: made here, the answer sent
   /// back whole. Only to the Mac itself or its local network, never anywhere a phone could reach
   /// on its own.
-  static func fetch(_ request: RemoteHTTPRequest) async -> RemoteHTTPResponse {
+  ///
+  /// A file is read only in `fileFolders` (see ``fileFolders``), and only to be shown.
+  static func fetch(_ request: RemoteHTTPRequest, fileFolders: [URL] = []) async
+    -> RemoteHTTPResponse
+  {
+    if let url = URL(string: request.url), url.isFileURL {
+      return await file(url, for: request, in: fileFolders)
+    }
     guard let url = URL(string: request.url), RemoteWebAddress.isMacLocal(url) else {
       return RemoteHTTPResponse(
         id: request.id, status: 0, headers: [:], body: Data(), failure: CompanionStrings.addressRefused)
@@ -167,6 +197,32 @@ final class CompanionWebMirror {
       return RemoteHTTPResponse(
         id: request.id, status: http?.statusCode ?? 200, headers: headers, body: data)
     } catch {
+      return RemoteHTTPResponse(
+        id: request.id, status: 0, headers: [:], body: Data(),
+        failure: error.localizedDescription)
+    }
+  }
+
+  /// A file of the Mac's for the phone's web view, with its type for WebKit to show it.
+  private static func file(_ url: URL, for request: RemoteHTTPRequest, in folders: [URL]) async
+    -> RemoteHTTPResponse
+  {
+    guard request.method.uppercased() == "GET", isReadable(url, in: folders) else {
+      return RemoteHTTPResponse(
+        id: request.id, status: 0, headers: [:], body: Data(),
+        failure: CompanionStrings.addressRefused)
+    }
+    let path = url.standardizedFileURL.resolvingSymlinksInPath()
+    let read = Task.detached { () -> Result<Data, any Error> in
+      Result { try Data(contentsOf: path) }
+    }
+    switch await read.value {
+    case .success(let data):
+      let type = UTType(filenameExtension: path.pathExtension)?.preferredMIMEType
+        ?? "application/octet-stream"
+      return RemoteHTTPResponse(
+        id: request.id, status: 200, headers: ["Content-Type": type], body: data)
+    case .failure(let error):
       return RemoteHTTPResponse(
         id: request.id, status: 0, headers: [:], body: Data(),
         failure: error.localizedDescription)

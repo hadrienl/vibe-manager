@@ -615,12 +615,16 @@ public enum RemoteWebAddress {
     }
   }
 
+  /// The schemes the phone hands to the Mac: its local servers, and its files — a page an agent
+  /// wrote, such as an artifact, which only the Mac can read.
+  public static let proxiedSchemes = ["http", "https", "file"]
+
   /// The phone's own spelling of a Mac-local address: its scheme prefixed, for the web view to hand
   /// it to the channel rather than to the network.
   public static let proxiedPrefix = "vibemac-"
 
   public static func proxied(_ url: URL) -> URL {
-    guard isMacLocal(url), let scheme = url.scheme, !scheme.hasPrefix(proxiedPrefix),
+    guard isMacLocal(url) || url.isFileURL, let scheme = url.scheme, !scheme.hasPrefix(proxiedPrefix),
       var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
     else { return url }
     components.scheme = proxiedPrefix + scheme
