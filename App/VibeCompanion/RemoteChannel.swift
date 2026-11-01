@@ -5,6 +5,12 @@ import Observation
 import Security
 import UIKit
 
+/// A creation that did not happen: all that was asked, and why.
+struct ReturnedCreation: Equatable {
+  let request: RemoteNewSession
+  let error: String
+}
+
 /// The phone's end of the direct channel (#399, #400): the Mac's sessions, the conversation shown,
 /// and what the user does to them, over iroh while the application is in the foreground.
 ///
@@ -54,6 +60,12 @@ final class RemoteChannel {
   @ObservationIgnored private var askedIcons: Set<String> = []
   /// The session just created from the phone, for the list to show it.
   var createdSessionID: String?
+  /// What is being created, from the form's closing to the Mac's answer (#470).
+  var pendingCreation: RemoteNewSession? { creation.pending }
+  /// A creation that failed, for its form to come back.
+  var returnedCreation: ReturnedCreation?
+  private var creation = RemoteCreation()
+  @ObservationIgnored private var creationTimeout: Task<Void, Never>?
   /// The session a tapped notification is about (#401): the list opens it.
   var notifiedSessionID: String?
   /// The last thing the Mac could not do, for an alert.
@@ -99,6 +111,7 @@ final class RemoteChannel {
           failure: String(localized: "Connection lost")))
     }
     fetches = [:]
+    creation.connectionLost()
     attempt += 1
     tasks.forEach { $0.cancel() }
     tasks = []
@@ -226,9 +239,9 @@ final class RemoteChannel {
         homePath = listing.path
       }
     case .created(let id):
-      createdSessionID = id
+      if let answer = creation.created(id) { settle(answer) }
     case .failure(let reason):
-      failure = reason
+      if let answer = creation.failed(reason) { settle(answer) } else { failure = reason }
     case .hello, .show, .send, .sendFiles, .answer, .answers, .setStatus, .search, .newSessionOptions,
       .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart,
       .httpRequest, .folderIcon, .close:
@@ -382,7 +395,36 @@ final class RemoteChannel {
   }
 
   func create(_ session: RemoteNewSession) {
-    write(.createSession(session))
+    if creation.submit(session) { write(.createSession(session)) }
+    awaitCreation()
+  }
+
+  /// No answer in this time, and the form comes back: the Mac may be asleep, or out of reach.
+  private func awaitCreation() {
+    creationTimeout?.cancel()
+    creationTimeout = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(30))
+      guard !Task.isCancelled, let self, let request = self.creation.expire() else { return }
+      self.returnedCreation = ReturnedCreation(
+        request: request,
+        error: String(
+          localized: "The Mac didn’t answer. Check that it’s awake, then try again."))
+    }
+  }
+
+  private func settle(_ answer: RemoteCreation.Answer) {
+    if creation.pending == nil { creationTimeout?.cancel() }
+    switch answer {
+    case .created(let id), .createdLate(let id):
+      createdSessionID = id
+    case .failed(let request, let reason):
+      returnedCreation = ReturnedCreation(request: request, error: reason.text)
+    case .send(let request):
+      write(.createSession(request))
+      awaitCreation()
+    case .ignored:
+      break
+    }
   }
 
   // MARK: - Key
