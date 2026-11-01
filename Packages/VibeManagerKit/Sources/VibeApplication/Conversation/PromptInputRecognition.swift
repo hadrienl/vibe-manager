@@ -13,7 +13,7 @@ public enum PromptInputRecognition {
     let lines = screen.components(separatedBy: "\n")
     guard
       let start = lines.indices.last(where: { index in
-        index > 0 && lines[index].hasPrefix("❯") && isRule(lines[index - 1])
+        index > 0 && lines[index].hasPrefix("❯") && isOpeningRule(lines[index - 1])
       }),
       let end = lines[(start + 1)...].firstIndex(where: isRule)
     else { return nil }
@@ -79,6 +79,14 @@ public enum PromptInputRecognition {
   static func isRule(_ line: String) -> Bool {
     let rest = line.trimmingCharacters(in: .whitespaces)
     return !rest.isEmpty && rest.allSatisfy { "─━".contains($0) }
+  }
+
+  /// The rule over the prompt: Claude Code 2.1.316 writes the name of a named session in it —
+  /// `──────── Deploy ─` — which a rule across a question never holds.
+  static func isOpeningRule(_ line: String) -> Bool {
+    let rest = line.trimmingCharacters(in: .whitespaces)
+    guard let first = rest.first, let last = rest.last else { return false }
+    return "─━".contains(first) && "─━".contains(last)
   }
 
   /// How much of the end of a long text is looked for: enough to tell it from a hint.

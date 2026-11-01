@@ -358,6 +358,20 @@ struct DialogScreenKeymapTests {
     #expect(!claude.showsPromptAtRest(onScreen: "Resuming conversation…"))
   }
 
+  @Test("Claude Code's prompt at rest, a named session's name in its rule")
+  func claudePromptAtRestInNamedSession() {
+    let resumed = """
+      ⏺ Le déploiement est terminé.
+
+      ───────────────────────────────────────────────────── #393 Salesforce ─
+      ❯\u{0020}
+      ────────────────────────────────────────────────────────────────
+        ? for shortcuts
+      """
+    #expect(claude.showsPromptAtRest(onScreen: resumed))
+    #expect(claude.startupDialog(onScreen: resumed) == nil)
+  }
+
   @Test("Codex's prompt at rest: no dialog of its start waits; a dialog's pointer is not it")
   func codexPromptAtRest() {
     #expect(codex.showsPromptAtRest(onScreen: DialogScreens.codexAtRest))
