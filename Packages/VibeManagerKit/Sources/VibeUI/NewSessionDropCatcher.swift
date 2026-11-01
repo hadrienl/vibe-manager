@@ -1,6 +1,7 @@
 import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
+import VibeApplication
 
 /// What a drag of files over the new session's draft does where it hovers.
 enum NewSessionDropHover: Equatable {
@@ -33,6 +34,10 @@ struct NewSessionDropCatcher: NSViewRepresentable {
   let hover: @MainActor (_ files: [URL], _ location: CGPoint) -> NewSessionDropHover?
   let hovering: @MainActor (NewSessionDropHover?) -> Void
   let dropped: @MainActor ([URL], NewSessionDropHover) -> Void
+  /// So many files are on their way, from a drop just made.
+  let receiving: @MainActor (Int) -> Void
+  /// One delivery of them: what came, and whether something could not be read.
+  let received: @MainActor ([URL], Bool) -> Void
 
   static let fileTypes: [NSPasteboard.PasteboardType] =
     [
@@ -59,9 +64,9 @@ struct NewSessionDropCatcher: NSViewRepresentable {
     return (urls as? [URL] ?? []).filter(\.isFileURL)
   }
 
-  /// Whether a drag with no file of the disk brings one all the same: promised, or an image.
+  /// Whether a drag brings a file that is not on the disk yet: promised, or an image.
   static func carriesFileToReceive(on pasteboard: NSPasteboard) -> Bool {
-    !promises(on: pasteboard).isEmpty || image(on: pasteboard) != nil
+    !promises(on: pasteboard).isEmpty || !images(on: pasteboard).isEmpty
   }
 
   private static func promises(on pasteboard: NSPasteboard) -> [NSFilePromiseReceiver] {
@@ -69,42 +74,84 @@ struct NewSessionDropCatcher: NSViewRepresentable {
       ?? []
   }
 
-  private static func image(on pasteboard: NSPasteboard) -> (NSPasteboard.PasteboardType, UTType)? {
-    for type in pasteboard.types ?? [] {
-      if let uti = UTType(type.rawValue), uti.conforms(to: .image) { return (type, uti) }
+  /// The image of each element of the drag with no file of its own, in a format the agents read
+  /// when it offers one.
+  private static func images(
+    on pasteboard: NSPasteboard
+  ) -> [(item: NSPasteboardItem, type: NSPasteboard.PasteboardType, uti: UTType)] {
+    let readable: [UTType] = [.png, .jpeg, .gif, .webP]
+    return (pasteboard.pasteboardItems ?? []).compactMap { item in
+      guard !item.types.contains(.fileURL) else { return nil }
+      let offered = item.types.compactMap { type in
+        UTType(type.rawValue).flatMap { $0.conforms(to: .image) ? (type, $0) : nil }
+      }
+      let best =
+        offered.first { pair in readable.contains(where: pair.1.conforms(to:)) } ?? offered.first
+      return best.map { (item, $0.0, $0.1) }
     }
-    return nil
   }
 
-  /// Receives what a drag brings without a file of the disk, each file handed over as it arrives:
-  /// a promise is kept by its source, which delivers it after the drop.
-  static func receiveFiles(
-    on pasteboard: NSPasteboard, delivering deliver: @escaping @MainActor ([URL]) -> Void
-  ) {
+  private static func newFolder() -> URL? {
     let folder = FileManager.default.temporaryDirectory
       .appendingPathComponent("VibeManagerDrops", isDirectory: true)
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
-    guard
-      (try? FileManager.default.createDirectory(
-        at: folder, withIntermediateDirectories: true,
-        attributes: [.posixPermissions: 0o700])) != nil
-    else { return }
-    let promises = promises(on: pasteboard)
-    if !promises.isEmpty {
-      for promise in promises {
-        promise.receivePromisedFiles(atDestination: folder, operationQueue: .main) { url, error in
-          guard error == nil else { return }
-          MainActor.assumeIsolated { deliver([url]) }
-        }
-      }
+    let created = try? FileManager.default.createDirectory(
+      at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+    return created == nil ? nil : folder
+  }
+
+  /// A floating screenshot lives where the system deletes it behind the drop: a copy is joined.
+  /// Any other file is the original, which the agent reads and edits.
+  static func kept(_ file: URL) -> URL {
+    guard file.path.contains("/TemporaryItems/"), let folder = newFolder() else { return file }
+    let copy = folder.appendingPathComponent(file.lastPathComponent)
+    return (try? FileManager.default.copyItem(at: file, to: copy)) == nil ? file : copy
+  }
+
+  /// Receives what a drag brings with no file of the disk, images first as `DropReader` does: a
+  /// promise may fail where the bytes are there. `receiving` tells how many deliveries to expect,
+  /// `received` is called once for each: a promise is delivered by its source, after the drop.
+  func receiveFiles(on pasteboard: NSPasteboard) {
+    guard let folder = Self.newFolder() else {
+      receiving(1)
+      received([], true)
       return
     }
-    guard let (type, uti) = image(on: pasteboard), let data = pasteboard.data(forType: type),
-      case .data(let bytes, let name) = DropReader.imageItem(data, type: uti, suggestedName: nil)
-    else { return }
-    let file = folder.appendingPathComponent(name)
-    guard (try? bytes.write(to: file)) != nil else { return }
-    deliver([file])
+    var files: [URL] = []
+    var failed = false
+    for image in Self.images(on: pasteboard) {
+      guard let data = image.item.data(forType: image.type),
+        case .data(let bytes, let name) = DropReader.imageItem(
+          data, type: image.uti, suggestedName: nil)
+      else {
+        failed = true
+        continue
+      }
+      let file = folder.appendingPathComponent(
+        DropNaming.unique(name) { taken in
+          files.contains { $0.lastPathComponent == taken }
+        })
+      if (try? bytes.write(to: file)) == nil { failed = true } else { files.append(file) }
+    }
+    if !files.isEmpty {
+      receiving(1)
+      received(files, failed)
+      return
+    }
+    let promises = Self.promises(on: pasteboard)
+    guard !promises.isEmpty else {
+      receiving(1)
+      received([], true)
+      return
+    }
+    receiving(promises.reduce(0) { $0 + max($1.fileNames.count, 1) })
+    let received = received
+    for promise in promises {
+      promise.receivePromisedFiles(atDestination: folder, options: [:], operationQueue: .main) {
+        url, error in
+        MainActor.assumeIsolated { received(error == nil ? [url] : [], error != nil) }
+      }
+    }
   }
 
   final class CatcherView: NSView {
@@ -142,7 +189,7 @@ struct NewSessionDropCatcher: NSViewRepresentable {
     override func draggingEntered(_ drag: any NSDraggingInfo) -> NSDragOperation {
       let pasteboard = drag.draggingPasteboard
       files = NewSessionDropCatcher.files(on: pasteboard)
-      receivesFile = files.isEmpty && NewSessionDropCatcher.carriesFileToReceive(on: pasteboard)
+      receivesFile = NewSessionDropCatcher.carriesFileToReceive(on: pasteboard)
       return propose(drag)
     }
 
@@ -161,13 +208,11 @@ struct NewSessionDropCatcher: NSViewRepresentable {
     override func performDragOperation(_ drag: any NSDraggingInfo) -> Bool {
       catcher?.hovering(nil)
       guard let hover = hover(drag), hover.isAccepting else { return false }
+      if !files.isEmpty {
+        catcher?.dropped(files.map(NewSessionDropCatcher.kept), hover)
+      }
       if receivesFile {
-        let dropped = catcher?.dropped
-        NewSessionDropCatcher.receiveFiles(on: drag.draggingPasteboard) { files in
-          dropped?(files, hover)
-        }
-      } else {
-        catcher?.dropped(files, hover)
+        catcher?.receiveFiles(on: drag.draggingPasteboard)
       }
       return true
     }
