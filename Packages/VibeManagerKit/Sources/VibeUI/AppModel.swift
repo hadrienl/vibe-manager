@@ -3142,6 +3142,7 @@ public final class AppModel {
       create: CreateSession(
         repository: repository, agents: agents, ticketContext: readTicketContext,
         icons: iconStore,
+        drops: dropStore,
         ticketResolvers: { [ticketTitles] in await ticketTitles.activeResolvers() },
         diagnostics: diagnostics),
       registry: agents,

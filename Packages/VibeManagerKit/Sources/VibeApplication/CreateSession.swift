@@ -47,6 +47,8 @@ public struct CreateSession: Sendable {
   /// Turns a ticket typed as `#12` into its address, from the working folder's repository (#69).
   private let ticketContext: ReadTicketContext?
   private let icons: (any SessionIconStore)?
+  /// Where the files a drop received for the draft are kept, for as long as the session.
+  private let drops: (any SessionDropStore)?
   /// The resolvers in use when Create is pressed, or `nil` when ticket titles are off (#89).
   private let ticketResolvers: (@Sendable () async -> TicketResolverSet?)?
   private let diagnostics: Diagnostics
@@ -60,6 +62,7 @@ public struct CreateSession: Sendable {
     clock: any SessionClock = SystemSessionClock(),
     ticketContext: ReadTicketContext? = nil,
     icons: (any SessionIconStore)? = nil,
+    drops: (any SessionDropStore)? = nil,
     ticketResolvers: (@Sendable () async -> TicketResolverSet?)? = nil,
     diagnostics: Diagnostics = .disabled
   ) {
@@ -69,6 +72,7 @@ public struct CreateSession: Sendable {
     self.clock = clock
     self.ticketContext = ticketContext
     self.icons = icons
+    self.drops = drops
     self.ticketResolvers = ticketResolvers
     self.diagnostics = diagnostics
   }
@@ -99,7 +103,10 @@ public struct CreateSession: Sendable {
     if let ticketContext, let path = draft.resolvedWorkingDirectoryPath {
       forge = await ticketContext(path: path).repository
     }
-    var session = await keepingIcon(of: draft).session(createdAt: clock.now(), repository: forge)
+    let id = SessionID()
+    let draft = await keepingDrops(of: draft, for: id)
+    var session = await keepingIcon(of: draft).session(
+      id: id, createdAt: clock.now(), repository: forge)
     let tickets = await recognizeTickets(in: draft, session: session)
     // Recognising an address reads nothing from the network: the link is known before the
     // session is stored, and its web view opens on it (#69).
@@ -130,6 +137,28 @@ public struct CreateSession: Sendable {
     let texts = [session.ticket?.url?.absoluteString ?? "", draft.name, session.initialPrompt]
     return resolvers.tickets(in: texts)
   }
+
+  /// The draft, its files received from a drop moved out of the temporary folder macOS empties:
+  /// the session's prompt names them, and it can be resumed days later. One that cannot be kept
+  /// stays where it is: the agent can still read it now.
+  private func keepingDrops(of draft: SessionDraft, for id: SessionID) async -> SessionDraft {
+    guard let drops else { return draft }
+    var draft = draft
+    for (index, file) in draft.attachments.enumerated()
+    where file.path.contains("/\(Self.receivedDropsFolder)/") {
+      do {
+        draft.attachments[index] = try await drops.copy(
+          file, suggestedName: file.lastPathComponent, for: id)
+        try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+      } catch {
+        diagnostics.record(.session, .error, "session.dropNotKept")
+      }
+    }
+    return draft
+  }
+
+  /// The temporary folder a draft's drop receives files in.
+  public static let receivedDropsFolder = "VibeManagerDrops"
 
   /// The draft, once the project icon it wears has been copied into the data folder.
   ///

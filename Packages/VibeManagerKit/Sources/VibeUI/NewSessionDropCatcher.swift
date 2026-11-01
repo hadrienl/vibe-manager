@@ -93,7 +93,7 @@ struct NewSessionDropCatcher: NSViewRepresentable {
 
   private static func newFolder() -> URL? {
     let folder = FileManager.default.temporaryDirectory
-      .appendingPathComponent("VibeManagerDrops", isDirectory: true)
+      .appendingPathComponent(CreateSession.receivedDropsFolder, isDirectory: true)
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
     let created = try? FileManager.default.createDirectory(
       at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
