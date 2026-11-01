@@ -43,8 +43,9 @@ struct SessionNotesEditor: NSViewRepresentable {
   }
 
   /// A plain-text view that leaves what is typed alone.
-  static func makeTextView() -> NSTextView {
-    let textView = NSTextView(usingTextLayoutManager: false)
+  static func makeTextView(
+    _ textView: NSTextView = NSTextView(usingTextLayoutManager: false)
+  ) -> NSTextView {
     textView.isRichText = false
     textView.importsGraphics = false
     textView.allowsUndo = true

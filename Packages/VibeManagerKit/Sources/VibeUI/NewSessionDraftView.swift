@@ -795,6 +795,7 @@ public struct NewSessionDraftView: View {
             onCancel: discarded,
             commands: model.commands
           )
+          .leavingFileDrags()
           .focused($focus, equals: .draft(.initialPrompt))
           .accessibilityIdentifier("new-session-prompt")
         }

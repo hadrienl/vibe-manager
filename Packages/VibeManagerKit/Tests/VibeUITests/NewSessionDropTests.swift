@@ -35,7 +35,9 @@ struct NewSessionDropTests {
     var draft: NewSessionModel? { model.newSessionModel }
 
     var catcher: NewSessionDropCatcher.CatcherView? {
-      Self.all(NewSessionDropCatcher.CatcherView.self, in: window.contentView).first
+      // The draft's, the prompt's field having its own.
+      Self.all(NewSessionDropCatcher.CatcherView.self, in: window.contentView)
+        .max { $0.bounds.height < $1.bounds.height }
     }
 
     /// The working folder's field.
@@ -113,11 +115,11 @@ struct NewSessionDropTests {
     pasteboard.writeObjects(objects)
     let types = pasteboard.types ?? []
     let root = try #require(workspace.window.contentView?.superview)
-    let destination = try #require(Self.dropDestination(in: root, at: location, for: types))
-    // AppKit's own choice, where it can be asked: the same view.
-    if let chosen = Self.appKitDestination(in: workspace.window, at: location, for: types) {
-      #expect(chosen === destination)
-    }
+    // AppKit's own choice, where it can be asked: the reading below does not see the views SwiftUI
+    // draws over others, and missed the prompt's field taking every drag.
+    let destination = try #require(
+      Self.appKitDestination(in: workspace.window, at: location, for: types)
+        ?? Self.dropDestination(in: root, at: location, for: types))
     let drag = PasteboardDrag(
       pasteboard: pasteboard, location: location, window: workspace.window,
       sourceMask: sourceMask)
@@ -199,7 +201,7 @@ struct NewSessionDropTests {
       draft.draft.attachments = []
       let outcome = try drop([url as NSURL], at: location, on: workspace)
 
-      #expect(outcome.destination === workspace.catcher, "\(place)")
+      #expect(outcome.destination is NewSessionDropCatcher.CatcherView, "\(place)")
       #expect(outcome.taken, "\(place)")
       #expect(outcome.proposed == .copy, "\(place)")
       #expect(draft.draft.attachments == [url], "\(place)")
@@ -236,12 +238,37 @@ struct NewSessionDropTests {
     let card = try #require(try points(of: workspace)["card"])
     let outcome = try drop([url as NSURL], at: card, on: workspace)
 
-    #expect(outcome.destination === workspace.catcher)
+    #expect(outcome.destination is NewSessionDropCatcher.CatcherView)
     #expect(!outcome.taken)
     #expect(!outcome.proposed.contains(.copy))
     #expect(draft.draft.initialPrompt.isEmpty)
     #expect(draft.draft.attachments.isEmpty)
     #expect(workspace.model.dropNotice == nil)
+  }
+
+  @Test("An image with no file let go on the draft becomes a chip, a file of its own")
+  func imageWithoutFile() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let bitmap = try #require(
+      NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1, bitsPerSample: 8, samplesPerPixel: 4,
+        hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0,
+        bitsPerPixel: 0))
+    let image = NSPasteboardItem()
+    image.setData(try #require(bitmap.representation(using: .png, properties: [:])), forType: .png)
+    let field = try #require(workspace.promptField)
+
+    let outcome = try drop(
+      [image], at: field.convert(NSPoint(x: field.bounds.midX, y: field.bounds.midY), to: nil),
+      on: workspace)
+
+    #expect(outcome.destination is NewSessionDropCatcher.CatcherView)
+    #expect(outcome.taken)
+    let file = try #require(workspace.draft?.draft.attachments.first)
+    #expect(file.pathExtension == "png")
+    #expect(FileManager.default.fileExists(atPath: file.path))
+    #expect(field.string.isEmpty)
   }
 
   @Test("A text let go on the prompt's field goes to the field")
