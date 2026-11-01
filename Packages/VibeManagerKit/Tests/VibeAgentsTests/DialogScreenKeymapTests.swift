@@ -372,6 +372,16 @@ struct DialogScreenKeymapTests {
     #expect(claude.startupDialog(onScreen: resumed) == nil)
   }
 
+  @Test("Claude Code's prompt at rest, a name too long for the width cut in its rule")
+  func claudePromptAtRestWithNameCut() {
+    let resumed = """
+       Une session au nom vraiment très lon… ─
+      ❯\u{00A0}
+      ────────────────────────────────────────
+      """
+    #expect(claude.showsPromptAtRest(onScreen: resumed))
+  }
+
   @Test("Codex's prompt at rest: no dialog of its start waits; a dialog's pointer is not it")
   func codexPromptAtRest() {
     #expect(codex.showsPromptAtRest(onScreen: DialogScreens.codexAtRest))

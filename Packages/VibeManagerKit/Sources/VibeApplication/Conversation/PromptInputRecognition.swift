@@ -85,8 +85,9 @@ public enum PromptInputRecognition {
   /// `──────── Deploy ─` — which a rule across a question never holds.
   static func isOpeningRule(_ line: String) -> Bool {
     let rest = line.trimmingCharacters(in: .whitespaces)
-    guard let first = rest.first, let last = rest.last else { return false }
-    return "─━".contains(first) && "─━".contains(last)
+    guard let first = rest.first, let last = rest.last, "─━".contains(last) else { return false }
+    // A name too long for the width is cut, and leaves no rule on its left: ` Un nom très lon… ─`.
+    return "─━".contains(first) || rest.dropLast().hasSuffix("… ")
   }
 
   /// How much of the end of a long text is looked for: enough to tell it from a hint.
