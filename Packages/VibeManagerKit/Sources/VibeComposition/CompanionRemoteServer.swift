@@ -151,8 +151,14 @@ final class CompanionRemoteServer {
     case .listFolder(let path):
       let listing = Self.listing(of: path)
       send(peer, .folderListing(listing))
+    case .createFolder(let parent, let name):
+      if let failure = Self.createFolder(named: name, in: parent) {
+        send(peer, .folderNotCreated(failure))
+      } else {
+        send(peer, .folderListing(Self.listing(of: parent)))
+      }
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
-      .folderListing, .iconData, .webState, .attachmentData, .httpResponse, .folderIconData:
+      .folderListing, .folderNotCreated, .iconData, .webState, .attachmentData, .httpResponse, .folderIconData:
       break
     }
   }
@@ -586,6 +592,36 @@ final class CompanionRemoteServer {
       return RemoteFolderListing(path: folder.path, folders: names)
     } catch {
       return RemoteFolderListing(path: folder.path, folders: [], isUnreadable: true)
+    }
+  }
+
+  /// Whether a name is one name of its folder, that the folder's listing would show: never a way
+  /// out of it, nor a hidden folder.
+  static func isFolderName(_ name: String) -> Bool {
+    !name.isEmpty && !name.hasPrefix(".") && name.utf8.count <= 255
+      && !name.unicodeScalars.contains {
+        $0 == "/" || $0 == ":" || CharacterSet.controlCharacters.contains($0)
+      }
+  }
+
+  /// Creates a subfolder of `parent`; what kept it from being created, if anything.
+  static func createFolder(named name: String, in parent: String) -> RemoteFailure? {
+    let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard isFolderName(name) else { return .folderNameInvalid }
+    let folder = URL(
+      fileURLWithPath: (parent as NSString).expandingTildeInPath, isDirectory: true
+    ).standardizedFileURL.appendingPathComponent(name, isDirectory: true)
+    do {
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
+      return nil
+    } catch CocoaError.fileWriteFileExists {
+      return .folderExists
+    } catch CocoaError.fileWriteNoPermission, CocoaError.fileWriteVolumeReadOnly {
+      return .folderNotAllowed
+    } catch CocoaError.fileNoSuchFile {
+      return .folderMissing
+    } catch {
+      return .other(error.localizedDescription)
     }
   }
 

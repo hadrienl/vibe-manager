@@ -27,6 +27,8 @@ func remoteFrames() throws {
     .hello(protocolVersion: 1, deviceName: "iPhone"),
     .send(sessionID: "S", text: "Bonjour 👋"),
     .failure(.requestGone),
+    .createFolder(parent: "/Users/me", name: "Projet"),
+    .folderNotCreated(.folderExists),
   ]
   let bytes = messages.map(RemoteFrame.encode).reduce(Data(), +)
   for chunk in [1, 3, 7, bytes.count] {
@@ -118,6 +120,9 @@ func protocolOneRequest() throws {
   #expect(!CompanionRemote.takesAnswers(1))
   #expect(!CompanionRemote.takesAnswers(nil))
   #expect(CompanionRemote.takesAnswers(CompanionRemote.protocolVersion))
+  #expect(!CompanionRemote.takesFolderCreation(nil))
+  #expect(!CompanionRemote.takesFolderCreation(2))
+  #expect(CompanionRemote.takesFolderCreation(CompanionRemote.protocolVersion))
   // A message the decoder does not know — as `answers` is to a phone of protocol 1 — is skipped
   // rather than failing the stream.
   let unknown = Data(#"{"futureCase":{"x":1}}"#.utf8)
