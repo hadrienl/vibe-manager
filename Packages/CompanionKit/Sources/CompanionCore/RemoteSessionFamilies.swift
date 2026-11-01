@@ -19,6 +19,8 @@ public struct RemoteSessionRow: Identifiable, Equatable, Sendable {
 
   public let content: Content
   public let line: RemoteFamilyLine?
+  /// How many children a folded coordinator keeps out of the list.
+  public var foldedChildren = 0
 
   public var id: String {
     switch content {
@@ -80,9 +82,10 @@ public struct RemoteSessionFamilies: Sendable {
     listed.filter { isListed($0, in: column) }.count
   }
 
-  /// The column by folder, `showingDone` naming the coordinators whose done children show.
+  /// The column by folder, `showingDone` naming the coordinators whose done children show, and
+  /// `folded` those whose children are all put away.
   public func groups(
-    in column: RemoteTaskStatus, showingDone: Set<String>
+    in column: RemoteTaskStatus, showingDone: Set<String>, folded: Set<String> = []
   ) -> [RemoteSessionGroup] {
     let byRank: (RemoteSession, RemoteSession) -> Bool = {
       ($0.rank, $0.updatedAt) < ($1.rank, $1.updatedAt)
@@ -99,7 +102,7 @@ public struct RemoteSessionFamilies: Sendable {
       let rows = tops.flatMap { top in
         family(
           of: top, children: (children[top.id] ?? []).sorted(by: byRank), column: column,
-          showingDone: showingDone)
+          showingDone: showingDone, isFolded: folded.contains(top.id))
       }
       return RemoteSessionGroup(path: path, name: tops.first?.folderName ?? path, rows: rows)
     }
@@ -107,8 +110,14 @@ public struct RemoteSessionFamilies: Sendable {
 
   private func family(
     of top: RemoteSession, children: [RemoteSession], column: RemoteTaskStatus,
-    showingDone: Set<String>
+    showingDone: Set<String>, isFolded: Bool
   ) -> [RemoteSessionRow] {
+    if isFolded, !children.isEmpty {
+      return [
+        RemoteSessionRow(
+          content: .session(top, ownStatus: nil), line: nil, foldedChildren: children.count)
+      ]
+    }
     let doneCount = children.filter { $0.status == .done }.count
     let isShown = showingDone.contains(top.id)
     var under: [RemoteSessionRow.Content] =

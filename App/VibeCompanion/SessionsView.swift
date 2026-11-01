@@ -16,6 +16,9 @@ struct SessionsView: View {
   @State private var collapsed: Set<String> = []
   /// The coordinators whose done children show.
   @State private var showingDone: Set<String> = []
+  /// The coordinators whose children are folded away, by a long press on their row.
+  @State private var foldedCoordinators: Set<String> = []
+  @State private var foldTicks = 0
 
   var body: some View {
     NavigationStack(path: $path) {
@@ -51,6 +54,7 @@ struct SessionsView: View {
         }
       }
       .listStyle(.insetGrouped)
+      .sensoryFeedback(.impact, trigger: foldTicks)
       .navigationTitle("Vibe Manager")
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
@@ -118,12 +122,26 @@ struct SessionsView: View {
   @ViewBuilder private func rowView(_ row: RemoteSessionRow) -> some View {
     switch row.content {
     case .session(let session, let ownStatus):
-      Button {
-        path.append(session.id)
-      } label: {
-        SessionRow(session: session, indented: row.isChild, ownStatus: ownStatus)
+      // Gestures rather than a Button: a Button also opens the session when a long press ends.
+      let canFold = row.line == .parent || row.foldedChildren > 0
+      SessionRow(
+        session: session, indented: row.isChild, ownStatus: ownStatus,
+        foldedChildren: row.foldedChildren
+      )
+      .contentShape(Rectangle())
+      .onTapGesture { path.append(session.id) }
+      .onLongPressGesture {
+        if canFold { toggleFold(of: session.id) }
       }
-      .foregroundStyle(.primary)
+      .accessibilityAddTraits(.isButton)
+      .accessibilityAction { path.append(session.id) }
+      .accessibilityActions {
+        if canFold {
+          Button(row.foldedChildren > 0 ? "Show Children" : "Hide Children") {
+            toggleFold(of: session.id)
+          }
+        }
+      }
       .statusSwipe(of: session) { channel.setStatus($0, of: session.id) }
     case .doneChildren(let coordinatorID, let count, let isShown):
       DoneChildrenRow(count: count, isShown: isShown) {
@@ -138,6 +156,17 @@ struct SessionsView: View {
     }
   }
 
+  private func toggleFold(of id: String) {
+    foldTicks += 1
+    withAnimation {
+      if foldedCoordinators.contains(id) {
+        foldedCoordinators.remove(id)
+      } else {
+        foldedCoordinators.insert(id)
+      }
+    }
+  }
+
   private var families: RemoteSessionFamilies { RemoteSessionFamilies(channel.sessions) }
 
   private func count(_ status: RemoteTaskStatus) -> Int {
@@ -145,7 +174,7 @@ struct SessionsView: View {
   }
 
   private var groups: [RemoteSessionGroup] {
-    families.groups(in: filter, showingDone: showingDone)
+    families.groups(in: filter, showingDone: showingDone, folded: foldedCoordinators)
   }
 }
 
@@ -247,6 +276,8 @@ struct SessionRow: View {
   var indented = false
   /// A child's own status, when it is listed in another column.
   var ownStatus: RemoteTaskStatus?
+  /// How many children a folded coordinator hides.
+  var foldedChildren = 0
 
   var body: some View {
     HStack(spacing: 12) {
@@ -263,6 +294,15 @@ struct SessionRow: View {
             Label("Coordinator", systemImage: "person.3")
               .labelStyle(.iconOnly)
               .foregroundStyle(.tint)
+          }
+          if foldedChildren > 0 {
+            HStack(spacing: 2) {
+              Text(verbatim: "\(foldedChildren)")
+              Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
           }
           Text(verbatim: ShortDate.text(session.updatedAt))
             .font(.caption)

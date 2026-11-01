@@ -90,3 +90,15 @@ func archivedChild() {
   #expect(ids(families.groups(in: .doing, showingDone: [])) == ["c"])
   #expect(families.count(in: .doing) == 1)
 }
+
+@Test("A folded coordinator draws no line and counts its children, done ones included")
+func folded() {
+  let families = RemoteSessionFamilies([
+    session("c"), session("k", under: "c"), session("d", .done, under: "c"), session("plain"),
+  ])
+  let rows = families.groups(in: .doing, showingDone: [], folded: ["c", "plain"]).flatMap(\.rows)
+  #expect(Set(rows.map(\.id)) == ["c", "plain"])
+  #expect(rows.allSatisfy { $0.line == nil })
+  #expect(rows.first { $0.id == "c" }?.foldedChildren == 2)
+  #expect(rows.first { $0.id == "plain" }?.foldedChildren == 0)
+}
