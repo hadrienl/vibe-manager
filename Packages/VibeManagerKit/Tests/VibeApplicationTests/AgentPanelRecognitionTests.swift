@@ -70,4 +70,15 @@ struct AgentPanelRecognitionTests {
           """))
     #expect(!AgentPanelRecognition.showsSendNowHint(screen: "Press ctrl+x ctrl+s to send now"))
   }
+
+  @Test("The prompts queued are offered under a rule holding the session's name")
+  func sendNowUnderNamedRule() {
+    let screen = """
+      ───────── Deploy ─
+      ❯ next
+      ──────────────────
+        Press up to edit queued messages · ctrl+x ctrl+s to send now
+      """
+    #expect(AgentPanelRecognition.showsSendNowHint(screen: screen))
+  }
 }
