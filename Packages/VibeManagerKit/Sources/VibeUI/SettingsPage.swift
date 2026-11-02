@@ -20,6 +20,8 @@ public enum SettingsPage: Hashable, Sendable {
   case alertSounds
   /// An agent whose activity can be tracked (#45).
   case agent(AgentProviderID)
+  /// A new account of Claude Code or Codex (#478). An account's page is its agent's.
+  case newAccount
   /// A model server a session can run on (#107).
   case endpoint(EndpointID)
   /// A new endpoint, started from a known server.
@@ -113,6 +115,9 @@ public enum SettingsPage: Hashable, Sendable {
     case .agent:
       LocalizedStringResource(
         "Agent", bundle: .module, comment: "A page of the Settings window: an agent.")
+    case .newAccount:
+      LocalizedStringResource(
+        "New Account", bundle: .module, comment: "A page of the Settings window.")
     case .endpoint:
       LocalizedStringResource(
         "Endpoint", bundle: .module, comment: "A page of the Settings window: a model server.")
@@ -167,7 +172,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .requests, .avatars, .alertSounds: "bell.badge.fill"
     case .agent: "sparkles"
     case .endpoint: "server.rack"
-    case .newEndpoint: "plus"
+    case .newEndpoint, .newAccount: "plus"
     case .webView: "globe"
     case .coordination: "person.2.fill"
     case .worktrees: "arrow.triangle.branch"
@@ -190,7 +195,7 @@ public enum SettingsPage: Hashable, Sendable {
     case .requests, .avatars, .alertSounds: .red
     case .agent: .orange
     case .endpoint: .indigo
-    case .newEndpoint: .secondary
+    case .newEndpoint, .newAccount: .secondary
     case .webView: .cyan
     case .coordination: .teal
     case .worktrees: .brown

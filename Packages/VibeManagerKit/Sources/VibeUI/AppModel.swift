@@ -436,6 +436,12 @@ public final class AppModel {
   /// When each agent was last signed in from here: a session stopped on its sign-in before that
   /// only waits to be resumed.
   var signedInAt: [AgentProviderID: Date] = [:]
+  /// The address each agent's CLI last said it uses (#478), for its page of the settings.
+  public internal(set) var signedInAddresses: [AgentProviderID: String] = [:]
+  /// The accounts expected of the agents (#478).
+  public var signedInAccounts = SignedInAccountMemory()
+  /// The extra accounts of the agents (#478).
+  public var agentAccounts: AgentAccountsSettingsModel?
   var signInTasks: [AgentProviderID: Task<Void, Never>] = [:]
   /// Sessions being restarted and handed their prompt back, once signed in.
   public internal(set) var resumingAfterSignIn: Set<SessionID> = []

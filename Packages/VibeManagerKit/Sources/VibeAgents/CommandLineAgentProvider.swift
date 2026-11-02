@@ -24,7 +24,7 @@ public struct CommandLineAgentSpecification: Sendable {
   /// Where a user can read how to install or update this CLI.
   public let documentationURL: URL?
   /// The command a user types to sign in, shown by the authentication remediation.
-  public let authenticationCommandLine: String?
+  public var authenticationCommandLine: String?
   /// Reads the sign in state out of the authentication command's result.
   ///
   /// `nil` keeps the default, which is the exit code alone. A CLI that exits with `0` whether
@@ -114,6 +114,9 @@ public struct CommandLineAgentProvider: AgentProvider {
   private let catalog: [AgentModel]
   private let environment: [String: String]
   private let shellEnvironment: (any ShellEnvironmentSource)?
+  /// What no shell may change: the configuration folder of an extra account (#478). A
+  /// `CLAUDE_CONFIG_DIR` exported by `.zshrc` would otherwise mix the accounts.
+  private let pinnedEnvironment: [String: String]
 
   public init(
     descriptor: AgentDescriptor,
@@ -122,8 +125,10 @@ public struct CommandLineAgentProvider: AgentProvider {
     argumentBuilder: any CommandLineAgentArgumentBuilder,
     availabilityProbe: AgentAvailabilityProbe,
     environment: [String: String] = ProcessInfo.processInfo.environment,
-    shellEnvironment: (any ShellEnvironmentSource)? = nil
+    shellEnvironment: (any ShellEnvironmentSource)? = nil,
+    pinnedEnvironment: [String: String] = [:]
   ) {
+    self.pinnedEnvironment = pinnedEnvironment
     self.descriptor = descriptor
     self.specification = specification
     catalog = models
@@ -180,7 +185,8 @@ public struct CommandLineAgentProvider: AgentProvider {
       executablePath: installation.executablePath,
       arguments: arguments,
       environment: AgentEnvironmentPolicy.environment(
-        base: environment.merging(shellEnvironment) { _, shell in shell },
+        base: environment.merging(shellEnvironment) { _, shell in shell }
+          .merging(pinnedEnvironment) { _, pinned in pinned },
         additionalKeys: specification.additionalEnvironmentKeys,
         overrides: request.additionalEnvironment
       ),

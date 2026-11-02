@@ -153,7 +153,11 @@ public final class AppEnvironment {
     let notes = FileSessionNotesStore(directory: data.notes, diagnostics: diagnostics)
     // Where the transcripts are, remembered once for the conversation view and the branch
     // report (#276).
-    let transcriptLocations = TranscriptLocationCache()
+    let accountsURL = data.store.deletingLastPathComponent()
+      .appendingPathComponent("agent-accounts.json")
+    let agentHomes = AgentHomes()
+    let transcriptLocations = TranscriptLocationCache(
+      locator: AgentTranscriptLocator(homes: agentHomes))
     let providers =
       configuration.providers?(diagnostics.log)
       ?? Self.providers(
@@ -172,8 +176,14 @@ public final class AppEnvironment {
         launch: Self.gatewayLaunch(
           location: gatewayLocation,
           keychainService: Self.keychainService(isolated: data.defaultsSuite != nil))))
+    let agentAccounts = AgentAccountCatalog(
+      repository: FileAgentAccountRepository(storeURL: accountsURL),
+      homes: agentHomes, environment: configuration.environment, diagnostics: diagnostics.log,
+      transcriptLocations: transcriptLocations)
     let registry = AgentProviderRegistry(
       providers: providers,
+      accounts: agentAccounts.providers(
+        for: (try? FileAgentAccountRepository.read(accountsURL)) ?? []),
       endpoints: EndpointCatalog.providers(
         for: (try? FileEndpointRepository.read(data.endpoints)) ?? [], among: providers,
         gateway: gateway, secrets: endpointSecrets, gatewayDirectory: gatewayLocation.directory))
@@ -220,7 +230,7 @@ public final class AppEnvironment {
     let usageLedger = FileUsageLedger(directory: data.usage)
     let usageTracking = FileUsageTrackingStore(directory: data.usage)
     let usageRecorder = UsageRecorder(ledger: usageLedger, tracking: usageTracking)
-    let usageReader = AgentUsageReader()
+    let usageReader = AgentUsageReader(locator: AgentTranscriptLocator(homes: agentHomes))
     let usage = UsageService(
       recorder: usageRecorder,
       ledger: usageLedger,
@@ -393,7 +403,7 @@ public final class AppEnvironment {
     let journal = SessionJournalModel(
       monitor: SessionJournalMonitor(
         store: FileSessionJournalStore(directory: data.journal),
-        reader: SessionJournalReader(),
+        reader: SessionJournalReader(homes: agentHomes),
         repositories: GitRepositoryIdentityResolver(
           git: ProcessGitCommandRunner(timeout: .seconds(10), diagnostics: diagnostics.log)),
         summarizers: AgentSessionSummarizers(agents: registry),
@@ -596,6 +606,22 @@ public final class AppEnvironment {
         await appModel?.refreshAgents()
         await appModel?.conversations.refreshReadableAgents()
       })
+    appModel.agentAccounts = AgentAccountsSettingsModel(
+      repository: agentAccounts.repository,
+      home: AgentHomeDirectory.home(in: configuration.environment),
+      defaultDirectories: [
+        .claudeCode: ClaudeCodeHome.directory(environment: configuration.environment).path,
+        .codex: CodexHome.directory(environment: configuration.environment).path,
+      ],
+      didSave: { [weak appModel] in
+        await agentAccounts.reload(into: registry)
+        await appModel?.refreshAgents()
+        await appModel?.loadSigningInAgents()
+        await appModel?.conversations.refreshReadableAgents()
+      })
+    if let defaults = defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? Optional(.standard) {
+      appModel.signedInAccounts = SignedInAccountMemory(defaults: defaults)
+    }
     // The mobile companion (#347): the active sessions to the agent embedded in the bundle, which
     // alone holds the iCloud entitlement, and the phone's tests back as alerts.
     companion = CompanionComposition.start(

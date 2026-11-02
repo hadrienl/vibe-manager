@@ -10,15 +10,21 @@ public actor AgentProviderRegistry: AgentProviderResolving {
   /// The endpoints (#107): replaced as a whole each time their settings are saved, after the
   /// command line agents, in the user's order.
   private var endpoints: [any AgentProvider] = []
+  /// The extra accounts of the command line agents (#478), between those and the endpoints.
+  private var accounts: [any AgentProvider] = []
   private var ordered: [any AgentProvider]
   private var index: [AgentProviderID: any AgentProvider]
 
   /// - Parameter endpoints: the endpoints' providers known at launch, registered with the others
   ///   so that no session is adopted before its agent is known.
-  public init(providers: [any AgentProvider] = [], endpoints: [any AgentProvider] = []) {
+  public init(
+    providers: [any AgentProvider] = [], accounts: [any AgentProvider] = [],
+    endpoints: [any AgentProvider] = []
+  ) {
     fixed = providers
+    self.accounts = accounts
     self.endpoints = endpoints
-    (ordered, index) = Self.indexed(providers + endpoints)
+    (ordered, index) = Self.indexed(providers + accounts + endpoints)
   }
 
   private static func indexed(_ providers: [any AgentProvider]) -> (
@@ -37,7 +43,14 @@ public actor AgentProviderRegistry: AgentProviderResolving {
   /// was deleted then resolves to no provider, and loads unresumable, like any unknown agent.
   public func replaceEndpoints(_ providers: [any AgentProvider]) {
     endpoints = providers
-    (ordered, index) = Self.indexed(fixed + providers)
+    (ordered, index) = Self.indexed(fixed + accounts + providers)
+  }
+
+  /// Registers the extra accounts in place of the previous ones. A session whose account was
+  /// deleted resolves to no provider, as for a deleted endpoint.
+  public func replaceAccounts(_ providers: [any AgentProvider]) {
+    accounts = providers
+    (ordered, index) = Self.indexed(fixed + providers + endpoints)
   }
 
   public func providers() -> [any AgentProvider] {

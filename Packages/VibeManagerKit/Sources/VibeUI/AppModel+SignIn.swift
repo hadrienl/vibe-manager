@@ -8,17 +8,48 @@ public enum AgentSignInProgress: Equatable, Sendable {
   case running
   /// What the CLI said, and when: a session stopped on its sign-in after that is a new expiry.
   case failed(detail: String?, at: Date)
+  /// Signed in, to another account than this agent's (#478): nothing resumes until the user says.
+  case otherAccount(expected: String, actual: String)
+}
+
+/// The address of the account each agent is signed in to (#478). Only the address: the sign-in
+/// itself is the CLI's.
+public final class SignedInAccountMemory: @unchecked Sendable {
+  private let defaults: UserDefaults?
+  private var inMemory: [String: String] = [:]
+  private static let key = "agentSignedInAccounts"
+
+  /// - Parameter defaults: `nil` keeps them for this run only, for the tests.
+  public init(defaults: UserDefaults? = nil) {
+    self.defaults = defaults
+  }
+
+  private var all: [String: String] {
+    get { defaults?.dictionary(forKey: Self.key) as? [String: String] ?? inMemory }
+    set {
+      inMemory = newValue
+      defaults?.set(newValue, forKey: Self.key)
+    }
+  }
+
+  public func account(of provider: AgentProviderID) -> String? { all[provider.rawValue] }
+  public func remember(_ account: String?, of provider: AgentProviderID) {
+    all[provider.rawValue] = account
+  }
 }
 
 /// The CLI's sign-in expired (#410): signed in again from the conversation, in the browser, once
 /// for every session of that agent — and each session it had stopped is restarted, its
 /// conversation resumed, and handed back the prompt that failed.
 extension AppModel {
-  func loadSigningInAgents() async {
+  public func loadSigningInAgents() async {
     guard let agents else { return }
     var signing: Set<AgentProviderID> = []
     for descriptor in await agents.descriptors()
-    where await agents.provider(id: descriptor.id) is any AgentSigningIn {
+    {
+      guard let provider = await agents.provider(id: descriptor.id) as? any AgentSigningIn,
+        provider.signsInFromConversations
+      else { continue }
       signing.insert(descriptor.id)
     }
     signingInAgents = signing
@@ -31,16 +62,51 @@ extension AppModel {
   /// on it shows the same one.
   public func signIn(from id: SessionID) {
     guard let provider = agentProvider(of: id), signingInAgents.contains(provider),
-      signInTasks[provider] == nil, signInRoutes[provider]?.route == .browser,
-      let agents
+      signInRoutes[provider]?.route == .browser
     else { return }
+    signIn(agent: provider)
+  }
+
+  /// Signs an agent in from its page of the settings, or from one of its conversations.
+  public func signIn(agent provider: AgentProviderID) {
+    guard signInTasks[provider] == nil, let agents else { return }
     signIns[provider] = .running
     publishSignIns()
     signInTasks[provider] = Task { [weak self] in
-      let outcome =
-        await (agents.provider(id: provider) as? any AgentSigningIn)?.signIn()
-        ?? .notSignedIn(detail: nil)
-      await self?.signInEnded(provider, outcome: outcome)
+      let signing = await agents.provider(id: provider) as? any AgentSigningIn
+      // Read before: an expired sign-in still names its account, and it is the expected one the
+      // first time this agent signs in from here.
+      let before = await signing?.signedInAccount()
+      let outcome = await signing?.signIn() ?? .notSignedIn(detail: nil)
+      let after = outcome == .signedIn ? await signing?.signedInAccount() : nil
+      await self?.signInEnded(provider, outcome: outcome, before: before, after: after)
+    }
+  }
+
+  public func cancelSignIn(agent provider: AgentProviderID) {
+    signInTasks[provider]?.cancel()
+  }
+
+  /// The account signed in is the one wanted after all: its sessions resume.
+  public func keepSignedInAccount(of provider: AgentProviderID) {
+    guard case .otherAccount(_, let actual)? = signIns[provider] else { return }
+    signedInAccounts.remember(actual, of: provider)
+    signedInAddresses[provider] = actual
+    signIns[provider] = nil
+    signedInAt[provider] = Date()
+    Task { await resumeSessionsSignedIn(provider) }
+  }
+
+  /// Asks the CLI which account it uses, for the agent's page. The first one known is the one
+  /// expected from then on.
+  public func refreshSignedInAccount(of provider: AgentProviderID) async {
+    guard let agents,
+      let signing = await agents.provider(id: provider) as? any AgentSigningIn
+    else { return }
+    let address = await signing.signedInAccount()
+    signedInAddresses[provider] = address
+    if let address, signedInAccounts.account(of: provider) == nil {
+      signedInAccounts.remember(address, of: provider)
     }
   }
 
@@ -68,10 +134,24 @@ extension AppModel {
     }
   }
 
-  func signInEnded(_ provider: AgentProviderID, outcome: AgentSignInOutcome) async {
+  func signInEnded(
+    _ provider: AgentProviderID, outcome: AgentSignInOutcome, before: String? = nil,
+    after: String? = nil
+  ) async {
     signInTasks[provider] = nil
     switch outcome {
     case .signedIn:
+      let expected = signedInAccounts.account(of: provider) ?? before
+      signedInAddresses[provider] = after
+      if let expected, let after, expected.caseInsensitiveCompare(after) != .orderedSame {
+        // The first prompt it would be handed goes to the wrong account: nothing resumes.
+        signedInAccounts.remember(expected, of: provider)
+        signIns[provider] = .otherAccount(expected: expected, actual: after)
+        publishSignIns()
+        await refreshAgents(forceRefresh: false)
+        return
+      }
+      if let after { signedInAccounts.remember(after, of: provider) }
       signIns[provider] = nil
       signedInAt[provider] = Date()
     case .cancelled:
@@ -83,6 +163,10 @@ extension AppModel {
       publishSignIns()
       return
     }
+    await resumeSessionsSignedIn(provider)
+  }
+
+  private func resumeSessionsSignedIn(_ provider: AgentProviderID) async {
     // Every session it stopped says it resumes from now on, not that text waits in it: each is
     // looked at in its turn.
     let blocked = sessions.map(\.id).filter {
@@ -236,6 +320,9 @@ extension AppModel {
       return ConversationSignIn(agentName: name, state: .signingIn, route: route)
     case .failed(let detail, let at)? where at > request.receivedAt:
       return ConversationSignIn(agentName: name, state: .failed(detail: detail), route: route)
+    case .otherAccount(let expected, let actual)?:
+      return ConversationSignIn(
+        agentName: name, state: .otherAccount(expected: expected, actual: actual), route: route)
     case .failed?, nil:
       if let signedIn = signedInAt[provider], signedIn > request.receivedAt {
         return ConversationSignIn(

@@ -212,6 +212,10 @@ extension AppModel {
       model.startSignIn = { [weak self] in self?.signIn(from: id) }
       model.cancelSignIn = { [weak self] in self?.cancelSignIn(from: id) }
       model.signInInTerminal = { [weak self] in self?.signInInTerminal(id) }
+      model.keepSignedInAccount = { [weak self] in
+        guard let provider = self?.agentProvider(of: id) else { return }
+        self?.keepSignedInAccount(of: provider)
+      }
       model.resumeAfterSignIn = { [weak self] in self?.resumeAfterSignIn(id) }
       model.activity = self?.activity(for: id)?.activity
       model.isAgentReady = ConversationWorkspace.isReady(self?.activity(for: id))

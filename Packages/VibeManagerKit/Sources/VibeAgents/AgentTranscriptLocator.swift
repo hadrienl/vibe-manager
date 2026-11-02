@@ -11,16 +11,25 @@ public struct AgentTranscriptLocator: Sendable {
   public let codexSessions: URL
   /// Lists a folder; `nil` when it cannot be read. Injected so that tests can count the listings.
   let list: ListDirectory
+  /// The folders of the extra accounts, looked through after these two (#478).
+  let homes: AgentHomes?
 
   public init(
     claudeProjects: URL = ClaudeCodeHome.projectsDirectory(),
     codexSessions: URL = CodexHome.sessionsDirectory(),
+    homes: AgentHomes? = nil,
     list: @escaping ListDirectory = AgentTranscriptLocator.contents(of:)
   ) {
     self.claudeProjects = claudeProjects
     self.codexSessions = codexSessions
+    self.homes = homes
     self.list = list
   }
+
+  /// Every folder a Claude Code conversation can be in, the agent's own first.
+  public var allClaudeProjects: [URL] { [claudeProjects] + (homes?.claudeProjects ?? []) }
+  /// Every folder a Codex conversation can be in, the agent's own first.
+  public var allCodexSessions: [URL] { [codexSessions] + (homes?.codexSessions ?? []) }
 
   @Sendable public static func contents(of folder: URL) -> [URL]? {
     try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
@@ -28,9 +37,8 @@ public struct AgentTranscriptLocator: Sendable {
 
   public func claudeTranscripts(for identifier: String) -> [URL] {
     let manager = FileManager.default
-    guard let folders = list(claudeProjects) else { return [] }
     var found: [URL] = []
-    for folder in folders {
+    for folder in allClaudeProjects.flatMap({ list($0) ?? [] }) {
       let main = folder.appendingPathComponent("\(identifier).jsonl")
       guard manager.fileExists(atPath: main.path) else { continue }
       found.append(main)
@@ -62,18 +70,21 @@ public struct AgentTranscriptLocator: Sendable {
     var day = calendar.startOfDay(for: first)
     let today = calendar.startOfDay(for: now)
     var found: [URL] = []
+    let roots = allCodexSessions
     while day <= today {
       let parts = calendar.dateComponents([.year, .month, .day], from: day)
-      let folder =
-        codexSessions
-        .appendingPathComponent(String(format: "%04d", parts.year ?? 0))
-        .appendingPathComponent(String(format: "%02d", parts.month ?? 0))
-        .appendingPathComponent(String(format: "%02d", parts.day ?? 0))
-      if let files = list(folder) {
-        found.append(
-          contentsOf: files.filter {
-            $0.lastPathComponent.contains(identifier) && $0.pathExtension == "jsonl"
-          })
+      for root in roots {
+        let folder =
+          root
+          .appendingPathComponent(String(format: "%04d", parts.year ?? 0))
+          .appendingPathComponent(String(format: "%02d", parts.month ?? 0))
+          .appendingPathComponent(String(format: "%02d", parts.day ?? 0))
+        if let files = list(folder) {
+          found.append(
+            contentsOf: files.filter {
+              $0.lastPathComponent.contains(identifier) && $0.pathExtension == "jsonl"
+            })
+        }
       }
       guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
       day = next

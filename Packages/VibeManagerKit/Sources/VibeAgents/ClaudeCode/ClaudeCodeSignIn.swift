@@ -51,5 +51,18 @@ extension ClaudeCodeAgentProvider: AgentSigningIn {
     return output.map(ClaudeCodeAuthenticationStatus.signInRoute(in:)) ?? .browser
   }
 
+  public func signedInAccount() async -> String? {
+    let run = OneShotAgentRun(
+      provider: self, runner: BoundedSummaryProcessRunner(), folderPrefix: "vibe-sign-in-",
+      timeout: Self.signInRouteTimeout)
+    let output = try? await run.run(
+      prepare: { _, _ in
+        OneShotAgentRun.Invocation(
+          arguments: ["auth", "status", "--json"], environment: [:], input: Data())
+      },
+      read: { result, _ in String(decoding: result.standardOutput, as: UTF8.self) })
+    return output.flatMap(ClaudeCodeAuthenticationStatus.email(in:))
+  }
+
   static let signInRouteTimeout: Duration = .seconds(15)
 }

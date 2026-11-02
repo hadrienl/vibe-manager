@@ -80,6 +80,21 @@ struct SignInNotice: View {
             comment: "Restarts a session signed in again, and types back the prompt that failed.")
         }
       }
+    case .otherAccount:
+      Button {
+        model.startSignIn?()
+      } label: {
+        Text(
+          "Sign In Again", bundle: .module,
+          comment: "Signs an agent's CLI in again, after it signed in to the wrong account.")
+      }
+      Button {
+        model.keepSignedInAccount?()
+      } label: {
+        Text(
+          "Keep This Account", bundle: .module,
+          comment: "Accepts the account an agent just signed in to, and resumes its sessions.")
+      }
     case .resuming:
       ProgressView().controlSize(.small)
     }
@@ -120,6 +135,10 @@ struct SignInNotice: View {
       String(
         localized: "\(signIn.agentName) is signed in again.", bundle: .module,
         comment: "An agent's name.")
+    case .otherAccount(let expected, let actual):
+      String(
+        localized: "\(signIn.agentName) is now signed in to \(actual), not \(expected).",
+        bundle: .module, comment: "An agent's name, then two email addresses.")
     case .resuming:
       String(
         localized: "Signed in. The session resumes where it stopped.", bundle: .module)

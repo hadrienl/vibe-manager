@@ -85,11 +85,19 @@ public struct CodexAgentProvider: AgentProvider {
     environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
     shellEnvironment: (any ShellEnvironmentSource)? = nil,
-    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
+    account: AgentDescriptor? = nil
   ) -> CodexAgentProvider {
     // A `CODEX_HOME` this application cannot resolve is dropped rather than forwarded: the
     // CLI would then write its sessions where nothing watches for them.
     let environment = CodexHome.sanitized(environment: rawEnvironment)
+    let descriptor = account ?? Self.descriptor
+    var specification = Self.specification
+    if account != nil, let directory = environment[CodexHome.overrideKey] {
+      // The plain command would sign in the agent's own account.
+      specification.authenticationCommandLine =
+        "\(CodexHome.overrideKey)=\(AgentHomeDirectory.shellQuoted(directory)) codex login"
+    }
     let probe = SystemProcessProbe()
     let locator = FileSystemExecutableLocator(environment: environment, probe: probe)
     let availabilityProbe = AgentAvailabilityProbe(
@@ -111,7 +119,9 @@ public struct CodexAgentProvider: AgentProvider {
         argumentBuilder: CodexArgumentBuilder(),
         availabilityProbe: availabilityProbe,
         environment: environment,
-        shellEnvironment: shellEnvironment
+        shellEnvironment: shellEnvironment,
+        pinnedEnvironment: account == nil
+          ? [:] : environment.filter { $0.key == CodexHome.overrideKey }
       ),
       catalog: CodexModelCatalog(environment: environment),
       discovery: CodexRolloutSessionDiscovery(environment: environment),

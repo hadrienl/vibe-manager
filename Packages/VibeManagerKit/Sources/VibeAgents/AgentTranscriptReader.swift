@@ -86,16 +86,18 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
   public func transcriptDirectories(for session: WorkSession) async -> [String] {
     var directories: [String] = []
     for conversation in session.conversations where Self.identifier(of: conversation) != nil {
-      let directory: String
+      let found: [URL]
       switch conversation.transcriptProviderID {
       case ClaudeCodeAgentProvider.id.rawValue:
-        directory = locator.claudeProjects.path
+        found = locator.allClaudeProjects
       case CodexAgentProvider.id.rawValue:
-        directory = locator.codexSessions.path
+        found = locator.allCodexSessions
       default:
         continue
       }
-      if !directories.contains(directory) { directories.append(directory) }
+      for directory in found.map(\.path) where !directories.contains(directory) {
+        directories.append(directory)
+      }
     }
     return directories
   }

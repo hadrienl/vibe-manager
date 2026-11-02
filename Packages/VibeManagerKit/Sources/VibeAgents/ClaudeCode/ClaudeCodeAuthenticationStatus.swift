@@ -24,6 +24,12 @@ public enum ClaudeCodeAuthenticationStatus {
     }
   }
 
+  /// The address of the account `auth status --json` describes (#478).
+  public static func email(in output: String) -> String? {
+    guard let email = decodeStatus(in: output)?.email, !email.isEmpty else { return nil }
+    return email
+  }
+
   /// The answer as JSON, wherever it sits in the stream.
   ///
   /// Anything else the run put on the way — a Node deprecation warning, a proxy or certificate
@@ -53,5 +59,6 @@ public enum ClaudeCodeAuthenticationStatus {
     let loggedIn: Bool
     let authMethod: String?
     let apiKeySource: String?
+    let email: String?
   }
 }

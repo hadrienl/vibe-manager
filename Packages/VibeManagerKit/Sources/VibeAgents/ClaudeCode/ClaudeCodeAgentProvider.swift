@@ -47,12 +47,16 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
   let commandReader: any ClaudeCodeCommandReading
   /// Where its transcripts were found, shared with the branch report (#276).
   let transcriptLocations: TranscriptLocationCache
+  /// Where this agent's CLI writes its transcripts: another folder for an extra account (#478).
+  let projectsDirectory: URL
 
   public init(
     base: CommandLineAgentProvider, catalog: any ClaudeCodeModelCatalogSource,
     commandReader: any ClaudeCodeCommandReading = ClaudeCodeCommandProcess(),
-    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
+    projectsDirectory: URL = ClaudeCodeHome.projectsDirectory()
   ) {
+    self.projectsDirectory = projectsDirectory
     self.base = base
     self.catalog = catalog
     self.commandReader = commandReader
@@ -63,11 +67,19 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
     environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
     shellEnvironment: (any ShellEnvironmentSource)? = nil,
-    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
+    account: AgentDescriptor? = nil
   ) -> ClaudeCodeAgentProvider {
     // The CLI and the catalog reader must agree on where the configuration lives, so a value
     // that cannot be resolved into an absolute path is dropped rather than forwarded.
     let environment = ClaudeCodeHome.sanitized(environment: rawEnvironment)
+    let descriptor = account ?? Self.descriptor
+    var specification = Self.specification
+    if account != nil, let directory = environment[ClaudeCodeHome.overrideKey] {
+      // The plain command would sign in the agent's own account.
+      specification.authenticationCommandLine =
+        "\(ClaudeCodeHome.overrideKey)=\(AgentHomeDirectory.shellQuoted(directory)) claude auth login"
+    }
     let probe = SystemProcessProbe()
     let locator = FileSystemExecutableLocator(environment: environment, probe: probe)
     let availabilityProbe = AgentAvailabilityProbe(
@@ -87,10 +99,13 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
         argumentBuilder: ClaudeCodeArgumentBuilder(),
         availabilityProbe: availabilityProbe,
         environment: environment,
-        shellEnvironment: shellEnvironment
+        shellEnvironment: shellEnvironment,
+        pinnedEnvironment: account == nil
+          ? [:] : environment.filter { $0.key == ClaudeCodeHome.overrideKey }
       ),
       catalog: ClaudeCodeModelCatalog(environment: environment),
-      transcriptLocations: transcriptLocations
+      transcriptLocations: transcriptLocations,
+      projectsDirectory: ClaudeCodeHome.projectsDirectory(environment: environment)
     )
   }
 
@@ -99,7 +114,7 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
     for sessionID: SessionID,
     repository: any SessionRepository,
     recording: AgentResumeRecording = AgentResumeRecording(providerID: id.rawValue),
-    transcripts: any ClaudeCodeTranscriptWatching = ClaudeCodeTranscriptWatcher(),
+    transcripts: (any ClaudeCodeTranscriptWatching)? = nil,
     transcriptWatchLimit: Duration =
       ClaudeCodeSessionIdentifierCapture.defaultTranscriptWatchLimit,
     persistenceWindow: Duration = ClaudeCodeSessionIdentifierCapture.defaultPersistenceWindow
@@ -109,7 +124,7 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
       record: RecordAgentResumeIdentifier(
         repository: repository, providerID: recording.providerID, launchedAt: Date(),
         harnessID: recording.harnessID),
-      transcripts: transcripts,
+      transcripts: transcripts ?? ClaudeCodeTranscriptWatcher(projectsDirectory: projectsDirectory),
       transcriptWatchLimit: transcriptWatchLimit,
       persistenceWindow: persistenceWindow
     )
