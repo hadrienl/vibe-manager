@@ -95,9 +95,13 @@ struct NewSessionDropCatcher: NSViewRepresentable {
     let folder = FileManager.default.temporaryDirectory
       .appendingPathComponent(CreateSession.receivedDropsFolder, isDirectory: true)
       .appendingPathComponent(UUID().uuidString, isDirectory: true)
-    let created = try? FileManager.default.createDirectory(
-      at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
-    return created == nil ? nil : folder
+    do {
+      try FileManager.default.createDirectory(
+        at: folder, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+      return folder
+    } catch {
+      return nil
+    }
   }
 
   /// A floating screenshot lives where the system deletes it behind the drop: a copy is joined.
