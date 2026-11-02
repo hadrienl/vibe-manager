@@ -62,6 +62,8 @@ public struct CodexAgentProvider: AgentProvider {
   let transcriptLocations: TranscriptLocationCache
   /// What its rollouts and `config.toml` say of the reasoning effort (#411).
   let effortReader: CodexEffortReader
+  /// The folder of an extra account (#478): what a session adopted without a plan runs on.
+  var accountHome: String?
 
   public init(
     base: CommandLineAgentProvider,
@@ -109,7 +111,7 @@ public struct CodexAgentProvider: AgentProvider {
       diagnostics: diagnostics
     )
 
-    return CodexAgentProvider(
+    var provider = CodexAgentProvider(
       base: CommandLineAgentProvider(
         descriptor: descriptor,
         specification: specification,
@@ -128,6 +130,8 @@ public struct CodexAgentProvider: AgentProvider {
       transcriptLocations: transcriptLocations,
       effortReader: CodexEffortReader(environment: environment)
     )
+    if account != nil { provider.accountHome = environment[CodexHome.overrideKey] }
+    return provider
   }
 
   /// Builds the object that captures the resume identifier of one launch and stores it.

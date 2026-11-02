@@ -158,7 +158,7 @@ extension AppModel {
 
   // MARK: - Setting
 
-  func loadHookTrustingAgents() async {
+  public func loadHookTrustingAgents() async {
     guard let agents else { return }
     var trusting: [AgentDescriptor] = []
     for descriptor in await agents.descriptors() {

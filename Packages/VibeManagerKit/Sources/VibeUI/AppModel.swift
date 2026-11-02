@@ -442,6 +442,8 @@ public final class AppModel {
   public var signedInAccounts = SignedInAccountMemory()
   /// The extra accounts of the agents (#478).
   public var agentAccounts: AgentAccountsSettingsModel?
+  /// The agents whose page of the settings offers the sign-in.
+  public internal(set) var agentsSigningIn: Set<AgentProviderID> = []
   var signInTasks: [AgentProviderID: Task<Void, Never>] = [:]
   /// Sessions being restarted and handed their prompt back, once signed in.
   public internal(set) var resumingAfterSignIn: Set<SessionID> = []
@@ -2900,6 +2902,15 @@ public final class AppModel {
   /// whole set would hold every result behind the slowest one, and a CLI that answers none of its
   /// probes now costs three budgets and their retries: there is no reason for the agents that
   /// answered straight away to stay hidden for that long.
+  /// After the list of agents changed: a detection under way read the old one (#478).
+  public func refreshAgentsAfterChange() async {
+    while isRefreshingAgents { try? await Task.sleep(for: .milliseconds(50)) }
+    await refreshAgents()
+    await loadSigningInAgents()
+    await loadHookTrustingAgents()
+    await loadSigningAgents()
+  }
+
   public func refreshAgents(forceRefresh: Bool = false) async {
     guard let agents, !isRefreshingAgents else { return }
 

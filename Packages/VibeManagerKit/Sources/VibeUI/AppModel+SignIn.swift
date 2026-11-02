@@ -42,6 +42,18 @@ public final class SignedInAccountMemory: @unchecked Sendable {
 /// for every session of that agent — and each session it had stopped is restarted, its
 /// conversation resumed, and handed back the prompt that failed.
 extension AppModel {
+  /// The agents whose page of the settings offers the sign-in, whatever their state: a CLI can say
+  /// it is signed in with a token that expired, and an account may be changed at will.
+  func loadSigningAgents() async {
+    guard let agents else { return }
+    var signing: Set<AgentProviderID> = []
+    for descriptor in await agents.descriptors()
+    where await agents.provider(id: descriptor.id) is any AgentSigningIn {
+      signing.insert(descriptor.id)
+    }
+    agentsSigningIn = signing
+  }
+
   public func loadSigningInAgents() async {
     guard let agents else { return }
     var signing: Set<AgentProviderID> = []
@@ -62,7 +74,7 @@ extension AppModel {
   /// on it shows the same one.
   public func signIn(from id: SessionID) {
     guard let provider = agentProvider(of: id), signingInAgents.contains(provider),
-      signInRoutes[provider]?.route == .browser
+      signInRoutes[provider]?.route == .browser || isOnOtherAccount(provider)
     else { return }
     signIn(agent: provider)
   }
@@ -70,17 +82,33 @@ extension AppModel {
   /// Signs an agent in from its page of the settings, or from one of its conversations.
   public func signIn(agent provider: AgentProviderID) {
     guard signInTasks[provider] == nil, let agents else { return }
+    // A second try after the wrong account: the CLI still holds it, and it is what comes back
+    // should this one be cancelled or fail.
+    let pending = signIns[provider]
+    var wanted: String?
+    if case .otherAccount(let expected, _)? = pending { wanted = expected }
     signIns[provider] = .running
     publishSignIns()
     signInTasks[provider] = Task { [weak self] in
       let signing = await agents.provider(id: provider) as? any AgentSigningIn
-      // Read before: an expired sign-in still names its account, and it is the expected one the
-      // first time this agent signs in from here.
-      let before = await signing?.signedInAccount()
+      // Read before: an expired sign-in still names its account, even one changed outside.
+      let before = wanted == nil ? await signing?.signedInAccount() : wanted
       let outcome = await signing?.signIn() ?? .notSignedIn(detail: nil)
       let after = outcome == .signedIn ? await signing?.signedInAccount() : nil
-      await self?.signInEnded(provider, outcome: outcome, before: before, after: after)
+      guard let self else { return }
+      if wanted != nil, outcome != .signedIn {
+        self.signInTasks[provider] = nil
+        self.signIns[provider] = pending
+        self.publishSignIns()
+        return
+      }
+      await self.signInEnded(provider, outcome: outcome, before: before, after: after)
     }
+  }
+
+  private func isOnOtherAccount(_ provider: AgentProviderID) -> Bool {
+    if case .otherAccount? = signIns[provider] { return true }
+    return false
   }
 
   public func cancelSignIn(agent provider: AgentProviderID) {
@@ -97,15 +125,16 @@ extension AppModel {
     Task { await resumeSessionsSignedIn(provider) }
   }
 
-  /// Asks the CLI which account it uses, for the agent's page. The first one known is the one
-  /// expected from then on.
+  /// Asks the CLI which account it uses, for the agent's page.
   public func refreshSignedInAccount(of provider: AgentProviderID) async {
     guard let agents,
       let signing = await agents.provider(id: provider) as? any AgentSigningIn
     else { return }
     let address = await signing.signedInAccount()
     signedInAddresses[provider] = address
-    if let address, signedInAccounts.account(of: provider) == nil {
+    // Changed outside — `claude auth login`, `/login` — it is the user's: only a pending alert
+    // still waits for an answer.
+    if let address, !isOnOtherAccount(provider) {
       signedInAccounts.remember(address, of: provider)
     }
   }
@@ -141,7 +170,7 @@ extension AppModel {
     signInTasks[provider] = nil
     switch outcome {
     case .signedIn:
-      let expected = signedInAccounts.account(of: provider) ?? before
+      let expected = before ?? signedInAccounts.account(of: provider)
       signedInAddresses[provider] = after
       if let expected, let after, expected.caseInsensitiveCompare(after) != .orderedSame {
         // The first prompt it would be handed goes to the wrong account: nothing resumes.

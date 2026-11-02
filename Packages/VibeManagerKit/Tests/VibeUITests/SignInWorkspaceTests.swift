@@ -127,6 +127,16 @@ struct SignInWorkspaceTests {
     #expect(await supervisor.startCount == started)
   }
 
+  @Test("An account changed outside the application is not taken for a mistake (#478)")
+  func changedOutside() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    model.signedInAccounts.remember("old@x.io", of: stub)
+    await model.signInEnded(stub, outcome: .signedIn, before: "new@x.io", after: "new@x.io")
+    #expect(model.signIns[stub] == nil)
+    #expect(model.signedInAccounts.account(of: stub) == "new@x.io")
+  }
+
   @Test("Signed in to the same account, or to one the CLI does not name, it resumes (#478)")
   func sameAccount() async throws {
     let (model, _) = try await running()

@@ -192,12 +192,15 @@ struct AgentAccountSections: View {
           }
         } message: {
           Text(
-            "The agent leaves the list. Its folder and its conversations stay on the disk.",
+            "The agent leaves the list, and its sessions can no longer be read or resumed here, even if the folder is added again. The folder and its conversations stay on the disk.",
             bundle: .module)
         }
       }
     }
-    .task { await model.agentAccounts?.load() }
+    .task {
+      await model.agentAccounts?.load()
+      await model.loadSigningAgents()
+    }
     .onDisappear { if let account { rename(account) } }
   }
 
@@ -213,7 +216,7 @@ struct AgentAccountSections: View {
     let progress = model.signIns[agent.id]
     let address = model.signedInAddresses[agent.id]
     let isSignedOut = state == .unauthenticated
-    if address != nil || isSignedOut || progress != nil {
+    if address != nil || isSignedOut || progress != nil || model.agentsSigningIn.contains(agent.id) {
       Section {
         if let address {
           LabeledContent {
@@ -257,7 +260,18 @@ struct AgentAccountSections: View {
           if let detail { Text(verbatim: detail).foregroundStyle(.secondary) }
           signInButton
         case nil:
-          if isSignedOut { signInButton }
+          if isSignedOut {
+            signInButton
+          } else if model.agentsSigningIn.contains(agent.id) {
+            HStack {
+              Spacer()
+              Button {
+                model.signIn(agent: agent.id)
+              } label: {
+                Text("Sign In Again", bundle: .module)
+              }
+            }
+          }
         }
       } footer: {
         if isSignedOut, progress == nil,

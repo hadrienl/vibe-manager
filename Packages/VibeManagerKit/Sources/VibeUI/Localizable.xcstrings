@@ -157238,102 +157238,102 @@
         }
       }
     },
-    "The agent leaves the list. Its folder and its conversations stay on the disk." : {
+    "The agent leaves the list, and its sessions can no longer be read or resumed here, even if the folder is added again. The folder and its conversations stay on the disk." : {
       "localizations" : {
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "يختفي الوكيل من القائمة. يبقى مجلده ومحادثاته على القرص."
+            "value" : "يختفي الوكيل من القائمة، ولن تعود قراءة جلساته أو استئنافها ممكنة هنا حتى لو أُضيف المجلد مجددًا. يبقى المجلد ومحادثاته على القرص."
           }
         },
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Der Agent verschwindet aus der Liste. Sein Ordner und seine Konversationen bleiben auf dem Datenträger."
+            "value" : "Der Agent verschwindet aus der Liste, und seine Sitzungen können hier nicht mehr gelesen oder fortgesetzt werden, auch wenn der Ordner erneut hinzugefügt wird. Der Ordner und seine Konversationen bleiben auf dem Datenträger."
           }
         },
         "es" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "El agente desaparece de la lista. Su carpeta y sus conversaciones se quedan en el disco."
+            "value" : "El agente desaparece de la lista y sus sesiones ya no se podrán leer ni reanudar aquí, aunque vuelvas a añadir la carpeta. La carpeta y sus conversaciones se quedan en el disco."
           }
         },
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’agent disparaît de la liste. Son dossier et ses conversations restent sur le disque."
+            "value" : "L’agent disparaît de la liste et ses sessions ne pourront plus être lues ni reprises ici, même si le dossier est ajouté de nouveau. Le dossier et ses conversations restent sur le disque."
           }
         },
         "hi" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "एजेंट सूची से हट जाता है। उसका फ़ोल्डर और बातचीत डिस्क पर बनी रहती हैं।"
+            "value" : "एजेंट सूची से हट जाता है, और उसके सत्र यहाँ न पढ़े जा सकेंगे न फिर से शुरू हो सकेंगे, भले ही फ़ोल्डर दोबारा जोड़ा जाए। फ़ोल्डर और उसकी बातचीत डिस्क पर बनी रहती हैं।"
           }
         },
         "it" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "L’agente esce dall’elenco. La sua cartella e le sue conversazioni restano sul disco."
+            "value" : "L’agente esce dall’elenco e le sue sessioni non potranno più essere lette né riprese qui, anche se la cartella viene aggiunta di nuovo. La cartella e le sue conversazioni restano sul disco."
           }
         },
         "ja" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "エージェントは一覧から消えます。フォルダと会話はディスクに残ります。"
+            "value" : "エージェントは一覧から消え、フォルダを再度追加してもそのセッションはここで読むことも再開することもできなくなります。フォルダと会話はディスクに残ります。"
           }
         },
         "ko" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "에이전트가 목록에서 사라집니다. 폴더와 대화는 디스크에 남습니다."
+            "value" : "에이전트가 목록에서 사라지며, 폴더를 다시 추가해도 해당 세션은 여기에서 읽거나 재개할 수 없습니다. 폴더와 대화는 디스크에 남습니다."
           }
         },
         "nl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "De agent verdwijnt uit de lijst. Zijn map en gesprekken blijven op de schijf staan."
+            "value" : "De agent verdwijnt uit de lijst en zijn sessies kunnen hier niet meer worden gelezen of hervat, ook niet als de map opnieuw wordt toegevoegd. De map en gesprekken blijven op de schijf staan."
           }
         },
         "pl" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Agent zniknie z listy. Jego folder i rozmowy pozostaną na dysku."
+            "value" : "Agent zniknie z listy, a jego sesji nie będzie można tu odczytać ani wznowić, nawet po ponownym dodaniu folderu. Folder i rozmowy pozostaną na dysku."
           }
         },
         "pt-BR" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "O agente sai da lista. A pasta e as conversas permanecem no disco."
+            "value" : "O agente sai da lista e suas sessões não poderão mais ser lidas nem retomadas aqui, mesmo que a pasta seja adicionada de novo. A pasta e as conversas permanecem no disco."
           }
         },
         "ru" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Агент исчезнет из списка. Его папка и разговоры останутся на диске."
+            "value" : "Агент исчезнет из списка, а его сеансы больше нельзя будет читать и возобновлять здесь, даже если добавить папку снова. Папка и разговоры останутся на диске."
           }
         },
         "tr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Aracı listeden kalkar. Klasörü ve konuşmaları diskte kalır."
+            "value" : "Aracı listeden kalkar ve klasör yeniden eklense bile oturumları burada artık okunamaz ya da sürdürülemez. Klasör ve konuşmaları diskte kalır."
           }
         },
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Агент зникне зі списку. Його папка й розмови залишаться на диску."
+            "value" : "Агент зникне зі списку, а його сеанси більше не можна буде читати й відновлювати тут, навіть якщо додати папку знову. Папка й розмови залишаться на диску."
           }
         },
         "zh-Hans" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "代理将从列表中移除。其文件夹和对话仍保留在磁盘上。"
+            "value" : "代理将从列表中移除，其会话无法再在此处读取或恢复，即使重新添加该文件夹也是如此。文件夹及其对话仍保留在磁盘上。"
           }
         },
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "代理會從列表中移除。其檔案夾和對話仍保留在磁碟上。"
+            "value" : "代理會從列表中移除，其工作階段無法再於此處讀取或繼續，即使重新加入該檔案夾也一樣。檔案夾及其對話仍保留在磁碟上。"
           }
         }
       }

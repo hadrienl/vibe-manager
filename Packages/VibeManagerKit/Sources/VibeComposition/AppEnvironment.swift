@@ -615,8 +615,7 @@ public final class AppEnvironment {
       ],
       didSave: { [weak appModel] in
         await agentAccounts.reload(into: registry)
-        await appModel?.refreshAgents()
-        await appModel?.loadSigningInAgents()
+        await appModel?.refreshAgentsAfterChange()
         await appModel?.conversations.refreshReadableAgents()
       })
     if let defaults = defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? Optional(.standard) {
