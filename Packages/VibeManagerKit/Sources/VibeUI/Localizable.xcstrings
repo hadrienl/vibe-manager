@@ -3559,6 +3559,106 @@
         }
       }
     },
+    "%@ is now signed in to %@, not %@." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ مسجَّل الدخول الآن إلى %2$@ وليس %3$@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ist jetzt bei %2$@ angemeldet, nicht bei %3$@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ha iniciado sesión con %2$@, no con %3$@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ est maintenant connecté à %2$@, et non à %3$@."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ अब %2$@ से साइन इन है, %3$@ से नहीं।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ ora ha eseguito l’accesso con %2$@, non con %3$@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ は %3$@ ではなく %2$@ でサインインしています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@이(가) %3$@이(가) 아닌 %2$@(으)로 로그인되었습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ is nu ingelogd met %2$@, niet met %3$@."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ jest teraz zalogowany na %2$@, a nie na %3$@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ agora está conectado a %2$@, não a %3$@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ теперь использует %2$@, а не %3$@."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ artık %3$@ yerine %2$@ ile oturum açmış durumda."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ тепер використовує %2$@, а не %3$@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 现已登录 %2$@，而不是 %3$@。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%1$@ 現已登入 %2$@，而非 %3$@。"
+          }
+        }
+      }
+    },
     "%@ is ready." : {
       "comment" : "Said once an agent composed a sound, or changed one.",
       "localizations" : {
@@ -32816,24 +32916,6 @@
         "ar" : {
           "variations" : {
             "plural" : {
-              "zero" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld صوت · %@"
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld صوت · %@"
-                }
-              },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld صوتان · %@"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -32846,7 +32928,25 @@
                   "value" : "%lld صوتًا · %@"
                 }
               },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld صوت · %@"
+                }
+              },
               "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld صوت · %@"
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld صوتان · %@"
+                }
+              },
+              "zero" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld صوت · %@"
@@ -32894,16 +32994,16 @@
         "es" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld sonido · %@"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld sonidos · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld sonido · %@"
                 }
               },
               "other" : {
@@ -32918,16 +33018,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld son · %@"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld sons · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld son · %@"
                 }
               },
               "other" : {
@@ -32960,16 +33060,16 @@
         "it" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld suono · %@"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld suoni · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld suono · %@"
                 }
               },
               "other" : {
@@ -33026,12 +33126,6 @@
         "pl" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld dźwięk · %@"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -33042,6 +33136,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld dźwięków · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld dźwięk · %@"
                 }
               },
               "other" : {
@@ -33056,16 +33156,16 @@
         "pt-BR" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld som · %@"
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld sons · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld som · %@"
                 }
               },
               "other" : {
@@ -33080,12 +33180,6 @@
         "ru" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld звук · %@"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -33096,6 +33190,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld звуков · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld звук · %@"
                 }
               },
               "other" : {
@@ -33128,12 +33228,6 @@
         "uk" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "%lld звук · %@"
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -33144,6 +33238,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "%lld звуків · %@"
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "%lld звук · %@"
                 }
               },
               "other" : {
@@ -39347,6 +39447,106 @@
         }
       }
     },
+    "Account" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الحساب"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuenta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compte"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "खाता"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Учётная запись"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hesap"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Обліковий запис"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帳號"
+          }
+        }
+      }
+    },
     "Account to check" : {
       "comment" : "The title of a request of an agent: its CLI is signed out, refused or unpaid, and the turn stopped.",
       "localizations" : {
@@ -40550,6 +40750,106 @@
         }
       }
     },
+    "Add an Account…" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "إضافة حساب…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto hinzufügen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Añadir una cuenta…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouter un compte…"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "खाता जोड़ें…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aggiungi un account…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウントを追加…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정 추가…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account toevoegen…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dodaj konto…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Adicionar uma conta…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Добавить учётную запись…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hesap ekle…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Додати обліковий запис…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "添加账户…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新增帳號…"
+          }
+        }
+      }
+    },
     "Add an Endpoint…" : {
       "comment" : "The last line of the endpoints in the Settings window's sidebar.",
       "localizations" : {
@@ -40755,12 +41055,6 @@
     "Added %@" : {
       "comment" : "When an iPhone was first admitted; %@ is a date.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ajouté le %@"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -40777,6 +41071,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Añadido el %@"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ajouté le %@"
           }
         },
         "hi" : {
@@ -61649,6 +61949,106 @@
         }
       }
     },
+    "Configuration Folder" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "مجلد الإعداد"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konfigurationsordner"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Carpeta de configuración"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dossier de configuration"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कॉन्फ़िगरेशन फ़ोल्डर"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cartella di configurazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定フォルダ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "구성 폴더"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Configuratiemap"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder konfiguracji"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Pasta de configuração"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Папка конфигурации"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yapılandırma klasörü"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Папка конфігурації"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "配置文件夹"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "設定檔案夾"
+          }
+        }
+      }
+    },
     "Conflicts" : {
       "comment" : "A list of the Git inspector: conflicted files.",
       "localizations" : {
@@ -61753,12 +62153,6 @@
     "Connected" : {
       "comment" : "An iPhone of the companion, connected now.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connecté"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -61775,6 +62169,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Conectado"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connecté"
           }
         },
         "hi" : {
@@ -68054,6 +68454,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "刪除"
+          }
+        }
+      }
+    },
+    "Delete Account…" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حذف الحساب…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konto löschen …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Eliminar la cuenta…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Supprimer le compte…"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "खाता हटाएँ…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Elimina account…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "アカウントを削除…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "계정 삭제…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Account verwijderen…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Usuń konto…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Apagar conta…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Удалить учётную запись…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Hesabı sil…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Видалити обліковий запис…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "删除账户…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "刪除帳號…"
           }
         }
       }
@@ -75803,6 +76303,106 @@
         }
       }
     },
+    "Enter an absolute path, or one starting with ~/." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أدخل مسارًا مطلقًا أو مسارًا يبدأ بـ ~/."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib einen absoluten Pfad an oder einen, der mit ~/ beginnt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indica una ruta absoluta o que empiece por ~/."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Indique un chemin absolu ou commençant par ~/."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "पूर्ण पथ या ~/ से शुरू होने वाला पथ दर्ज करें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inserisci un percorso assoluto o che inizia con ~/."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "絶対パス、または ~/ で始まるパスを入力してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "절대 경로 또는 ~/로 시작하는 경로를 입력하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Voer een absoluut pad in, of een pad dat met ~/ begint."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Podaj ścieżkę bezwzględną lub zaczynającą się od ~/."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informe um caminho absoluto ou que comece com ~/."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Укажите абсолютный путь или путь, начинающийся с ~/."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mutlak bir yol ya da ~/ ile başlayan bir yol girin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вкажіть абсолютний шлях або шлях, що починається з ~/."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请输入绝对路径或以 ~/ 开头的路径。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請輸入絕對路徑或以 ~/ 開頭的路徑。"
+          }
+        }
+      }
+    },
     "Enter an address or #ticket" : {
       "localizations" : {
         "ar" : {
@@ -83347,6 +83947,106 @@
         }
       }
     },
+    "Give this account a name." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "أعطِ هذا الحساب اسمًا."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gib diesem Konto einen Namen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ponle un nombre a esta cuenta."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Donne un nom à ce compte."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इस खाते को नाम दें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dai un nome a questo account."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアカウントに名前を付けてください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 계정의 이름을 입력하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geef dit account een naam."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nadaj nazwę temu kontu."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dê um nome a esta conta."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назовите эту учётную запись."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu hesaba bir ad verin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Назвіть цей обліковий запис."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "请为此账户命名。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "請為此帳號命名。"
+          }
+        }
+      }
+    },
     "Given by the template — pick another if needed." : {
       "localizations" : {
         "ar" : {
@@ -89580,12 +90280,6 @@
     "It can no longer connect to this Mac. Opening Vibe Companion on it again adds it back." : {
       "comment" : "Explains removing an iPhone.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Il ne pourra plus se connecter à ce Mac. Rouvrir Vibe Companion dessus le rajoute."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -89602,6 +90296,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Ya no podrá conectarse a este Mac. Si vuelves a abrir Vibe Companion en él, se añadirá de nuevo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il ne pourra plus se connecter à ce Mac. Rouvrir Vibe Companion dessus le rajoute."
           }
         },
         "hi" : {
@@ -91081,6 +91781,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "保持開啟"
+          }
+        }
+      }
+    },
+    "Keep This Account" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الاحتفاظ بهذا الحساب"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieses Konto behalten"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Conservar esta cuenta"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Garder ce compte"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यही खाता रखें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mantieni questo account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このアカウントを使用"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 계정 유지"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit account behouden"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zachowaj to konto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Manter esta conta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Оставить эту учётную запись"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu hesabı koru"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Залишити цей обліковий запис"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留此账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "保留此帳號"
           }
         }
       }
@@ -101784,6 +102584,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "新的"
+          }
+        }
+      }
+    },
+    "New Account" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "حساب جديد"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neues Konto"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuenta nueva"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouveau compte"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "नया खाता"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuovo account"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新規アカウント"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 계정"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuw account"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nowe konto"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova conta"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новая учётная запись"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yeni hesap"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новий обліковий запис"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新账户"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新帳號"
           }
         }
       }
@@ -115473,12 +116373,6 @@
     "Only the iPhones of your iCloud account can connect. Remove one you gave away or lost: it can no longer reach this Mac." : {
       "comment" : "Settings › iPhone Companion: footer of the iPhones.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Seuls les iPhone de votre compte iCloud peuvent se connecter. Retirez celui que vous avez donné ou perdu : il ne pourra plus accéder à ce Mac."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -115495,6 +116389,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Solo pueden conectarse los iPhone de tu cuenta de iCloud. Elimina el que hayas regalado o perdido: ya no podrá acceder a este Mac."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Seuls les iPhone de votre compte iCloud peuvent se connecter. Retirez celui que vous avez donné ou perdu : il ne pourra plus accéder à ce Mac."
           }
         },
         "hi" : {
@@ -116579,12 +117479,6 @@
     "Open Vibe Companion on an iPhone signed in to the same iCloud account: it appears here." : {
       "comment" : "Settings › iPhone Companion: no iPhone yet.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Ouvrez Vibe Companion sur un iPhone connecté au même compte iCloud : il apparaît ici."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -116601,6 +117495,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Abre Vibe Companion en un iPhone con la sesión iniciada en la misma cuenta de iCloud: aparecerá aquí."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ouvrez Vibe Companion sur un iPhone connecté au même compte iCloud : il apparaît ici."
           }
         },
         "hi" : {
@@ -124719,12 +125619,6 @@
     "Ready: your iPhones can connect" : {
       "comment" : "The companion's agent.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Prêt : vos iPhone peuvent se connecter"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -124741,6 +125635,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Listo: tus iPhone pueden conectarse"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Prêt : vos iPhone peuvent se connecter"
           }
         },
         "hi" : {
@@ -127944,12 +128844,6 @@
     "Remove “%@”?" : {
       "comment" : "Asks before removing an iPhone; %@ is its name.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retirer « %@ » ?"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -127966,6 +128860,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "¿Eliminar “%@”?"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer « %@ » ?"
           }
         },
         "hi" : {
@@ -128045,12 +128945,6 @@
     "Remove…" : {
       "comment" : "Removes an iPhone from the companion.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Retirer…"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -128067,6 +128961,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Eliminar…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Retirer…"
           }
         },
         "hi" : {
@@ -145561,6 +146461,206 @@
         }
       }
     },
+    "Sign In" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تسجيل الدخول"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anmelden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciar sesión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se connecter"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "साइन इन करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "サインイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "로그인"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inloggen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zaloguj się"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Войти"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Oturum aç"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Увійти"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "登入"
+          }
+        }
+      }
+    },
+    "Sign In Again" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تسجيل الدخول مجددًا"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Erneut anmelden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Volver a iniciar sesión"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se reconnecter"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "फिर से साइन इन करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accedi di nuovo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "もう一度サインイン"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "다시 로그인"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Opnieuw inloggen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zaloguj się ponownie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrar novamente"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Войти снова"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yeniden oturum aç"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Увійти знову"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登录"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "重新登入"
+          }
+        }
+      }
+    },
     "Sign in to %@ in the web view to read the title of %@." : {
       "comment" : "A site, then a ticket's identifier.",
       "localizations" : {
@@ -145671,12 +146771,6 @@
     "Sign in to iCloud on this Mac to use the companion" : {
       "comment" : "The companion's agent.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Connectez-vous à iCloud sur ce Mac pour utiliser le compagnon"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -145693,6 +146787,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Inicia sesión en iCloud en este Mac para usar el compañero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connectez-vous à iCloud sur ce Mac pour utiliser le compagnon"
           }
         },
         "hi" : {
@@ -145967,6 +147067,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "訊號 %@"
+          }
+        }
+      }
+    },
+    "Signing in to %@ in the browser…" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "جارٍ تسجيل الدخول إلى %@ في المتصفح…"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Anmeldung bei %@ im Browser …"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Iniciando sesión en %@ en el navegador…"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Connexion à %@ dans le navigateur…"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ब्राउज़र में %@ में साइन इन हो रहा है…"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Accesso a %@ nel browser…"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ブラウザで %@ にサインイン中…"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "브라우저에서 %@에 로그인하는 중…"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Inloggen bij %@ in de browser…"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Logowanie do %@ w przeglądarce…"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Entrando no %@ pelo navegador…"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вход в %@ в браузере…"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Tarayıcıda %@ oturumu açılıyor…"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Вхід до %@ у браузері…"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在浏览器中登录 %@…"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "正在瀏覽器中登入 %@…"
           }
         }
       }
@@ -154329,12 +155529,6 @@
     "The Vibe Companion app shows this Mac’s sessions, follows their conversations and answers their requests. It finds the Mac through your iCloud account, then talks to it directly." : {
       "comment" : "Settings › iPhone Companion: under the switch.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "L’app Vibe Companion affiche les sessions de ce Mac, suit leurs conversations et répond à leurs demandes. Elle retrouve le Mac grâce à votre compte iCloud, puis communique directement avec lui."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -154351,6 +155545,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "La app Vibe Companion muestra las sesiones de este Mac, sigue sus conversaciones y responde a sus peticiones. Encuentra el Mac a través de tu cuenta de iCloud y después se comunica directamente con él."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’app Vibe Companion affiche les sessions de ce Mac, suit leurs conversations et répond à leurs demandes. Elle retrouve le Mac grâce à votre compte iCloud, puis communique directement avec lui."
           }
         },
         "hi" : {
@@ -156034,6 +157234,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "代理程式正在工作：推理強度可在兩輪之間變更。"
+          }
+        }
+      }
+    },
+    "The agent leaves the list. Its folder and its conversations stay on the disk." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يختفي الوكيل من القائمة. يبقى مجلده ومحادثاته على القرص."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Agent verschwindet aus der Liste. Sein Ordner und seine Konversationen bleiben auf dem Datenträger."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El agente desaparece de la lista. Su carpeta y sus conversaciones se quedan en el disco."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agent disparaît de la liste. Son dossier et ses conversations restent sur le disque."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "एजेंट सूची से हट जाता है। उसका फ़ोल्डर और बातचीत डिस्क पर बनी रहती हैं।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "L’agente esce dall’elenco. La sua cartella e le sue conversazioni restano sul disco."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "エージェントは一覧から消えます。フォルダと会話はディスクに残ります。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "에이전트가 목록에서 사라집니다. 폴더와 대화는 디스크에 남습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De agent verdwijnt uit de lijst. Zijn map en gesprekken blijven op de schijf staan."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Agent zniknie z listy. Jego folder i rozmowy pozostaną na dysku."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O agente sai da lista. A pasta e as conversas permanecem no disco."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Агент исчезнет из списка. Его папка и разговоры останутся на диске."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Aracı listeden kalkar. Klasörü ve konuşmaları diskte kalır."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Агент зникне зі списку. Його папка й розмови залишаться на диску."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理将从列表中移除。其文件夹和对话仍保留在磁盘上。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "代理會從列表中移除。其檔案夾和對話仍保留在磁碟上。"
           }
         }
       }
@@ -161863,12 +163163,6 @@
     "The companion could not start" : {
       "comment" : "The companion's agent.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le compagnon n’a pas pu démarrer"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -161885,6 +163179,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "No se ha podido iniciar el compañero"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le compagnon n’a pas pu démarrer"
           }
         },
         "hi" : {
@@ -164974,6 +166274,106 @@
         }
       }
     },
+    "The folder is created if needed. The account starts from nothing: it has neither the MCP servers, the plugins nor the skills of the agent's own account." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يُنشأ المجلد عند الحاجة. يبدأ الحساب من الصفر: فلا يملك خوادم MCP ولا الإضافات ولا المهارات الخاصة بحساب الوكيل الأساسي."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der Ordner wird bei Bedarf erstellt. Das Konto beginnt bei null: Es hat weder die MCP-Server noch die Plug-ins oder Skills des eigenen Kontos des Agenten."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La carpeta se crea si hace falta. La cuenta empieza de cero: no tiene los servidores MCP, los plugins ni las habilidades de la cuenta principal del agente."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le dossier est créé s’il n’existe pas. Le compte part de zéro : il n’a ni les serveurs MCP, ni les plugins, ni les skills du compte principal de l’agent."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "ज़रूरत होने पर फ़ोल्डर बनाया जाता है। खाता शून्य से शुरू होता है: इसमें एजेंट के अपने खाते के MCP सर्वर, प्लगइन या स्किल नहीं होते।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La cartella viene creata se necessario. L’account parte da zero: non ha i server MCP, i plugin né le skill dell’account dell’agente."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "フォルダは必要に応じて作成されます。アカウントは空の状態から始まり、エージェント本来のアカウントの MCP サーバ、プラグイン、スキルは引き継がれません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "폴더는 필요하면 생성됩니다. 계정은 빈 상태로 시작하며, 에이전트 기본 계정의 MCP 서버, 플러그인, 스킬은 포함되지 않습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De map wordt indien nodig aangemaakt. Het account begint blanco: zonder de MCP-servers, plug-ins en skills van het eigen account van de agent."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Folder zostanie utworzony w razie potrzeby. Konto zaczyna od zera: nie ma serwerów MCP, wtyczek ani umiejętności głównego konta agenta."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A pasta é criada se necessário. A conta começa do zero: não tem os servidores MCP, os plugins nem as skills da conta principal do agente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Папка создаётся при необходимости. Учётная запись начинается с нуля: в ней нет серверов MCP, плагинов и навыков основной учётной записи агента."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Klasör gerekirse oluşturulur. Hesap sıfırdan başlar: aracının kendi hesabındaki MCP sunucuları, eklentiler ve beceriler bulunmaz."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Папку буде створено за потреби. Обліковий запис починається з нуля: у ньому немає серверів MCP, плагінів і навичок основного облікового запису агента."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "文件夹会在需要时创建。此账户从零开始：不包含代理主账户的 MCP 服务器、插件和技能。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "檔案夾會在需要時建立。此帳號從零開始：不包含代理主帳號的 MCP 伺服器、外掛和技能。"
+          }
+        }
+      }
+    },
     "The format must hold {title}, and may hold {id} and {url}." : {
       "localizations" : {
         "ar" : {
@@ -165378,12 +166778,6 @@
     "The iPhone companion needs a Mac with Apple silicon." : {
       "comment" : "Settings › iPhone Companion: an Intel Mac.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Le compagnon iPhone nécessite un Mac avec puce Apple."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -165400,6 +166794,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "El compañero para iPhone necesita un Mac con chip de Apple."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le compagnon iPhone nécessite un Mac avec puce Apple."
           }
         },
         "hi" : {
@@ -175502,12 +176902,6 @@
     "This build of Vibe Manager does not include the companion." : {
       "comment" : "Settings › iPhone Companion: a build without the companion.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Cette version de Vibe Manager n’inclut pas le compagnon."
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -175524,6 +176918,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Esta versión de Vibe Manager no incluye el compañero."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cette version de Vibe Manager n’inclut pas le compagnon."
           }
         },
         "hi" : {
@@ -176301,6 +177701,106 @@
         }
       }
     },
+    "This folder is already the account %@’s." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذا المجلد مستخدَم بالفعل للحساب %@."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Ordner gehört bereits zum Konto %@."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta carpeta ya es de la cuenta %@."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce dossier est déjà celui du compte %@."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह फ़ोल्डर पहले से खाते %@ का है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa cartella è già dell’account %@."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このフォルダはすでにアカウント %@ が使用しています。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 폴더는 이미 계정 %@에서 사용 중입니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze map is al van het account %@."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ten folder należy już do konta %@."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta pasta já é da conta %@."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Эта папка уже используется учётной записью %@."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu klasör zaten %@ hesabına ait."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ця папка вже належить обліковому запису %@."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此文件夹已被账户 %@ 使用。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "此檔案夾已由帳號 %@ 使用。"
+          }
+        }
+      }
+    },
     "This icon cannot be stored." : {
       "localizations" : {
         "ar" : {
@@ -176497,6 +177997,106 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "這是檔案將包含的所有內容。請閱讀、使用 ⌘F 搜尋，然後儲存並自行附加到報告中：不會傳送任何內容。"
+          }
+        }
+      }
+    },
+    "This is the folder of %@. Choose another one." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذا مجلد %@. اختر مجلدًا آخر."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Das ist der Ordner von %@. Wähle einen anderen."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta es la carpeta de %@. Elige otra."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "C’est le dossier de %@. Choisis-en un autre."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह %@ का फ़ोल्डर है। कोई दूसरा चुनें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questa è la cartella di %@. Scegline un’altra."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "これは %@ のフォルダです。別のフォルダを選択してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "%@의 폴더입니다. 다른 폴더를 선택하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dit is de map van %@. Kies een andere."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "To folder agenta %@. Wybierz inny."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Esta é a pasta do %@. Escolha outra."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Это папка %@. Выберите другую."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu, %@ klasörü. Başka bir klasör seçin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Це папка %@. Виберіть іншу."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这是 %@ 的文件夹。请选择其他文件夹。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這是 %@ 的檔案夾。請選擇其他檔案夾。"
           }
         }
       }
@@ -187638,12 +189238,6 @@
     "Use Vibe Manager from your iPhone" : {
       "comment" : "Settings › iPhone Companion: the switch that turns the companion on.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Utiliser Vibe Manager depuis votre iPhone"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -187660,6 +189254,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Usa Vibe Manager desde tu iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Utiliser Vibe Manager depuis votre iPhone"
           }
         },
         "hi" : {
@@ -195343,24 +196943,6 @@
         "ar" : {
           "variations" : {
             "plural" : {
-              "zero" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "لديك %lld صوت بالفعل: احذف واحدًا أولًا."
-                }
-              },
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "لديك %lld صوت بالفعل: احذفه أولًا."
-                }
-              },
-              "two" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "لديك %lld صوتان بالفعل: احذف واحدًا أولًا."
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -195373,7 +196955,25 @@
                   "value" : "لديك %lld صوتًا بالفعل: احذف واحدًا أولًا."
                 }
               },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "لديك %lld صوت بالفعل: احذفه أولًا."
+                }
+              },
               "other" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "لديك %lld صوت بالفعل: احذف واحدًا أولًا."
+                }
+              },
+              "two" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "لديك %lld صوتان بالفعل: احذف واحدًا أولًا."
+                }
+              },
+              "zero" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "لديك %lld صوت بالفعل: احذف واحدًا أولًا."
@@ -195421,16 +197021,16 @@
         "es" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Ya tienes %lld sonido: elimina uno primero."
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Ya tienes %lld sonidos: elimina uno primero."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Ya tienes %lld sonido: elimina uno primero."
                 }
               },
               "other" : {
@@ -195445,16 +197045,16 @@
         "fr" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Vous gardez déjà %lld son : supprimez-en un d’abord."
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Vous gardez déjà %lld sons : supprimez-en un d’abord."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Vous gardez déjà %lld son : supprimez-en un d’abord."
                 }
               },
               "other" : {
@@ -195487,16 +197087,16 @@
         "it" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Hai già %lld suono: eliminane prima uno."
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Hai già %lld suoni: eliminane prima uno."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Hai già %lld suono: eliminane prima uno."
                 }
               },
               "other" : {
@@ -195553,12 +197153,6 @@
         "pl" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Masz już %lld dźwięk: najpierw usuń jeden."
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -195569,6 +197163,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Masz już %lld dźwięków: najpierw usuń jeden."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Masz już %lld dźwięk: najpierw usuń jeden."
                 }
               },
               "other" : {
@@ -195583,16 +197183,16 @@
         "pt-BR" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "Você já tem %lld som: apague um primeiro."
-                }
-              },
               "many" : {
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "Você já tem %lld sons: apague um primeiro."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "Você já tem %lld som: apague um primeiro."
                 }
               },
               "other" : {
@@ -195607,12 +197207,6 @@
         "ru" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "У вас уже %lld звук: сначала удалите один."
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -195623,6 +197217,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "У вас уже %lld звуков: сначала удалите один."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "У вас уже %lld звук: сначала удалите один."
                 }
               },
               "other" : {
@@ -195655,12 +197255,6 @@
         "uk" : {
           "variations" : {
             "plural" : {
-              "one" : {
-                "stringUnit" : {
-                  "state" : "translated",
-                  "value" : "У вас уже %lld звук: спершу видаліть один."
-                }
-              },
               "few" : {
                 "stringUnit" : {
                   "state" : "translated",
@@ -195671,6 +197265,12 @@
                 "stringUnit" : {
                   "state" : "translated",
                   "value" : "У вас уже %lld звуків: спершу видаліть один."
+                }
+              },
+              "one" : {
+                "stringUnit" : {
+                  "state" : "translated",
+                  "value" : "У вас уже %lld звук: спершу видаліть один."
                 }
               },
               "other" : {
@@ -201762,12 +203362,6 @@
     "iPhone Companion" : {
       "comment" : "A page of the Settings window.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "Compagnon iPhone"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -201784,6 +203378,12 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Compañero para iPhone"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Compagnon iPhone"
           }
         },
         "hi" : {
@@ -201863,12 +203463,6 @@
     "iPhones" : {
       "comment" : "A section of Settings › iPhone Companion.",
       "localizations" : {
-        "fr" : {
-          "stringUnit" : {
-            "state" : "translated",
-            "value" : "iPhone"
-          }
-        },
         "ar" : {
           "stringUnit" : {
             "state" : "translated",
@@ -201882,6 +203476,12 @@
           }
         },
         "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "iPhone"
+          }
+        },
+        "fr" : {
           "stringUnit" : {
             "state" : "translated",
             "value" : "iPhone"

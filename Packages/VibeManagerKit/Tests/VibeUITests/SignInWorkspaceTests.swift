@@ -94,6 +94,49 @@ struct SignInWorkspaceTests {
 
     """.utf8)
 
+  @Test("Signed in to another account, nothing resumes until the user says (#478)")
+  func anotherAccount() async throws {
+    let supervisor = WorkspaceSupervisor()
+    let (model, subject) = try await running(supervisor: supervisor)
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+    let stub = AgentProviderID("stub")
+    let started = await supervisor.startCount
+
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: "perso@x.io")
+    #expect(
+      model.signInNotice(for: subject.id)?.state
+        == .otherAccount(expected: "pro@x.io", actual: "perso@x.io"))
+    #expect(await supervisor.startCount == started)
+    // Whatever the CLI says before a second try, the expected account stays the first.
+    #expect(model.signedInAccounts.account(of: stub) == "pro@x.io")
+
+    model.keepSignedInAccount(of: stub)
+    #expect(model.signedInAccounts.account(of: stub) == "perso@x.io")
+    #expect(model.signIns[stub] == nil)
+    // From there it is the sign-in of #410: this screen's prompt cannot be read, so Resume is offered.
+    await model.reload()
+    let deadline = ContinuousClock.now + .seconds(10)
+    while model.signInNotice(for: subject.id)?.state != .signedIn(canResume: true, waiting: .text(nil)),
+      ContinuousClock.now < deadline
+    {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(
+      model.signInNotice(for: subject.id)?.state
+        == .signedIn(canResume: true, waiting: .text(nil)))
+    #expect(await supervisor.startCount == started)
+  }
+
+  @Test("Signed in to the same account, or to one the CLI does not name, it resumes (#478)")
+  func sameAccount() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    await model.signInEnded(stub, outcome: .signedIn, before: "Pro@x.io", after: "pro@x.io")
+    #expect(model.signIns[stub] == nil)
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: nil)
+    #expect(model.signIns[stub] == nil)
+  }
+
   @Test("Text left in the prompt is shown, and Resume sends it once the agent is restarted")
   func textWaitingIsSent() async throws {
     let supervisor = WorkspaceSupervisor(history: Self.promptHoldingText)
