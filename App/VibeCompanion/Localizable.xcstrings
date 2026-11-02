@@ -1903,7 +1903,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Папка з такою назвою вже існує."
+            "value" : "Тека з такою назвою вже існує."
           }
         },
         "zh-Hans" : {
@@ -7268,7 +7268,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Назва папки"
+            "value" : "Назва теки"
           }
         },
         "zh-Hans" : {
@@ -9995,7 +9995,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Нова папка"
+            "value" : "Нова тека"
           }
         },
         "zh-Hans" : {
@@ -16459,7 +16459,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Не вдалося створити папку"
+            "value" : "Не вдалося створити теку"
           }
         },
         "zh-Hans" : {
@@ -16762,7 +16762,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mac не дозволяє створити тут папку."
+            "value" : "Mac не дозволяє створити тут теку."
           }
         },
         "zh-Hans" : {
@@ -18176,7 +18176,7 @@
         "uk" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Цю назву не можна використати для папки."
+            "value" : "Цю назву не можна використати для теки."
           }
         },
         "zh-Hans" : {
