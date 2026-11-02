@@ -407,6 +407,23 @@ final class LinkMenuItem: NSMenuItem {
   }
 }
 
+/// A terminal's screen as text, as it shows and without its dim text (#464).
+public struct TerminalScreens: Sendable, Equatable {
+  public let shown: String
+  public let undimmed: String
+
+  public init(shown: String, undimmed: String) {
+    self.shown = shown
+    self.undimmed = undimmed
+  }
+
+  init(of terminal: Terminal) {
+    shown = TerminalText.visibleScreen(of: terminal, keepingIndent: true)
+    undimmed = TerminalText.visibleScreen(
+      of: terminal, keepingIndent: true, droppingDimText: true)
+  }
+}
+
 /// Text out of a terminal, for people rather than for a terminal.
 public enum TerminalText {
   /// What a terminal of `size` shows once it has drawn `history`, as `visibleScreen` reads it but
@@ -421,12 +438,30 @@ public enum TerminalText {
     return visibleScreen(of: terminal, keepingIndent: true)
   }
 
+  /// The screen as `screen(replaying:size:)` reads it, and the same without its dim text (#464):
+  /// what an agent shows greyed in its prompt — `Try "…"`, a suggested answer — is not text typed
+  /// into it. The history is replayed once for both.
+  public static func screens(replaying history: [UInt8], size: TerminalSize) -> TerminalScreens {
+    let terminal = Terminal(
+      delegate: SilentTerminalDelegate(),
+      options: TerminalOptions(cols: size.columns, rows: size.rows, scrollback: 0))
+    terminal.feed(byteArray: history)
+    return TerminalScreens(of: terminal)
+  }
+
   /// The screen's lines, trailing blanks and trailing empty lines removed — and leading blanks,
-  /// unless `keepingIndent`.
-  public static func visibleScreen(of terminal: Terminal, keepingIndent: Bool = false) -> String {
+  /// unless `keepingIndent`. Dim text is read as blanks when `droppingDimText`.
+  public static func visibleScreen(
+    of terminal: Terminal, keepingIndent: Bool = false, droppingDimText: Bool = false
+  ) -> String {
     var lines: [String] = []
+    let undimmed: ((CharData) -> Character)? =
+      droppingDimText
+      ? { cell in cell.attribute.style.contains(.dim) ? " " : cell.getCharacter() } : nil
     for row in 0..<terminal.rows {
-      let text = terminal.getLine(row: row)?.translateToString(trimRight: true) ?? ""
+      let text =
+        terminal.getLine(row: row)?.translateToString(
+          trimRight: true, characterProvider: undimmed) ?? ""
       // Cells never written read as NUL, which is nothing to say.
       let line = text.replacingOccurrences(of: "\u{0}", with: " ")
       lines.append(
@@ -518,6 +553,15 @@ public actor TerminalScreenFollower {
   public init() {}
 
   public func screen(of history: TerminalHistorySnapshot, size: TerminalSize) -> String {
+    TerminalText.visibleScreen(of: follow(history, size: size), keepingIndent: true)
+  }
+
+  /// The screen as it shows and without its dim text (#464).
+  public func screens(of history: TerminalHistorySnapshot, size: TerminalSize) -> TerminalScreens {
+    TerminalScreens(of: follow(history, size: size))
+  }
+
+  private func follow(_ history: TerminalHistorySnapshot, size: TerminalSize) -> Terminal {
     let start = fedThrough - history.startOffset
     let terminal: Terminal
     if let followed = self.terminal, self.size == size, (0...history.bytes.count).contains(start) {
@@ -533,6 +577,6 @@ public actor TerminalScreenFollower {
       self.size = size
     }
     fedThrough = history.endOffset
-    return TerminalText.visibleScreen(of: terminal, keepingIndent: true)
+    return terminal
   }
 }

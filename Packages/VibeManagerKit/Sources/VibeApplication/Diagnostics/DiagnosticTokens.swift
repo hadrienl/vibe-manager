@@ -133,3 +133,4 @@ extension DiagnosticValue {
   }
 }
 extension QuitBehavior: DiagnosticTokenConvertible {}
+extension TypingBlock: DiagnosticTokenConvertible {}

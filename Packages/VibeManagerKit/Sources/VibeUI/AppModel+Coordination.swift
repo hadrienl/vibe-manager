@@ -304,24 +304,49 @@ extension AppModel {
   /// and the user has not typed in its terminal for two seconds. An agent without hooks says
   /// nothing of what it does: it is taken to be at rest.
   func canTypeCoordinationMessage(into id: SessionID) async -> Bool {
-    guard launcher?.isRunning(id) == true else { return false }
+    await typingBlock(of: id) == nil
+  }
+
+  /// What keeps a message from being typed into this session now, as `canTypeCoordinationMessage`
+  /// says; nil when nothing does. Logged once a minute at most per session and reason (#464).
+  func typingBlock(of id: SessionID) async -> TypingBlock? {
+    let block = await findTypingBlock(of: id)
+    if let block {
+      let now = coordination.now()
+      let last = coordination.deferralLogged[id]
+      if last?.0 != block || now.timeIntervalSince(last?.1 ?? .distantPast) >= 60 {
+        coordination.deferralLogged[id] = (block, now)
+        diagnostics.record(
+          .session, .info, "coordination.typingDeferred",
+          ["session": diagnostics.pseudonym(id), "reason": .token(DiagnosticToken(block))])
+      }
+    } else {
+      coordination.deferralLogged[id] = nil
+    }
+    return block
+  }
+
+  private func findTypingBlock(of id: SessionID) async -> TypingBlock? {
+    guard launcher?.isRunning(id) == true else { return .notRunning }
     switch activity(for: id)?.activity {
-    case .working, .awaitingUser: return false
+    case .working: return .working
+    case .awaitingUser: return .awaitingUser
     case .idle, nil: break
     }
     if let typed = pane(for: id)?.lastKeyboardInputAt, ContinuousClock.now - typed < .seconds(2) {
-      return false
+      return .recentKeyboard
     }
-    if let screen = await launcher?.screen(of: id) {
-      if AgentPanelRecognition.showsPanel(screen: screen) { return false }
-      // Text the user left in the prompt would be sent with the message: it waits for them.
-      if let input = PromptInputRecognition.input(screen: screen),
+    if let screens = await launcher?.screens(of: id) {
+      if AgentPanelRecognition.showsPanel(screen: screens.shown) { return .panel }
+      // Text the user left in the prompt would be sent with the message: it waits for them. What
+      // the agent shows greyed there — a hint, a suggested answer — is no text (#464).
+      if let input = PromptInputRecognition.input(screen: screens.undimmed),
         PromptInputRecognition.holdsText(input)
       {
-        return false
+        return .promptText
       }
     }
-    return true
+    return nil
   }
 
   /// Types a message into a session at rest, one at a time per session. Return is pressed only
@@ -339,9 +364,13 @@ extension AppModel {
     // Taken before the checks, which wait: two messages checked together would both be typed.
     guard coordination.typing.insert(id).inserted else { return .notTyped }
     defer { coordination.typing.remove(id) }
-    guard let launcher, await submitLeftCoordinationMessage(in: id, launcher: launcher),
-      await canTypeCoordinationMessage(into: id)
-    else { return .notTyped }
+    guard let launcher, await submitLeftCoordinationMessage(in: id, launcher: launcher) else {
+      noteTypingBlock(nil, for: id)
+      return .notTyped
+    }
+    let block = await typingBlock(of: id)
+    noteTypingBlock(block, for: id)
+    if block != nil { return .notTyped }
     let outcome = await launcher.typeMessage(text, into: id) { [weak self] in
       self?.typingState(of: id) ?? .atRest
     }
@@ -458,12 +487,14 @@ extension AppModel {
     for (id, messages) in coordination.outbox {
       guard let text = messages.first else {
         coordination.outbox[id] = nil
+        coordination.outboxWaits[id] = nil
         continue
       }
       guard sessions.contains(where: { $0.id == id && $0.status != .archived }),
         launcher?.isRunning(id) == true
       else {
         coordination.outbox[id] = nil
+        coordination.outboxWaits[id] = nil
         // Its coordinator was told they would be typed: it is told they were not.
         if let child = sessions.first(where: { $0.id == id }),
           let coordinatorID = child.coordination?.coordinatorID
@@ -476,10 +507,51 @@ extension AppModel {
         }
         continue
       }
-      guard await typeCoordinationMessage(text, into: id) else { continue }
+      if coordination.outboxWaits[id] == nil {
+        coordination.outboxWaits[id] = OutboxWait(since: now)
+      }
+      guard await typeCoordinationMessage(text, into: id) else {
+        tellIfStuck(id, count: messages.count)
+        continue
+      }
       let rest = Array((coordination.outbox[id] ?? []).dropFirst())
       coordination.outbox[id] = rest.isEmpty ? nil : rest
+      // Typed: the next one waits from now.
+      coordination.outboxWaits[id] = rest.isEmpty ? nil : OutboxWait(since: coordination.now())
     }
+  }
+
+  /// Keeps why a child's outbox waits. The two minutes count from when it came to rest kept from
+  /// its messages, not from when they were sent: a turn of its own is no wait (#464).
+  private func noteTypingBlock(_ block: TypingBlock?, for id: SessionID) {
+    guard var wait = coordination.outboxWaits[id] else { return }
+    if OutboxWait.keepsAtRest(block), !OutboxWait.keepsAtRest(wait.block) {
+      wait.since = coordination.now()
+      wait.told = false
+    }
+    wait.block = block
+    coordination.outboxWaits[id] = wait
+  }
+
+  /// Tells a child's coordinator once that the messages kept for it are not typed while it is at
+  /// rest, and why (#464): a child kept from them by a prompt or a panel is no longer silent.
+  private func tellIfStuck(_ id: SessionID, count: Int) {
+    let now = coordination.now()
+    guard let wait = coordination.outboxWaits[id], wait.isStuck(at: now), let block = wait.block,
+      let child = sessions.first(where: { $0.id == id }),
+      let coordinatorID = child.coordination?.coordinatorID
+    else { return }
+    coordination.outboxWaits[id]?.told = true
+    diagnostics.record(
+      .session, .notice, "coordination.messagesStuck",
+      [
+        "session": diagnostics.pseudonym(id), "reason": .token(DiagnosticToken(block)),
+        "count": .count(count),
+      ])
+    tell(
+      coordinatorID,
+      CoordinationEvent(
+        childID: id, childName: child.name, kind: .messagesStuck(count, block), date: now))
   }
 }
 
@@ -764,6 +836,11 @@ extension AppModel {
     if let request = activity(for: child.id)?.requests.first {
       parts.append("Waiting for the user: \(CoordinationDigest.summary(of: request))")
     }
+    if let waiting = coordination.outbox[child.id]?.count, waiting > 0 {
+      let messages = waiting == 1 ? "1 message you sent waits" : "\(waiting) messages you sent wait"
+      let why = coordination.outboxWaits[child.id]?.block.map { ": \($0.reason)" } ?? ""
+      parts.append("\(messages) to be typed\(why).")
+    }
     if let journal = journal?.journals.value(for: child.id) {
       let summary = journal.entries.suffix(5).map { "- \($0.text)" }
       if !summary.isEmpty { parts.append("Activity summary:\n" + summary.joined(separator: "\n")) }
@@ -814,8 +891,21 @@ extension AppModel {
       }
     }
     coordination.outbox[child.id, default: []].append(message)
+    if coordination.outboxWaits[child.id] == nil {
+      coordination.outboxWaits[child.id] = OutboxWait(
+        since: coordination.now(), block: coordination.deferralLogged[child.id]?.0)
+    }
     startCoordinationTicker()
-    return "“\(child.name)” is busy: the message will be typed once it finishes its turn."
+    let waiting = coordination.outbox[child.id]?.count ?? 1
+    let queued = waiting == 1 ? "" : " (\(waiting) messages waiting)"
+    switch coordination.outboxWaits[child.id]?.block {
+    case .some(let block) where block != .working:
+      return
+        "Not typed into “\(child.name)” yet\(queued): \(block.reason). It will be typed once that clears."
+    default:
+      return
+        "“\(child.name)” is busy\(queued): the message will be typed once it finishes its turn."
+    }
   }
 
   private func moveChild(of coordinator: WorkSession, _ arguments: JSONValue) async throws

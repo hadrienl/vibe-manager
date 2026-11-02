@@ -53,6 +53,10 @@ public final class CoordinationModel {
   @ObservationIgnored var inbox = CoordinationInbox()
   /// Messages a coordinator sent to a child busy with a turn, typed once it is at rest, in order.
   @ObservationIgnored var outbox: [SessionID: [String]] = [:]
+  /// Since when each outbox waits, and why its last message could not be typed (#464).
+  @ObservationIgnored var outboxWaits: [SessionID: OutboxWait] = [:]
+  /// When each session's reason for not being typed into was last logged: once a minute at most.
+  @ObservationIgnored var deferralLogged: [SessionID: (TypingBlock, Date)] = [:]
   /// The message typed into each session's prompt but not sent (#435): sent before the next one.
   @ObservationIgnored var leftInInput: [SessionID: LeftMessage] = [:]
   /// Sessions a message is being typed into: one at a time each, never two interleaved.

@@ -899,6 +899,19 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     }.value
   }
 
+  /// The screen as `screen(of:)` reads it, and the same without its dim text: what an agent
+  /// shows greyed in its prompt is not text typed into it (#464).
+  public func screens(of id: SessionID) async -> TerminalScreens? {
+    guard let pane = panes[id], pane.status == .running, let terminal = pane.session else {
+      return nil
+    }
+    let history = await terminal.history()
+    let size = pane.viewportSize ?? TerminalSize(columns: 300, rows: 120)
+    return await Task.detached(priority: .userInitiated) {
+      TerminalText.screens(replaying: history.bytes, size: size)
+    }.value
+  }
+
   /// The screen, as `screen(of:)` reads it, by a follower that replays only what is new: for a
   /// screen read again and again (#411).
   public func screen(of id: SessionID, following follower: TerminalScreenFollower) async -> String?
