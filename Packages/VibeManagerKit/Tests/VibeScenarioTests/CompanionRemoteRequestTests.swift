@@ -123,6 +123,9 @@ struct CompanionRemoteFolderTests {
     try withParent { parent in
       #expect(CompanionRemoteServer.createFolder(named: "  Nouveau été ", in: parent.path) == nil)
       #expect(CompanionRemoteServer.listing(of: parent.path).folders == ["Nouveau été"])
+      // Joiners are part of a name, in an emoji or in Hindi.
+      #expect(CompanionRemoteServer.createFolder(named: "👨‍💻 Projets", in: parent.path) == nil)
+      #expect(CompanionRemoteServer.isFolderName("क्\u{200D}ष"))
     }
   }
 

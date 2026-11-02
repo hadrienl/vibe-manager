@@ -1915,7 +1915,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "已有同名檔案夾。"
+            "value" : "已有同名資料夾。"
           }
         }
       }
@@ -7280,7 +7280,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "檔案夾名稱"
+            "value" : "資料夾名稱"
           }
         }
       }
@@ -10007,7 +10007,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "新增檔案夾"
+            "value" : "新增資料夾"
           }
         }
       }
@@ -16471,7 +16471,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "無法建立檔案夾"
+            "value" : "無法建立資料夾"
           }
         }
       }
@@ -16774,7 +16774,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Mac 不允許在此處建立檔案夾。"
+            "value" : "Mac 不允許在此處建立資料夾。"
           }
         }
       }
@@ -18188,7 +18188,7 @@
         "zh-Hant" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "此名稱不能用於檔案夾。"
+            "value" : "此名稱不能用於資料夾。"
           }
         }
       }

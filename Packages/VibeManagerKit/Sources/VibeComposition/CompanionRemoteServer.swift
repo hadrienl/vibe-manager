@@ -152,11 +152,10 @@ final class CompanionRemoteServer {
       let listing = Self.listing(of: path)
       send(peer, .folderListing(listing))
     case .createFolder(let parent, let name):
-      if let failure = Self.createFolder(named: name, in: parent) {
-        send(peer, .folderNotCreated(failure))
-      } else {
-        send(peer, .folderListing(Self.listing(of: parent)))
-      }
+      let failure = Self.createFolder(named: name, in: parent)
+      // Always, for the phone's list not to contradict the refusal.
+      send(peer, .folderListing(Self.listing(of: parent)))
+      if let failure { send(peer, .folderNotCreated(failure)) }
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
       .folderListing, .folderNotCreated, .iconData, .webState, .attachmentData, .httpResponse, .folderIconData:
       break
@@ -600,7 +599,7 @@ final class CompanionRemoteServer {
   static func isFolderName(_ name: String) -> Bool {
     !name.isEmpty && !name.hasPrefix(".") && name.utf8.count <= 255
       && !name.unicodeScalars.contains {
-        $0 == "/" || $0 == ":" || CharacterSet.controlCharacters.contains($0)
+        $0 == "/" || $0 == ":" || $0.properties.generalCategory == .control
       }
   }
 

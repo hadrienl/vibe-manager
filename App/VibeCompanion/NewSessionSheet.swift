@@ -166,6 +166,8 @@ struct NewSessionSheet: View {
         if failure != nil { isCreating = false }
       }
     }
+    // An answer that came after the sheet that asked was gone isn't this sheet's.
+    .onAppear { channel.folderFailure = nil }
     // On the stack, not the form under it: the browser that asked is pushed above the form.
     .alert(
       "The Folder Couldn’t Be Created",
@@ -258,10 +260,13 @@ struct FolderBrowser: View {
     }
     .alert("New Folder", isPresented: $asksFolderName) {
       TextField("Folder Name", text: $newFolderName)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
       Button("Cancel", role: .cancel) { /* The alert dismisses itself. */  }
       Button("Create") {
         if let listing { channel.createFolder(named: newFolderName, in: listing.path) }
       }
+      .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
     }
     .safeAreaInset(edge: .bottom) {
       if let resolved {

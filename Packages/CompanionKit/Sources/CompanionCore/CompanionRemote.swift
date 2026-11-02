@@ -704,8 +704,8 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case createSession(RemoteNewSession)
   /// A folder's subfolders; `nil` for the user's home.
   case listFolder(path: String?)
-  /// A new subfolder, named by one name alone: the Mac answers with `parent`'s listing, or
-  /// `folderNotCreated`.
+  /// A new subfolder, named by one name alone: the Mac answers with `parent`'s listing, then
+  /// `folderNotCreated` if it wasn't created.
   case createFolder(parent: String, name: String)
   /// A project icon's PNG.
   case icon(id: String)
