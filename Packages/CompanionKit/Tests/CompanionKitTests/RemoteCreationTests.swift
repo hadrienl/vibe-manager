@@ -31,7 +31,7 @@ func creationLate() {
   #expect(creation.submit(request) == true)
   #expect(creation.expire() == request)
   #expect(creation.expire() == nil)
-  #expect(creation.created("S") == .createdLate("S"))
+  #expect(creation.created("S") == .created("S"))
 
   #expect(creation.submit(request) == true)
   #expect(creation.expire() == request)
@@ -63,5 +63,47 @@ func creationConnectionLost() {
   _ = creation.expire()
   creation.connectionLost()
   #expect(creation.created("S") == nil)
+  #expect(creation.submit(request) == true)
+}
+
+@Test("A request the old connection took is not waited for on the new one")
+func creationExpiredAfterConnectionLost() {
+  var creation = RemoteCreation()
+  #expect(creation.submit(request) == true)
+  creation.connectionLost()
+  #expect(creation.expire() == request)
+  #expect(creation.submit(request) == true)
+}
+
+@Test("A second tap makes no second request")
+func creationSubmittedTwice() {
+  var creation = RemoteCreation()
+  let other = RemoteNewSession(
+    name: "", folder: "/g", agentID: "a", modelID: nil, prompt: "", start: true, coordinates: false)
+  #expect(creation.submit(request) == true)
+  #expect(creation.submit(other) == false)
+  #expect(creation.pending == request)
+}
+
+@Test("A different request held back goes once the one given up on exists")
+func creationHeldDifferent() {
+  var creation = RemoteCreation()
+  let other = RemoteNewSession(
+    name: "", folder: "/g", agentID: "a", modelID: nil, prompt: "", start: true, coordinates: false)
+  #expect(creation.submit(request) == true)
+  _ = creation.expire()
+  #expect(creation.submit(other) == false)
+  #expect(creation.created("S") == .send(other))
+  #expect(creation.pending == other)
+  #expect(creation.created("T") == .created("T"))
+}
+
+@Test("A Mac that never answers does not hold requests back for ever")
+func creationHoldEnds() {
+  var creation = RemoteCreation()
+  #expect(creation.submit(request) == true)
+  _ = creation.expire()
+  #expect(creation.submit(request) == false)
+  #expect(creation.expire() == request)
   #expect(creation.submit(request) == true)
 }

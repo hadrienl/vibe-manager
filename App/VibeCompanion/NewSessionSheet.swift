@@ -177,9 +177,16 @@ struct NewSessionSheet: View {
       .onChange(of: options, initial: true) { _, options in
         guard let options else { return }
         if folder == nil { folder = options.folders.first }
-        if agentID == nil { agentID = options.agents.first?.id }
+        // A form that came back may name an agent the Mac no longer has.
+        if !options.agents.contains(where: { $0.id == agentID }) {
+          agentID = options.agents.first?.id
+        }
       }
       .onChange(of: agentID) { _, _ in modelID = nil }
+      .onChange(of: folder) { _, _ in error = nil }
+      .onChange(of: channel.phase) { _, phase in
+        if phase == .connected { error = nil }
+      }
       .onChange(of: folder, initial: true) { _, folder in
         if let folder { channel.askFolderIcon(folder) }
       }

@@ -415,7 +415,7 @@ final class RemoteChannel {
   private func settle(_ answer: RemoteCreation.Answer) {
     if creation.pending == nil { creationTimeout?.cancel() }
     switch answer {
-    case .created(let id), .createdLate(let id):
+    case .created(let id):
       createdSessionID = id
     case .failed(let request, let reason):
       returnedCreation = ReturnedCreation(request: request, error: reason.text)

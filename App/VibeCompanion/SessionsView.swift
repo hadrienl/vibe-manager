@@ -11,9 +11,8 @@ struct SessionsView: View {
   @State private var path: [String] = []
   @State private var showsSearch = false
   @State private var showsSettings = false
-  @State private var showsNewSession = false
-  /// The creation the form comes back with, when it failed.
-  @State private var returnedCreation: ReturnedCreation?
+  /// The form shown, which comes back with the creation that failed.
+  @State private var newSessionForm: NewSessionForm?
   /// The folders folded away, by path.
   @State private var collapsed: Set<String> = []
 
@@ -58,7 +57,7 @@ struct SessionsView: View {
           Button("Settings", systemImage: "gearshape") { showsSettings = true }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          Button("New Session", systemImage: "plus") { showsNewSession = true }
+          Button("New Session", systemImage: "plus") { newSessionForm = NewSessionForm() }
             .disabled(channel.phase != .connected || channel.pendingCreation != nil)
         }
       }
@@ -92,8 +91,8 @@ struct SessionsView: View {
       .sheet(isPresented: $showsSettings) {
         SettingsSheet()
       }
-      .sheet(isPresented: $showsNewSession, onDismiss: { returnedCreation = nil }) {
-        NewSessionSheet(returned: returnedCreation)
+      .sheet(item: $newSessionForm) { form in
+        NewSessionSheet(returned: form.returned)
       }
       .onChange(of: channel.pendingCreation != nil) { _, isCreating in
         if isCreating { path.append(CreatingSessionView.id) }
@@ -104,23 +103,24 @@ struct SessionsView: View {
         path.removeAll { $0 == CreatingSessionView.id }
         showsSearch = false
         showsSettings = false
-        returnedCreation = returned
-        showsNewSession = true
+        newSessionForm = NewSessionForm(returned: returned)
       }
       .onChange(of: channel.notifiedSessionID, initial: true) { _, id in
         guard let id else { return }
         channel.notifiedSessionID = nil
         showsSearch = false
         showsSettings = false
-        showsNewSession = false
+        newSessionForm = nil
         path = [id]
       }
       .onChange(of: channel.createdSessionID) { _, id in
         guard let id else { return }
         channel.createdSessionID = nil
-        // Someone who left the waiting screen, or cancelled the form, is not taken back.
-        let isWaiting = path.contains(CreatingSessionView.id) || showsNewSession
-        showsNewSession = false
+        // Someone who left the waiting screen, or cancelled the form, is not taken back; a form
+        // opened for another session stays.
+        let isReturned = newSessionForm?.returned != nil
+        let isWaiting = path.contains(CreatingSessionView.id) || isReturned
+        if isReturned { newSessionForm = nil }
         var shown = path.filter { $0 != CreatingSessionView.id }
         if isWaiting { shown.append(id) }
         path = shown
@@ -182,6 +182,12 @@ struct SessionsView: View {
       return Group(path: path, name: sessions.first?.folderName ?? path, rows: rows)
     }
   }
+}
+
+/// One showing of the new session form.
+struct NewSessionForm: Identifiable {
+  let id = UUID()
+  var returned: ReturnedCreation?
 }
 
 /// A session being created (#470), until the Mac says it exists.
