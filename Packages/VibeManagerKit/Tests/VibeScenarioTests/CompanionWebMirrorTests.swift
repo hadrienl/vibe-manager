@@ -49,7 +49,8 @@ struct CompanionWebMirrorTests {
     }
     let page = await get(artifact.appendingPathComponent("index.html"))
     #expect(page.status == 200)
-    #expect(page.headers["Content-Type"] == "text/html")
+    #expect(page.headers["Content-Type"] == "text/html; charset=utf-8")
+    #expect(page.headers["Content-Security-Policy"]?.hasPrefix("sandbox") == true)
     #expect(page.body == Data("<p>hi</p>".utf8))
 
     for refused in [
@@ -71,5 +72,81 @@ struct CompanionWebMirrorTests {
         from: artifact.appendingPathComponent("index.html").absoluteString, fileFolders: folders)
         != nil)
     #expect(CompanionWebMirror.url(from: "file:///etc/passwd", fileFolders: folders) == nil)
+  }
+
+  private func folder() throws -> (root: URL, artifact: URL) {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let artifact = root.appendingPathComponent("artifact", isDirectory: true)
+    try FileManager.default.createDirectory(at: artifact, withIntermediateDirectories: true)
+    return (root, artifact)
+  }
+
+  private func get(_ url: URL, in folders: [URL]) async -> RemoteHTTPResponse {
+    await CompanionWebMirror.fetch(
+      RemoteHTTPRequest(id: 1, url: url.absoluteString, method: "GET", headers: [:], body: nil),
+      fileFolders: folders)
+  }
+
+  @Test("Neither a link out of the folder nor a hidden file is read")
+  func linksAndHidden() async throws {
+    let (root, artifact) = try folder()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let secret = root.appendingPathComponent("secret.txt")
+    try Data("secret".utf8).write(to: secret)
+    let link = artifact.appendingPathComponent("link.txt")
+    try FileManager.default.createSymbolicLink(at: link, withDestinationURL: secret)
+    let hidden = artifact.appendingPathComponent(".env")
+    try Data("KEY=1".utf8).write(to: hidden)
+    let git = artifact.appendingPathComponent(".git", isDirectory: true)
+    try FileManager.default.createDirectory(at: git, withIntermediateDirectories: true)
+    let config = git.appendingPathComponent("config")
+    try Data("x".utf8).write(to: config)
+    for refused in [link, hidden, config] {
+      #expect(await get(refused, in: [artifact]).failure == CompanionStrings.addressRefused)
+    }
+  }
+
+  @Test("A folder holding too much else opens nothing")
+  func broadFolders() async {
+    let home = URL(fileURLWithPath: NSHomeDirectory())
+    for broad in [
+      "/", "/tmp", "/Users", "/private/etc", NSHomeDirectory(), NSTemporaryDirectory(),
+      home.appendingPathComponent("Documents").path, home.appendingPathComponent(".ssh").path,
+    ] {
+      #expect(CompanionWebMirror.isTooBroad(broad), "\(broad)")
+    }
+    #expect(!CompanionWebMirror.isTooBroad(home.appendingPathComponent("Documents/report").path))
+    let key = home.appendingPathComponent(".ssh/id_rsa")
+    #expect(!CompanionWebMirror.isReadable(key, in: [home]))
+  }
+
+  @Test("A file not sent answers with its status, the channel stays up")
+  func statuses() async throws {
+    let (root, artifact) = try folder()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let missing = await get(artifact.appendingPathComponent("none.json"), in: [artifact])
+    #expect(missing.status == 404)
+    #expect(missing.failure == nil)
+    let large = artifact.appendingPathComponent("demo.mp4")
+    #expect(FileManager.default.createFile(atPath: large.path, contents: nil))
+    let handle = try FileHandle(forWritingTo: large)
+    try handle.truncate(atOffset: UInt64(CompanionWebMirror.maximumFileLength + 1))
+    try handle.close()
+    let tooLarge = await get(large, in: [artifact])
+    #expect(tooLarge.status == 413)
+    #expect(tooLarge.body.isEmpty)
+  }
+
+  @Test("A file says its type, and text its encoding")
+  func types() {
+    func type(_ name: String, _ data: Data = Data("é".utf8)) -> String {
+      CompanionWebMirror.contentType(of: URL(fileURLWithPath: "/a/" + name), data: data)
+    }
+    #expect(type("notes.txt") == "text/plain; charset=utf-8")
+    #expect(type("README") == "text/plain; charset=utf-8")
+    #expect(type("app.wasm", Data([0xFF])) == "application/wasm")
+    #expect(type("blob", Data([0xFF])) == "application/octet-stream")
+    #expect(type("latin.txt", Data([0xE9])) == "text/plain")
   }
 }

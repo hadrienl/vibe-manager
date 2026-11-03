@@ -226,11 +226,9 @@ private struct SyncedWebView: UIViewRepresentable {
     /// The pages the web view goes to: the web, and the Mac's own — its servers, its files —
     /// through the channel. Anything else — a file of the phone's, another application's scheme —
     /// is not opened from here.
-    static let allowedSchemes: Set<String> = [
-      "http", "https", "about", "blob", "data",
-      RemoteWebAddress.proxiedPrefix + "http", RemoteWebAddress.proxiedPrefix + "https",
-      RemoteWebAddress.proxiedPrefix + "file",
-    ]
+    static let allowedSchemes: Set<String> = Set(
+      ["http", "https", "about", "blob", "data"]
+        + RemoteWebAddress.proxiedSchemes.map { RemoteWebAddress.proxiedPrefix + $0 })
 
     func webView(
       _ webView: WKWebView, decidePolicyFor action: WKNavigationAction,

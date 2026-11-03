@@ -29,6 +29,7 @@ final class CompanionWebMirror {
   private var loop: Task<Void, Never>?
   private var lastState: RemoteWebState?
   private var phoneScrolledAt: ContinuousClock.Instant?
+  private var grantedFolders: [URL] = []
 
   init(
     sessionID: SessionID, appModel: AppModel, send: @escaping @MainActor (RemoteMessage) -> Void
@@ -141,24 +142,62 @@ final class CompanionWebMirror {
     return url
   }
 
-  /// The folders whose files the phone may read: those of the pages this session's tabs show from
-  /// a file — an artifact and the images, scripts and pages beside it. Never any other file of the
-  /// Mac's, whatever a paired phone asks for.
+  /// The folders whose files the phone may read: those of the pages this session's tabs have shown
+  /// from a file since the phone opened this web view — an artifact and the images, scripts and
+  /// pages beside it. Kept when a tab moves on: a page below the first still reaches `../style.css`.
+  /// Never any other file of the Mac's, whatever a paired phone asks for.
   var fileFolders: [URL] {
-    (browser?.tabs ?? []).compactMap { tab in
-      tab.url.isFileURL ? tab.url.deletingLastPathComponent() : nil
+    for tab in browser?.tabs ?? [] where tab.url.isFileURL && !tab.url.hasDirectoryPath {
+      let folder = Self.canonical(tab.url.deletingLastPathComponent())
+      if !Self.isTooBroad(folder.path), !grantedFolders.contains(folder) {
+        grantedFolders.append(folder)
+      }
+    }
+    return grantedFolders
+  }
+
+  /// A path as the system spells a file once open, every link resolved. Not
+  /// `resolvingSymlinksInPath`, which drops `/private` from `/private/tmp`. A file that does not
+  /// exist keeps its name under its folder's real path.
+  nonisolated private static func canonical(_ url: URL) -> URL {
+    let path = url.standardizedFileURL
+    if let real = realpath(path.path, nil) {
+      defer { free(real) }
+      return URL(fileURLWithPath: String(cString: real))
+    }
+    guard path.path != "/" else { return path }
+    return canonical(path.deletingLastPathComponent())
+      .appendingPathComponent(path.lastPathComponent)
+  }
+
+  /// Whether a folder holds too much else to be opened to the phone for a page in it: the top of
+  /// the disk, the shared temporary folders, the home folder and what sits right in it.
+  nonisolated static func isTooBroad(_ path: String) -> Bool {
+    func resolved(_ path: String) -> String {
+      canonical(URL(fileURLWithPath: path)).path
+    }
+    let folder = resolved(path)
+    let home = resolved(NSHomeDirectory())
+    let temporary = ["/tmp", "/var/tmp", NSTemporaryDirectory()].map(resolved)
+    if temporary.contains(folder) { return true }
+    if URL(fileURLWithPath: folder).pathComponents.count <= 3 { return true }
+    return home == folder || home.hasPrefix(folder + "/")
+      || URL(fileURLWithPath: folder).deletingLastPathComponent().path == home
+  }
+
+  /// Whether a path, links and `..` already resolved, lies in one of `folders` and is no hidden
+  /// file or in no hidden folder below it: not a repository's `.env` or `.git`.
+  nonisolated private static func lies(_ path: String, in folders: [URL]) -> Bool {
+    folders.contains { folder in
+      let root = canonical(folder).path
+      guard !isTooBroad(root), path.hasPrefix(root + "/") else { return false }
+      return !path.dropFirst(root.count + 1).split(separator: "/").contains { $0.hasPrefix(".") }
     }
   }
 
-  /// Whether `url` is a file in one of `folders`, or below one, once links and `..` are resolved.
+  /// Whether `url` is a file the phone may read in `folders`, once links and `..` are resolved.
   static func isReadable(_ url: URL, in folders: [URL]) -> Bool {
-    guard url.isFileURL else { return false }
-    let path = url.standardizedFileURL.resolvingSymlinksInPath().path
-    return folders.contains { folder in
-      var root = folder.standardizedFileURL.resolvingSymlinksInPath().path
-      if !root.hasSuffix("/") { root += "/" }
-      return root != "/" && path.hasPrefix(root)
-    }
+    url.isFileURL && lies(canonical(url).path, in: folders)
   }
 
   // MARK: - The phone's requests
@@ -203,30 +242,87 @@ final class CompanionWebMirror {
     }
   }
 
-  /// A file of the Mac's for the phone's web view, with its type for WebKit to show it.
+  /// A file of the Mac's for the phone's web view, with its type for WebKit to show it. Its script
+  /// runs sandboxed, in an origin of its own: it cannot read the other files the phone may read.
   private static func file(_ url: URL, for request: RemoteHTTPRequest, in folders: [URL]) async
     -> RemoteHTTPResponse
   {
-    guard request.method.uppercased() == "GET", isReadable(url, in: folders) else {
-      return RemoteHTTPResponse(
+    func refused() -> RemoteHTTPResponse {
+      RemoteHTTPResponse(
         id: request.id, status: 0, headers: [:], body: Data(),
         failure: CompanionStrings.addressRefused)
     }
-    let path = url.standardizedFileURL.resolvingSymlinksInPath()
-    let read = Task.detached { () -> Result<Data, any Error> in
-      Result { try Data(contentsOf: path) }
+    guard request.method.uppercased() == "GET", isReadable(url, in: folders) else {
+      return refused()
     }
-    switch await read.value {
-    case .success(let data):
-      let type = UTType(filenameExtension: path.pathExtension)?.preferredMIMEType
-        ?? "application/octet-stream"
+    let path = canonical(url)
+    let read = await Task.detached { read(path, in: folders) }.value
+    switch read {
+    case .refused:
+      return refused()
+    case .status(let status):
+      return RemoteHTTPResponse(id: request.id, status: status, headers: [:], body: Data())
+    case .data(let data):
       return RemoteHTTPResponse(
-        id: request.id, status: 200, headers: ["Content-Type": type], body: data)
-    case .failure(let error):
-      return RemoteHTTPResponse(
-        id: request.id, status: 0, headers: [:], body: Data(),
-        failure: error.localizedDescription)
+        id: request.id, status: 200,
+        headers: [
+          "Content-Type": contentType(of: path, data: data),
+          "Content-Security-Policy": "sandbox allow-scripts allow-forms",
+        ],
+        body: data)
     }
+  }
+
+  private enum FileRead: Sendable {
+    case data(Data)
+    /// The HTTP status of a file that is not sent.
+    case status(Int)
+    case refused
+  }
+
+  /// The largest file sent: as base64 in one frame, a larger one would not fit
+  /// `RemoteFrame.maximumLength` and would close the whole channel.
+  nonisolated static let maximumFileLength = 20 * 1024 * 1024
+
+  /// Reads the file that was opened, checked once open: a link swapped after the path was checked
+  /// reads nothing outside `folders`.
+  nonisolated private static func read(_ path: URL, in folders: [URL]) -> FileRead {
+    let descriptor = open(path.path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)
+    guard descriptor >= 0 else {
+      switch errno {
+      case ENOENT, ENOTDIR: return .status(404)
+      case ELOOP: return .refused
+      default: return .status(403)
+      }
+    }
+    let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
+    var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    guard fcntl(descriptor, F_GETPATH, &buffer) == 0,
+      lies(String(cString: buffer), in: folders)
+    else { return .refused }
+    var info = stat()
+    guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
+      return .status(404)
+    }
+    guard info.st_size <= maximumFileLength else { return .status(413) }
+    guard let data = try? handle.readToEnd() else { return info.st_size == 0 ? .data(Data()) : .status(403) }
+    return .data(data)
+  }
+
+  /// What the phone needs to show a file: text said to be UTF-8 when it is, and text with no known
+  /// type — a `README`, a `.ts` — shown as text.
+  static func contentType(of path: URL, data: Data) -> String {
+    let isUTF8 = String(data: data, encoding: .utf8) != nil
+    let known =
+      path.pathExtension.lowercased() == "wasm"
+      ? "application/wasm" : UTType(filenameExtension: path.pathExtension)?.preferredMIMEType
+    guard let type = known ?? (isUTF8 ? "text/plain" : nil) else {
+      return "application/octet-stream"
+    }
+    let isText =
+      type.hasPrefix("text/") || type.hasSuffix("json") || type.hasSuffix("xml")
+      || type.hasSuffix("javascript")
+    return isText && isUTF8 ? type + "; charset=utf-8" : type
   }
 
   /// What the transport sets itself, or what no longer holds once the body is whole.
