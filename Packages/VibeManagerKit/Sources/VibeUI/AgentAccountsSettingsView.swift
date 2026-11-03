@@ -183,8 +183,9 @@ struct AgentAccountSections: View {
         ) {
           Button(role: .destructive) {
             Task {
+              guard await model.agentAccounts?.delete(account.id) == true else { return }
+              model.cancelSignIn(agent: agent.id)
               model.signedInAccounts.remember(nil, of: agent.id)
-              await model.agentAccounts?.delete(account.id)
               model.settingsPage = .newAccount
             }
           } label: {
@@ -262,7 +263,9 @@ struct AgentAccountSections: View {
         case nil:
           if isSignedOut {
             signInButton
-          } else if model.agentsSigningIn.contains(agent.id) {
+          } else if model.agentsSigningIn.contains(agent.id),
+            model.signInRoutes[agent.id]?.route ?? .browser == .browser
+          {
             HStack {
               Spacer()
               Button {

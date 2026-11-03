@@ -96,7 +96,8 @@ extension AppModel {
       let outcome = await signing?.signIn() ?? .notSignedIn(detail: nil)
       let after = outcome == .signedIn ? await signing?.signedInAccount() : nil
       guard let self else { return }
-      if wanted != nil, outcome != .signedIn {
+      // Nor is an account that cannot be read a sign that the alert was answered.
+      if wanted != nil, outcome != .signedIn || after == nil {
         self.signInTasks[provider] = nil
         self.signIns[provider] = pending
         self.publishSignIns()
@@ -130,7 +131,11 @@ extension AppModel {
     guard let agents,
       let signing = await agents.provider(id: provider) as? any AgentSigningIn
     else { return }
+    // A key or a provider set outside the CLI is not signed in again from the page.
+    signInRoutes[provider] = (await signing.signInRoute(), Date())
     let address = await signing.signedInAccount()
+    // A sign-in under way has the last word: it reads the account when it ends.
+    guard signInTasks[provider] == nil else { return }
     signedInAddresses[provider] = address
     // Changed outside — `claude auth login`, `/login` — it is the user's: only a pending alert
     // still waits for an answer.

@@ -11,6 +11,8 @@ public final class AgentAccountsSettingsModel {
   /// Why the file could not be read or written, kept until a save succeeds.
   public private(set) var storeError: String?
 
+  /// A save waits for the agents to be detected again: a second click must not add twice.
+  @ObservationIgnored private var isSaving = false
   @ObservationIgnored private let repository: any AgentAccountRepository
   @ObservationIgnored private let home: String
   @ObservationIgnored private let defaultDirectories: [EndpointHarness: String]
@@ -45,7 +47,7 @@ public final class AgentAccountsSettingsModel {
   /// when it could not be.
   @discardableResult
   public func add(_ account: AgentAccount) async -> Bool {
-    guard issues(of: account).isEmpty,
+    guard !isSaving, issues(of: account).isEmpty,
       let directory = AgentAccount.resolvedDirectory(account.configurationDirectory, home: home)
     else { return false }
     do {
@@ -76,15 +78,18 @@ public final class AgentAccountsSettingsModel {
   }
 
   private func save(_ list: [AgentAccount]) async -> Bool {
+    isSaving = true
+    defer { isSaving = false }
     do {
       try await repository.save(list)
-      accounts = list
       storeError = nil
     } catch {
       storeError = error.localizedDescription
       return false
     }
     await didSave()
+    // Only now: the form still shows what was just added, which would read as a folder taken.
+    accounts = list
     return true
   }
 }
