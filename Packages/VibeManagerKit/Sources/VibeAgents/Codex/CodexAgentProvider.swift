@@ -121,9 +121,7 @@ public struct CodexAgentProvider: AgentProvider {
         argumentBuilder: CodexArgumentBuilder(),
         availabilityProbe: availabilityProbe,
         environment: environment,
-        shellEnvironment: shellEnvironment,
-        pinnedEnvironment: account == nil
-          ? [:] : environment.filter { $0.key == CodexHome.overrideKey }
+        shellEnvironment: shellEnvironment
       ),
       catalog: CodexModelCatalog(environment: environment),
       discovery: CodexRolloutSessionDiscovery(environment: environment),

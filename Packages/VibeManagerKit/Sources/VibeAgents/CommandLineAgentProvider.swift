@@ -114,9 +114,6 @@ public struct CommandLineAgentProvider: AgentProvider {
   private let catalog: [AgentModel]
   private let environment: [String: String]
   private let shellEnvironment: (any ShellEnvironmentSource)?
-  /// What no shell may change: the configuration folder of an extra account (#478). A
-  /// `CLAUDE_CONFIG_DIR` exported by `.zshrc` would otherwise mix the accounts.
-  private let pinnedEnvironment: [String: String]
 
   public init(
     descriptor: AgentDescriptor,
@@ -125,10 +122,8 @@ public struct CommandLineAgentProvider: AgentProvider {
     argumentBuilder: any CommandLineAgentArgumentBuilder,
     availabilityProbe: AgentAvailabilityProbe,
     environment: [String: String] = ProcessInfo.processInfo.environment,
-    shellEnvironment: (any ShellEnvironmentSource)? = nil,
-    pinnedEnvironment: [String: String] = [:]
+    shellEnvironment: (any ShellEnvironmentSource)? = nil
   ) {
-    self.pinnedEnvironment = pinnedEnvironment
     self.descriptor = descriptor
     self.specification = specification
     catalog = models
@@ -185,8 +180,7 @@ public struct CommandLineAgentProvider: AgentProvider {
       executablePath: installation.executablePath,
       arguments: arguments,
       environment: AgentEnvironmentPolicy.environment(
-        base: environment.merging(shellEnvironment) { _, shell in shell }
-          .merging(pinnedEnvironment) { _, pinned in pinned },
+        base: environment.merging(shellEnvironment) { _, shell in shell },
         additionalKeys: specification.additionalEnvironmentKeys,
         overrides: request.additionalEnvironment
       ),

@@ -240,10 +240,11 @@ struct AgentAccountSections: View {
               Text("Cancel", bundle: .module)
             }
           }
-        case .otherAccount(let expected, let actual)?:
+        case .otherAccount(let expected, let actual, let detail)?:
           Text(
-            "\(agent.displayName) is now signed in to \(actual), not \(expected).",
+            "\(agent.displayName) is now signed in to \(AgentSignInProgress.label(of: actual)), not \(expected.label).",
             bundle: .module, comment: "An agent's name, then two email addresses.")
+          if let detail { Text(verbatim: detail).foregroundStyle(.secondary) }
           HStack {
             Spacer()
             Button {

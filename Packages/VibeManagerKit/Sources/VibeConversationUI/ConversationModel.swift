@@ -99,7 +99,7 @@ public struct ConversationSignIn: Equatable, Sendable {
     /// behind it, or it could not be restarted.
     case signedIn(canResume: Bool, waiting: Waiting?)
     /// Signed in to another account than this agent's (#478): nothing resumes until the user says.
-    case otherAccount(expected: String, actual: String)
+    case otherAccount(expected: String, actual: String, detail: String? = nil)
     /// Restarted, its prompt about to be typed back.
     case resuming
   }

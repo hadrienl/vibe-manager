@@ -99,9 +99,7 @@ public struct ClaudeCodeAgentProvider: AgentProvider {
         argumentBuilder: ClaudeCodeArgumentBuilder(),
         availabilityProbe: availabilityProbe,
         environment: environment,
-        shellEnvironment: shellEnvironment,
-        pinnedEnvironment: account == nil
-          ? [:] : environment.filter { $0.key == ClaudeCodeHome.overrideKey }
+        shellEnvironment: shellEnvironment
       ),
       catalog: ClaudeCodeModelCatalog(environment: environment),
       transcriptLocations: transcriptLocations,

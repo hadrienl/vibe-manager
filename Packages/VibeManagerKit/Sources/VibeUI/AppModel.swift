@@ -2896,12 +2896,6 @@ public final class AppModel {
     if names != agentNames { agentNames = names }
   }
 
-  /// Detection never fails the application: an unavailable agent is data, not an error.
-  ///
-  /// Each agent is published as its own detection lands, in registration order. Waiting for the
-  /// whole set would hold every result behind the slowest one, and a CLI that answers none of its
-  /// probes now costs three budgets and their retries: there is no reason for the agents that
-  /// answered straight away to stay hidden for that long.
   /// After the list of agents changed: a detection under way read the old one (#478).
   public func refreshAgentsAfterChange() async {
     while isRefreshingAgents { try? await Task.sleep(for: .milliseconds(50)) }
@@ -2911,6 +2905,12 @@ public final class AppModel {
     await loadSigningAgents()
   }
 
+  /// Detection never fails the application: an unavailable agent is data, not an error.
+  ///
+  /// Each agent is published as its own detection lands, in registration order. Waiting for the
+  /// whole set would hold every result behind the slowest one, and a CLI that answers none of its
+  /// probes now costs three budgets and their retries: there is no reason for the agents that
+  /// answered straight away to stay hidden for that long.
   public func refreshAgents(forceRefresh: Bool = false) async {
     guard let agents, !isRefreshingAgents else { return }
 

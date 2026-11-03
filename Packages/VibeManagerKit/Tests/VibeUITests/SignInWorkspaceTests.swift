@@ -137,13 +137,38 @@ struct SignInWorkspaceTests {
     #expect(model.signedInAccounts.account(of: stub) == "new@x.io")
   }
 
-  @Test("Signed in to the same account, or to one the CLI does not name, it resumes (#478)")
+  @Test("A plan or a name that changed is the same account, another organization is not (#478)")
+  func organizations() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    let max = AgentSignedInAccount(label: "a@x.io · Max", email: "a@x.io", organizationID: "1")
+    let ultra = AgentSignedInAccount(label: "a@x.io · Ultra", email: "a@x.io", organizationID: "1")
+    let team = AgentSignedInAccount(label: "a@x.io · Team", email: "a@x.io", organizationID: "2")
+    await model.signInEnded(stub, outcome: .signedIn, before: max, after: ultra)
+    #expect(model.signIns[stub] == nil)
+    await model.signInEnded(stub, outcome: .signedIn, before: ultra, after: team)
+    #expect(model.signIns[stub] == .otherAccount(expected: ultra, actual: team))
+  }
+
+  @Test("An account that cannot be read after signing in resumes nothing (#478)")
+  func unreadableAccount() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: nil)
+    #expect(model.signIns[stub] == .otherAccount(expected: "pro@x.io", actual: nil))
+    model.keepSignedInAccount(of: stub)
+    #expect(model.signIns[stub] == nil)
+    #expect(model.signedInAccounts.account(of: stub) == nil)
+  }
+
+  @Test("Signed in to the same account, or by a CLI that names none, it resumes (#478)")
   func sameAccount() async throws {
     let (model, _) = try await running()
     let stub = AgentProviderID("stub")
     await model.signInEnded(stub, outcome: .signedIn, before: "Pro@x.io", after: "pro@x.io")
     #expect(model.signIns[stub] == nil)
-    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: nil)
+    model.signedInAccounts.remember(nil, of: stub)
+    await model.signInEnded(stub, outcome: .signedIn)
     #expect(model.signIns[stub] == nil)
   }
 

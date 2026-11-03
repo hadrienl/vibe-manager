@@ -135,7 +135,7 @@ struct SignInNotice: View {
       String(
         localized: "\(signIn.agentName) is signed in again.", bundle: .module,
         comment: "An agent's name.")
-    case .otherAccount(let expected, let actual):
+    case .otherAccount(let expected, let actual, _):
       String(
         localized: "\(signIn.agentName) is now signed in to \(actual), not \(expected).",
         bundle: .module, comment: "An agent's name, then two email addresses.")
@@ -153,6 +153,7 @@ struct SignInNotice: View {
           "Signing in again does not change the API key or the provider \(signIn.agentName) uses. Check them, then restart the session.",
         bundle: .module, comment: "An agent's name.")
     case .failed(let detail): detail
+    case .otherAccount(_, _, let detail): detail
     case .signedIn(_, .text(let text?)?):
       String(
         localized: "Resume sends what waits in this session’s prompt: “\(text)”", bundle: .module,

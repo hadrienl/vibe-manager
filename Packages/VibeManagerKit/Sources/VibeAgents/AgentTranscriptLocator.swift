@@ -35,16 +35,28 @@ public struct AgentTranscriptLocator: Sendable {
     try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)
   }
 
+  /// A folder copied to start an account holds the same conversations: only the home that wrote
+  /// last counts, or they would be read and added up twice. Within a home, a conversation resumed
+  /// from another project has two files, and both count.
   public func claudeTranscripts(for identifier: String) -> [URL] {
     let manager = FileManager.default
     var found: [URL] = []
-    for folder in allClaudeProjects.flatMap({ list($0) ?? [] }) {
-      let main = folder.appendingPathComponent("\(identifier).jsonl")
-      guard manager.fileExists(atPath: main.path) else { continue }
-      found.append(main)
-      found.append(contentsOf: claudeSubagents(of: main, identifier: identifier))
+    var newest: Date?
+    for projects in allClaudeProjects {
+      let mains = (list(projects) ?? [])
+        .map { $0.appendingPathComponent("\(identifier).jsonl") }
+        .filter { manager.fileExists(atPath: $0.path) }
+      guard let written = mains.map(Self.modificationDate(of:)).max() else { continue }
+      if let newest, written <= newest { continue }
+      newest = written
+      found = mains.flatMap { [$0] + claudeSubagents(of: $0, identifier: identifier) }
     }
     return found
+  }
+
+  private static func modificationDate(of file: URL) -> Date {
+    (try? file.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate)
+      ?? .distantPast
   }
 
   /// The sub-agents of the conversation whose file is `main`: in `<id>/subagents/` beside it.
@@ -89,6 +101,16 @@ public struct AgentTranscriptLocator: Sendable {
       guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
       day = next
     }
-    return found
+    // The same rollout in two homes, a folder copied to start an account: the one written last.
+    var kept: [String: URL] = [:]
+    for file in found {
+      if let other = kept[file.lastPathComponent],
+        Self.modificationDate(of: file) <= Self.modificationDate(of: other)
+      {
+        continue
+      }
+      kept[file.lastPathComponent] = file
+    }
+    return found.filter { kept[$0.lastPathComponent] == $0 }
   }
 }

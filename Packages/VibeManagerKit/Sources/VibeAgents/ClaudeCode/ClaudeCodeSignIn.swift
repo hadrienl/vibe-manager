@@ -9,15 +9,47 @@ extension ClaudeCodeAgentProvider: AgentSigningIn {
   static let signInTimeout: Duration = .seconds(600)
 
   public func signIn() async -> AgentSignInOutcome {
+    await runSignIn(arguments: ["auth", "login"])
+  }
+
+  /// What `auth status --json` says of the account. One that cannot be read is taken for a
+  /// subscription, the CLI's own default.
+  public func signInRoute() async -> AgentSignInRoute {
+    await authenticationStatus().map(ClaudeCodeAuthenticationStatus.signInRoute(in:)) ?? .browser
+  }
+
+  public func signedInAccount() async -> AgentSignedInAccount? {
+    await authenticationStatus().flatMap(ClaudeCodeAuthenticationStatus.account(in:))
+  }
+
+  private func authenticationStatus() async -> String? {
     let run = OneShotAgentRun(
       provider: self, runner: BoundedSummaryProcessRunner(), folderPrefix: "vibe-sign-in-",
-      timeout: Self.signInTimeout)
+      timeout: Self.signInRouteTimeout)
+    return try? await run.run(
+      prepare: { _, _ in
+        OneShotAgentRun.Invocation(
+          arguments: ["auth", "status", "--json"], environment: [:], input: Data())
+      },
+      read: { result, _ in String(decoding: result.standardOutput, as: UTF8.self) })
+  }
+
+  static let signInRouteTimeout: Duration = .seconds(15)
+}
+
+extension AgentProvider {
+  /// The CLI's own sign-in, until it ends. Its exit says whether it signed in: `auth status` still
+  /// answers `loggedIn` with a token that has expired, which is how the sessions came to fail. The
+  /// detection is then told: it is what the settings, and the next launch, read.
+  func runSignIn(arguments: [String]) async -> AgentSignInOutcome {
+    let run = OneShotAgentRun(
+      provider: self, runner: BoundedSummaryProcessRunner(), folderPrefix: "vibe-sign-in-",
+      timeout: ClaudeCodeAgentProvider.signInTimeout)
     let result: BoundedProcessResult
     do {
       result = try await run.run(
         prepare: { _, _ in
-          OneShotAgentRun.Invocation(
-            arguments: ["auth", "login"], environment: [:], input: Data())
+          OneShotAgentRun.Invocation(arguments: arguments, environment: [:], input: Data())
         },
         read: { result, _ in result })
     } catch is CancellationError {
@@ -28,41 +60,8 @@ extension ClaudeCodeAgentProvider: AgentSigningIn {
     let said = String(decoding: result.standardError + result.standardOutput, as: UTF8.self)
       .trimmingCharacters(in: .whitespacesAndNewlines)
     let detail = said.isEmpty ? nil : String(said.suffix(300))
-    // Its exit says whether it signed in: `auth status` still answers `loggedIn` with a token
-    // that has expired, which is how the sessions came to fail.
     guard result.termination == .exited(0) else { return .notSignedIn(detail: detail) }
-    // And the detection is told: it is what the settings, and the next launch, read.
     let state = await availability(forceRefresh: true).state
     return state == .unauthenticated ? .notSignedIn(detail: detail) : .signedIn
   }
-
-  /// What `auth status --json` says of the account. One that cannot be read is taken for a
-  /// subscription, the CLI's own default.
-  public func signInRoute() async -> AgentSignInRoute {
-    let run = OneShotAgentRun(
-      provider: self, runner: BoundedSummaryProcessRunner(), folderPrefix: "vibe-sign-in-",
-      timeout: Self.signInRouteTimeout)
-    let output = try? await run.run(
-      prepare: { _, _ in
-        OneShotAgentRun.Invocation(
-          arguments: ["auth", "status", "--json"], environment: [:], input: Data())
-      },
-      read: { result, _ in String(decoding: result.standardOutput, as: UTF8.self) })
-    return output.map(ClaudeCodeAuthenticationStatus.signInRoute(in:)) ?? .browser
-  }
-
-  public func signedInAccount() async -> String? {
-    let run = OneShotAgentRun(
-      provider: self, runner: BoundedSummaryProcessRunner(), folderPrefix: "vibe-sign-in-",
-      timeout: Self.signInRouteTimeout)
-    let output = try? await run.run(
-      prepare: { _, _ in
-        OneShotAgentRun.Invocation(
-          arguments: ["auth", "status", "--json"], environment: [:], input: Data())
-      },
-      read: { result, _ in String(decoding: result.standardOutput, as: UTF8.self) })
-    return output.flatMap(ClaudeCodeAuthenticationStatus.account(in:))
-  }
-
-  static let signInRouteTimeout: Duration = .seconds(15)
 }

@@ -12,32 +12,6 @@ struct AgentAccountProvidersTests {
     executablePath: "/usr/bin/true", version: AgentVersion(major: 3, minor: 0, patch: 0),
     source: .candidateDirectory, detectedAt: Date())
 
-  private func base(pinned: [String: String]) -> CommandLineAgentProvider {
-    let probe = SystemProcessProbe()
-    return CommandLineAgentProvider(
-      descriptor: ClaudeCodeAgentProvider.descriptor,
-      specification: ClaudeCodeAgentProvider.specification,
-      argumentBuilder: ClaudeCodeArgumentBuilder(),
-      availabilityProbe: AgentAvailabilityProbe(
-        descriptor: ClaudeCodeAgentProvider.descriptor,
-        specification: ClaudeCodeAgentProvider.specification,
-        locator: FileSystemExecutableLocator(environment: environment, probe: probe),
-        probe: probe, environment: environment),
-      environment: environment, pinnedEnvironment: pinned)
-  }
-
-  @Test("The account's folder wins over one the shell exports")
-  func pinnedWinsOverShell() throws {
-    let shell = ["CLAUDE_CONFIG_DIR": "/Users/someone/.from-zshrc"]
-    let request = AgentLaunchRequest(workingDirectoryPath: "/tmp")
-    let plain = try base(pinned: [:]).plan(
-      for: request, installation: installation, shellEnvironment: shell)
-    #expect(plain.environment["CLAUDE_CONFIG_DIR"] == "/Users/someone/.from-zshrc")
-    let pinned = try base(pinned: ["CLAUDE_CONFIG_DIR": "/Users/someone/.two"]).plan(
-      for: request, installation: installation, shellEnvironment: shell)
-    #expect(pinned.environment["CLAUDE_CONFIG_DIR"] == "/Users/someone/.two")
-  }
-
   @Test("An account is its CLI's provider, under its own name and identifier")
   func descriptors() throws {
     let claude = AgentAccount(name: "Perso", harness: .claudeCode, configurationDirectory: "~/.c2")
@@ -96,5 +70,28 @@ struct AgentAccountProvidersTests {
   func signInCommand() {
     #expect(AgentHomeDirectory.shellQuoted("/a/.b-c") == "/a/.b-c")
     #expect(AgentHomeDirectory.shellQuoted("/a b") == "'/a b'")
+  }
+
+  @Test("A folder copied to start an account does not count a conversation twice")
+  func copiedHome() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    func transcript(in home: String, at date: Date) throws -> URL {
+      let folder = root.appendingPathComponent(home).appendingPathComponent("projects/p")
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+      let file = folder.appendingPathComponent("abc.jsonl")
+      try Data().write(to: file)
+      try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: file.path)
+      return file
+    }
+    _ = try transcript(in: "one", at: Date(timeIntervalSince1970: 1_000))
+    let newer = try transcript(in: "two", at: Date(timeIntervalSince1970: 2_000))
+    let homes = AgentHomes()
+    homes.replace(claudeHomes: [root.appendingPathComponent("two")], codexHomes: [])
+    let locator = AgentTranscriptLocator(
+      claudeProjects: root.appendingPathComponent("one/projects"), homes: homes)
+    let found = locator.claudeTranscripts(for: "abc")
+    #expect(found.count == 1)
+    #expect(found.first?.resolvingSymlinksInPath().path == newer.resolvingSymlinksInPath().path)
   }
 }

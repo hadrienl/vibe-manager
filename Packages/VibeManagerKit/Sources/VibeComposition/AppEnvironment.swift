@@ -158,11 +158,14 @@ public final class AppEnvironment {
     let agentHomes = AgentHomes()
     let transcriptLocations = TranscriptLocationCache(
       locator: AgentTranscriptLocator(homes: agentHomes))
+    // One shell for every agent and account.
+    let loginShell = LoginShellEnvironment(
+      inherited: configuration.environment, probe: SystemProcessProbe())
     let providers =
       configuration.providers?(diagnostics.log)
       ?? Self.providers(
         environment: configuration.environment, diagnostics: diagnostics.log,
-        transcriptLocations: transcriptLocations)
+        transcriptLocations: transcriptLocations, shell: loginShell)
     // The endpoints (#107): registered beside the command line agents from the start — a session
     // the terminal host kept is adopted as soon as the workspace loads, and must find its agent —
     // their secrets in the keychain, their sessions reaching them through the gateway.
@@ -179,7 +182,7 @@ public final class AppEnvironment {
     let agentAccounts = AgentAccountCatalog(
       repository: FileAgentAccountRepository(storeURL: accountsURL),
       homes: agentHomes, environment: configuration.environment, diagnostics: diagnostics.log,
-      transcriptLocations: transcriptLocations)
+      transcriptLocations: transcriptLocations, shell: loginShell)
     let registry = AgentProviderRegistry(
       providers: providers,
       accounts: agentAccounts.providers(
@@ -618,9 +621,8 @@ public final class AppEnvironment {
         await appModel?.refreshAgentsAfterChange()
         await appModel?.conversations.refreshReadableAgents()
       })
-    if let defaults = defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? Optional(.standard) {
-      appModel.signedInAccounts = SignedInAccountMemory(defaults: defaults)
-    }
+    appModel.signedInAccounts = SignedInAccountMemory(
+      defaults: defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard)
     // The mobile companion (#347): the active sessions to the agent embedded in the bundle, which
     // alone holds the iCloud entitlement, and the phone's tests back as alerts.
     companion = CompanionComposition.start(
@@ -963,14 +965,13 @@ public final class AppEnvironment {
   /// on a Mac with Claude Code or Codex installed, they would otherwise come first.
   private static func providers(
     environment: [String: String], diagnostics: any DiagnosticLog,
-    transcriptLocations: TranscriptLocationCache
+    transcriptLocations: TranscriptLocationCache, shell: LoginShellEnvironment
   ) -> [any AgentProvider] {
     if environment["VIBE_ENABLE_MOCK_AGENT"] == "only" {
       return [MockAgentProvider(environment: environment)]
     }
-    // One shell for both agents, asked as soon as the application starts: by the time the first
+    // One shell, asked as soon as the application starts: by the time the first
     // session is launched, its answer is usually there.
-    let shell = LoginShellEnvironment(inherited: environment, probe: SystemProcessProbe())
     shell.warmUp()
     var providers: [any AgentProvider] = [
       ClaudeCodeAgentProvider.make(

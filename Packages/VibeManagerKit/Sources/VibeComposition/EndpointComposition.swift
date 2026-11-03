@@ -89,14 +89,15 @@ final class AgentAccountCatalog {
 
   init(
     repository: any AgentAccountRepository, homes: AgentHomes, environment: [String: String],
-    diagnostics: any DiagnosticLog, transcriptLocations: TranscriptLocationCache
+    diagnostics: any DiagnosticLog, transcriptLocations: TranscriptLocationCache,
+    shell: LoginShellEnvironment
   ) {
     self.repository = repository
     self.homes = homes
     self.environment = environment
     self.diagnostics = diagnostics
     self.transcriptLocations = transcriptLocations
-    shell = LoginShellEnvironment(inherited: environment, probe: SystemProcessProbe())
+    self.shell = shell
   }
 
   func providers(for accounts: [AgentAccount]) -> [any AgentProvider] {

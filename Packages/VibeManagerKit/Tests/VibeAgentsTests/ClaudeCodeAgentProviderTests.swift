@@ -333,7 +333,8 @@ struct ClaudeCodeAuthenticationStatusTests {
   func accountNamesItsOrganization() {
     func account(_ org: String, _ plan: String) -> String? {
       ClaudeCodeAuthenticationStatus.account(
-        in: #"{"loggedIn":true,"email":"a@x.io","orgName":"\#(org)","subscriptionType":"\#(plan)"}"#)
+        in: #"{"loggedIn":true,"email":"a@x.io","orgName":"\#(org)","subscriptionType":"\#(plan)"}"#)?
+        .label
     }
     #expect(account("Prisme.ai", "team") == "a@x.io · Prisme.ai")
     #expect(account("a@x.io's Organization", "max") == "a@x.io · Max")
