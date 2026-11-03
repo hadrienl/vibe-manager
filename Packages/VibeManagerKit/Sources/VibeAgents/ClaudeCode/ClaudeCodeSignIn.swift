@@ -61,7 +61,7 @@ extension ClaudeCodeAgentProvider: AgentSigningIn {
           arguments: ["auth", "status", "--json"], environment: [:], input: Data())
       },
       read: { result, _ in String(decoding: result.standardOutput, as: UTF8.self) })
-    return output.flatMap(ClaudeCodeAuthenticationStatus.email(in:))
+    return output.flatMap(ClaudeCodeAuthenticationStatus.account(in:))
   }
 
   static let signInRouteTimeout: Duration = .seconds(15)

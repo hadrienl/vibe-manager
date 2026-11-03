@@ -8,8 +8,8 @@ public protocol AgentSigningIn: Sendable {
   func signIn() async -> AgentSignInOutcome
   /// How the account the CLI uses now is signed in again (#419).
   func signInRoute() async -> AgentSignInRoute
-  /// The address of the account the CLI uses (#478), to notice a sign-in to another one. `nil`
-  /// when the CLI does not say.
+  /// The account the CLI uses, as shown to the user (#478) — its address, and its organization
+  /// when the CLI gives one — to notice a sign-in to another one. `nil` when the CLI does not say.
   func signedInAccount() async -> String?
   /// Whether a conversation stopped on its sign-in offers it. Otherwise only the settings do.
   var signsInFromConversations: Bool { get }

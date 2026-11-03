@@ -328,4 +328,18 @@ struct ClaudeCodeAuthenticationStatusTests {
     #expect(route(#"{"loggedIn":true,"authMethod":"something_new"}"#) == .terminal)
     #expect(route("not json") == .browser)
   }
+
+  @Test("An account is told apart by its organization, a personal one by its plan (#478)")
+  func accountNamesItsOrganization() {
+    func account(_ org: String, _ plan: String) -> String? {
+      ClaudeCodeAuthenticationStatus.account(
+        in: #"{"loggedIn":true,"email":"a@x.io","orgName":"\#(org)","subscriptionType":"\#(plan)"}"#)
+    }
+    #expect(account("Prisme.ai", "team") == "a@x.io · Prisme.ai")
+    #expect(account("a@x.io's Organization", "max") == "a@x.io · Max")
+    #expect(
+      ClaudeCodeAuthenticationStatus.account(in: #"{"loggedIn":true,"email":"a@x.io"}"#)
+        == "a@x.io")
+    #expect(ClaudeCodeAuthenticationStatus.account(in: #"{"loggedIn":false}"#) == nil)
+  }
 }

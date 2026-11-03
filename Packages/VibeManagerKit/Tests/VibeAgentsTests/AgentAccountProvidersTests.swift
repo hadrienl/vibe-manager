@@ -88,8 +88,8 @@ struct AgentAccountProvidersTests {
   @Test("The address is read from the CLI's status")
   func email() {
     #expect(
-      ClaudeCodeAuthenticationStatus.email(in: #"{"loggedIn":true,"email":"a@b.c"}"#) == "a@b.c")
-    #expect(ClaudeCodeAuthenticationStatus.email(in: #"{"loggedIn":false}"#) == nil)
+      ClaudeCodeAuthenticationStatus.account(in: #"{"loggedIn":true,"email":"a@b.c"}"#) == "a@b.c")
+    #expect(ClaudeCodeAuthenticationStatus.account(in: #"{"loggedIn":false}"#) == nil)
   }
 
   @Test("The command to sign in says which folder")

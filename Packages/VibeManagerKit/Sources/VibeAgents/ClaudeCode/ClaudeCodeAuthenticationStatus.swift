@@ -24,10 +24,21 @@ public enum ClaudeCodeAuthenticationStatus {
     }
   }
 
-  /// The address of the account `auth status --json` describes (#478).
-  public static func email(in output: String) -> String? {
-    guard let email = decodeStatus(in: output)?.email, !email.isEmpty else { return nil }
-    return email
+  /// The account `auth status --json` describes, as the user tells it from another (#478): one
+  /// address can sign in to several organizations, chosen on the sign-in page. A personal one has
+  /// no name of its own, only one made from the address: its plan says it better.
+  public static func account(in output: String) -> String? {
+    guard let status = decodeStatus(in: output), let email = status.email, !email.isEmpty else {
+      return nil
+    }
+    let organization =
+      if let name = status.orgName, !name.isEmpty, !name.localizedCaseInsensitiveContains(email) {
+        name
+      } else {
+        status.subscriptionType?.capitalized
+      }
+    guard let organization, !organization.isEmpty else { return email }
+    return "\(email) · \(organization)"
   }
 
   /// The answer as JSON, wherever it sits in the stream.
@@ -60,5 +71,7 @@ public enum ClaudeCodeAuthenticationStatus {
     let authMethod: String?
     let apiKeySource: String?
     let email: String?
+    let orgName: String?
+    let subscriptionType: String?
   }
 }
