@@ -95,6 +95,10 @@ extension CodexAgentProvider: AgentLaunchObserverProviding {
     for sessionID: SessionID,
     repository: any SessionRepository
   ) -> any AgentLaunchObserver {
-    CodexLaunchObserver(sessionID: sessionID, repository: repository, provider: self)
+    CodexLaunchObserver(
+      sessionID: sessionID, repository: repository, provider: self,
+      recording: descriptor.id == Self.id
+        ? AgentResumeRecording(providerID: Self.id.rawValue)
+        : AgentResumeRecording(providerID: descriptor.id.rawValue, harnessID: Self.id.rawValue))
   }
 }

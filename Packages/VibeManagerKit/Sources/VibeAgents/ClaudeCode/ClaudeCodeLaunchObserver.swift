@@ -41,7 +41,14 @@ extension ClaudeCodeAgentProvider: AgentLaunchObserverProviding {
   ) -> any AgentLaunchObserver {
     launchObserver(
       for: sessionID, repository: repository,
-      recording: AgentResumeRecording(providerID: Self.id.rawValue))
+      recording: Self.recording(of: descriptor.id))
+  }
+
+  /// An extra account records its conversations as Claude Code's, under its own identifier.
+  static func recording(of provider: AgentProviderID) -> AgentResumeRecording {
+    provider == id
+      ? AgentResumeRecording(providerID: id.rawValue)
+      : AgentResumeRecording(providerID: provider.rawValue, harnessID: id.rawValue)
   }
 
   /// The same, for a conversation recorded under another agent: an endpoint Claude Code drives.

@@ -19,6 +19,12 @@ public enum AgentHomeDirectory {
     return nil
   }
 
+  /// A folder as a command line to copy says it.
+  public static func shellQuoted(_ path: String) -> String {
+    let plain = path.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber || "/._-".contains($0)) }
+    return plain ? path : "'" + path.replacingOccurrences(of: "'", with: "'\\''") + "'"
+  }
+
   public static func home(in environment: [String: String]) -> String {
     environment["HOME"].flatMap { $0.hasPrefix("/") ? $0 : nil } ?? NSHomeDirectory()
   }

@@ -98,6 +98,8 @@ public struct ConversationSignIn: Equatable, Sendable {
     /// Signed in, and this session was not resumed by itself: text waited in its prompt, or work
     /// behind it, or it could not be restarted.
     case signedIn(canResume: Bool, waiting: Waiting?)
+    /// Signed in to another account than this agent's (#478): nothing resumes until the user says.
+    case otherAccount(expected: String, actual: String, detail: String? = nil)
     /// Restarted, its prompt about to be typed back.
     case resuming
   }
@@ -404,6 +406,7 @@ public final class ConversationModel {
   @ObservationIgnored public var startSignIn: (() -> Void)?
   @ObservationIgnored public var cancelSignIn: (() -> Void)?
   @ObservationIgnored public var signInInTerminal: (() -> Void)?
+  @ObservationIgnored public var keepSignedInAccount: (() -> Void)?
   @ObservationIgnored public var resumeAfterSignIn: (() -> Void)?
   /// Whether the session's process runs. Read through the terminal's own observable state, so
   /// that a view showing the composer follows it.

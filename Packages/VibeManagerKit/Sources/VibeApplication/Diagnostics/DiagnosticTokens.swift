@@ -23,6 +23,9 @@ extension AgentProviderID: DiagnosticTokenConvertible {
     // is theirs to choose, so neither belongs in a log.
     case let id where id.hasPrefix(AgentProviderID.endpointPrefix):
       return DiagnosticToken("endpoint")
+    // Likewise for an account: its name and its folder are the user's.
+    case let id where id.hasPrefix(AgentProviderID.accountPrefix):
+      return DiagnosticToken("account")
     default: return DiagnosticToken("other")
     }
   }

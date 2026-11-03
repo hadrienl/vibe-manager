@@ -219,7 +219,16 @@ struct SettingsSidebarContent {
               tint: SettingsPage.agent(agent.id).tint,
               status: AgentSettingsPage.color(
                 of: model.agentDiagnostics.first { $0.providerID == agent.id }?.state))
-          }))
+          } + (model.agentAccounts == nil ? [] : [
+            Entry(
+              page: .newAccount,
+              name: SettingsPage.string(
+                LocalizedStringResource(
+                  "Add an Account…", bundle: .module,
+                  comment: "The last line of the agents in the Settings window's sidebar."),
+                locale: locale),
+              symbolName: SettingsPage.newAccount.symbolName, tint: SettingsPage.newAccount.tint)
+          ])))
     }
     if let endpoints = model.endpoints {
       let page = SettingsPage.newEndpoint
@@ -281,7 +290,7 @@ struct SettingsSidebarContent {
   /// The name of `page` in the window's title: the agent's or endpoint's for theirs.
   func name(of page: SettingsPage) -> String {
     // The new endpoint's line says what it does, "Add an Endpoint…"; its page is named.
-    if page.parent == nil, page != .newEndpoint,
+    if page.parent == nil, page != .newEndpoint, page != .newAccount,
       let entry = groups.lazy.flatMap(\.entries).first(where: { $0.page == page })
     {
       return entry.name
@@ -391,6 +400,10 @@ struct SettingsPageView: View {
     case .agent(let id):
       if let agent = model.settingsAgents.first(where: { $0.id == id }) {
         AgentSettingsPage(model: model, agent: agent)
+      }
+    case .newAccount:
+      if let accounts = model.agentAccounts {
+        NewAgentAccountPage(accounts: accounts) { model.settingsPage = $0 }
       }
     case .endpoint(let id):
       if let endpoints = model.endpoints {
@@ -598,6 +611,7 @@ struct AgentSettingsPage: View {
           }
         }
       }
+      AgentAccountSections(model: model, agent: agent)
       if model.hookTrustingAgents.contains(where: { $0.id == agent.id }) {
         Section {
           AgentActivityRow(model: model, agent: agent)
@@ -629,6 +643,7 @@ struct AgentSettingsPage: View {
       }
     }
     .formStyle(.grouped)
+    .task(id: agent.id) { await model.refreshSignedInAccount(of: agent.id) }
   }
 
   /// The dot of an agent's state: ready, usable with something to fix, or not usable.
