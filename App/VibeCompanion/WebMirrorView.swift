@@ -28,6 +28,13 @@ struct WebMirrorView: View {
 
   var body: some View {
     VStack(spacing: 0) {
+      if let tab = activeTab, let url = URL(string: tab.url), url.scheme == "vibe-device",
+        let id = url.host
+      {
+        // POC #480: the tab the agent opened on a simulator, here as on the Mac.
+        DeviceMirrorScreen(device: CompanionMirror.Device(id: id, name: tab.title))
+          .id(id)
+      } else {
       addressBar
       if let tab = activeTab, let url = URL(string: tab.url) {
         SyncedWebView(
@@ -43,6 +50,7 @@ struct WebMirrorView: View {
         }
       } else {
         ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+      }
       }
     }
     .navigationTitle("Web View")

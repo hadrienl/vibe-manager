@@ -27,6 +27,25 @@ extension BrowserWorkspace: BrowserToolRunning {
         return result
       case "tab_open":
         return try await openTab(arguments, browser: browser, tool: tool)
+      case "devices_list":
+        let devices = await Task.detached { DeviceCatalog.running() }.value
+        return .text(
+          JSONValue.array(
+            devices.map { ["id": .string($0.id), "name": .string($0.name)] }
+          ).jsonText)
+      case "device_open":
+        let id = arguments["device"]?.stringValue ?? ""
+        let devices = await Task.detached { DeviceCatalog.running() }.value
+        guard let device = devices.first(where: { $0.id == id }),
+          let url = DeviceCatalog.url(of: id)
+        else {
+          throw BrowserToolFailure("\(id) is not running: see devices_list, or boot it first.")
+        }
+        let tab = open(url, in: browser.sessionID, openedBy: .agent, activate: true)
+        tab.nameDevice(device.name)
+        noteAgentOpenedPage(in: browser.sessionID)
+        record(tool, in: browser, tab: tab, target: id, decision: .automatic)
+        return .text("\(device.name) is in tab \(tab.id), in front.")
       default:
         let tab = try target(arguments, in: browser)
         return try await run(tool, on: tab, arguments: arguments, browser: browser)
