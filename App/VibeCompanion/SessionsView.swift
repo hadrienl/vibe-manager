@@ -56,6 +56,14 @@ struct SessionsView: View {
           Button("Settings", systemImage: "gearshape") { showsSettings = true }
         }
         ToolbarItem(placement: .topBarTrailing) {
+          NavigationLink {
+            DeviceListScreen()
+          } label: {
+            Image(systemName: "iphone")
+          }
+          .disabled(channel.phase != .connected)
+        }
+        ToolbarItem(placement: .topBarTrailing) {
           Button("New Session", systemImage: "plus") { showsNewSession = true }
             .disabled(channel.phase != .connected)
         }

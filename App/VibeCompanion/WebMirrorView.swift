@@ -50,6 +50,13 @@ struct WebMirrorView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
+        NavigationLink {
+          DeviceListScreen()
+        } label: {
+          Image(systemName: "iphone")
+        }
+      }
+      ToolbarItem(placement: .topBarTrailing) {
         Menu("Tabs", systemImage: "square.on.square") {
           ForEach(state?.tabs ?? []) { tab in
             Button {

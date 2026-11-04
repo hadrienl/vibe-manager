@@ -163,10 +163,17 @@ static void touch(char phase, double x, double y) {
   sendMessage(message);
 }
 
+// Asked when late frames were dropped: decoding needs a key frame, even on a still screen.
+static volatile bool keyRequested = false;
+
 static void readTouches(void) {
   char line[64];
   bool lostTouch = true;
   while (fgets(line, sizeof line, stdin)) {
+    if (line[0] == 'k') {
+      keyRequested = true;
+      continue;
+    }
     char phase;
     double x, y;
     if (sscanf(line, "%c %lf %lf", &phase, &x, &y) != 3) continue;
@@ -269,15 +276,16 @@ int main(int argc, char **argv) {
           VTSessionSetProperty(encoder, kVTCompressionPropertyKey_MaxKeyFrameInterval, (__bridge CFTypeRef) @240);
           forceKey = true;
         }
-        if (surface && encoder && IOSurfaceGetSeed(surface) != seed && now - lastFrame > 16000000ull) {
+        if (surface && encoder && (IOSurfaceGetSeed(surface) != seed || keyRequested) && now - lastFrame > 16000000ull) {
           seed = IOSurfaceGetSeed(surface);
           lastFrame = now;
           CVPixelBufferRef buffer = NULL;
           CVPixelBufferCreateWithIOSurface(NULL, surface, NULL, &buffer);
           if (buffer) {
             NSDictionary *properties =
-                forceKey ? @{(id)kVTEncodeFrameOptionKey_ForceKeyFrame : @YES} : nil;
+                (forceKey || keyRequested) ? @{(id)kVTEncodeFrameOptionKey_ForceKeyFrame : @YES} : nil;
             forceKey = false;
+            keyRequested = false;
             VTCompressionSessionEncodeFrame(encoder, buffer, CMTimeMake(index++, 60), kCMTimeInvalid,
                                             (__bridge CFDictionaryRef)properties, NULL, NULL);
             CVPixelBufferRelease(buffer);

@@ -63,6 +63,7 @@ final class RemoteChannel {
   private(set) var path = CompanionPathKind.unknown
 
   private var endpoint: Endpoint?
+  private var macAddress: (id: String, relay: String?)?
   private var connection: Connection?
   private var sending: RemoteFrameQueue?
   private var tasks: [Task<Void, Never>] = []
@@ -129,6 +130,7 @@ final class RemoteChannel {
       let own = endpoint.id().description
       self.endpointID = own
       await onEndpoint?(own)
+      macAddress = (endpointID, relay)
       let address = EndpointAddr(
         id: try EndpointId.fromString(s: endpointID), relayUrl: relay, addresses: [])
       let connection = try await endpoint.connect(addr: address, alpn: CompanionIroh.remoteALPN)
@@ -246,6 +248,14 @@ final class RemoteChannel {
   private func write(_ message: RemoteMessage) {
     guard let sending else { return }
     sending.enqueue(RemoteFrame.encode(message))
+  }
+
+  /// POC #480: a connection of the simulators' mirror, beside the sessions' channel.
+  func mirrorConnection() async throws -> Connection {
+    guard let endpoint, let macAddress else { throw CancellationError() }
+    let address = EndpointAddr(
+      id: try EndpointId.fromString(s: macAddress.id), relayUrl: macAddress.relay, addresses: [])
+    return try await endpoint.connect(addr: address, alpn: CompanionIroh.mirrorALPN)
   }
 
   // MARK: - What the user does
