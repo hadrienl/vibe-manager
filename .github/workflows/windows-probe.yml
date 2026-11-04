@@ -32,3 +32,33 @@ jobs:
       - name: Build ${{ matrix.target }}
         working-directory: Packages/WindowsProbe
         run: swift build --target ${{ matrix.target }} -Xswiftc -continue-building-after-errors
+  deps:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {name: crypto, url: "https://github.com/apple/swift-crypto.git", req: 'from: "3.0.0"', product: Crypto, pkg: swift-crypto}
+          - {name: markdown, url: "https://github.com/swiftlang/swift-markdown.git", req: 'exact: "0.6.0"', product: Markdown, pkg: swift-markdown}
+          - {name: swiftterm, url: "https://github.com/migueldeicaza/SwiftTerm.git", req: 'exact: "1.20.0"', product: SwiftTerm, pkg: SwiftTerm}
+          - {name: swiftcrossui, url: "https://github.com/moreSwift/swift-cross-ui.git", req: 'branch: "main"', product: SwiftCrossUI, pkg: swift-cross-ui}
+          - {name: winuibackend, url: "https://github.com/moreSwift/swift-cross-ui.git", req: 'branch: "main"', product: WinUIBackend, pkg: swift-cross-ui}
+    steps:
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.2-release
+          swift-build: 6.2-RELEASE
+      - name: Build ${{ matrix.name }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dep/Sources/Dep | Out-Null
+          Set-Location dep
+          @"
+          // swift-tools-version: 6.0
+          import PackageDescription
+          let package = Package(name: "dep", dependencies: [.package(url: "${{ matrix.url }}", ${{ matrix.req }})],
+            targets: [.target(name: "Dep", dependencies: [.product(name: "${{ matrix.product }}", package: "${{ matrix.pkg }}")])])
+          "@ | Set-Content Package.swift
+          "import ${{ matrix.product }}" | Set-Content Sources/Dep/Dep.swift
+          swift build
