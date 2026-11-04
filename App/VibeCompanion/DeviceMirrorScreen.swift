@@ -50,11 +50,13 @@ struct DeviceMirrorScreen: View {
   @Environment(RemoteChannel.self) private var channel
   @State private var session = DeviceMirrorClient()
   @State private var attempt = 0
+  @State private var isFullScreen = false
 
   var body: some View {
     ZStack(alignment: .bottom) {
       Color.black.ignoresSafeArea()
       MirrorVideo(session: session)
+        .ignoresSafeArea(edges: isFullScreen ? .all : [])
       if let failure = session.failure {
         VStack(spacing: 12) {
           Text(verbatim: failure).foregroundStyle(.white).multilineTextAlignment(.center)
@@ -63,7 +65,7 @@ struct DeviceMirrorScreen: View {
         }
         .padding()
         .frame(maxHeight: .infinity)
-      } else {
+      } else if !isFullScreen {
         // What the measures of the POC read.
         Text(verbatim: session.status)
           .font(.caption2.monospaced())
@@ -73,6 +75,33 @@ struct DeviceMirrorScreen: View {
           .allowsHitTesting(false)
       }
     }
+    .overlay(alignment: .topTrailing) {
+      // The only way out: the whole screen belongs to the simulator's touches.
+      if isFullScreen {
+        Button {
+          isFullScreen = false
+        } label: {
+          Image(systemName: "arrow.down.right.and.arrow.up.left")
+            .font(.footnote.weight(.semibold))
+            .foregroundStyle(.white)
+            .frame(width: 32, height: 32)
+            .background(.black.opacity(0.45), in: Circle())
+        }
+        .padding(8)
+      }
+    }
+    .toolbar(isFullScreen ? .hidden : .automatic, for: .navigationBar)
+    .toolbar {
+      ToolbarItem(placement: .topBarTrailing) {
+        Button {
+          isFullScreen = true
+        } label: {
+          Image(systemName: "arrow.up.left.and.arrow.down.right")
+        }
+      }
+    }
+    .statusBarHidden(isFullScreen)
+    .persistentSystemOverlays(isFullScreen ? .hidden : .automatic)
     // The system's own edge swipes ask a second swipe, the first going to the simulator.
     .defersSystemGestures(on: .all)
     .navigationTitle(device.name)
