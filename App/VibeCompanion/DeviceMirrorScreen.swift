@@ -65,14 +65,6 @@ struct DeviceMirrorScreen: View {
         }
         .padding()
         .frame(maxHeight: .infinity)
-      } else if !isFullScreen {
-        // What the measures of the POC read.
-        Text(verbatim: session.status)
-          .font(.caption2.monospaced())
-          .foregroundStyle(.white.opacity(0.7))
-          .padding(4)
-          .background(.black.opacity(0.5))
-          .allowsHitTesting(false)
       }
     }
     .overlay(alignment: .topTrailing) {
