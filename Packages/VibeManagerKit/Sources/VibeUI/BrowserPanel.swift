@@ -81,7 +81,6 @@ private struct BrowserTabStrip: View {
   let workspace: BrowserWorkspace
   let browser: SessionBrowser
   @State private var isShowingTrace = false
-  @State private var isShowingDevices = false
 
   var body: some View {
     HStack(spacing: 4) {
@@ -116,21 +115,6 @@ private struct BrowserTabStrip: View {
       .buttonStyle(.borderless)
       .instantTooltip(Text("New Tab", bundle: .module))
       .accessibilityLabel(Text("New Tab", bundle: .module))
-
-      Button {
-        isShowingDevices.toggle()
-      } label: {
-        Image(systemName: "iphone")
-          .frame(width: 24, height: 24)
-      }
-      .buttonStyle(.borderless)
-      .popover(isPresented: $isShowingDevices, arrowEdge: .bottom) {
-        DeviceMirrorPicker { udid, name in
-          isShowingDevices = false
-          guard let url = URL(string: "vibe-device://\(udid)") else { return }
-          model.openDeviceTab(url, title: name)
-        }
-      }
 
       Spacer(minLength: 0)
 

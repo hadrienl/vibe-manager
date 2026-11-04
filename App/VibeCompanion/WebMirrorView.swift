@@ -26,14 +26,31 @@ struct WebMirrorView: View {
     state?.tabs.first { $0.id == state?.activeTabID }
   }
 
+  /// The tabs showing a page: the simulators have their own view here.
+  private var webTabs: [RemoteWebTab] {
+    (state?.tabs ?? []).filter { URL(string: $0.url)?.scheme != "vibe-device" }
+  }
+
   var body: some View {
     VStack(spacing: 0) {
       if let tab = activeTab, let url = URL(string: tab.url), url.scheme == "vibe-device",
         let id = url.host
       {
-        // POC #480: the tab the agent opened on a simulator, here as on the Mac.
-        DeviceMirrorScreen(device: CompanionMirror.Device(id: id, name: tab.title))
-          .id(id)
+        // POC #480: a tab on the Mac, a view of its own here.
+        ContentUnavailableView {
+          Label {
+            Text(verbatim: tab.title)
+          } icon: {
+            Image(systemName: "iphone")
+          }
+        } actions: {
+          NavigationLink {
+            DeviceMirrorScreen(device: CompanionMirror.Device(id: id, name: tab.title))
+          } label: {
+            Text(verbatim: "Ouvrir le simulateur")
+          }
+          .buttonStyle(.borderedProminent)
+        }
       } else {
       addressBar
       if let tab = activeTab, let url = URL(string: tab.url) {
@@ -58,15 +75,8 @@ struct WebMirrorView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        NavigationLink {
-          DeviceListScreen()
-        } label: {
-          Image(systemName: "iphone")
-        }
-      }
-      ToolbarItem(placement: .topBarTrailing) {
         Menu("Tabs", systemImage: "square.on.square") {
-          ForEach(state?.tabs ?? []) { tab in
+          ForEach(webTabs) { tab in
             Button {
               page.attach()
               channel.web(.selectTab(tab.id), in: sessionID)
@@ -79,7 +89,7 @@ struct WebMirrorView: View {
             }
           }
         }
-        .disabled((state?.tabs.count ?? 0) < 2)
+        .disabled(webTabs.isEmpty || (webTabs.count == 1 && webTabs.first?.id == state?.activeTabID))
       }
       ToolbarItemGroup(placement: .bottomBar) {
         Button("Back", systemImage: "chevron.backward") {

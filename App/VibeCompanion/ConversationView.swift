@@ -95,6 +95,18 @@ struct ConversationView: View {
         }
       }
       ToolbarItem(placement: .topBarTrailing) {
+        // POC #480: a view of its own here, one view showing at a time on the phone.
+        NavigationLink {
+          DeviceListScreen()
+        } label: {
+          Label {
+            Text(verbatim: "Simulateurs")
+          } icon: {
+            Image(systemName: "iphone")
+          }
+        }
+      }
+      ToolbarItem(placement: .topBarTrailing) {
         Menu("More", systemImage: "ellipsis") {
           Button("Close Session", systemImage: "power", role: .destructive) {
             showsCloseConfirmation = true

@@ -221,6 +221,32 @@ private final class DeviceMirrorSession: @unchecked Sendable {
 }
 
 /// The simulators running now, to open one in a tab.
+/// POC #480: beside the web view's button, what opens a simulator in one of its tabs.
+struct DeviceMirrorToolbarButton: View {
+  let model: AppModel
+  @State private var isShowingDevices = false
+
+  var body: some View {
+    Button {
+      isShowingDevices.toggle()
+    } label: {
+      Label {
+        Text(verbatim: "Simulateurs")
+      } icon: {
+        Image(systemName: "iphone")
+      }
+    }
+    .disabled(!model.isWebViewAvailable)
+    .popover(isPresented: $isShowingDevices, arrowEdge: .bottom) {
+      DeviceMirrorPicker { udid, name in
+        isShowingDevices = false
+        guard let url = URL(string: "vibe-device://\(udid)") else { return }
+        model.openDeviceTab(url, title: name)
+      }
+    }
+  }
+}
+
 struct DeviceMirrorPicker: View {
   let open: (_ udid: String, _ name: String) -> Void
   @State private var devices: [(udid: String, name: String)]?

@@ -504,6 +504,9 @@ public struct RootView: View {
                 ? Text("Shown", bundle: .module, comment: "The web view is shown.")
                 : Text("Hidden", bundle: .module, comment: "The web view is hidden."))
           }
+          ToolbarItem(placement: .primaryAction) {
+            DeviceMirrorToolbarButton(model: model)
+          }
         }
         ToolbarItem(placement: .primaryAction) {
           // Never disabled: with the column open and the selection gone, a disabled button
