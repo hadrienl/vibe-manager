@@ -74,7 +74,7 @@ public enum BrowserToolCatalog {
           ],
         ], required: ["url"], namesTab: false)),
     Tool(
-      name: "devices_list", actionClass: .observe,
+      name: "devices_list", actionClass: .read,
       description: """
         Lists the iOS simulators and Android emulators running on this Mac: the id device_open \
         takes, and the name. Boot one first (simctl boot, emulator -avd) if none suits.
