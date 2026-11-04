@@ -1,0 +1,45 @@
+name: Windows
+
+# The port of #481: which modules build on Windows. A module is listed under `required` by the
+# ticket that ports it; until then its failure is reported without failing the run.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    continue-on-error: ${{ !matrix.required }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: VibeDomain, required: false }
+          - { target: VibeApplication, required: false }
+          - { target: VibeProcess, required: false }
+          - { target: VibePersistence, required: false }
+          - { target: VibeGit, required: false }
+          - { target: VibeAgents, required: false }
+          - { target: VibeEndpoints, required: false }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.4.2-release
+          swift-build: 6.4.2-RELEASE
+      - name: Resolve
+        working-directory: Packages/VibeManagerKit
+        run: swift package resolve
+      - name: Build ${{ matrix.target }}
+        working-directory: Packages/VibeManagerKit
+        run: swift build --build-system native --target ${{ matrix.target }}
