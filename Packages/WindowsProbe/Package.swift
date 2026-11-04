@@ -3,7 +3,7 @@
 // It reuses their sources as they are, and leaves out the Apple-only dependencies of the real manifest.
 import PackageDescription
 
-let sources = "../VibeManagerKit/Sources"
+let sources = "Sources"  // copied from ../VibeManagerKit/Sources by the workflow
 let package = Package(
   name: "WindowsProbe",
   defaultLocalization: "en",
