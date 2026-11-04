@@ -93,10 +93,17 @@ private final class DeviceMirrorSession: @unchecked Sendable {
   init(udid: String, video: AVSampleBufferDisplayLayer) {
     self.video = video
     video.sampleBufferRenderer.flush()
-    guard let bridge = Bundle.main.url(forAuxiliaryExecutable: "sim-bridge") else { return }
+    let isAndroid = udid.hasPrefix("android-")
+    guard let bridge = Bundle.main.url(forAuxiliaryExecutable: isAndroid ? "emu-bridge" : "sim-bridge")
+    else { return }
     let output = Pipe()
     process.executableURL = bridge
-    process.arguments = [udid]
+    process.arguments = [isAndroid ? String(udid.dropFirst("android-".count)) : udid]
+    if isAndroid,
+      let token = DeviceMirrorPicker.runningEmulators().first(where: { $0.id == udid })?.token
+    {
+      process.environment = ["EMU_TOKEN": token]
+    }
     process.standardInput = input
     process.standardOutput = output
     do { try process.run() } catch { return }
@@ -221,7 +228,7 @@ struct DeviceMirrorPicker: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       if let devices {
-        if devices.isEmpty { Text(verbatim: "Aucun simulateur démarré").padding(8) }
+        if devices.isEmpty { Text(verbatim: "Aucun simulateur ni émulateur démarré").padding(8) }
         ForEach(devices, id: \.udid) { device in
           Button(device.name) { open(device.udid, device.name) }
             .buttonStyle(.borderless)
@@ -234,7 +241,30 @@ struct DeviceMirrorPicker: View {
     .padding(6)
     .frame(minWidth: 200, alignment: .leading)
     .task {
-      devices = await Task.detached { Self.booted() }.value
+      devices = await Task.detached {
+        Self.booted() + Self.runningEmulators().map { ($0.id, $0.name) }
+      }.value
+    }
+  }
+
+  /// POC #480: the Android emulators running now, as the emulator itself lists them. Their id is
+  /// `android-<gRPC port>`.
+  nonisolated static func runningEmulators() -> [(id: String, name: String, token: String?)] {
+    let folder = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent("Library/Caches/TemporaryItems/avd/running")
+    let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+    return files.compactMap { file in
+      let stem = file.deletingPathExtension().lastPathComponent
+      guard stem.hasPrefix("pid_"), let pid = Int32(stem.dropFirst(4)), kill(pid, 0) == 0,
+        let text = try? String(contentsOf: file, encoding: .utf8)
+      else { return nil }
+      var values: [String: String] = [:]
+      for line in text.split(whereSeparator: \.isNewline) {
+        let parts = line.split(separator: "=", maxSplits: 1)
+        if parts.count == 2 { values[String(parts[0])] = String(parts[1]) }
+      }
+      guard let port = values["grpc.port"] else { return nil }
+      return ("android-\(port)", values["avd.name"] ?? "Android", values["grpc.token"])
     }
   }
 

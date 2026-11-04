@@ -46,8 +46,16 @@ enum CompanionMirrorServer {
     let process = Process()
     let input = Pipe()
     let output = Pipe()
-    process.executableURL = bridge
-    process.arguments = [udid]
+    if udid.hasPrefix("android-") {
+      process.executableURL = bridge.deletingLastPathComponent().appendingPathComponent("emu-bridge")
+      process.arguments = [String(udid.dropFirst("android-".count))]
+      if let token = runningEmulators().first(where: { $0.id == udid })?.token {
+        process.environment = ["EMU_TOKEN": token]
+      }
+    } else {
+      process.executableURL = bridge
+      process.arguments = [udid]
+    }
     process.standardInput = input
     process.standardOutput = output
     do {
@@ -103,7 +111,32 @@ enum CompanionMirrorServer {
     return data
   }
 
+  /// POC #480: the Android emulators running now, as the emulator itself lists them. Their id is
+  /// `android-<gRPC port>`.
+  private static func runningEmulators() -> [(id: String, name: String, token: String?)] {
+    let folder = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent("Library/Caches/TemporaryItems/avd/running")
+    let files = (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil)) ?? []
+    return files.compactMap { file in
+      let stem = file.deletingPathExtension().lastPathComponent
+      guard stem.hasPrefix("pid_"), let pid = Int32(stem.dropFirst(4)), kill(pid, 0) == 0,
+        let text = try? String(contentsOf: file, encoding: .utf8)
+      else { return nil }
+      var values: [String: String] = [:]
+      for line in text.split(whereSeparator: \.isNewline) {
+        let parts = line.split(separator: "=", maxSplits: 1)
+        if parts.count == 2 { values[String(parts[0])] = String(parts[1]) }
+      }
+      guard let port = values["grpc.port"] else { return nil }
+      return ("android-\(port)", values["avd.name"] ?? "Android", values["grpc.token"])
+    }
+  }
+
   private static func bootedDevices() -> [CompanionMirror.Device] {
+    simulators() + runningEmulators().map { CompanionMirror.Device(id: $0.id, name: $0.name) }
+  }
+
+  private static func simulators() -> [CompanionMirror.Device] {
     let process = Process()
     process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
     process.arguments = ["simctl", "list", "devices", "booted", "-j"]

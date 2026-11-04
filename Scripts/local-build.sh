@@ -71,9 +71,15 @@ xcrun clang -fobjc-arc -O2 -w -framework Foundation -framework IOSurface -framew
 
 # The same identity as the build's: the terminal host only accepts a peer signed as itself, and
 # the privacy permissions follow the identifier and the team.
+# ...and to the Android emulators.
+xcrun clang -fobjc-arc -O2 -w -framework Foundation -framework Accelerate -framework VideoToolbox \
+  -framework CoreMedia -framework CoreVideo "$repository_root/Scripts/poc-480/emu-bridge.m" \
+  -o "$app/Contents/MacOS/emu-bridge"
+
 readonly identity="$(codesign -dvv "$built" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
 [[ -n "$identity" ]] || fail "the build is not signed with an identity"
 codesign --force --options runtime --sign "$identity" "$app/Contents/MacOS/sim-bridge"
+codesign --force --options runtime --sign "$identity" "$app/Contents/MacOS/emu-bridge"
 codesign --force --preserve-metadata=identifier,entitlements,flags,runtime \
   --sign "$identity" "$app"
 codesign --verify --strict "$app" || fail "the renamed application does not verify"
