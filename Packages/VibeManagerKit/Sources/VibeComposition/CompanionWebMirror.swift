@@ -296,9 +296,9 @@ final class CompanionWebMirror {
       }
     }
     let handle = FileHandle(fileDescriptor: descriptor, closeOnDealloc: true)
-    var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN))
+    var buffer = [UInt8](repeating: 0, count: Int(MAXPATHLEN))
     guard fcntl(descriptor, F_GETPATH, &buffer) == 0,
-      lies(String(cString: buffer), in: folders)
+      lies(String(decoding: buffer.prefix { $0 != 0 }, as: UTF8.self), in: folders)
     else { return .refused }
     var info = stat()
     guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
