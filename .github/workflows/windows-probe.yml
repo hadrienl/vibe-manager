@@ -25,7 +25,10 @@ jobs:
       - name: Toolchain
         run: swift --version
       - name: Copy sources
-        run: Copy-Item -Recurse Packages/VibeManagerKit/Sources Packages/WindowsProbe/Sources
+        run: |
+          Copy-Item -Recurse Packages/VibeManagerKit/Sources Packages/WindowsProbe/Sources
+          Get-ChildItem -Recurse -Filter Localization.swift Packages/WindowsProbe/Sources | Remove-Item
+          Copy-Item Packages/WindowsProbe/Shims/LocalizationShim.swift Packages/WindowsProbe/Sources/VibeDomain/
       - name: Build ${{ matrix.target }}
         working-directory: Packages/WindowsProbe
         run: swift build --target ${{ matrix.target }} -Xswiftc -continue-building-after-errors
