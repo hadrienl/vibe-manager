@@ -1,0 +1,29 @@
+name: Windows probe
+# Study of a Windows port: reports which modules build on Windows. Never blocks anything.
+on:
+  push:
+    branches: [spike/windows-probe, 'study/*windows*']
+  pull_request:
+    paths: [Packages/WindowsProbe/**, .github/workflows/windows-probe.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [VibeDomain, VibeApplication, VibeProcess, VibePersistence, VibeGit, VibeAgents, VibeEndpoints]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: compnerd/gha-setup-swift@main
+        with:
+          swift-version: swift-6.2-release
+          swift-build: 6.2-RELEASE
+      - name: Toolchain
+        run: swift --version
+      - name: Build ${{ matrix.target }}
+        working-directory: Packages/WindowsProbe
+        run: swift build --target ${{ matrix.target }} -Xswiftc -continue-building-after-errors
