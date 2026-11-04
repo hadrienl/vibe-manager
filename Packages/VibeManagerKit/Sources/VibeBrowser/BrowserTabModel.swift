@@ -165,6 +165,16 @@ public final class BrowserTabModel: NSObject, Identifiable {
 
   public var isBlank: Bool { url == Self.blankPage }
 
+  /// POC #480: what the tab strip calls a simulator.
+  public func nameDevice(_ name: String) {
+    title = name
+  }
+
+  /// POC #480: the simulator this tab shows instead of a page.
+  public var deviceUDID: String? {
+    url.scheme == "vibe-device" ? url.host : nil
+  }
+
   /// What the tab strip shows: the title once there is one, else the host.
   public var displayTitle: String {
     if !title.isEmpty { return title }
@@ -236,6 +246,10 @@ public final class BrowserTabModel: NSObject, Identifiable {
   }
 
   public func load(_ url: URL) {
+    if url.scheme == "vibe-device" {
+      self.url = url
+      return
+    }
     stopRetrying()
     self.url = url
     failure = nil
