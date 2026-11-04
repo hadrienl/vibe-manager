@@ -31,7 +31,7 @@ jobs:
           Copy-Item Packages/WindowsProbe/Shims/LocalizationShim.swift Packages/WindowsProbe/Sources/VibeDomain/
       - name: Build ${{ matrix.target }}
         working-directory: Packages/WindowsProbe
-        run: swift build --target ${{ matrix.target }} -Xswiftc -continue-building-after-errors
+        run: swift build --build-system native --target ${{ matrix.target }} -Xswiftc -continue-building-after-errors
   deps:
     runs-on: windows-latest
     timeout-minutes: 45
@@ -61,4 +61,4 @@ jobs:
             targets: [.target(name: "Dep", dependencies: [.product(name: "${{ matrix.product }}", package: "${{ matrix.pkg }}")])])
           "@ | Set-Content Package.swift
           "import ${{ matrix.product }}" | Set-Content Sources/Dep/Dep.swift
-          swift build
+          swift build --build-system native
