@@ -73,6 +73,8 @@ struct DeviceMirrorScreen: View {
           .allowsHitTesting(false)
       }
     }
+    // The system's own edge swipes ask a second swipe, the first going to the simulator.
+    .defersSystemGestures(on: .all)
     .navigationTitle(device.name)
     .navigationBarTitleDisplayMode(.inline)
     .task(id: attempt) {
@@ -98,6 +100,7 @@ final class MirrorVideoView: UIView {
   override class var layerClass: AnyClass { AVSampleBufferDisplayLayer.self }
   var video: AVSampleBufferDisplayLayer { layer as! AVSampleBufferDisplayLayer }
   fileprivate var session: DeviceMirrorClient?
+  private weak var navigation: UINavigationController?
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -108,6 +111,18 @@ final class MirrorVideoView: UIView {
 
   @available(*, unavailable)
   required init?(coder: NSCoder) { nil }
+
+  /// While a simulator is open every finger is the simulator's: only the back button leaves, not
+  /// the swipes that pop a screen, from its edge or (iOS 26) anywhere on it.
+  override func didMoveToWindow() {
+    super.didMoveToWindow()
+    if window != nil {
+      navigation = sequence(first: self as UIResponder, next: \.next)
+        .compactMap { $0 as? UINavigationController }.first
+    }
+    navigation?.interactivePopGestureRecognizer?.isEnabled = window == nil
+    navigation?.interactiveContentPopGestureRecognizer?.isEnabled = window == nil
+  }
 
   override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) { send("d", touches) }
   override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) { send("m", touches) }
