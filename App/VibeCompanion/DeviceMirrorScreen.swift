@@ -213,9 +213,16 @@ final class DeviceMirrorClient {
       let size: @Sendable (CGSize) async -> Void = { [weak self] size in
         await MainActor.run { self?.videoSize = size }
       }
-      try await Task.detached {
+      let receiver = Task.detached {
         try await Self.receive(receiving, into: layer, counter: counter, size: size)
-      }.value
+      }
+      // Closing is what ends a read under way; a detached task does not hear the screen leave.
+      try await withTaskCancellationHandler {
+        try await receiver.value
+      } onCancel: {
+        receiver.cancel()
+        try? connection.close(errorCode: 0, reason: Data())
+      }
       if !Task.isCancelled { failure = "Le simulateur ne répond plus." }
     } catch {
       if !Task.isCancelled { failure = CompanionIroh.describe(error) }

@@ -13,6 +13,39 @@ public enum DeviceCatalog {
     URL(string: "vibe-device://\(id)")
   }
 
+  /// Shuts down a simulator, or ends an emulator as its own window's close would.
+  public static func stop(_ id: String) {
+    if id.hasPrefix("android-") {
+      if let pid = emulatorProcess(of: id) { kill(pid, SIGTERM) }
+      return
+    }
+    let process = Process()
+    process.executableURL = URL(fileURLWithPath: "/usr/bin/xcrun")
+    process.arguments = ["simctl", "shutdown", id]
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    guard (try? process.run()) != nil else { return }
+    process.waitUntilExit()
+  }
+
+  private static func emulatorProcess(of id: String) -> Int32? {
+    let folder = FileManager.default.homeDirectoryForCurrentUser
+      .appendingPathComponent("Library/Caches/TemporaryItems/avd/running")
+    let files =
+      (try? FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: nil))
+      ?? []
+    let port = "grpc.port=\(id.dropFirst("android-".count))"
+    for file in files {
+      let stem = file.deletingPathExtension().lastPathComponent
+      guard stem.hasPrefix("pid_"), let pid = Int32(stem.dropFirst(4)), kill(pid, 0) == 0,
+        let text = try? String(contentsOf: file, encoding: .utf8),
+        text.split(whereSeparator: \.isNewline).contains(where: { $0 == port })
+      else { continue }
+      return pid
+    }
+    return nil
+  }
+
   public static func running() -> [Device] {
     simulators() + emulators()
   }

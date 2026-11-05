@@ -106,6 +106,8 @@ private final class DeviceMirrorSession: @unchecked Sendable {
     }
     process.standardInput = input
     process.standardOutput = output
+    // A bridge gone must cost the next touch an error, not a `SIGPIPE` that ends the app.
+    _ = fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
     do { try process.run() } catch { return }
     let reading = output.fileHandleForReading
     Thread.detachNewThread { [self] in read(reading) }

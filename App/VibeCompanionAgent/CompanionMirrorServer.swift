@@ -172,11 +172,11 @@ enum CompanionMirrorServer {
 
     func add(_ frame: Data, isKey: Bool) {
       let (needsKey, resume): (Bool, (CheckedContinuation<Data?, Never>, Data)?) = lock.withLock {
-        if let waiter {
-          self.waiter = nil
-          return (false, (waiter, frame))
-        }
-        return (backlog.add(frame, isKey: isKey), nil)
+        // Through the backlog even with a writer waiting: it knows when a key frame is due.
+        let needsKey = backlog.add(frame, isKey: isKey)
+        guard let waiter, let next = backlog.next() else { return (needsKey, nil) }
+        self.waiter = nil
+        return (needsKey, (waiter, next))
       }
       if needsKey { askKey() }
       if let resume { resume.0.resume(returning: resume.1) }

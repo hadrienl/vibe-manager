@@ -11,7 +11,6 @@
 #import <Foundation/Foundation.h>
 #import <VideoToolbox/VideoToolbox.h>
 #import <arpa/inet.h>
-#import <mach/mach_time.h>
 #import <netinet/tcp.h>
 #import <pthread.h>
 #import <sys/socket.h>
@@ -321,9 +320,6 @@ int main(int argc, char **argv) {
     NSMutableData *message = [NSMutableData data];
     size_t bodySize = 1 << 21;
     uint8_t *body = malloc(bodySize);
-    uint64_t lastShown = 0;
-    mach_timebase_info_data_t base;
-    mach_timebase_info(&base);
     for (;;) {
       uint8_t header[9];
       readAll(header, 9);
@@ -369,11 +365,8 @@ int main(int argc, char **argv) {
               video = askFrames((int)(width * scale) & ~1, (int)(height * scale) & ~1);
               break;
             }
-            uint64_t now = mach_absolute_time() * base.numer / base.denom;
-            if (now - lastShown > 16000000ull) {
-              lastShown = now;
-              show(pixels, count, width, height);
-            }
+            // Every frame: the emulator sends one per change, and the last must not be lost.
+            show(pixels, count, width, height);
           }
           [message replaceBytesInRange:NSMakeRange(0, 5 + (size_t)size) withBytes:NULL length:0];
         }

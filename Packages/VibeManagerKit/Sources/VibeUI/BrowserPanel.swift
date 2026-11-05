@@ -41,6 +41,21 @@ struct BrowserPanel: View {
   private var content: some View {
     if let udid = browser.activeTab?.deviceUDID {
       DeviceMirrorView(udid: udid)
+        .overlay(alignment: .topTrailing) {
+          Button {
+            model.closeWebTab()
+            Task.detached { DeviceCatalog.stop(udid) }
+          } label: {
+            Image(systemName: "stop.fill")
+              .foregroundStyle(.white)
+              .frame(width: 28, height: 28)
+              .background(.black.opacity(0.55), in: Circle())
+          }
+          .buttonStyle(.plain)
+          .padding(8)
+          .instantTooltip(Text(verbatim: "Arrêter le simulateur"))
+          .accessibilityLabel(Text(verbatim: "Arrêter le simulateur"))
+        }
     } else if let tab = browser.activeTab {
       ZStack {
         BrowserWebViewHost(
