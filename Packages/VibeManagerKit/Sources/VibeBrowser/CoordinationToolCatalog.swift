@@ -29,7 +29,7 @@ public enum CoordinationToolCatalog {
       name: "agents_list",
       description: """
         Lists the coding agents installed on this Mac that a child can run, with their models, \
-        and how many children are running against the limit the user set.
+        which one is your own, and how many children are running against the limit the user set.
         """,
       inputSchema: schema([:])),
     .init(
@@ -48,7 +48,10 @@ public enum CoordinationToolCatalog {
           "folder": [
             "type": "string", "description": "The absolute path of the folder it works in.",
           ],
-          "agent": ["type": "string", "description": "An agent id from agents_list."],
+          "agent": [
+            "type": "string",
+            "description": "An agent id from agents_list. Omitted: your own agent.",
+          ],
           "model": [
             "type": "string",
             "description": "A model id from agents_list. Omitted: the agent's own default.",
@@ -60,7 +63,7 @@ public enum CoordinationToolCatalog {
           "start": [
             "type": "boolean", "description": "Start its agent now (default) or leave it in To Do.",
           ],
-        ], required: ["name", "folder", "agent", "mission"])),
+        ], required: ["name", "folder", "mission"])),
     .init(
       name: "sessions_list",
       description: """

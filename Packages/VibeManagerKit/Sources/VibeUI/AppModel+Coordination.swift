@@ -721,7 +721,8 @@ extension AppModel {
         models.isEmpty
         ? "its own default model"
         : models.map { $0.isDefault ? "\($0.id) (default)" : $0.id }.joined(separator: ", ")
-      lines.append("- \(descriptor.id.rawValue): \(descriptor.displayName); models: \(list)")
+      let note = Self.agentNote(for: descriptor.id.rawValue, of: coordinator)
+      lines.append("- \(descriptor.id.rawValue): \(descriptor.displayName)\(note); models: \(list)")
     }
     let limit = coordination.maximumRunningChildren
     lines.append(
@@ -729,12 +730,25 @@ extension AppModel {
     return lines.joined(separator: "\n")
   }
 
+  /// A coordinator on one account has no reason of its own to start children on another: the name
+  /// of an account can look like the project's, and the child then asks for what that account's
+  /// folder has not approved yet.
+  private static func agentNote(for id: String, of coordinator: WorkSession) -> String {
+    if id == coordinator.agent?.providerID { return " (your own, the default for a child)" }
+    if id.hasPrefix(AgentAccount.providerPrefix) {
+      return " (another account of the user's, only when they ask for it)"
+    }
+    return ""
+  }
+
   private func createChild(of coordinator: WorkSession, _ arguments: JSONValue) async throws
     -> String
   {
     let name = try Self.string("name", in: arguments)
     let folder = (try Self.string("folder", in: arguments) as NSString).expandingTildeInPath
-    let agent = try Self.string("agent", in: arguments)
+    let agent =
+      arguments["agent"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 }
+      ?? coordinator.agent?.providerID
     let mission = try Self.string("mission", in: arguments)
     let start = arguments["start"]?.boolValue ?? true
     var isDirectory: ObjCBool = false

@@ -36,7 +36,7 @@ actor CoordinationRepository: SessionRepository {
 }
 
 private struct OneAgent: AgentProvider {
-  let descriptor = AgentDescriptor(
+  var descriptor = AgentDescriptor(
     id: AgentProviderID("claude-code"), displayName: "Claude Code",
     capabilities: AgentCapabilities(
       supportsModelSelection: true, supportsInitialPrompt: true, supportsResume: true))
@@ -72,6 +72,34 @@ private struct OneAgentRegistry: AgentProviderResolving {
   }
 }
 
+/// Claude Code and a second account of it (#478).
+private struct TwoAccountsRegistry: AgentProviderResolving {
+  static let account = AgentAccount.providerPrefix + "00000000-0000-0000-0000-000000000478"
+
+  private let agents = [
+    OneAgent(),
+    OneAgent(
+      descriptor: AgentDescriptor(
+        id: AgentProviderID(TwoAccountsRegistry.account), displayName: "Claude Work",
+        capabilities: AgentCapabilities(
+          supportsModelSelection: true, supportsInitialPrompt: true, supportsResume: true))),
+  ]
+
+  func descriptors() async -> [AgentDescriptor] { agents.map(\.descriptor) }
+
+  func provider(id: AgentProviderID) async -> (any AgentProvider)? {
+    agents.first { $0.descriptor.id == id }
+  }
+
+  func availabilities(forceRefresh: Bool) async -> [AgentProviderID: AgentAvailability] {
+    var all: [AgentProviderID: AgentAvailability] = [:]
+    for agent in agents {
+      all[agent.descriptor.id] = await agent.availability(forceRefresh: forceRefresh)
+    }
+    return all
+  }
+}
+
 @MainActor
 @Suite("A coordinator's tools, on the workspace (#352)")
 struct CoordinationToolsTests {
@@ -96,10 +124,12 @@ struct CoordinationToolsTests {
       coordination: .child(of: coordinator.id))
   }
 
-  private func makeModel(_ extra: [WorkSession] = []) async -> AppModel {
+  private func makeModel(
+    _ extra: [WorkSession] = [], agents: any AgentProviderResolving = OneAgentRegistry()
+  ) async -> AppModel {
     let model = AppModel(
       repository: CoordinationRepository([parent, other, alone] + extra),
-      agents: OneAgentRegistry(),
+      agents: agents,
       layout: WorkspaceLayoutController(
         store: RecordingLayoutStore(
           layout: WorkspaceLayout(sessionFilter: SessionFilter(column: .doing, sort: .manual))),
@@ -248,6 +278,72 @@ struct CoordinationToolsTests {
     // Listed under its coordinator, in the coordinator's column, not selected.
     #expect(model.visibleSessions.map(\.name).prefix(2) == ["V2", "#351 Dictation"])
     #expect(model.selectedSessionID != created.id)
+  }
+
+  private func coordinator(on agent: String) -> WorkSession {
+    WorkSession(
+      name: "Mother", agent: SessionAgentConfiguration(providerID: agent),
+      createdAt: Date(timeIntervalSince1970: 0), updatedAt: Date(timeIntervalSince1970: 100),
+      taskStatus: .doing, rank: 5, coordination: .coordinator)
+  }
+
+  /// Creates a child waiting in To Do, in a folder of its own, and gives the agent it was put on.
+  private func childAgent(
+    of mother: WorkSession, in model: AppModel, named agent: JSONValue?
+  ) async throws -> String? {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("coordination-\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let name = "Child \(UUID().uuidString)"
+    var arguments: [String: JSONValue] = [
+      "name": .string(name), "folder": .string(folder.path), "mission": "Fix it.", "start": false,
+    ]
+    arguments["agent"] = agent
+    let result = await call(model, "session_create", .object(arguments), as: mother.id)
+    #expect(!result.isError, "\(text(result))")
+    return try #require(model.sessions.first { $0.name == name }).agent?.providerID
+  }
+
+  @Test("A child with no agent named runs its coordinator's, on its account")
+  func childStaysOnTheAccount() async throws {
+    let onAccount = coordinator(on: TwoAccountsRegistry.account)
+    let onDefault = coordinator(on: "claude-code")
+    let model = await makeModel([onAccount, onDefault], agents: TwoAccountsRegistry())
+
+    #expect(
+      try await childAgent(of: onAccount, in: model, named: nil) == TwoAccountsRegistry.account)
+    #expect(try await childAgent(of: onDefault, in: model, named: nil) == "claude-code")
+  }
+
+  @Test("Another account the user asked for is still given")
+  func namedAccountIsGiven() async throws {
+    let mother = coordinator(on: "claude-code")
+    let model = await makeModel([mother], agents: TwoAccountsRegistry())
+
+    let agent = try await childAgent(
+      of: mother, in: model, named: .string(TwoAccountsRegistry.account))
+    #expect(agent == TwoAccountsRegistry.account)
+  }
+
+  @Test("agents_list says which agent is the coordinator's, and that an account is the user's")
+  func listedAgentsAreMarked() async {
+    let onDefault = coordinator(on: "claude-code")
+    let onAccount = coordinator(on: TwoAccountsRegistry.account)
+    let model = await makeModel([onDefault, onAccount], agents: TwoAccountsRegistry())
+
+    let fromDefault = text(await call(model, "agents_list", as: onDefault.id))
+    #expect(fromDefault.contains("- claude-code: Claude Code (your own, the default for a child)"))
+    #expect(
+      fromDefault.contains(
+        "- \(TwoAccountsRegistry.account): Claude Work (another account of the user's, only when they ask for it)"
+      ))
+
+    let fromAccount = text(await call(model, "agents_list", as: onAccount.id))
+    #expect(fromAccount.contains("- claude-code: Claude Code; models"))
+    #expect(
+      fromAccount.contains(
+        "- \(TwoAccountsRegistry.account): Claude Work (your own, the default for a child)"))
   }
 
   @Test("A folder that does not exist is refused before anything is created")
