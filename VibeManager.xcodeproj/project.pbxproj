@@ -607,11 +607,15 @@
 			inputFileListPaths = (
 			);
 			inputPaths = (
+				"$(SRCROOT)/Scripts/device-mirror/sim-bridge.m",
+				"$(SRCROOT)/Scripts/device-mirror/emu-bridge.m",
 			);
 			name = "Build the device bridges";
 			outputFileListPaths = (
 			);
 			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/sim-bridge",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/emu-bridge",
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
