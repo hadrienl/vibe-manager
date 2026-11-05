@@ -29,7 +29,7 @@ final class CompanionModel {
   /// The endpoint this launch already wrote.
   private var registeredEndpointID: String?
   /// The whole zone, as the last update had it: what `remove(_:)` looks through.
-  private var records: [CompanionRecord] = []
+  @ObservationIgnored private var records: [CompanionRecord] = []
 
   init(sync: any CompanionSyncing, deviceName: String) {
     self.sync = sync

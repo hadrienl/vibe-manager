@@ -121,6 +121,15 @@ final class RemoteChannel {
     macProtocolVersion = nil
   }
 
+  /// The Mac this channel last spoke to left the list (#521). `close` keeps what it said, for the
+  /// list to stay as it was across a reconnection; here no reconnection may ever replace it.
+  func forgetMac() {
+    macName = nil
+    sessions = []
+    conversation = nil
+    shownSessionID = nil
+  }
+
   private func connect(endpointID: String, relay: String?, attempt: Int) async {
     do {
       let endpoint = try await Endpoint.bind(

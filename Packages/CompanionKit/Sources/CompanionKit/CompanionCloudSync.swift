@@ -410,6 +410,11 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
         fail("envoi de \(id.recordName)", failure.error)
       }
     }
+    // A record already gone is what was asked. The entry left when the deletion was queued, so a
+    // removal that stays in iCloud shows nowhere else than here.
+    for (id, error) in sent.failedRecordDeletes where error.code != .unknownItem {
+      fail("suppression de \(id.recordName)", error)
+    }
     engine.state.add(pendingDatabaseChanges: zones)
     engine.state.add(pendingRecordZoneChanges: retry)
     persist()
@@ -443,7 +448,7 @@ public actor CompanionCloudSync: CompanionSyncing, CKSyncEngineDelegate {
     case .sentDatabaseChanges(let sent):
       "sentDatabaseChanges \(sent.savedZones.count) saved, \(sent.failedZoneSaves.count) failed"
     case .sentRecordZoneChanges(let sent):
-      "sentRecordZoneChanges \(sent.savedRecords.count) saved, \(sent.deletedRecordIDs.count) deleted, \(sent.failedRecordSaves.count) failed"
+      "sentRecordZoneChanges \(sent.savedRecords.count) saved, \(sent.deletedRecordIDs.count) deleted, \(sent.failedRecordSaves.count + sent.failedRecordDeletes.count) failed"
     case .willFetchChanges: "willFetchChanges"
     case .willFetchRecordZoneChanges: "willFetchRecordZoneChanges"
     case .didFetchRecordZoneChanges(let done):

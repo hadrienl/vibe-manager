@@ -41,9 +41,7 @@ struct SettingsSheet: View {
             }
             .swipeActions(edge: .trailing, allowsFullSwipe: false) {
               if canRemove(mac) {
-                Button("Remove", systemImage: "trash", role: .destructive) {
-                  Task { await model.remove(mac) }
-                }
+                Button("Remove", systemImage: "trash", role: .destructive) { remove(mac) }
               } else {
                 // Gray rather than `.disabled`, which would take the explanation with the touch.
                 Button("Remove", systemImage: "trash") { showsStillConnected = true }
@@ -89,17 +87,23 @@ struct SettingsSheet: View {
     }
   }
 
-  /// A Mac that is there would write itself back by its next heartbeat, so only one that is not can
-  /// go (#521). The channel counts too: a Mac's record can lag behind, iOS delaying its pushes.
+  /// `model.now`, not `Date()`: the clock that redraws the sheet, so that a Mac past the tolerance
+  /// turns removable while it is open.
   private func canRemove(_ mac: CompanionMac) -> Bool {
-    let isChannelUp =
-      model.selectedMac?.installationID == mac.installationID && channel.phase == .connected
-    return !isChannelUp && !CompanionPresence.isConnected(mac, now: Date())
+    CompanionMacRemoval.isAllowed(mac, isChannelUp: isChannelUp(to: mac), now: model.now)
+  }
+
+  private func isChannelUp(to mac: CompanionMac) -> Bool {
+    model.selectedMac?.installationID == mac.installationID && channel.phase == .connected
+  }
+
+  private func remove(_ mac: CompanionMac) {
+    if model.selectedMac?.installationID == mac.installationID { channel.forgetMac() }
+    Task { await model.remove(mac) }
   }
 
   private func state(of mac: CompanionMac) -> String {
-    let isSelected = model.selectedMac?.installationID == mac.installationID
-    if isSelected, channel.phase == .connected {
+    if isChannelUp(to: mac) {
       switch channel.path {
       case .direct: return String(localized: "Connected · direct")
       case .relay: return String(localized: "Connected · through a relay")

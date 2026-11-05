@@ -141,3 +141,30 @@ func macRemoval() {
     ])
   #expect(CompanionMacRemoval.recordNames(macID: "gone", among: records).isEmpty)
 }
+
+@Test("Only a Mac that is not there can be removed, whatever its record says of it")
+func macRemovalAllowed() {
+  let tolerance = CompanionPresence.tolerance
+  func isAllowed(online: Bool, seen: TimeInterval, isChannelUp: Bool = false) -> Bool {
+    CompanionMacRemoval.isAllowed(
+      mac(online: online, seen: seen), isChannelUp: isChannelUp, now: now)
+  }
+  #expect(!isAllowed(online: true, seen: 60))
+  #expect(!isAllowed(online: true, seen: tolerance - 1))
+  #expect(isAllowed(online: true, seen: tolerance + 1))
+  #expect(isAllowed(online: false, seen: 60))
+  // The channel is up while the record lags behind: the Mac is there.
+  #expect(!isAllowed(online: false, seen: 60, isChannelUp: true))
+  #expect(!isAllowed(online: true, seen: tolerance + 1, isChannelUp: true))
+}
+
+@Test("A Mac is listed by its own record, not by another Mac's or by what it left")
+func macRemovalListed() {
+  let session = CompanionSession(
+    id: "1", macID: "A", title: "", agent: "", state: .working, updatedAt: now)
+  let listed: [CompanionRecord] = [.session(session), .mac(mac(online: true, seen: 0))]
+  #expect(CompanionMacRemoval.isListed(macID: "A", among: listed))
+  #expect(!CompanionMacRemoval.isListed(macID: "B", among: listed))
+  #expect(!CompanionMacRemoval.isListed(macID: "A", among: [.session(session)]))
+  #expect(!CompanionMacRemoval.isListed(macID: "A", among: []))
+}

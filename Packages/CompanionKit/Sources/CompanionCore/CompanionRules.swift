@@ -152,6 +152,20 @@ public enum CompanionSessionMerge {
 
 /// What goes when the user takes a Mac off the phone's list (#521).
 public enum CompanionMacRemoval {
+  /// A Mac that is there would write itself back by its next heartbeat, so only one that is not can
+  /// go. The channel counts too: a Mac's record can lag behind, iOS delaying its pushes.
+  public static func isAllowed(_ mac: CompanionMac, isChannelUp: Bool, now: Date) -> Bool {
+    !isChannelUp && !CompanionPresence.isConnected(mac, now: now)
+  }
+
+  /// Whether the Mac still has its record: the running one writes it back when it does not.
+  public static func isListed(macID: String, among records: [CompanionRecord]) -> Bool {
+    records.contains {
+      if case .mac(let mac) = $0 { return mac.installationID == macID }
+      return false
+    }
+  }
+
   /// The Mac's record and what it left in the zone: each Mac purges its own alone, so what an
   /// installation that is gone wrote stays there otherwise. Pings are addressed to no Mac in
   /// particular, and the phones are not a Mac's.
