@@ -9,6 +9,7 @@ struct SettingsSheet: View {
   @Environment(RemoteChannel.self) private var channel
   @Environment(\.dismiss) private var dismiss
   @Environment(\.openURL) private var openURL
+  @State private var showsStillConnected = false
 
   var body: some View {
     @Bindable var model = model
@@ -43,6 +44,10 @@ struct SettingsSheet: View {
                 Button("Remove", systemImage: "trash", role: .destructive) {
                   Task { await model.remove(mac) }
                 }
+              } else {
+                // Gray rather than `.disabled`, which would take the explanation with the touch.
+                Button("Remove", systemImage: "trash") { showsStillConnected = true }
+                  .tint(.gray)
               }
             }
           }
@@ -67,6 +72,12 @@ struct SettingsSheet: View {
             CompanionScreen()
           }
         }
+      }
+      .alert("This Mac Is Still Connected", isPresented: $showsStillConnected) {
+      } message: {
+        Text(
+          "Vibe Manager is running on this Mac and would put it back in the list. Quit it there first. If it has already stopped, try again in a while."
+        )
       }
       .navigationTitle("Settings")
       .navigationBarTitleDisplayMode(.inline)

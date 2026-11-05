@@ -18092,6 +18092,107 @@
         }
       }
     },
+    "This Mac Is Still Connected" : {
+      "comment" : "Title of the alert shown when a Mac of the settings’ list can’t be removed: Vibe Manager still runs on it.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ce Mac est encore connecté"
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "هذا الـMac لا يزال متصلاً"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Dieser Mac ist noch verbunden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este Mac sigue conectado"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "यह Mac अभी भी कनेक्टेड है"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Questo Mac è ancora connesso"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacはまだ接続されています"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac은 아직 연결되어 있어요"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Deze Mac is nog verbonden"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Ten Mac jest nadal połączony"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Este Mac ainda está conectado"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Этот Mac всё ещё подключён"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bu Mac hâlâ bağlı"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Цей Mac досі підключений"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 仍处于连接状态"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 仍處於連線狀態"
+          }
+        }
+      }
+    },
     "This name can’t be used for a folder." : {
       "comment" : "Failure when creating a folder.",
       "localizations" : {
@@ -19300,6 +19401,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "Vibe Manager"
+          }
+        }
+      }
+    },
+    "Vibe Manager is running on this Mac and would put it back in the list. Quit it there first. If it has already stopped, try again in a while." : {
+      "comment" : "The alert shown when a Mac of the settings’ list can’t be removed. “It” is Vibe Manager; “try again in a while”: a Mac that stopped without saying so counts as connected for 20 minutes.",
+      "localizations" : {
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager tourne sur ce Mac et le remettrait dans la liste. Quittez-le d’abord. S’il est déjà arrêté, réessayez un peu plus tard."
+          }
+        },
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "يعمل Vibe Manager على هذا الـMac وسيعيده إلى القائمة. أغلقه هناك أولاً. وإذا كان قد توقف بالفعل، فحاول مرة أخرى بعد قليل."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager läuft auf diesem Mac und würde ihn wieder in die Liste aufnehmen. Beende es zuerst dort. Falls es schon beendet ist, versuch es etwas später noch einmal."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager se está ejecutando en este Mac y volvería a ponerlo en la lista. Ciérralo allí primero. Si ya se ha detenido, inténtalo de nuevo más tarde."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager इस Mac पर चल रहा है और इसे सूची में वापस जोड़ देगा। पहले उसे वहाँ बंद करो। अगर वह पहले ही रुक चुका है, तो थोड़ी देर बाद फिर कोशिश करो।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager è in esecuzione su questo Mac e lo rimetterebbe nell’elenco. Prima chiudilo lì. Se si è già arrestato, riprova tra un po’."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "このMacではVibe Managerが実行中で、リストに再び表示されます。先にMacでVibe Managerを終了してください。すでに停止している場合は、しばらくしてからもう一度お試しください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이 Mac에서 Vibe Manager가 실행 중이라 목록에 다시 나타나요. 먼저 Mac에서 종료해 주세요. 이미 멈췄다면 잠시 후 다시 시도해 주세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager draait op deze Mac en zou hem weer in de lijst zetten. Sluit het daar eerst af. Is het al gestopt, probeer het dan later opnieuw."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager działa na tym Macu i dodałby go z powrotem do listy. Najpierw zamknij go na Macu. Jeśli już się zatrzymał, spróbuj ponownie za jakiś czas."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O Vibe Manager está em execução neste Mac e o colocaria de volta na lista. Encerre-o lá primeiro. Se ele já parou, tente de novo daqui a pouco."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На этом Mac работает Vibe Manager, и он снова добавит его в список. Сначала закрой его на Mac. Если он уже остановлен, попробуй ещё раз чуть позже."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager bu Mac’te çalışıyor ve onu yeniden listeye ekler. Önce orada kapat. Zaten durduysa biraz sonra yeniden dene."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "На цьому Mac працює Vibe Manager, і він знову додасть його до списку. Спочатку закрийте його на Mac. Якщо він уже зупинився, спробуйте ще раз трохи згодом."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "这台 Mac 上正在运行 Vibe Manager，它会重新出现在列表中。请先在 Mac 上退出 Vibe Manager。如果已经停止，请稍后再试。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "這台 Mac 上正在執行 Vibe Manager，它會重新出現在列表中。請先在 Mac 上結束 Vibe Manager。如果已經停止，請稍後再試一次。"
           }
         }
       }
