@@ -290,6 +290,20 @@ final class CompanionAgent {
     }
     answerTests()
     giveAnswers()
+    restoreMacIfRemoved()
+  }
+
+  /// The phone took this Mac off its list (#521): it is back at once, not at the next heartbeat.
+  /// The deletion can also reach a launch whose first write waits to be sent, which it cancels.
+  private func restoreMacIfRemoved() {
+    guard let installation, !isDeparting,
+      !records.contains(where: { $0.recordName == CompanionRecordName.mac(installation.id) })
+    else { return }
+    Self.logger.notice("the Mac's record is gone: written again")
+    Task {
+      await writeMac(online: true)
+      sendSoon()
+    }
   }
 
   /// The answers the phone wrote from a notification (#401): handed to the application, which

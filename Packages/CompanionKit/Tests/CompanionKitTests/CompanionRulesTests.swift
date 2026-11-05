@@ -105,3 +105,39 @@ func testRunStages() {
   #expect(!tookTwice)
   #expect(run.roundTrip == 4)
 }
+
+@Test("Removing a Mac takes what it left in the zone, and nothing of another Mac's or of the phone")
+func macRemoval() {
+  func session(_ id: String, of macID: String) -> CompanionRecord {
+    .session(
+      CompanionSession(id: id, macID: macID, title: "", agent: "", state: .working, updatedAt: now))
+  }
+  func request(_ id: String, of macID: String) -> CompanionRecord {
+    .request(
+      CompanionRequest(
+        id: id, macID: macID, sessionTitle: "", agent: "", text: "", createdAt: now))
+  }
+  let other = CompanionMac(
+    installationID: "B", name: "iMac", version: "1.0.2", buildLabel: "", online: true,
+    lastSeen: now)
+  let records: [CompanionRecord] = [
+    .mac(mac(online: false, seen: 3600)),
+    session("1", of: "A"),
+    request("2", of: "A"),
+    .pong(CompanionPong(nonce: "3", macID: "A", receivedAt: now)),
+    .answer(
+      CompanionAnswer(
+        id: "4", macID: "A", sessionID: "1", requestID: "2", choice: .deny, createdAt: now)),
+    .mac(other),
+    session("5", of: "B"),
+    request("6", of: "B"),
+    .pong(CompanionPong(nonce: "7", macID: "B", receivedAt: now)),
+    .ping(CompanionPing(nonce: "8", deviceName: "iPhone", sentAt: now)),
+    .device(CompanionDevice(endpointID: "9", name: "iPhone", addedAt: now)),
+  ]
+  #expect(
+    CompanionMacRemoval.recordNames(macID: "A", among: records) == [
+      "answer-4", "mac-A", "pong-3", "request-2", "session-1",
+    ])
+  #expect(CompanionMacRemoval.recordNames(macID: "gone", among: records).isEmpty)
+}

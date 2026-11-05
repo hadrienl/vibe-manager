@@ -13851,7 +13851,7 @@
       }
     },
     "Remove" : {
-      "comment" : "Removes a file joined to the next message.",
+      "comment" : "Removes a file joined to the next message, or a Mac from the list in the settings.",
       "localizations" : {
         "fr" : {
           "stringUnit" : {

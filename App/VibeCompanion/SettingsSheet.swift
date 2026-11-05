@@ -38,6 +38,13 @@ struct SettingsSheet: View {
                   .foregroundStyle(.secondary)
               }
             }
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+              if canRemove(mac) {
+                Button("Remove", systemImage: "trash", role: .destructive) {
+                  Task { await model.remove(mac) }
+                }
+              }
+            }
           }
         } header: {
           Text("Mac")
@@ -69,6 +76,14 @@ struct SettingsSheet: View {
         }
       }
     }
+  }
+
+  /// A Mac that is there would write itself back by its next heartbeat, so only one that is not can
+  /// go (#521). The channel counts too: a Mac's record can lag behind, iOS delaying its pushes.
+  private func canRemove(_ mac: CompanionMac) -> Bool {
+    let isChannelUp =
+      model.selectedMac?.installationID == mac.installationID && channel.phase == .connected
+    return !isChannelUp && !CompanionPresence.isConnected(mac, now: Date())
   }
 
   private func state(of mac: CompanionMac) -> String {
