@@ -1,4 +1,4 @@
-// POC #480. One Android emulator's screen as H.264 on stdout, its touches from stdin: the same
+// One Android emulator's screen as H.264 on stdout, its touches from stdin: the same
 // protocol as sim-bridge, over the emulator's public gRPC API. No gRPC library: HTTP/2 without TLS
 // is a few frames, and only what these two calls need is here (headers of responses are not read).
 //

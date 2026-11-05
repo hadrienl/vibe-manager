@@ -369,6 +369,7 @@
 				D00000000000000000000001 /* Frameworks */,
 				D00000000000000000000002 /* Resources */,
 				D0000000000000000000000C /* Embed the companion agent */,
+				D0000000000000000000480A /* Build the device bridges */,
 			);
 			buildRules = (
 			);
@@ -597,6 +598,24 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "# An ad-hoc signature gets a new code identity at every build, and macOS keys privacy\n# permissions to that identity: Full Disk Access, and every folder ever allowed, are asked for\n# again after each compilation. Warned rather than failed: a fresh clone must still build.\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -z \"${DEVELOPMENT_TEAM}\" ]; then\n  echo \"warning: No DEVELOPMENT_TEAM, so this build is signed ad hoc and macOS will forget every permission granted to it at the next build. Copy Configuration/Local.xcconfig.example to Configuration/Local.xcconfig and put your team in it.\"\nfi\n";
+		};
+		D0000000000000000000480A /* Build the device bridges */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Build the device bridges";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The bridges to the simulators and emulators (#480): processes of their own, next to the\n# executable, signed before the application is.\nset -e\nout=\"${TARGET_BUILD_DIR}/${EXECUTABLE_FOLDER_PATH}\"\narches=\"\"\nfor arch in ${ARCHS}; do arches=\"$arches -arch $arch\"; done\ncommon=\"-fobjc-arc -O2 -w $arches -framework Foundation -framework VideoToolbox -framework CoreMedia -framework CoreVideo\"\nxcrun clang $common -framework IOSurface \"${SRCROOT}/Scripts/device-mirror/sim-bridge.m\" -o \"$out/sim-bridge\"\nxcrun clang $common -framework Accelerate \"${SRCROOT}/Scripts/device-mirror/emu-bridge.m\" -o \"$out/emu-bridge\"\nidentity=\"${EXPANDED_CODE_SIGN_IDENTITY:--}\"\ncodesign --force --options runtime --timestamp=none --sign \"$identity\" \"$out/sim-bridge\"\ncodesign --force --options runtime --timestamp=none --sign \"$identity\" \"$out/emu-bridge\"\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 

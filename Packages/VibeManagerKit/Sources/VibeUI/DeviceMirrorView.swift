@@ -3,7 +3,7 @@ import AppKit
 import SwiftUI
 import VibeBrowser
 
-/// POC #480: a simulator in a tab of the web view. `sim-bridge`, a process of its own, holds the
+/// A simulator in a tab of the web view. `sim-bridge`, a process of its own, holds the
 /// private frameworks; this view shows its H.264 and sends it the mouse as touches.
 struct DeviceMirrorView: NSViewRepresentable {
   let udid: String
@@ -223,7 +223,7 @@ private final class DeviceMirrorSession: @unchecked Sendable {
 }
 
 /// The simulators running now, to open one in a tab.
-/// POC #480: beside the web view's button, what opens a simulator in one of its tabs.
+/// Beside the web view's button, what opens a simulator in one of its tabs.
 struct DeviceMirrorToolbarButton: View {
   let model: AppModel
   @State private var isShowingDevices = false
@@ -233,7 +233,7 @@ struct DeviceMirrorToolbarButton: View {
       isShowingDevices.toggle()
     } label: {
       Label {
-        Text(verbatim: "Simulateurs")
+        Text("Simulators", bundle: .module)
       } icon: {
         Image(systemName: "iphone")
       }
@@ -256,7 +256,7 @@ struct DeviceMirrorPicker: View {
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
       if let devices {
-        if devices.isEmpty { Text(verbatim: "Aucun simulateur ni émulateur démarré").padding(8) }
+        if devices.isEmpty { Text("No simulator or emulator running", bundle: .module).padding(8) }
         ForEach(devices, id: \.udid) { device in
           Button(device.name) { open(device.udid, device.name) }
             .buttonStyle(.borderless)

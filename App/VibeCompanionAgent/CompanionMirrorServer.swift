@@ -2,7 +2,7 @@ import CompanionCore
 import Foundation
 import IrohLib
 
-/// POC #480: the Mac's end of the simulator mirror. Each stream is a request of `CompanionMirror`;
+/// The Mac's end of the simulator mirror. Each stream is a request of `CompanionMirror`;
 /// `open` runs `sim-bridge`, next to the application's executable, for as long as the stream lasts.
 enum CompanionMirrorServer {
   static func serve(_ connection: Connection) async {
@@ -111,7 +111,7 @@ enum CompanionMirrorServer {
     return data
   }
 
-  /// POC #480: the Android emulators running now, as the emulator itself lists them. Their id is
+  /// The Android emulators running now, as the emulator itself lists them. Their id is
   /// `android-<gRPC port>`.
   private static func runningEmulators() -> [(id: String, name: String, token: String?)] {
     let folder = FileManager.default.homeDirectoryForCurrentUser

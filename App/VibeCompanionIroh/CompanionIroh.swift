@@ -15,7 +15,7 @@ enum CompanionIroh {
   static let alpn = Data(CompanionEcho.alpn.utf8)
   /// The direct channel's protocol (#399).
   static let remoteALPN = Data(CompanionRemote.alpn.utf8)
-  /// The simulators' mirror (POC #480).
+  /// The simulators' mirror.
   static let mirrorALPN = Data(CompanionMirror.alpn.utf8)
 
   /// n0's preset: their public relays (Community, without an account, for development) and their

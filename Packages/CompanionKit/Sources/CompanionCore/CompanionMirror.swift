@@ -1,6 +1,6 @@
 import Foundation
 
-/// POC #480: a simulator of the Mac on the phone, on a protocol of its own so that video never
+/// A simulator of the Mac on the phone, on a protocol of its own so that video never
 /// holds up the sessions' channel. The phone opens one stream per request, each message of it a
 /// `u8` length and a line: `list`, or `open <UDID>` followed by touches (`d|m|u x y`).
 /// `list` answers a `u32` length and JSON; `open` answers `sim-bridge`'s frames as they come.

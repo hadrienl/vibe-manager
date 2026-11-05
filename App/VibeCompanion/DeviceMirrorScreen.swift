@@ -4,7 +4,7 @@ import IrohLib
 import SwiftUI
 import UIKit
 
-/// POC #480: the simulators running on the Mac.
+/// The simulators running on the Mac.
 struct DeviceListScreen: View {
   @Environment(RemoteChannel.self) private var channel
   @State private var devices: [CompanionMirror.Device]?
@@ -13,7 +13,7 @@ struct DeviceListScreen: View {
   var body: some View {
     List {
       if let devices, devices.isEmpty {
-        Text(verbatim: "Aucun simulateur démarré sur le Mac")
+        Text("No simulator running on the Mac")
       }
       ForEach(devices ?? []) { device in
         NavigationLink(device.name) { DeviceMirrorScreen(device: device) }
@@ -21,7 +21,7 @@ struct DeviceListScreen: View {
       if let failure { Text(verbatim: failure).foregroundStyle(.secondary) }
     }
     .overlay { if devices == nil && failure == nil { ProgressView() } }
-    .navigationTitle(Text(verbatim: "Simulateurs"))
+    .navigationTitle("Simulators")
     .navigationBarTitleDisplayMode(.inline)
     .refreshable { await load() }
     .task { await load() }
@@ -60,7 +60,7 @@ struct DeviceMirrorScreen: View {
       if let failure = session.failure {
         VStack(spacing: 12) {
           Text(verbatim: failure).foregroundStyle(.white).multilineTextAlignment(.center)
-          Button { attempt += 1 } label: { Text(verbatim: "Reconnecter") }
+          Button { attempt += 1 } label: { Text("Reconnect") }
             .buttonStyle(.borderedProminent)
         }
         .padding()
@@ -79,6 +79,7 @@ struct DeviceMirrorScreen: View {
             .frame(width: 32, height: 32)
             .background(.black.opacity(0.45), in: Circle())
         }
+        .accessibilityLabel(Text("Exit Full Screen"))
         .padding(8)
       }
     }
@@ -90,6 +91,7 @@ struct DeviceMirrorScreen: View {
         } label: {
           Image(systemName: "arrow.up.left.and.arrow.down.right")
         }
+        .accessibilityLabel(Text("Full Screen"))
       }
     }
     .statusBarHidden(isFullScreen)
@@ -167,7 +169,6 @@ final class MirrorVideoView: UIView {
 @MainActor @Observable
 final class DeviceMirrorClient {
   var failure: String?
-  var status = "Connexion…"
   private(set) var videoSize: CGSize?
   @ObservationIgnored var video: AVSampleBufferDisplayLayer?
   @ObservationIgnored private var touches: AsyncStream<String>.Continuation?
@@ -179,7 +180,6 @@ final class DeviceMirrorClient {
   /// Until the task is cancelled or the stream fails.
   func run(udid: String, channel: RemoteChannel) async {
     failure = nil
-    status = "Connexion…"
     video?.sampleBufferRenderer.flush()
     do {
       let connection = try await channel.mirrorConnection()
@@ -199,22 +199,12 @@ final class DeviceMirrorClient {
         continuation.finish()
       }
       nonisolated(unsafe) let layer = video
-      let counter = FrameCounter()
-      let meter = Task { [weak self] in
-        while !Task.isCancelled {
-          try? await Task.sleep(for: .seconds(1))
-          let (frames, bytes) = counter.take()
-          self?.status =
-            "\(frames) i/s · \(bytes * 8 / 1000) kbit/s · \(CompanionIroh.describe(connection.paths()))"
-        }
-      }
-      defer { meter.cancel() }
       let receiving = stream.recv()
       let size: @Sendable (CGSize) async -> Void = { [weak self] size in
         await MainActor.run { self?.videoSize = size }
       }
       let receiver = Task.detached {
-        try await Self.receive(receiving, into: layer, counter: counter, size: size)
+        try await Self.receive(receiving, into: layer, size: size)
       }
       // Closing is what ends a read under way; a detached task does not hear the screen leave.
       try await withTaskCancellationHandler {
@@ -223,7 +213,7 @@ final class DeviceMirrorClient {
         receiver.cancel()
         try? connection.close(errorCode: 0, reason: Data())
       }
-      if !Task.isCancelled { failure = "Le simulateur ne répond plus." }
+      if !Task.isCancelled { failure = String(localized: "The simulator stopped responding.") }
     } catch {
       if !Task.isCancelled { failure = CompanionIroh.describe(error) }
     }
@@ -231,7 +221,7 @@ final class DeviceMirrorClient {
   }
 
   private nonisolated static func receive(
-    _ receiving: RecvStream, into layer: AVSampleBufferDisplayLayer?, counter: FrameCounter,
+    _ receiving: RecvStream, into layer: AVSampleBufferDisplayLayer?,
     size: @Sendable (CGSize) async -> Void
   ) async throws {
     nonisolated(unsafe) let layer = layer
@@ -239,7 +229,6 @@ final class DeviceMirrorClient {
     while !Task.isCancelled {
       let length = try await receiving.readExact(size: 4).reduce(0) { $0 << 8 | UInt32($1) }
       let payload = try await receiving.readExact(size: length)
-      counter.add(payload.count)
       guard let isKey = payload.first else { continue }
       var offset = 1
       if isKey != 0 {
@@ -329,25 +318,3 @@ final class DeviceMirrorClient {
   }
 }
 
-private final class FrameCounter: @unchecked Sendable {
-  private let lock = NSLock()
-  private var frames = 0
-  private var bytes = 0
-
-  func add(_ count: Int) {
-    lock.withLock {
-      frames += 1
-      bytes += count
-    }
-  }
-
-  func take() -> (Int, Int) {
-    lock.withLock {
-      defer {
-        frames = 0
-        bytes = 0
-      }
-      return (frames, bytes)
-    }
-  }
-}

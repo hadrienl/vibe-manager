@@ -93,12 +93,12 @@ struct ConversationView: View {
         Button("Web View", systemImage: "globe") { showsWeb = true }
       }
       ToolbarItem(placement: .topBarTrailing) {
-        // POC #480: a view of its own here, one view showing at a time on the phone.
+        // A view of its own here, one view showing at a time on the phone.
         Button {
           showsDevices = true
         } label: {
           Label {
-            Text(verbatim: "Simulateurs")
+            Text("Simulators")
           } icon: {
             Image(systemName: "iphone")
           }

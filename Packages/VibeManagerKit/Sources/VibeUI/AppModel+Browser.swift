@@ -124,7 +124,7 @@ extension AppModel {
     addressBarFocusRequest += 1
   }
 
-  /// POC #480: a simulator in a new tab.
+  /// A simulator in a new tab.
   func openDeviceTab(_ url: URL, title: String) {
     guard let browser, let id = selectedSessionID, isWebViewAvailable else { return }
     browser.open(url, in: id, openedBy: .user)

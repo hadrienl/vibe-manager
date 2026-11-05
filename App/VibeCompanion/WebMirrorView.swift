@@ -36,7 +36,7 @@ struct WebMirrorView: View {
       if let tab = activeTab, let url = URL(string: tab.url), url.scheme == "vibe-device",
         let id = url.host
       {
-        // POC #480: a tab on the Mac, a view of its own here.
+        // A tab on the Mac, a view of its own here.
         ContentUnavailableView {
           Label {
             Text(verbatim: tab.title)
@@ -47,7 +47,7 @@ struct WebMirrorView: View {
           NavigationLink {
             DeviceMirrorScreen(device: CompanionMirror.Device(id: id, name: tab.title))
           } label: {
-            Text(verbatim: "Ouvrir le simulateur")
+            Text("Open Simulator")
           }
           .buttonStyle(.borderedProminent)
         }

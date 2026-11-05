@@ -165,12 +165,12 @@ public final class BrowserTabModel: NSObject, Identifiable {
 
   public var isBlank: Bool { url == Self.blankPage }
 
-  /// POC #480: what the tab strip calls a simulator.
+  /// What the tab strip calls a simulator.
   public func nameDevice(_ name: String) {
     title = name
   }
 
-  /// POC #480: the simulator this tab shows instead of a page.
+  /// The simulator this tab shows instead of a page.
   public var deviceUDID: String? {
     url.scheme == "vibe-device" ? url.host : nil
   }

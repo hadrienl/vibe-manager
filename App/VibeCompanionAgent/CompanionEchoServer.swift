@@ -122,7 +122,7 @@ actor CompanionEchoServer {
       return
     }
     if connection.alpn() == CompanionIroh.mirrorALPN {
-      // POC #480: the same admission as the direct channel's.
+      // The same admission as the direct channel's.
       guard await authorize(connection.remoteId().description) else {
         try? connection.close(errorCode: 2, reason: Data("not paired".utf8))
         return

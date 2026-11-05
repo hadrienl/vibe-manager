@@ -53,8 +53,8 @@ struct BrowserPanel: View {
           }
           .buttonStyle(.plain)
           .padding(8)
-          .instantTooltip(Text(verbatim: "Arrêter le simulateur"))
-          .accessibilityLabel(Text(verbatim: "Arrêter le simulateur"))
+          .instantTooltip(Text("Stop Simulator", bundle: .module))
+          .accessibilityLabel(Text("Stop Simulator", bundle: .module))
         }
     } else if let tab = browser.activeTab {
       ZStack {

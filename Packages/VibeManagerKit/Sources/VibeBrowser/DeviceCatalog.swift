@@ -1,6 +1,6 @@
 import Foundation
 
-/// POC #480: the simulators and emulators running on this Mac, which a tab can show.
+/// The simulators and emulators running on this Mac, which a tab can show.
 public enum DeviceCatalog {
   public struct Device: Sendable, Hashable {
     /// A simulator's UDID, or `android-<gRPC port>`.

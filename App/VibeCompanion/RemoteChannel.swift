@@ -250,7 +250,7 @@ final class RemoteChannel {
     sending.enqueue(RemoteFrame.encode(message))
   }
 
-  /// POC #480: a connection of the simulators' mirror, beside the sessions' channel.
+  /// A connection of the simulators' mirror, beside the sessions' channel.
   func mirrorConnection() async throws -> Connection {
     guard let endpoint, let macAddress else { throw CancellationError() }
     let address = EndpointAddr(

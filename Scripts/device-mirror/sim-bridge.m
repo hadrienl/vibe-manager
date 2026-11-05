@@ -1,4 +1,4 @@
-// POC #480. One simulator's screen as H.264 on stdout, its touches from stdin; it holds Apple's
+// One simulator's screen as H.264 on stdout, its touches from stdin; it holds Apple's
 // private frameworks so that the application never loads them, and leaves when stdin closes.
 //
 //   sim-bridge <UDID>
