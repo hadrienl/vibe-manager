@@ -121,6 +121,19 @@ struct CompanionWebMirrorTests {
     #expect(!CompanionWebMirror.isReadable(key, in: [home]))
   }
 
+  @Test("Nothing in ~/Library is opened: browsers' profiles, iCloud Drive")
+  func library() {
+    let library = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library")
+    for folder in [
+      "Application Support", "Application Support/Google/Chrome/Default",
+      "Mobile Documents/com~apple~CloudDocs", "Mobile Documents/com~apple~CloudDocs/Site",
+    ].map(library.appendingPathComponent) {
+      #expect(CompanionWebMirror.isTooBroad(folder.path), "\(folder.path)")
+      let page = folder.appendingPathComponent("index.html")
+      #expect(!CompanionWebMirror.isReadable(page, in: [folder]), "\(page.path)")
+    }
+  }
+
   @Test("A file not sent answers with its status, the channel stays up")
   func statuses() async throws {
     let (root, artifact) = try folder()

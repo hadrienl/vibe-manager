@@ -159,7 +159,7 @@ final class CompanionWebMirror {
   /// A path as the system spells a file once open, every link resolved. Not
   /// `resolvingSymlinksInPath`, which drops `/private` from `/private/tmp`. A file that does not
   /// exist keeps its name under its folder's real path.
-  nonisolated private static func canonical(_ url: URL) -> URL {
+  nonisolated static func canonical(_ url: URL) -> URL {
     let path = url.standardizedFileURL
     if let real = realpath(path.path, nil) {
       defer { free(real) }
@@ -171,7 +171,8 @@ final class CompanionWebMirror {
   }
 
   /// Whether a folder holds too much else to be opened to the phone for a page in it: the top of
-  /// the disk, the shared temporary folders, the home folder and what sits right in it.
+  /// the disk, the shared temporary folders, the home folder and what sits right in it, and
+  /// anything in `~/Library`.
   nonisolated static func isTooBroad(_ path: String) -> Bool {
     func resolved(_ path: String) -> String {
       canonical(URL(fileURLWithPath: path)).path
@@ -179,10 +180,17 @@ final class CompanionWebMirror {
     let folder = resolved(path)
     let home = resolved(NSHomeDirectory())
     let temporary = ["/tmp", "/var/tmp", NSTemporaryDirectory()].map(resolved)
-    if temporary.contains(folder) { return true }
+    if temporary.contains(folder) || isInLibrary(folder) { return true }
     if URL(fileURLWithPath: folder).pathComponents.count <= 3 { return true }
     return home == folder || home.hasPrefix(folder + "/")
       || URL(fileURLWithPath: folder).deletingLastPathComponent().path == home
+  }
+
+  /// Whether a path, links resolved, is in `~/Library`: the browsers' profiles and cookies, the
+  /// other applications' data, iCloud Drive. Never the phone's to read or write in.
+  nonisolated static func isInLibrary(_ path: String) -> Bool {
+    let library = canonical(URL(fileURLWithPath: NSHomeDirectory())).path + "/Library/"
+    return (canonical(URL(fileURLWithPath: path)).path + "/").hasPrefix(library)
   }
 
   /// Whether a path, links and `..` already resolved, lies in one of `folders` and is no hidden
