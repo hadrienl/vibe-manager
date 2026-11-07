@@ -235,19 +235,50 @@ struct CoordinatorArchiveTests {
 
   private func workspaceStartingOneChild() -> (AppModel, SessionLauncher, WatchedRepository) {
     let children = pair.map { child($0.name, column: $0.column) }
+    return workspace([coordinator] + children) { [coordinatorID] archived in
+      archived == coordinatorID ? [] : children.filter { $0.id != archived }
+    }
+  }
+
+  /// A workspace on `sessions` where, the first time a session `starts` answers for is written
+  /// archived, the sessions it answers are started again.
+  private func workspace(
+    _ sessions: [WorkSession],
+    startingOnArchive starts: @escaping @Sendable (SessionID) -> [WorkSession]
+  ) -> (AppModel, SessionLauncher, WatchedRepository) {
     let moment = ArchiveMoment()
-    let repository = WatchedRepository([coordinator] + children) { session in
-      guard session.status == .archived, session.id != coordinatorID else { return }
+    let repository = WatchedRepository(sessions) { session in
+      guard session.status == .archived, !starts(session.id).isEmpty else { return }
       await moment.reached(session.id)
     }
     let (model, launcher) = makeWorkspace(on: repository)
-    let plans = Dictionary(uniqueKeysWithValues: children.map { ($0.id, plan(for: $0)) })
+    let plans = Dictionary(uniqueKeysWithValues: sessions.map { ($0.id, plan(for: $0)) })
     moment.action = { archived in
-      guard let other = children.first(where: { $0.id != archived }), let plan = plans[other.id]
-      else { return }
-      await launcher.launch(session: other, plan: plan)
+      for session in starts(archived) {
+        guard let plan = plans[session.id] else { continue }
+        await launcher.launch(session: session, plan: plan)
+      }
     }
     return (model, launcher, repository)
+  }
+
+  @Test("In a selection, a child that only follows is looked at again; one chosen goes as asked")
+  func selectionLooksAgainAtFollowers() async throws {
+    let chosen = child("TICKET-185", column: .done)
+    let follower = child("TICKET-186", column: .doing)
+    // Both started again while the coordinator, archived first, is written.
+    let (model, launcher, repository) = workspace([coordinator, chosen, follower]) {
+      [coordinatorID] archived in archived == coordinatorID ? [chosen, follower] : []
+    }
+    await model.load()
+
+    await model.performBatch(
+      model.batchPlan(.archive, for: [coordinatorID, chosen.id]), skipsAnnounced: true)
+
+    #expect(await repository.session(id: coordinatorID)?.status == .archived)
+    #expect(await repository.session(id: chosen.id)?.status == .archived)
+    #expect(launcher.isRunning(follower.id))
+    #expect(await repository.session(id: follower.id)?.status == .active)
   }
 
   /// One child archived, the other running, out of the archive.
@@ -317,6 +348,25 @@ struct CoordinatorArchiveTests {
     #expect(name == "Reds")
     #expect(await repository.session(id: protected.id)?.status == .closed)
     #expect(await store.load().rules.first?.lastRun?.archived == 2)
+  }
+
+  @Test("A rule archives a coordinator before a child it names itself, which comes back with it")
+  func ruleArchivesCoordinatorFirst() async throws {
+    var coordinator = self.coordinator
+    // Done after its child: by their dates in Done alone, the child would go first.
+    try coordinator.setTaskStatus(.doing, at: created.addingTimeInterval(2 * 3600), cause: .user)
+    try coordinator.setTaskStatus(.done, at: created.addingTimeInterval(3 * 3600), cause: .user)
+    let red = child("TICKET-185", column: .done, color: "#B42318")
+    let (model, _, repository) = makeWorkspace([coordinator, red])
+    _ = rules(protecting: [], on: model)
+    await model.load()
+
+    await model.runArchiveRules()
+    #expect(await repository.session(id: red.id)?.status == .archived)
+    await model.restore(coordinatorID)
+
+    #expect(await repository.session(id: coordinatorID)?.status == .closed)
+    #expect(await repository.session(id: red.id)?.status == .closed)
   }
 
   @Test("A protection that reads Git reads the children's folders, whatever their column")

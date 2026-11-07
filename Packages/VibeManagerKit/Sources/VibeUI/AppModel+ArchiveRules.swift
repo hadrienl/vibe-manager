@@ -209,7 +209,9 @@ extension AppModel {
         // Reading Git and archiving take time: the user may have started, moved or protected a
         // session since the plan. Each is looked at again, as it stands now, right before.
         await reload()
-        for id in plan.archived {
+        // A coordinator before its children, whatever their dates in Done (#525).
+        let (leading, following) = coordinatorsFirst(plan.archived)
+        for id in leading + following {
           guard var live = archiveCandidates().first(where: { $0.id == id }) else { continue }
           // Its folder too: a file changed since the plan keeps a session with changes.
           if readsGit {

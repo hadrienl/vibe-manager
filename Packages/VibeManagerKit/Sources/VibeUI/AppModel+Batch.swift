@@ -399,14 +399,21 @@ extension AppModel {
       }
       // A coordinator's children once it is archived: archived after it, they come back with it
       // when it is unarchived (#525).
-      let leaving = Set(eligible)
-      let followers = eligible.filter { id in
-        sessions.first { $0.id == id }?.coordination?.coordinatorID.map(leaving.contains) == true
-      }
-      for wave in [eligible.filter { !followers.contains($0) }, followers] {
+      let (leading, following) = coordinatorsFirst(eligible)
+      let chosen = Set(current.eligible)
+      for wave in [leading, following] {
         results.merge(
-          await concurrently(wave) {
-            await $0.archiveInBatch($1, recordsByHand: !together)
+          await concurrently(wave) { model, id in
+            // One that only follows its coordinator is looked at again, the coordinator's stop
+            // waited out: started meanwhile, it stays. One the user chose goes, as asked.
+            if !chosen.contains(id),
+              let coordinator = model.sessions.first(where: { $0.id == id })?.coordination?
+                .coordinatorID,
+              !model.followsArchive(id, of: coordinator)
+            {
+              return .skipped(.stillRunning)
+            }
+            return await model.archiveInBatch(id, recordsByHand: !together)
           }
         ) { $1 }
       }

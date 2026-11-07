@@ -1115,6 +1115,16 @@ extension AppModel {
     childrenFollowingArchive(of: id).contains { $0.id == child }
   }
 
+  /// Sessions to archive, the children whose coordinator is among them apart: archived after it,
+  /// a child comes back with it when it is unarchived (#525).
+  func coordinatorsFirst(_ ids: [SessionID]) -> (leading: [SessionID], following: [SessionID]) {
+    let leaving = Set(ids)
+    let following = ids.filter { id in
+      sessions.first { $0.id == id }?.coordination?.coordinatorID.map(leaving.contains) == true
+    }
+    return (ids.filter { !following.contains($0) }, following)
+  }
+
   /// Archives the children of a coordinator the user just archived (#525), as they would one by
   /// one. Those archived, as they stood before: ⌘Z brings them back with it.
   func archiveChildren(of id: SessionID, recordsByHand: Bool = true) async -> [WorkSession] {
