@@ -54,19 +54,25 @@ public final class TranscriptLocationCache: @unchecked Sendable {
       return known
     }
     let name = "\(identifier).jsonl"
+    let roots = locator.allClaudeProjects
     if let workingDirectory {
-      let direct = locator.claudeProjects
-        .appendingPathComponent(Self.claudeFolderName(for: workingDirectory))
-        .appendingPathComponent(name)
-      if manager.fileExists(atPath: direct.path) {
-        remember(claude: direct, for: identifier)
-        return direct
+      for root in roots {
+        let direct =
+          root
+          .appendingPathComponent(Self.claudeFolderName(for: workingDirectory))
+          .appendingPathComponent(name)
+        if manager.fileExists(atPath: direct.path) {
+          remember(claude: direct, for: identifier)
+          return direct
+        }
       }
     }
     if known == nil, let missed, moment.timeIntervalSince(missed) < missRetry { return nil }
-    let folders = Signposts.interval("transcripts.list") { locator.list(locator.claudeProjects) }
+    let folders = Signposts.interval("transcripts.list") {
+      roots.flatMap { locator.list($0) ?? [] }
+    }
     guard
-      let found = (folders ?? []).lazy.map({ $0.appendingPathComponent(name) })
+      let found = folders.lazy.map({ $0.appendingPathComponent(name) })
         .first(where: { manager.fileExists(atPath: $0.path) })
     else {
       lock.withLock {

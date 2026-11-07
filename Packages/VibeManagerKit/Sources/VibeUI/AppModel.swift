@@ -436,6 +436,14 @@ public final class AppModel {
   /// When each agent was last signed in from here: a session stopped on its sign-in before that
   /// only waits to be resumed.
   var signedInAt: [AgentProviderID: Date] = [:]
+  /// The address each agent's CLI last said it uses (#478), for its page of the settings.
+  public internal(set) var signedInAddresses: [AgentProviderID: String] = [:]
+  /// The accounts expected of the agents (#478).
+  public var signedInAccounts = SignedInAccountMemory()
+  /// The extra accounts of the agents (#478).
+  public var agentAccounts: AgentAccountsSettingsModel?
+  /// The agents whose page of the settings offers the sign-in.
+  public internal(set) var agentsSigningIn: Set<AgentProviderID> = []
   var signInTasks: [AgentProviderID: Task<Void, Never>] = [:]
   /// Sessions being restarted and handed their prompt back, once signed in.
   public internal(set) var resumingAfterSignIn: Set<SessionID> = []
@@ -2886,6 +2894,15 @@ public final class AppModel {
     let names = Dictionary(
       descriptors.map { ($0.id.rawValue, $0.displayName) }, uniquingKeysWith: { first, _ in first })
     if names != agentNames { agentNames = names }
+  }
+
+  /// After the list of agents changed: a detection under way read the old one (#478).
+  public func refreshAgentsAfterChange() async {
+    while isRefreshingAgents { try? await Task.sleep(for: .milliseconds(50)) }
+    await refreshAgents()
+    await loadSigningInAgents()
+    await loadHookTrustingAgents()
+    await loadSigningAgents()
   }
 
   /// Detection never fails the application: an unavailable agent is data, not an error.

@@ -24,7 +24,7 @@ public struct CommandLineAgentSpecification: Sendable {
   /// Where a user can read how to install or update this CLI.
   public let documentationURL: URL?
   /// The command a user types to sign in, shown by the authentication remediation.
-  public let authenticationCommandLine: String?
+  public var authenticationCommandLine: String?
   /// Reads the sign in state out of the authentication command's result.
   ///
   /// `nil` keeps the default, which is the exit code alone. A CLI that exits with `0` whether

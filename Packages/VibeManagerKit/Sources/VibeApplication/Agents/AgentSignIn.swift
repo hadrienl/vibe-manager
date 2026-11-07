@@ -8,6 +8,42 @@ public protocol AgentSigningIn: Sendable {
   func signIn() async -> AgentSignInOutcome
   /// How the account the CLI uses now is signed in again (#419).
   func signInRoute() async -> AgentSignInRoute
+  /// The account the CLI uses (#478), to notice a sign-in to another one. `nil` when the CLI does
+  /// not say.
+  func signedInAccount() async -> AgentSignedInAccount?
+  /// Whether a conversation stopped on its sign-in offers it. Otherwise only the settings do.
+  var signsInFromConversations: Bool { get }
+}
+
+extension AgentSigningIn {
+  public func signedInAccount() async -> AgentSignedInAccount? { nil }
+  public var signsInFromConversations: Bool { true }
+}
+
+/// The account a CLI is signed in to (#478). One address can sign in to several organizations,
+/// and an organization's name and plan can change: only the address and the identifier tell one
+/// account from another, the label only shows it.
+public struct AgentSignedInAccount: Equatable, Codable, Sendable, ExpressibleByStringLiteral {
+  public var label: String
+  public var email: String
+  public var organizationID: String?
+
+  public init(label: String, email: String, organizationID: String? = nil) {
+    self.label = label
+    self.email = email
+    self.organizationID = organizationID
+  }
+
+  public init(stringLiteral email: String) {
+    self.init(label: email, email: email)
+  }
+
+  /// An identifier the CLI did not give says nothing: an expired sign-in may well leave it out.
+  public func isSame(as other: AgentSignedInAccount) -> Bool {
+    guard email.caseInsensitiveCompare(other.email) == .orderedSame else { return false }
+    guard let organizationID, let theirs = other.organizationID else { return true }
+    return organizationID == theirs
+  }
 }
 
 /// How an agent's account is signed in again (#419).

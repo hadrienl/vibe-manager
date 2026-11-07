@@ -21,9 +21,11 @@ public actor SessionJournalReader: SessionJournalReading {
   public init(
     claudeProjects: URL = ClaudeCodeHome.projectsDirectory(),
     codexSessions: URL = CodexHome.sessionsDirectory(),
+    homes: AgentHomes? = nil,
     chunkSize: Int = 4 << 20
   ) {
-    locator = AgentTranscriptLocator(claudeProjects: claudeProjects, codexSessions: codexSessions)
+    locator = AgentTranscriptLocator(
+      claudeProjects: claudeProjects, codexSessions: codexSessions, homes: homes)
     self.chunkSize = chunkSize
   }
 
@@ -68,13 +70,15 @@ public actor SessionJournalReader: SessionJournalReading {
       session.conversations.map(\.transcriptProviderID)
       + [session.agent?.transcriptProviderID].compactMap { $0 }
     for providerID in providers {
-      let directory: String
+      let found: [URL]
       switch providerID {
-      case ClaudeCodeAgentProvider.id.rawValue: directory = locator.claudeProjects.path
-      case CodexAgentProvider.id.rawValue: directory = locator.codexSessions.path
+      case ClaudeCodeAgentProvider.id.rawValue: found = locator.allClaudeProjects
+      case CodexAgentProvider.id.rawValue: found = locator.allCodexSessions
       default: continue
       }
-      if !directories.contains(directory) { directories.append(directory) }
+      for directory in found.map(\.path) where !directories.contains(directory) {
+        directories.append(directory)
+      }
     }
     return directories
   }

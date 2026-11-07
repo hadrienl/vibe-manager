@@ -40,4 +40,41 @@ struct TerminalScreenReplayTests {
       size: size)
     #expect(dropped == TerminalText.screen(replaying: kept, size: size))
   }
+
+  /// Claude Code 2.1, at rest: its prompt between two rules, as it draws it (#464).
+  private static func prompt(_ content: String) -> [UInt8] {
+    let rule = String(repeating: "─", count: 30)
+    return Array(
+      "Done.\r\n\(rule)\r\n❯\u{A0}\(content)\u{1B}[0m\r\n\(rule)\r\n  ? for shortcuts".utf8)
+  }
+
+  @Test("What the agent shows greyed in its prompt is no text typed into it (#464)")
+  func dimTextIsNoInput() {
+    let size = TerminalSize(columns: 40, rows: 10)
+    // A suggested answer, drawn dim as Claude Code draws `Try "…"`.
+    let suggested = TerminalText.screens(
+      replaying: Self.prompt("\u{1B}[2myes, push it"), size: size)
+    #expect(suggested.shown.contains("❯\u{A0}yes, push it"))
+    let input = PromptInputRecognition.input(screen: suggested.undimmed)
+    #expect(input != nil)
+    #expect(PromptInputRecognition.holdsText(input ?? ["x"]) == false)
+
+    // The same words typed by the user are text, in Claude Code's white.
+    let typed = TerminalText.screens(
+      replaying: Self.prompt("\u{1B}[38;2;255;255;255myes, push it"), size: size)
+    #expect(typed.undimmed == typed.shown)
+    #expect(
+      PromptInputRecognition.input(screen: typed.undimmed).map(PromptInputRecognition.holdsText)
+        == true)
+  }
+
+  @Test("The follower reads the screen with and without its dim text (#464)")
+  func followedUndimmed() async {
+    let size = TerminalSize(columns: 40, rows: 10)
+    let bytes = Self.prompt("\u{1B}[2mTry \"fix lint errors\"")
+    let screens = await TerminalScreenFollower().screens(
+      of: TerminalHistorySnapshot(bytes: bytes, droppedByteCount: 0), size: size)
+    #expect(screens == TerminalText.screens(replaying: bytes, size: size))
+    #expect(!screens.undimmed.contains("Try"))
+  }
 }

@@ -24,6 +24,23 @@ public enum ClaudeCodeAuthenticationStatus {
     }
   }
 
+  /// The account `auth status --json` describes, as the user tells it from another (#478): one
+  /// address can sign in to several organizations, chosen on the sign-in page. A personal one has
+  /// no name of its own, only one made from the address: its plan says it better.
+  public static func account(in output: String) -> AgentSignedInAccount? {
+    guard let status = decodeStatus(in: output), let email = status.email, !email.isEmpty else {
+      return nil
+    }
+    let organization =
+      if let name = status.orgName, !name.isEmpty, !name.localizedCaseInsensitiveContains(email) {
+        name
+      } else {
+        status.subscriptionType?.capitalized
+      }
+    let label = (organization?.isEmpty ?? true) ? email : "\(email) · \(organization ?? "")"
+    return AgentSignedInAccount(label: label, email: email, organizationID: status.orgId)
+  }
+
   /// The answer as JSON, wherever it sits in the stream.
   ///
   /// Anything else the run put on the way — a Node deprecation warning, a proxy or certificate
@@ -53,5 +70,9 @@ public enum ClaudeCodeAuthenticationStatus {
     let loggedIn: Bool
     let authMethod: String?
     let apiKeySource: String?
+    let email: String?
+    let orgId: String?
+    let orgName: String?
+    let subscriptionType: String?
   }
 }

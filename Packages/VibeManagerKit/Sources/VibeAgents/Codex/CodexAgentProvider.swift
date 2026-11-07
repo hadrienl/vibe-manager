@@ -62,6 +62,8 @@ public struct CodexAgentProvider: AgentProvider {
   let transcriptLocations: TranscriptLocationCache
   /// What its rollouts and `config.toml` say of the reasoning effort (#411).
   let effortReader: CodexEffortReader
+  /// The folder of an extra account (#478): what a session adopted without a plan runs on.
+  var accountHome: String?
 
   public init(
     base: CommandLineAgentProvider,
@@ -85,11 +87,19 @@ public struct CodexAgentProvider: AgentProvider {
     environment rawEnvironment: [String: String] = ProcessInfo.processInfo.environment,
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
     shellEnvironment: (any ShellEnvironmentSource)? = nil,
-    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
+    account: AgentDescriptor? = nil
   ) -> CodexAgentProvider {
     // A `CODEX_HOME` this application cannot resolve is dropped rather than forwarded: the
     // CLI would then write its sessions where nothing watches for them.
     let environment = CodexHome.sanitized(environment: rawEnvironment)
+    let descriptor = account ?? Self.descriptor
+    var specification = Self.specification
+    if account != nil, let directory = environment[CodexHome.overrideKey] {
+      // The plain command would sign in the agent's own account.
+      specification.authenticationCommandLine =
+        "\(CodexHome.overrideKey)=\(AgentHomeDirectory.shellQuoted(directory)) codex login"
+    }
     let probe = SystemProcessProbe()
     let locator = FileSystemExecutableLocator(environment: environment, probe: probe)
     let availabilityProbe = AgentAvailabilityProbe(
@@ -101,7 +111,7 @@ public struct CodexAgentProvider: AgentProvider {
       diagnostics: diagnostics
     )
 
-    return CodexAgentProvider(
+    var provider = CodexAgentProvider(
       base: CommandLineAgentProvider(
         descriptor: descriptor,
         specification: specification,
@@ -118,6 +128,8 @@ public struct CodexAgentProvider: AgentProvider {
       transcriptLocations: transcriptLocations,
       effortReader: CodexEffortReader(environment: environment)
     )
+    if account != nil { provider.accountHome = environment[CodexHome.overrideKey] }
+    return provider
   }
 
   /// Builds the object that captures the resume identifier of one launch and stores it.
