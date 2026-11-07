@@ -29,6 +29,7 @@ extension AppModel {
     sessions.filter { $0.status != .archived }.map { session in
       ArchiveCandidate(
         session: session, project: groupName(of: session),
+        ownFolderName: ownFolderName(of: session),
         isRunning: launcher?.isRunning(session.id) == true
           || !runningDrawerCommands(of: session.id).isEmpty
           || archivingSessionIDs.contains(session.id))
@@ -39,6 +40,16 @@ extension AppModel {
   func groupName(of session: WorkSession) -> String? {
     guard let key = folderKey(for: session) else { return nil }
     return folderLabels[key] ?? URL(fileURLWithPath: key.path).lastPathComponent
+  }
+
+  /// The name of the folder a session works in, when it is filed under another: a worktree's,
+  /// under its repository (#525). The project a rule written before named it by.
+  func ownFolderName(of session: WorkSession) -> String? {
+    guard let path = session.repositories.first?.path, !path.isEmpty,
+      let key = folderKey(for: session)
+    else { return nil }
+    let own = SessionFolderKey.lexical(path)
+    return own == key ? nil : URL(fileURLWithPath: own.path).lastPathComponent
   }
 
   /// The colours of the palette by their names, the symbols' names and the agents'.
