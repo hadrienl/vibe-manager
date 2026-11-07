@@ -801,18 +801,22 @@ private struct StoredRepositoryV2: Codable {
   let id: UUID
   let path: String
   let git: StoredGitSnapshotV2?
+  /// Absent from a store written before #525.
+  let mainRepositoryPath: String?
 
   init(_ repository: RepositoryContext) {
     id = repository.id.rawValue
     path = repository.path
     git = repository.git.map(StoredGitSnapshotV2.init)
+    mainRepositoryPath = repository.mainRepositoryPath
   }
 
   var domainValue: RepositoryContext {
     RepositoryContext(
       id: RepositoryID(rawValue: id),
       path: path,
-      git: git?.domainValue
+      git: git?.domainValue,
+      mainRepositoryPath: mainRepositoryPath.flatMap { $0.isEmpty ? nil : $0 }
     )
   }
 }

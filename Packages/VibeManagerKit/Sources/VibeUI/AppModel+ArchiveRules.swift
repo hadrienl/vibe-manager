@@ -216,6 +216,17 @@ extension AppModel {
           if await archiveByRule(id, run: run) {
             archived.append(id)
             photos.append(photo)
+            // A coordinator's children go with it (#525), in the same batch: those a protection
+            // names stay, as anything else running does.
+            for child in childrenFollowingRule(of: id, protections: protections, now: now) {
+              guard archivingSessionIDs.insert(child.id).inserted else { continue }
+              defer { archivingSessionIDs.remove(child.id) }
+              let photo = await archiveSnapshot(of: child, at: now)
+              if await archiveByRule(child.id, run: run) {
+                archived.append(child.id)
+                photos.append(photo)
+              }
+            }
           }
         }
         archivedAny = archivedAny || !archived.isEmpty
@@ -223,9 +234,15 @@ extension AppModel {
         candidates.removeAll { gone.contains($0.id) }
       }
       if run.isTrial {
+        var listed = Set(plan.archived)
         for id in plan.archived {
           guard let candidate = candidates.first(where: { $0.id == id }) else { continue }
           photos.append(await archiveSnapshot(of: candidate.session, at: now))
+          // And the children that would go with it (#525).
+          for child in childrenFollowingRule(of: id, protections: protections, now: now)
+          where listed.insert(child.id).inserted {
+            photos.append(await archiveSnapshot(of: child, at: now))
+          }
         }
       }
       let batch = await archiveReports?.recordRun(
@@ -240,7 +257,7 @@ extension AppModel {
           return SkippedSession(sessionID: id, name: name, reason: reason)
         }.sorted { $0.name.localizedStandardCompare($1.name) == .orderedAscending },
         summarizing: model.set.rules.first { $0.id == run.ruleID }?.summarizes ?? false)
-      let count = run.isTrial ? plan.archived.count : archived.count
+      let count = run.isTrial ? photos.count : archived.count
       let result = ArchiveRunResult(
         date: now, archived: count, skipped: plan.skipped.count, isTrial: run.isTrial)
       try? await scheduler.record(result, for: run.ruleID)
@@ -264,6 +281,20 @@ extension AppModel {
 }
 
 extension AppModel {
+  /// The children that go to the archive with a coordinator a rule archives (#525): those that
+  /// would go with it by hand, but the ones a protection names.
+  func childrenFollowingRule(
+    of id: SessionID, protections: [ArchiveProtection], now: Date
+  ) -> [WorkSession] {
+    let calendar = archiveRules?.calendar() ?? .autoupdatingCurrent
+    let candidates = archiveCandidates()
+    return childrenFollowingArchive(of: id).filter { child in
+      guard let candidate = candidates.first(where: { $0.id == child.id }) else { return false }
+      return ArchiveRuleEvaluation.protection(
+        of: candidate, among: protections, now: now, calendar: calendar) == nil
+    }
+  }
+
   /// Archives one session for a rule, as an archive by hand does but without ⌘Z: a rule's archive
   /// is undone from the archive, never by a key the user pressed for something else. The session
   /// on screen hands the selection to its neighbour, the keyboard staying in the sidebar.

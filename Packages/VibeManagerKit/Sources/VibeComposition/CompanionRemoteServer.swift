@@ -158,7 +158,8 @@ final class CompanionRemoteServer {
       send(peer, .folderListing(Self.listing(of: parent)))
       if let failure { send(peer, .folderNotCreated(failure)) }
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
-      .folderListing, .folderNotCreated, .iconData, .webState, .attachmentData, .httpResponse, .folderIconData:
+      .folderListing, .folderNotCreated, .iconData, .webState, .attachmentData, .httpResponse,
+      .folderIconData:
       break
     }
   }
@@ -203,7 +204,8 @@ final class CompanionRemoteServer {
       appModel.agentDescriptors.map { ($0.id.rawValue, $0.displayName) },
       uniquingKeysWith: { first, _ in first })
     return appModel.sessions.map { session in
-      let path = SessionFolderKey.primaryPath(of: session) ?? ""
+      // Its group, as the sidebar files it: a worktree's under its repository (#525).
+      let path = appModel.folderKey(for: session)?.path ?? ""
       let label =
         appModel.folderLabels[SessionFolderKey(path: path)]
         ?? (path.isEmpty ? "" : (path as NSString).lastPathComponent)
@@ -481,7 +483,8 @@ final class CompanionRemoteServer {
       guard !questions.isEmpty, answers.count == questions.count else { return nil }
       var given: [AgentQuestionAnswer] = []
       for (question, answer) in zip(questions, answers) {
-        let indices = answer.choiceIDs.compactMap(Int.init).filter(question.options.indices.contains)
+        let indices = answer.choiceIDs.compactMap(Int.init).filter(
+          question.options.indices.contains)
         let text = answer.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         // The choices taken win over stray words; a question of several choices takes no words,
         // its dialog has no field for them.

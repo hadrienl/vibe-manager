@@ -379,24 +379,31 @@ extension AppModel {
     case .archive:
       let columns = Dictionary(
         uniqueKeysWithValues: sessions.map { ($0.id, $0.taskStatus) })
+      // A coordinator's children go with it (#525): in the same batch, and back with it on ⌘Z.
+      var eligible = current.eligible
+      for id in current.eligible {
+        for child in childrenFollowingArchive(of: id) where !eligible.contains(child.id) {
+          eligible.append(child.id)
+        }
+      }
       // Several archived together form a batch of their own (#408), photographed right before;
       // one alone joins the day's archives by hand.
-      let together = current.eligible.count > 1 && archiveReports != nil
+      let together = eligible.count > 1 && archiveReports != nil
       let date = Date()
       var photos: [SessionID: ArchivedSessionSnapshot] = [:]
       if together {
-        for id in current.eligible {
+        for id in eligible {
           guard let session = sessions.first(where: { $0.id == id }) else { continue }
           photos[id] = await archiveSnapshot(of: session, at: date)
         }
       }
       results.merge(
-        await concurrently(current.eligible) {
+        await concurrently(eligible) {
           await $0.archiveInBatch($1, recordsByHand: !together)
         }
       ) { $1 }
       if together {
-        let archived = current.eligible.filter { results[$0]?.isDone == true }.compactMap {
+        let archived = eligible.filter { results[$0]?.isDone == true }.compactMap {
           photos[$0]
         }
         let batch = await archiveReports?.recordRun(
@@ -406,7 +413,7 @@ extension AppModel {
       }
       // One ⌘Z brings the whole batch back, the session on screen selected again (#242).
       sidebarHistory.record(
-        current.eligible.compactMap { id in
+        eligible.compactMap { id in
           guard results[id]?.isDone == true, let column = columns[id] else { return nil }
           return SessionArchiveUndo(id: id, taskStatus: column, wasSelected: id == shown)
         })

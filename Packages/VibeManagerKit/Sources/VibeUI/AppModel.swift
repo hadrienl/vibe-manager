@@ -1616,9 +1616,14 @@ public final class AppModel {
     do {
       let archival = try await archiveProcess(id)
       archived = true
+      // A coordinator's children go with it (#525), and come back with it.
+      let children = await archiveChildren(of: id)
       if let session {
         sidebarHistory.record(
-          [SessionArchiveUndo(id: id, taskStatus: session.taskStatus, wasSelected: wasSelected)])
+          [SessionArchiveUndo(id: id, taskStatus: session.taskStatus, wasSelected: wasSelected)]
+            + children.map {
+              SessionArchiveUndo(id: $0.id, taskStatus: $0.taskStatus, wasSelected: false)
+            })
       }
       report(archival.detachment, for: archival.session, action: .archived)
       prepareHandOff(from: id, listedBefore: visible)

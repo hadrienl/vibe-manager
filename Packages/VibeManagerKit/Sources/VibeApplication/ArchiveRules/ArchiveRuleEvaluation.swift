@@ -81,10 +81,9 @@ public enum ArchiveRuleEvaluation {
   ) -> ArchiveVerdict {
     let session = candidate.session
     guard session.taskStatus == .done else { return .notDone }
-    // A protection that cannot be told for sure protects: a rule never acts on a guess.
-    if let protection = protections.first(where: {
-      evaluate($0.condition, candidate, now: now, calendar: calendar) != false
-    }) {
+    if let protection = protection(
+      of: candidate, among: protections, now: now, calendar: calendar)
+    {
       return .protected(protection)
     }
     if let condition = rule.condition,
@@ -95,6 +94,16 @@ public enum ArchiveRuleEvaluation {
     if candidate.isRunning { return .running }
     if cameBackFromArchive(session) { return .unarchived }
     return .archive
+  }
+
+  /// The protection that keeps `candidate` from every rule, whatever its column: what a child
+  /// that would follow its coordinator to the archive is checked against (#525). A protection
+  /// that cannot be told for sure protects: a rule never acts on a guess.
+  public static func protection(
+    of candidate: ArchiveCandidate, among protections: [ArchiveProtection], now: Date,
+    calendar: Calendar
+  ) -> ArchiveProtection? {
+    protections.first { evaluate($0.condition, candidate, now: now, calendar: calendar) != false }
   }
 
   /// A session the user unarchived, or brought back with ⌘Z, since it was last done: a rule does
