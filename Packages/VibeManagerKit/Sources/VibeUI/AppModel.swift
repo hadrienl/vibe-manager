@@ -2908,6 +2908,7 @@ public final class AppModel {
     await loadSigningInAgents()
     await loadHookTrustingAgents()
     await loadSigningAgents()
+    await loadCoordinatingAgents()
   }
 
   /// Detection never fails the application: an unavailable agent is data, not an error.
