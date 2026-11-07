@@ -18217,7 +18217,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "La connexion au Mac a été perdue avant sa réponse. La session existe peut-être déjà : vérifiez la liste avant de réessayer."
+            "value" : "La connexion au Mac a été perdue avant sa réponse. La session existe peut-être déjà : vérifiez la liste avant de réessayer."
           }
         },
         "hi" : {
@@ -24277,7 +24277,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Impossible de joindre « %@ » : un message porte 12 Mo au plus."
+            "value" : "Impossible de joindre « %@ » : un message porte 12 Mo au plus."
           }
         },
         "hi" : {
