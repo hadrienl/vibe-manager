@@ -27,6 +27,9 @@ public final class NewSessionModel {
   private var receptionGeneration = 0
   public var isReceivingAttachments: Bool { receivingAttachments > 0 }
   public private(set) var attachmentFailed = false
+  /// The folders a drop received this draft's files in (#475), by folder: nothing but the draft
+  /// reads them, and they go with it once nothing — not even ⌘Z — can bring it back.
+  @ObservationIgnored private var receivedDrops: [URL: ReceivedDropFolder] = [:]
   public private(set) var isLoadingAgents = false
   /// Problems are shown once the user has asked for the session, then kept live: a form that
   /// turns red while the first character is being typed is a form that nags.
@@ -292,6 +295,10 @@ public final class NewSessionModel {
   /// in the order they came and each once. Their paths reach the agent with the prompt. A
   /// template's prompt is its own; nothing is joined to it.
   public func attach(_ files: [URL]) {
+    for folder in files.compactMap(ReceivedDropFolder.folder(of:))
+    where receivedDrops[folder] == nil {
+      receivedDrops[folder] = ReceivedDropFolder(folder)
+    }
     guard draft.templateFill == nil else { return }
     for file in files where ShellPath.isWritable(file.path) && !draft.attachments.contains(file) {
       draft.attachments.append(file)
@@ -330,6 +337,11 @@ public final class NewSessionModel {
 
   public func removeAttachment(_ file: URL) {
     draft.attachments.removeAll { $0 == file }
+    // A file a drop received is nobody else's: it goes with its chip. Its folder goes with the
+    // draft — another file of the same drop may still be on its way there.
+    if ReceivedDropFolder.folder(of: file).map({ receivedDrops[$0] != nil }) == true {
+      try? FileManager.default.removeItem(at: file)
+    }
   }
 
   // MARK: - Templates
@@ -764,6 +776,9 @@ public final class NewSessionModel {
     do {
       let creation = try await create(draft)
       issues = []
+      // The session's now: what creating it could not move out, its agent reads.
+      receivedDrops.values.forEach { $0.keep() }
+      receivedDrops = [:]
       return creation
     } catch let rejection as SessionCreationRejected {
       issues = Self.namelessAllowed(rejection.issues)
@@ -1084,5 +1099,34 @@ enum RecentFolderProbe {
         waiter.resume(returning: statuses)
       }
     }
+  }
+}
+
+/// A folder a drop received a draft's files in (#475), removed when the draft that holds it goes
+/// for good. Drafts live no longer than the application: nothing after it reads these files.
+final class ReceivedDropFolder {
+  let url: URL
+  private var isKept = false
+
+  init(_ url: URL) {
+    self.url = url
+  }
+
+  /// The draft became a session: the folder is the session's.
+  func keep() {
+    isKept = true
+  }
+
+  deinit {
+    if !isKept { try? FileManager.default.removeItem(at: url) }
+  }
+
+  /// The folder of its own a drop received `file` in, under the temporary one `CreateSession`
+  /// moves files out of; `nil` for any other file — the user's own, never removed.
+  static func folder(of file: URL) -> URL? {
+    let folder = file.deletingLastPathComponent()
+    guard folder.deletingLastPathComponent().lastPathComponent == CreateSession.receivedDropsFolder
+    else { return nil }
+    return folder
   }
 }

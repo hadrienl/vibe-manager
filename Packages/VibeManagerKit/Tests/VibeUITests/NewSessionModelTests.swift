@@ -117,6 +117,53 @@ struct NewSessionModelTests {
     #expect(model.draft.attachments == [second])
   }
 
+  /// Two files a drop received in a folder of its own, as the draft's catcher receives them.
+  private func receivedDrop() throws -> (folder: URL, files: [URL]) {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent(CreateSession.receivedDropsFolder, isDirectory: true)
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let files = ["a.png", "b.png"].map { folder.appendingPathComponent($0) }
+    for file in files { try Data("png".utf8).write(to: file) }
+    return (folder, files)
+  }
+
+  @Test("Files a drop received go with their chip, and with the draft once it is gone for good")
+  func receivedDropsGoWithTheDraft() throws {
+    let (folder, files) = try receivedDrop()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let own = FileManager.default.temporaryDirectory.appendingPathComponent("\(UUID()).txt")
+    try Data("mine".utf8).write(to: own)
+    defer { try? FileManager.default.removeItem(at: own) }
+    var model: NewSessionModel? = makeModel()
+    model?.attach(files + [own])
+
+    model?.removeAttachment(files[0])
+    model?.removeAttachment(own)
+    #expect(!FileManager.default.fileExists(atPath: files[0].path))
+    #expect(FileManager.default.fileExists(atPath: files[1].path))
+    #expect(FileManager.default.fileExists(atPath: own.path))
+
+    model = nil
+    #expect(!FileManager.default.fileExists(atPath: folder.path))
+  }
+
+  @Test("Files a drop received stay with the session the draft became")
+  func receivedDropsStayWithTheSession() async throws {
+    let (folder, files) = try receivedDrop()
+    defer { try? FileManager.default.removeItem(at: folder) }
+    var model: NewSessionModel? = makeModel()
+    await model?.load()
+    model?.draft.workingDirectoryPath = "/workspace"
+    model?.draft.initialPrompt = "Look at these"
+    model?.attach(files)
+
+    #expect(await model?.submit() != nil)
+    model = nil
+
+    #expect(files.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
+  }
+
   @Test("A template's prompt takes no file")
   func templateTakesNoFile() {
     let model = makeModel()
