@@ -18193,6 +18193,107 @@
         }
       }
     },
+    "The connection to the Mac was lost before it answered. The session may already exist: check the list before trying again." : {
+      "comment" : "New session form: the connection dropped after the request was sent, and no session was recognised.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "انقطع الاتصال بجهاز Mac قبل أن يستجيب. قد تكون الجلسة موجودة بالفعل: تحقق من القائمة قبل المحاولة مرة أخرى."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Die Verbindung zum Mac ist vor seiner Antwort abgebrochen. Die Sitzung existiert vielleicht schon: Prüfe die Liste, bevor du es erneut versuchst."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Se perdió la conexión con el Mac antes de que respondiera. Puede que la sesión ya exista: revisa la lista antes de volver a intentarlo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La connexion au Mac a été perdue avant sa réponse. La session existe peut-être déjà : vérifiez la liste avant de réessayer."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac के जवाब देने से पहले उससे कनेक्शन टूट गया। हो सकता है सेशन पहले से मौजूद हो: दोबारा कोशिश करने से पहले सूची देखें।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "La connessione al Mac si è interrotta prima della sua risposta. La sessione potrebbe esistere già: controlla l’elenco prima di riprovare."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac が応答する前に接続が切れました。セッションはすでに作成されている可能性があります。もう一度試す前にリストを確認してください。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac이 응답하기 전에 연결이 끊겼습니다. 세션이 이미 있을 수 있으니 다시 시도하기 전에 목록을 확인하세요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De verbinding met de Mac is verbroken voordat hij antwoordde. De sessie bestaat misschien al: controleer de lijst voordat je het opnieuw probeert."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Połączenie z Makiem zostało przerwane, zanim odpowiedział. Sesja może już istnieć: sprawdź listę, zanim spróbujesz ponownie."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "A conexão com o Mac caiu antes da resposta. A sessão talvez já exista: confira a lista antes de tentar novamente."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Соединение с Mac прервалось до его ответа. Возможно, сессия уже создана: проверьте список, прежде чем повторить попытку."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac yanıt vermeden önce bağlantı kesildi. Oturum zaten oluşturulmuş olabilir: yeniden denemeden önce listeyi kontrol edin."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "З’єднання з Mac обірвалося до його відповіді. Можливо, сеанс уже створено: перевірте список, перш ніж спробувати ще раз."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 响应前连接已断开。会话可能已经存在：重试前请先查看列表。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mac 回應前連線已中斷。工作階段可能已經存在：再試一次前請先查看列表。"
+          }
+        }
+      }
+    },
     "The list stays as it was." : {
       "comment" : "Banner detail while connecting.",
       "localizations" : {
@@ -24148,6 +24249,107 @@
           "stringUnit" : {
             "state" : "translated",
             "value" : "無法傳送你的回答。請在 App 或 Mac 上回答。"
+          }
+        }
+      }
+    },
+    "“%@” can’t be attached: a message carries 12 MB at most." : {
+      "comment" : "A file picked to send would take the message over 12 MB in all. The argument is the file's name.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لا يمكن إرفاق «%@»: لا تتجاوز الرسالة الواحدة 12 ميغابايت."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "„%@“ kann nicht angehängt werden: Eine Nachricht umfasst höchstens 12 MB."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se puede adjuntar «%@»: un mensaje admite 12 MB como máximo."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossible de joindre « %@ » : un message porte 12 Mo au plus."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” नहीं जोड़ी जा सकती: एक संदेश में ज़्यादा से ज़्यादा 12 MB हो सकते हैं।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Impossibile allegare “%@”: un messaggio può contenere al massimo 12 MB."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "「%@」を添付できません。1件のメッセージは最大12 MBです。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” 파일을 첨부할 수 없어요. 메시지 하나는 최대 12MB까지예요."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” kan niet worden toegevoegd: een bericht bevat maximaal 12 MB."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie można załączyć „%@”: wiadomość może mieć maks. 12 MB."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não é possível anexar “%@”: uma mensagem leva no máximo 12 MB."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не удаётся прикрепить «%@»: сообщение может содержать не более 12 МБ."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "“%@” eklenemiyor: bir mesaj en fazla 12 MB taşıyabilir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Не вдається прикріпити «%@»: повідомлення може містити не більше 12 МБ."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "无法附加“%@”：一条消息最多 12 MB。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "無法附加「%@」：一則訊息上限為 12 MB。"
           }
         }
       }

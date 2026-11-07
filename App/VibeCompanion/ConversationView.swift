@@ -279,7 +279,7 @@ struct ConversationView: View {
   private func join(_ file: RemoteFile) {
     guard RemoteFile.fits(file.data.count, joining: files) else {
       channel.failure = .other(
-        String(localized: "“\(file.name)” can’t be joined: a message carries 12 MB at most."))
+        String(localized: "“\(file.name)” can’t be attached: a message carries 12 MB at most."))
       return
     }
     files.append(file)
