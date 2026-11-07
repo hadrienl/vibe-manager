@@ -44,7 +44,7 @@ Keywords are lower case. `//` starts a comment that runs to the end of the line.
 | `badge.symbol` | `=` `!=` `in` | a text in quotes | The SF Symbol the badge shows, by its name. Never matches a project icon. | `badge.symbol = "ladybug"` |
 | `badge.kind` | `=` `!=` | `symbol`, `projectIcon` | `symbol`, or `projectIcon` when the badge shows the project's icon. | `badge.kind = projectIcon` |
 | `name` | `=` `!=` `in` `contains` `~` | a text in quotes | The session's name. | `name contains "spike"` |
-| `project` | `=` `!=` `in` `contains` `~` | a text in quotes | The name of the session's group (its folder's name, or the name given to it). | `project = "vibe-manager"` |
+| `project` | `=` `!=` `in` `contains` `~` | a text in quotes | The name of the session's group (its folder's name, or the name given to it). A session in a git worktree is grouped under its repository; the worktree folder's own name matches too. | `project = "vibe-manager"` |
 | `folder` | `under` | a text in quotes | The session's working folder, with `under` and a path (`~` is the home folder). | `folder under "~/Code/client"` |
 | `agent` | `=` `!=` `in` | an identifier | The agent's identifier: one of the agents installed, or an endpoint's. | `agent = codex` |
 | `model` | `=` `!=` `in` `contains` `~` | a text in quotes | The model's identifier; a session on the agent's default model has none. | `model contains "sonnet"` |
