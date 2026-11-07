@@ -158,4 +158,24 @@ struct CompanionRemoteFolderTests {
       #expect(CompanionRemoteServer.createFolder(named: "c", in: parent.path) == .folderNotAllowed)
     }
   }
+
+  @Test("Nothing is created in a hidden folder, through a link to one, or in ~/Library")
+  func refusedParents() throws {
+    try withParent { parent in
+      let hidden = parent.appendingPathComponent(".config", isDirectory: true)
+      try FileManager.default.createDirectory(at: hidden, withIntermediateDirectories: false)
+      let link = parent.appendingPathComponent("link")
+      try FileManager.default.createSymbolicLink(at: link, withDestinationURL: hidden)
+      for refused in [hidden.path, link.path] {
+        #expect(CompanionRemoteServer.createFolder(named: "x", in: refused) == .folderNotAllowed)
+      }
+      #expect(try FileManager.default.contentsOfDirectory(atPath: hidden.path).isEmpty)
+    }
+    let absent = "vibe-test-\(UUID().uuidString)"
+    for parent in [
+      "~/Library/\(absent)", NSHomeDirectory() + "/Library/Application Support/\(absent)",
+    ] {
+      #expect(CompanionRemoteServer.createFolder(named: "x", in: parent) == .folderNotAllowed)
+    }
+  }
 }
