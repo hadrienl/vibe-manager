@@ -10,12 +10,23 @@ import VibeDomain
 extension WorkspaceProvider: AgentSigningIn {
   func signIn() async -> AgentSignInOutcome { .signedIn }
   func signInRoute() async -> AgentSignInRoute { .browser }
+
+  /// Names no account. Claude Code's says so only once the test lets it, as slow as its CLI.
+  func signedInAccount() async -> AgentSignedInAccount? {
+    if id == EndpointHarness.claudeCode.providerID {
+      await SignInWorkspaceTests.claudeCodeStatus.wait()
+    }
+    return nil
+  }
 }
 
 /// #410: a session whose turn stopped because its CLI's sign-in expired.
 @MainActor
 @Suite("Signing an agent in again from its conversation", .timeLimit(.minutes(2)))
 struct SignInWorkspaceTests {
+  /// Holds what an agent registered as Claude Code says of its account.
+  nonisolated static let claudeCodeStatus = ProbeGate()
+
   private func folder() -> String {
     let path = NSTemporaryDirectory().appending("vibe-sign-in-\(UUID().uuidString)")
     try? FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
@@ -25,38 +36,60 @@ struct SignInWorkspaceTests {
   private func running(
     supervisor: WorkspaceSupervisor = WorkspaceSupervisor()
   ) async throws -> (AppModel, WorkSession) {
-    let subject = WorkSession(
-      name: "Audit deps",
-      initialPrompt: "Audit the dependencies.",
-      agent: SessionAgentConfiguration(providerID: "stub", resumeIdentifier: "kept-identifier"),
-      status: .closed,
-      createdAt: Date(timeIntervalSince1970: 1_699_000_000),
-      updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
-      closedAt: Date(timeIntervalSince1970: 1_700_000_000),
-      repositories: [RepositoryContext(path: folder())]
-    )
-    let repository = WorkspaceRepository(sessions: [subject])
-    let registry = WorkspaceRegistry(providers: [WorkspaceProvider()])
+    let (model, sessions) = try await runningSessions(supervisor: supervisor)
+    return (model, sessions[0])
+  }
+
+  /// `count` sessions of the first of `providers`, running.
+  private func runningSessions(
+    _ count: Int = 1, providers: [WorkspaceProvider] = [WorkspaceProvider()],
+    supervisor: WorkspaceSupervisor = WorkspaceSupervisor()
+  ) async throws -> (AppModel, [WorkSession]) {
+    let sessions = (0..<count).map { index in
+      WorkSession(
+        name: index == 0 ? "Audit deps" : "Audit deps \(index + 1)",
+        initialPrompt: "Audit the dependencies.",
+        agent: SessionAgentConfiguration(
+          providerID: providers[0].id, resumeIdentifier: "kept-identifier"),
+        status: .closed,
+        createdAt: Date(timeIntervalSince1970: 1_699_000_000),
+        updatedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        closedAt: Date(timeIntervalSince1970: 1_700_000_000),
+        repositories: [RepositoryContext(path: folder())]
+      )
+    }
+    let repository = WorkspaceRepository(sessions: sessions)
+    let registry = WorkspaceRegistry(providers: providers)
     let launcher = SessionLauncher(
       supervisor: supervisor, repository: repository, agents: registry,
       viewportTimeout: .zero)
     let model = AppModel(repository: repository, agents: registry, launcher: launcher)
     await model.refreshAgents()
-    let path = try #require(RestartSession.workingDirectoryPath(of: subject))
-    let plan = try await WorkspaceProvider().launchPlan(
-      for: AgentLaunchRequest(workingDirectoryPath: path))
-    await launcher.launch(session: subject, plan: plan)
+    for session in sessions {
+      let path = try #require(RestartSession.workingDirectoryPath(of: session))
+      let plan = try await providers[0].launchPlan(
+        for: AgentLaunchRequest(workingDirectoryPath: path))
+      await launcher.launch(session: session, plan: plan)
+    }
     await model.reload()
     await model.loadSigningInAgents()
-    return (model, subject)
+    return (model, sessions)
+  }
+
+  /// Waits for what a step that goes on by itself leaves, as long as a slow machine may need.
+  private func waitUntil(_ condition: () -> Bool) async throws {
+    let deadline = ContinuousClock.now + .seconds(30)
+    while !condition(), ContinuousClock.now < deadline {
+      try await Task.sleep(for: .milliseconds(10))
+    }
   }
 
   /// The question about the account, whenever it was asked.
   private func question(_ progress: AgentSignInProgress?) -> AgentSignInProgress? {
-    guard case .otherAccount(let expected, let actual, let detail, _)? = progress else {
-      return progress
-    }
-    return .otherAccount(expected: expected, actual: actual, detail: detail, at: .distantPast)
+    guard case .otherAccount(let expected, let actual, let detail, _, let awaited)? = progress
+    else { return progress }
+    return .otherAccount(
+      expected: expected, actual: actual, detail: detail, at: .distantPast, awaited: awaited)
   }
 
   /// The turn stopped on `StopFailure`, its error `authentication_failed`.
@@ -135,7 +168,7 @@ struct SignInWorkspaceTests {
     #expect(await supervisor.startCount == started)
   }
 
-  @Test("The question about the account goes with its page, or with the next expiry (#478)")
+  @Test("A question no session waits on goes with its page, or with the next expiry (#478)")
   func questionDoesNotOutliveItsSignIn() async throws {
     let (model, subject) = try await running()
     let stub = AgentProviderID("stub")
@@ -145,19 +178,43 @@ struct SignInWorkspaceTests {
     model.leaveSignIn(of: stub)
     #expect(model.signIns[stub] == nil)
 
-    // A session waits on the answer: it is still asked in its conversation.
+    // The page kept open: a sign-in that expires after it is told as one, and the question goes.
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: "perso@x.io")
     model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+    #expect(model.signInNotice(for: subject.id)?.state == .expired)
+    model.publishSignIn(for: subject.id)
+    #expect(model.signIns[stub] == nil)
+
+    // Asked of a session stopped on its sign-in: the page left, its conversation still asks.
     await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: "perso@x.io")
     model.leaveSignIn(of: stub)
     #expect(
       model.signInNotice(for: subject.id)?.state
         == .otherAccount(expected: "pro@x.io", actual: "perso@x.io"))
+  }
 
-    // Its sign-in expires again: that is told, and the question cannot be answered any more.
-    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
-    #expect(model.signInNotice(for: subject.id)?.state == .expired)
-    model.publishSignIn(for: subject.id)
-    #expect(model.signIns[stub] == nil)
+  /// Two sessions at work when the sign-in expired: the first stops, is signed in again — to
+  /// another account —; the second, started on the old token, stops after that, and the first is
+  /// typed into again. None of them resumes on that account unasked.
+  @Test("A session stopping on its sign-in after the question joins it (#478)")
+  func laterExpiryJoinsTheQuestion() async throws {
+    let (model, sessions) = try await runningSessions(2)
+    let (first, second) = (sessions[0].id, sessions[1].id)
+    let stub = AgentProviderID("stub")
+    model.activityCells.set(stoppedOnSignIn(first), for: first)
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: "perso@x.io")
+
+    model.activityCells.set(stoppedOnSignIn(second), for: second)
+    model.publishSignIn(for: second)
+    model.activityCells.set(stoppedOnSignIn(first), for: first)
+    model.publishSignIn(for: first)
+
+    #expect(model.signIns[stub] != nil)
+    for id in [first, second] {
+      #expect(
+        model.signInNotice(for: id)?.state
+          == .otherAccount(expected: "pro@x.io", actual: "perso@x.io"))
+    }
   }
 
   @Test("A page left before the CLI said how it is signed in changes nothing (#478)")
@@ -185,13 +242,41 @@ struct SignInWorkspaceTests {
     model.signedInAccounts.remember("pro@x.io", of: AgentProviderID("claude-code"))
 
     await model.signInEnded(added, outcome: .signedIn, after: "Pro@x.io")
+    try await waitUntil { model.signIns[added] != nil }
     #expect(model.signIns[added] == .sameAccount(as: "claude-code"))
     model.leaveSignIn(of: added)
     #expect(model.signIns[added] == nil)
+  }
 
-    model.signedInAccounts.remember(nil, of: added)
-    await model.signInEnded(added, outcome: .signedIn, after: "perso@x.io")
-    #expect(model.signIns[added] == nil)
+  /// Each other agent's CLI is asked in turn, seconds each (#478).
+  @Test("The sessions resume before the other agents of the CLI have said their account")
+  func sameAccountCheckDoesNotHoldBackResuming() async throws {
+    let account = AgentAccount(
+      name: "Claude 2", harness: .claudeCode, configurationDirectory: "~/.claude-2")
+    let (model, sessions) = try await runningSessions(
+      providers: [
+        WorkspaceProvider(id: account.providerID),
+        WorkspaceProvider(id: EndpointHarness.claudeCode.providerID, name: "Claude Code"),
+      ])
+    let subject = sessions[0].id
+    model.agentAccounts = AgentAccountsSettingsModel(
+      repository: InMemoryAgentAccountRepository([account]), home: "/Users/someone",
+      defaultDirectories: [:])
+    let added = AgentProviderID(account.providerID)
+    model.signedInAccounts.remember("pro@x.io", of: AgentProviderID("claude-code"))
+    model.activityCells.set(stoppedOnSignIn(subject), for: subject)
+
+    // Claude Code has not said yet: the session is looked at all the same — Resume offered, as
+    // its screen shows no prompt that can be read.
+    let ending = Task { await model.signInEnded(added, outcome: .signedIn, after: "pro@x.io") }
+    let resumable = ConversationSignIn.State.signedIn(canResume: true, waiting: .text(nil))
+    try await waitUntil { model.signInNotice(for: subject)?.state == resumable }
+    #expect(model.signInNotice(for: subject)?.state == resumable)
+
+    await Self.claudeCodeStatus.open()
+    await ending.value
+    try await waitUntil { model.signIns[added] != nil }
+    #expect(model.signIns[added] == .sameAccount(as: "Claude Code"))
   }
 
   @Test("An account changed outside the application is not taken for a mistake (#478)")
@@ -216,7 +301,7 @@ struct SignInWorkspaceTests {
     await model.signInEnded(stub, outcome: .signedIn, before: ultra, after: team)
     #expect(
       question(model.signIns[stub])
-        == .otherAccount(expected: ultra, actual: team, at: .distantPast))
+        == .otherAccount(expected: ultra, actual: team, at: .distantPast, awaited: false))
   }
 
   @Test("An account that cannot be read after signing in resumes nothing (#478)")
@@ -226,7 +311,7 @@ struct SignInWorkspaceTests {
     await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: nil)
     #expect(
       question(model.signIns[stub])
-        == .otherAccount(expected: "pro@x.io", actual: nil, at: .distantPast))
+        == .otherAccount(expected: "pro@x.io", actual: nil, at: .distantPast, awaited: false))
     model.keepSignedInAccount(of: stub)
     #expect(model.signIns[stub] == nil)
     #expect(model.signedInAccounts.account(of: stub) == nil)

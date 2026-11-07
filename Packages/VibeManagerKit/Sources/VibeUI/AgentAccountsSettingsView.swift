@@ -202,11 +202,7 @@ struct AgentAccountSections: View {
       await model.agentAccounts?.load()
       await model.loadSigningAgents()
     }
-    .onDisappear {
-      if let account { rename(account) }
-      model.leaveSignIn(of: agent.id)
-    }
-    .onChange(of: agent.id) { left, _ in model.leaveSignIn(of: left) }
+    .onDisappear { if let account { rename(account) } }
   }
 
   private func rename(_ account: AgentAccount) {
@@ -244,7 +240,7 @@ struct AgentAccountSections: View {
               Text("Cancel", bundle: .module)
             }
           }
-        case .otherAccount(let expected, let actual, let detail, _)?:
+        case .otherAccount(let expected, let actual, let detail, _, _)?:
           Text(
             "\(agent.displayName) is now signed in to \(AgentSignInProgress.label(of: actual)), not \(expected.label).",
             bundle: .module, comment: "An agent's name, then two email addresses.")
