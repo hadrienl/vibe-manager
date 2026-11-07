@@ -16,8 +16,9 @@ extension AppModel {
     guard recentFolderHistory != .ready else { return }
     let base: RecentFolders
     if let stored {
-      // Written before #529, it may list the worktrees of coordinated sessions.
-      base = stored.replacingWorktrees()
+      // Written before #529, it may list the worktrees of coordinators' children. Read by the
+      // rule that records folders, it never loses one that recording would keep.
+      base = stored.droppingWorktrees(recordedIn: sessions)
     } else if case .loaded(let sessions) = state {
       base = RecentFolders.seeded(from: sessions)
     } else {
@@ -67,13 +68,11 @@ extension AppModel {
   }
 
   /// Puts the session's folder at the top of the history, whatever gave it: the open panel, a
-  /// card, a typed path or a template. The folder is the one the session was created in, or the
-  /// repository of the worktree it was created in; a coordinator's child records none (#529).
+  /// card, a typed path or a template. The folder is the one the session was created in; a
+  /// worktree or a coordinator's child records none (#529).
   ///
   /// Its identity is resolved through its links here, and only here: creation has just opened
   /// this folder, so reading it again raises no consent alert that has not already been answered.
-  /// A worktree's repository is the folder its session is filed under, which the sidebar resolves
-  /// on disk anyway (`SessionFolderResolution`).
   func rememberFolder(of session: WorkSession) async {
     guard let path = RecentFolders.folder(of: session) else { return }
     let lexical = RecentFolder.lexicalKey(of: path)

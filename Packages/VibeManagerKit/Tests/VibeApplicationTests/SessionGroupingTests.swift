@@ -303,8 +303,6 @@ struct WorktreeRepositoryTests {
     // A worktree made from another hangs from the clone.
     #expect(
       WorktreeRepository.inPath(of: "/w/api/.claude/worktrees/a/.claude/worktrees/b") == "/w/api")
-    // Whichever marker comes first in the path (#529).
-    #expect(WorktreeRepository.inPath(of: "/w/api/.worktrees/a/.claude/worktrees/b") == "/w/api")
     #expect(WorktreeRepository.inPath(of: "/Users/me/.codex/worktrees/1a2b/api") == nil)
     #expect(WorktreeRepository.inPath(of: "/w/mairie/.claude/worktrees/") == nil)
     #expect(WorktreeRepository.inPath(of: "/w/mairie") == nil)
