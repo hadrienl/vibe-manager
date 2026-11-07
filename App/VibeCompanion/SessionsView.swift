@@ -15,14 +15,27 @@ struct SessionsView: View {
   @State private var newSessionForm: NewSessionForm?
   /// The folders folded away, by path.
   @State private var collapsed: Set<String> = []
+  /// The coordinators whose done children show.
+  @State private var showingDone: Set<String> = []
+  /// The coordinators whose children are folded away, by a long press on their row.
+  @State private var foldedCoordinators: Set<String> = []
+  @State private var foldTicks = 0
+  /// The coordinator held down, while it is: cleared by the gesture itself, however it ends.
+  @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.3)))
+  private var pressedRow: String?
+  /// How long a coordinator is held down to fold: shorter than the system's half second, since
+  /// the row answers from the first touch.
+  private static let foldPress: Double = 0.35
 
   var body: some View {
+    let families = RemoteSessionFamilies(channel.sessions)
+    let groups = families.groups(in: filter, showingDone: showingDone, folded: foldedCoordinators)
     NavigationStack(path: $path) {
       List {
         Section {
           Picker("Status", selection: $filter) {
             ForEach(RemoteTaskStatus.columns, id: \.self) { status in
-              Text("\(Text(status.label)) \(count(status))").tag(status)
+              Text("\(Text(status.label)) \(families.count(in: status))").tag(status)
             }
           }
           .pickerStyle(.segmented)
@@ -33,13 +46,17 @@ struct SessionsView: View {
         ForEach(groups, id: \.path) { group in
           Section(isExpanded: expansion(of: group.path)) {
             ForEach(group.rows) { row in
-              Button {
-                path.append(row.session.id)
-              } label: {
-                SessionRow(session: row.session, indented: row.indented)
-              }
-              .foregroundStyle(.primary)
-              .statusSwipe(of: row.session) { channel.setStatus($0, of: row.session.id) }
+              rowView(row)
+                // A coordinator held down sinks in until it folds, as a row does before its menu;
+                // the line stays where it is, tied to the rows around.
+                .scaleEffect(pressedRow == row.id ? 0.96 : 1)
+                .background {
+                  if let line = row.line { FamilyLineView(line: line) }
+                }
+                // The line runs from row to row: no separator across it, but the ones around the
+                // family stay, folded or not.
+                .listRowSeparator(row.separatorAbove, edges: .top)
+                .listRowSeparator(row.separatorBelow, edges: .bottom)
             }
           } header: {
             FolderHeader(name: group.name, isExpanded: expansion(of: group.path))
@@ -51,6 +68,7 @@ struct SessionsView: View {
         }
       }
       .listStyle(.insetGrouped)
+      .sensoryFeedback(.impact, trigger: foldTicks)
       .navigationTitle("Vibe Manager")
       .toolbar {
         ToolbarItem(placement: .topBarLeading) {
@@ -136,52 +154,149 @@ struct SessionsView: View {
       })
   }
 
-  private func count(_ status: RemoteTaskStatus) -> Int {
-    channel.sessions.filter { $0.status == status }.count
-  }
-
-  // MARK: - Grouping
-
-  struct Row: Identifiable {
-    var id: String { session.id }
-    let session: RemoteSession
-    let indented: Bool
-  }
-
-  struct Group {
-    let path: String
-    let name: String
-    let rows: [Row]
-  }
-
-  /// The sessions of the column, by folder, each coordinator followed by its own sessions; a
-  /// session whose coordinator is in another column stands alone.
-  private var groups: [Group] {
-    let shown = channel.sessions.filter { $0.status == filter }
-    let shownIDs = Set(shown.map(\.id))
-    let byRank: (RemoteSession, RemoteSession) -> Bool = {
-      ($0.rank, $0.updatedAt) < ($1.rank, $1.updatedAt)
-    }
-    let children = Dictionary(
-      grouping: shown.filter { $0.coordinatorID.map(shownIDs.contains) ?? false },
-      by: { $0.coordinatorID ?? "" })
-    let tops = shown.filter { !($0.coordinatorID.map(shownIDs.contains) ?? false) }
-    let folders = Dictionary(grouping: tops, by: \.folderPath)
-    return folders.keys.sorted {
-      (folders[$0]?.first?.folderName ?? "").localizedStandardCompare(
-        folders[$1]?.first?.folderName ?? "") == .orderedAscending
-    }.map { path in
-      let sessions = (folders[path] ?? []).sorted(by: byRank)
-      var rows: [Row] = []
-      for session in sessions {
-        rows.append(Row(session: session, indented: false))
-        for child in (children[session.id] ?? []).sorted(by: byRank) {
-          rows.append(Row(session: child, indented: true))
+  @ViewBuilder private func rowView(_ row: RemoteSessionRow) -> some View {
+    switch row.content {
+    case .session(let session, let ownStatus):
+      let canFold = row.line == .parent || row.foldedChildren > 0
+      let label = SessionRow(
+        session: session, indented: row.isChild, ownStatus: ownStatus,
+        foldedChildren: row.foldedChildren)
+      Group {
+        if canFold {
+          // Gestures rather than a Button: in a List, a gesture added to a Button's row keeps its
+          // tap from opening anything. Held down, the row sinks in, in place of the highlight.
+          label
+            .contentShape(Rectangle())
+            .onTapGesture { path.append(session.id) }
+            .gesture(
+              LongPressGesture(minimumDuration: Self.foldPress)
+                .updating($pressedRow) { _, pressed, transaction in
+                  pressed = row.id
+                  transaction.animation = .easeOut(duration: Self.foldPress)
+                }
+                .onEnded { _ in toggleFold(of: session.id) }
+            )
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { path.append(session.id) }
+        } else {
+          // Any other row opens however long it is held, from anywhere in its cell.
+          Button {
+            path.append(session.id)
+          } label: {
+            label
+          }
+          .foregroundStyle(.primary)
         }
       }
-      return Group(path: path, name: sessions.first?.folderName ?? path, rows: rows)
+      .accessibilityValue(
+        canFold ? Text(row.foldedChildren > 0 ? "Collapsed" : "Expanded") : Text(verbatim: "")
+      )
+      .accessibilityActions {
+        if canFold {
+          Button(row.foldedChildren > 0 ? "Show Children" : "Hide Children") {
+            toggleFold(of: session.id)
+          }
+        }
+      }
+      .statusSwipe(of: session) { channel.setStatus($0, of: session.id) }
+    case .doneChildren(let coordinatorID, let count, let isShown):
+      DoneChildrenRow(count: count, isShown: isShown) {
+        withAnimation {
+          if isShown {
+            showingDone.remove(coordinatorID)
+          } else {
+            showingDone.insert(coordinatorID)
+          }
+        }
+      }
     }
   }
+
+  private func toggleFold(of id: String) {
+    // Every change of the list in one animated transaction: one made without an animation in the
+    // same update would remove the children at once.
+    withAnimation {
+      foldTicks += 1
+      if foldedCoordinators.contains(id) {
+        foldedCoordinators.remove(id)
+      } else {
+        foldedCoordinators.insert(id)
+      }
+    }
+  }
+
+}
+
+/// “Show Done Sessions (3)” under a coordinator's children, as on the Mac (#468).
+struct DoneChildrenRow: View {
+  let count: Int
+  let isShown: Bool
+  let toggle: () -> Void
+
+  var body: some View {
+    Button(action: toggle) {
+      HStack(spacing: 6) {
+        Image(systemName: "chevron.down")
+          .font(.caption2.weight(.semibold))
+          .rotationEffect(.degrees(isShown ? 180 : 0))
+        if isShown {
+          Text("Hide Done Sessions")
+        } else {
+          Text("Show Done Sessions (\(count))")
+        }
+        Spacer(minLength: 0)
+      }
+      .font(.subheadline)
+      .foregroundStyle(.secondary)
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .padding(.leading, FamilyLineGeometry.childIndent)
+  }
+}
+
+/// A row's piece of the line that ties a coordinator to its children, behind it (#468). Opaque:
+/// where the pieces of two rows meet, they do not darken each other.
+struct FamilyLineView: View {
+  let line: RemoteFamilyLine
+
+  var body: some View {
+    GeometryReader { proxy in
+      Path { path in
+        let geometry = FamilyLineGeometry.self
+        let middle = proxy.size.height / 2
+        switch line {
+        case .parent:
+          path.move(to: CGPoint(x: geometry.x, y: middle + geometry.badgeSize / 2 + geometry.gap))
+          path.addLine(to: CGPoint(x: geometry.x, y: proxy.size.height + geometry.overrun))
+        case .child(let isLast):
+          path.move(to: CGPoint(x: geometry.x, y: -geometry.overrun))
+          path.addLine(
+            to: CGPoint(
+              x: geometry.x, y: isLast ? middle : proxy.size.height + geometry.overrun))
+          path.move(to: CGPoint(x: geometry.x, y: middle))
+          path.addLine(to: CGPoint(x: geometry.childIndent - geometry.gap, y: middle))
+        }
+      }
+      .stroke(Color(.systemGray4), lineWidth: 1.5)
+    }
+    // Drawn from the leading edge, as the badges are laid out: on the right in Arabic.
+    .flipsForRightToLeftLayoutDirection(true)
+    .allowsHitTesting(false)
+    .accessibilityHidden(true)
+  }
+}
+
+/// Where the line runs, the badges set as `SessionRow` sets them.
+enum FamilyLineGeometry {
+  static let badgeSize: CGFloat = 34
+  /// Under the middle of the coordinator's badge.
+  static var x: CGFloat { badgeSize / 2 }
+  /// How far a child's badge is set in: room for the elbow.
+  static let childIndent: CGFloat = 28
+  static let gap: CGFloat = 3
+  /// Past the insets of the list's cells, to meet the next row's piece.
+  static let overrun: CGFloat = 20
 }
 
 /// One showing of the new session form.
@@ -212,6 +327,22 @@ struct CreatingSessionView: View {
   }
 }
 
+extension RemoteSessionRow {
+  /// The separator between a row and the one before: none inside a family.
+  fileprivate var separatorAbove: Visibility {
+    if case .child = line { return .hidden }
+    return .automatic
+  }
+
+  /// The separator between a row and the one after: none inside a family.
+  fileprivate var separatorBelow: Visibility {
+    switch line {
+    case .parent, .child(isLast: false): .hidden
+    case .child(isLast: true), nil: .automatic
+    }
+  }
+}
+
 /// A folder's header, which folds its sessions away: the whole line, as Mail's mailboxes.
 struct FolderHeader: View {
   let name: String
@@ -238,15 +369,20 @@ struct FolderHeader: View {
 struct SessionRow: View {
   let session: RemoteSession
   var indented = false
+  /// A child's own status, when it is listed in another column.
+  var ownStatus: RemoteTaskStatus?
+  /// How many children a folded coordinator hides.
+  var foldedChildren = 0
 
   var body: some View {
     HStack(spacing: 12) {
       SessionBadge(
-        appearance: session.appearance, activity: session.activity, size: indented ? 28 : 34)
+        appearance: session.appearance, activity: session.activity,
+        size: FamilyLineGeometry.badgeSize)
       VStack(alignment: .leading, spacing: 2) {
         HStack {
           Text(verbatim: session.name)
-            .font(indented ? .subheadline.weight(.semibold) : .body.weight(.semibold))
+            .font(.body.weight(.semibold))
             .lineLimit(1)
           Spacer(minLength: 8)
           if session.isCoordinator {
@@ -254,17 +390,36 @@ struct SessionRow: View {
               .labelStyle(.iconOnly)
               .foregroundStyle(.tint)
           }
+          if foldedChildren > 0 {
+            HStack(spacing: 2) {
+              Text(foldedChildren, format: .number)
+              Image(systemName: "chevron.forward")
+                .font(.caption2.weight(.semibold))
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            // Said by the row's value instead: Collapsed.
+            .accessibilityHidden(true)
+          }
           Text(verbatim: ShortDate.text(session.updatedAt))
             .font(.caption)
             .foregroundStyle(.secondary)
         }
-        Text(verbatim: session.subtitle)
-          .font(.subheadline)
-          .foregroundStyle(session.activity == .needsAttention ? Color.orange : .secondary)
-          .lineLimit(1)
+        HStack(spacing: 4) {
+          Text(verbatim: session.subtitle)
+            .foregroundStyle(session.activity == .needsAttention ? Color.orange : .secondary)
+          if let ownStatus {
+            Text(verbatim: "·")
+            Text(ownStatus.label)
+              .layoutPriority(1)
+          }
+        }
+        .font(.subheadline)
+        .foregroundStyle(.secondary)
+        .lineLimit(1)
       }
     }
-    .padding(.leading, indented ? 22 : 0)
+    .padding(.leading, indented ? FamilyLineGeometry.childIndent : 0)
     .accessibilityElement(children: .combine)
   }
 }
