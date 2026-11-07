@@ -1099,13 +1099,20 @@ extension AppModel {
   }
 
   /// The children that go to the archive with their coordinator (#525): every one not archived
-  /// yet, but those where something still runs — a child left running when the coordinator alone
-  /// was stopped goes on, in its own column, and finds its coordinator when it comes back.
+  /// yet, but those where something still runs, or is starting — a child left running when the
+  /// coordinator alone was stopped goes on, in its own column, and finds its coordinator when it
+  /// comes back.
   func childrenFollowingArchive(of id: SessionID) -> [WorkSession] {
     children(of: id).filter { child in
       launcher?.isRunning(child.id) != true && runningDrawerCommands(of: child.id).isEmpty
-        && !archivingSessionIDs.contains(child.id)
+        && !archivingSessionIDs.contains(child.id) && !restartingSessionIDs.contains(child.id)
     }
+  }
+
+  /// Whether a child still follows its coordinator to the archive, looked at again right before
+  /// it goes (#525): one started again while those before it were archived stays.
+  func followsArchive(_ child: SessionID, of id: SessionID) -> Bool {
+    childrenFollowingArchive(of: id).contains { $0.id == child }
   }
 
   /// Archives the children of a coordinator the user just archived (#525), as they would one by
@@ -1113,7 +1120,8 @@ extension AppModel {
   func archiveChildren(of id: SessionID, recordsByHand: Bool = true) async -> [WorkSession] {
     var archived: [WorkSession] = []
     for child in childrenFollowingArchive(of: id) {
-      guard archivingSessionIDs.insert(child.id).inserted else { continue }
+      guard followsArchive(child.id, of: id), archivingSessionIDs.insert(child.id).inserted
+      else { continue }
       defer { archivingSessionIDs.remove(child.id) }
       do {
         let archival = try await archiveProcess(child.id, recordsByHand: recordsByHand)
@@ -1126,6 +1134,28 @@ extension AppModel {
       }
     }
     return archived
+  }
+
+  /// The children that come back with a coordinator unarchived (#525): those archived with it,
+  /// or after it — a child left running when it went, archived since, would have gone with it.
+  /// One archived on its own before stays archived. Read before the coordinator comes back: its
+  /// archive date goes with it.
+  func childrenArchived(with id: SessionID) -> [SessionID] {
+    guard let archivedAt = sessions.first(where: { $0.id == id })?.archivedAt else { return [] }
+    return sessions.filter { session in
+      session.status == .archived && session.coordination?.coordinatorID == id
+        && (session.archivedAt ?? .distantPast) >= archivedAt
+    }.map(\.id)
+  }
+
+  /// Unarchives the children archived with a coordinator just unarchived (#525): they come back
+  /// closed, in Done, as any session unarchived.
+  func restoreChildren(_ ids: [SessionID]) async {
+    for id in ids {
+      guard case .failed = await restoreInBatch(id) else { continue }
+      diagnostics.record(
+        .session, .error, "coordination.childNotRestored", ["session": diagnostics.pseudonym(id)])
+    }
   }
 }
 

@@ -156,7 +156,8 @@ public final class ArchiveRulesModel {
       return
     }
     var facts: [SessionID: (branch: String?, isDirty: Bool?)] = [:]
-    for candidate in await readGitFacts(candidates()) {
+    // Those in Done: a rule archives no other.
+    for candidate in await readGitFacts(candidates().filter { $0.session.taskStatus == .done }) {
       facts[candidate.id] = (candidate.branch, candidate.isDirty)
     }
     gitFacts = facts
