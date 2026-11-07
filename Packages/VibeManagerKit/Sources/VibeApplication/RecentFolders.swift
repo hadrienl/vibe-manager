@@ -63,10 +63,30 @@ public struct RecentFolders: Equatable, Sendable {
     let folders =
       sessions
       .sorted { $0.createdAt > $1.createdAt }
-      .compactMap { $0.repositories.first?.path }
-      .filter { !$0.isEmpty }
+      .compactMap(folder(of:))
       .map(RecentFolder.init(lexicalPath:))
     return RecentFolders(folders)
+  }
+
+  /// The folder a session gives the history (#529): never a worktree — a task's folder, gone with
+  /// it, and no place to start the next session from — but the repository it belongs to, recorded
+  /// with the session (#525) or read in the path of one created before. `nil` for none.
+  public static func folder(of session: WorkSession) -> String? {
+    SessionFolderKey.primaryPath(of: session).map { WorktreeRepository.inPath(of: $0) ?? $0 }
+  }
+
+  /// The history with each worktree its sessions wrote in it replaced by its repository, read in
+  /// the path (#529). The repository is listed where it, or one of its worktrees, was used last.
+  public func replacingWorktrees() -> RecentFolders {
+    RecentFolders(
+      entries.map { entry in
+        guard let repository = WorktreeRepository.inPath(of: entry.path) else { return entry }
+        let spelling = RecentFolder.lexicalKey(of: repository)
+        // The entry the repository already has keeps the identity read on disk.
+        return entries.first {
+          $0.key == spelling || RecentFolder.lexicalKey(of: $0.path) == spelling
+        } ?? RecentFolder(lexicalPath: repository)
+      })
   }
 }
 

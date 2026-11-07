@@ -16,7 +16,8 @@ extension AppModel {
     guard recentFolderHistory != .ready else { return }
     let base: RecentFolders
     if let stored {
-      base = stored
+      // Written before #529, it may list the worktrees of coordinated sessions.
+      base = stored.replacingWorktrees()
     } else if case .loaded(let sessions) = state {
       base = RecentFolders.seeded(from: sessions)
     } else {
@@ -29,7 +30,7 @@ extension AppModel {
     let spellings = Set(recorded.map { RecentFolder.lexicalKey(of: $0.path) })
     recentFolders = RecentFolders(recorded + base.entries.filter { !spellings.contains($0.key) })
     recentFolderHistory = .ready
-    if stored == nil || !recorded.isEmpty {
+    if base != stored || !recorded.isEmpty {
       await recentFolderStore.save(recentFolders)
     }
   }
@@ -42,7 +43,7 @@ extension AppModel {
   ///
   /// Its identity is resolved meanwhile, off the main actor, without holding up the launch.
   func noteFolder(of session: WorkSession) {
-    guard let path = session.repositories.first?.path, !path.isEmpty else { return }
+    guard let path = RecentFolders.folder(of: session) else { return }
     let noted = RecentFolder(lexicalPath: path)
     notedFolder = noted
     Task { [weak self] in
@@ -66,12 +67,14 @@ extension AppModel {
   }
 
   /// Puts the session's folder at the top of the history, whatever gave it: the open panel, a
-  /// card, a typed path or a template. The folder is the one the session was created in.
+  /// card, a typed path or a template. The folder is the one the session was created in, or the
+  /// repository of the worktree it was created in (#529).
   ///
   /// Its identity is resolved through its links here, and only here: creation has just opened
-  /// this folder, so reading it again raises no consent alert that has not already been answered.
+  /// this folder, or the worktree whose `.git` named it, so reading it again raises no consent
+  /// alert that has not already been answered.
   func rememberFolder(of session: WorkSession) async {
-    guard let path = session.repositories.first?.path, !path.isEmpty else { return }
+    guard let path = RecentFolders.folder(of: session) else { return }
     let lexical = RecentFolder.lexicalKey(of: path)
     let key = await Task.detached { CanonicalPath.of(lexical) }.value
     // A folder seeded from the sessions was keyed by its spelling: that entry is this folder too.

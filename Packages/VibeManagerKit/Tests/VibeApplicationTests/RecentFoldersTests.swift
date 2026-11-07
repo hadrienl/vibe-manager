@@ -88,6 +88,46 @@ struct RecentFoldersTests {
     #expect(folders.entries.first?.key == NSHomeDirectory() + "/code")
   }
 
+  @Test("A session started in a worktree gives the history its repository (#529)")
+  func seededWithoutWorktrees() {
+    var recorded = session(folder: "/elsewhere/feat-1", createdAt: 3)
+    recorded.repositories[0].mainRepositoryPath = "/code/app"
+    let sessions = [
+      recorded,
+      // Created before the repository was kept with the session: read in the path.
+      session(folder: "/code/web/.claude/worktrees/fix-2", createdAt: 2),
+      session(folder: "/code/app", createdAt: 1),
+    ]
+
+    let folders = RecentFolders.seeded(from: sessions)
+
+    #expect(folders.entries.map(\.path) == ["/code/app", "/code/web"])
+  }
+
+  @Test("Worktrees already in the history give way to their repository, listed once (#529)")
+  func replacingWorktrees() {
+    let folders = RecentFolders([
+      folder("/code/app/.claude/worktrees/feat-1"),
+      folder("/code/web"),
+      folder("/code/app/.worktrees/fix-2"),
+      folder("/code/app", key: "/private/code/app"),
+      folder("/plain"),
+    ]).replacingWorktrees()
+
+    // Where a worktree of it was used last, under the identity its own entry had.
+    #expect(
+      folders.entries == [
+        folder("/code/app", key: "/private/code/app"), folder("/code/web"), folder("/plain"),
+      ])
+  }
+
+  @Test("A history without worktrees is left as it is")
+  func noWorktreeToReplace() {
+    let folders = RecentFolders([folder("/a"), folder("/b")])
+
+    #expect(folders.replacingWorktrees() == folders)
+  }
+
   @Test("The first history stays within the limit")
   func seedingIsBounded() {
     let sessions = (0..<30).map { session(folder: "/f\($0)", createdAt: TimeInterval($0)) }
