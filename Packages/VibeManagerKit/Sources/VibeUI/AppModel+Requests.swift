@@ -69,9 +69,10 @@ extension AppModel {
 
   /// Every request waiting, the session on screen's included: the Dock counts them all, the user
   /// may be in another application.
-  /// A dialog of a start shows once its screen was read — a guess only, the prompt at rest may
-  /// take it away — and once every session to restore has started: they come together, not one
-  /// after the other as the queue reaches them.
+  /// A dialog of a start shows once its screen was read and showed something — a guess only, the
+  /// prompt at rest may take it away, and a blank screen is an agent still starting (#474) — and
+  /// once every session to restore has started: they come together, not one after the other as
+  /// the queue reaches them.
   private func showsStartupDialog(_ request: AgentRequest) -> Bool {
     guard case .inTerminal(let prompt) = request.content,
       [.startup, .update, .trust].contains(prompt.kind)

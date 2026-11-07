@@ -69,11 +69,13 @@ extension AppModel {
     }
     guard let id = startup(state), startup(previous) != id, let answerRequest else { return }
     Task { [weak self] in
-      await answerRequest.readStartupDialog(id)
-      self?.readStartupGuesses.insert(id)
-      self?.requestsDidChange()
-      await answerRequest.followStartupDialog(id)
+      // Shown once the screen shows something: a blank one is an agent still starting (#474).
+      await answerRequest.followStartupDialog(id) { @MainActor [weak self] in
+        self?.readStartupGuesses.insert(id)
+        self?.requestsDidChange()
+      }
       self?.readStartupGuesses.remove(id)
+      self?.requestsDidChange()
     }
   }
 
