@@ -14,7 +14,8 @@ extension ClaudeCodeAgentProvider: AgentConversationReporting {
     if let identifier = conversation.resumeIdentifier?.trimmingCharacters(in: .whitespaces),
       !identifier.isEmpty,
       let found = transcriptLocations.claudeTranscript(
-        for: identifier, workingDirectory: RestartSession.workingDirectoryPath(of: session))
+        for: identifier, providerID: conversation.providerID,
+        workingDirectory: RestartSession.workingDirectoryPath(of: session))
     {
       files = [found]
     }
@@ -79,8 +80,10 @@ extension CodexAgentProvider: AgentConversationReporting {
     guard let identifier = conversation.resumeIdentifier?.trimmingCharacters(in: .whitespaces),
       !identifier.isEmpty
     else { return [] }
-    return transcriptLocations.codexRollouts(for: identifier, since: session.createdAt)
-      .sorted { $0.lastPathComponent < $1.lastPathComponent }
+    return transcriptLocations.codexRollouts(
+      for: identifier, providerID: conversation.providerID, since: session.createdAt
+    )
+    .sorted { $0.lastPathComponent < $1.lastPathComponent }
   }
 
   public func conversationDecoder(for file: URL) -> any ConversationDecoding {

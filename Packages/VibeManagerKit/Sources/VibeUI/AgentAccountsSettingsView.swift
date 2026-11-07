@@ -240,7 +240,7 @@ struct AgentAccountSections: View {
               Text("Cancel", bundle: .module)
             }
           }
-        case .otherAccount(let expected, let actual, let detail)?:
+        case .otherAccount(let expected, let actual, let detail, _, _)?:
           Text(
             "\(agent.displayName) is now signed in to \(AgentSignInProgress.label(of: actual)), not \(expected.label).",
             bundle: .module, comment: "An agent's name, then two email addresses.")
@@ -256,6 +256,18 @@ struct AgentAccountSections: View {
               model.keepSignedInAccount(of: agent.id)
             } label: {
               Text("Keep This Account", bundle: .module)
+            }
+          }
+        case .sameAccount(let other)?:
+          Text(
+            "\(agent.displayName) is signed in to the same account as \(other).", bundle: .module,
+            comment: "Two agents' names: an extra account of Claude Code or Codex, and another.")
+          HStack {
+            Spacer()
+            Button {
+              model.signIn(agent: agent.id)
+            } label: {
+              Text("Sign In Again", bundle: .module)
             }
           }
         case .failed(let detail, _)?:

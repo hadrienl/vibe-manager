@@ -51,12 +51,17 @@ struct AgentAccountProvidersTests {
     let locator = AgentTranscriptLocator(
       claudeProjects: root.appendingPathComponent("own/projects"),
       codexSessions: root.appendingPathComponent("own/sessions"), homes: homes)
-    #expect(locator.claudeTranscripts(for: "abc").isEmpty)
-    homes.replace(claudeHomes: [account], codexHomes: [])
-    #expect(locator.claudeTranscripts(for: "abc").map(\.lastPathComponent) == ["abc.jsonl"])
+    #expect(locator.claudeTranscripts(for: "abc", providerID: "account.1").isEmpty)
+    homes.replace(claudeHomes: ["account.1": account], codexHomes: [:])
+    #expect(
+      locator.claudeTranscripts(for: "abc", providerID: "account.1").map(\.lastPathComponent)
+        == ["abc.jsonl"])
     let cache = TranscriptLocationCache(locator: locator)
-    #expect(cache.claudeTranscript(for: "abc", workingDirectory: nil)?.lastPathComponent == "abc.jsonl")
-    #expect(cache.claudeTranscript(for: "abc", workingDirectory: "/work") != nil)
+    #expect(
+      cache.claudeTranscript(for: "abc", providerID: "account.1", workingDirectory: nil)?
+        .lastPathComponent == "abc.jsonl")
+    #expect(
+      cache.claudeTranscript(for: "abc", providerID: "account.1", workingDirectory: "/work") != nil)
   }
 
   @Test("The address is read from the CLI's status")
@@ -72,6 +77,7 @@ struct AgentAccountProvidersTests {
     #expect(AgentHomeDirectory.shellQuoted("/a b") == "'/a b'")
   }
 
+  /// `cp -R ~/.claude ~/.claude-2`: every file of the copy is newer than its original.
   @Test("A folder copied to start an account does not count a conversation twice")
   func copiedHome() throws {
     let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -84,14 +90,58 @@ struct AgentAccountProvidersTests {
       try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: file.path)
       return file
     }
-    _ = try transcript(in: "one", at: Date(timeIntervalSince1970: 1_000))
-    let newer = try transcript(in: "two", at: Date(timeIntervalSince1970: 2_000))
+    let original = try transcript(in: "one", at: Date(timeIntervalSince1970: 1_000))
+    let copy = try transcript(in: "two", at: Date(timeIntervalSince1970: 2_000))
     let homes = AgentHomes()
-    homes.replace(claudeHomes: [root.appendingPathComponent("two")], codexHomes: [])
+    homes.replace(claudeHomes: ["account.2": root.appendingPathComponent("two")], codexHomes: [:])
     let locator = AgentTranscriptLocator(
       claudeProjects: root.appendingPathComponent("one/projects"), homes: homes)
-    let found = locator.claudeTranscripts(for: "abc")
-    #expect(found.count == 1)
-    #expect(found.first?.resolvingSymlinksInPath().path == newer.resolvingSymlinksInPath().path)
+    func found(by providerID: String) -> [String] {
+      locator.claudeTranscripts(for: "abc", providerID: providerID).map {
+        $0.resolvingSymlinksInPath().path
+      }
+    }
+    // The agent's conversation is its own folder's, the copy's however newer; an endpoint's too.
+    #expect(found(by: "claude-code") == [original.resolvingSymlinksInPath().path])
+    #expect(found(by: "endpoint.1") == [original.resolvingSymlinksInPath().path])
+    #expect(found(by: "account.2") == [copy.resolvingSymlinksInPath().path])
+    // An account removed: wherever it is, once — the folder written last.
+    #expect(found(by: "account.gone") == [copy.resolvingSymlinksInPath().path])
+    let cache = TranscriptLocationCache(locator: locator)
+    #expect(
+      cache.claudeTranscript(for: "abc", providerID: "claude-code", workingDirectory: nil)?
+        .resolvingSymlinksInPath().path == original.resolvingSymlinksInPath().path)
+  }
+
+  @Test("A Codex folder copied to start an account does not count a rollout twice")
+  func copiedCodexHome() throws {
+    let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    defer { try? FileManager.default.removeItem(at: root) }
+    let day = Date(timeIntervalSince1970: 1_700_000_000)
+    let parts = Calendar(identifier: .gregorian).dateComponents(in: .current, from: day)
+    func rollout(in home: String, at date: Date) throws -> URL {
+      let folder = root.appendingPathComponent(home).appendingPathComponent(
+        String(
+          format: "sessions/%04d/%02d/%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0))
+      try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+      let file = folder.appendingPathComponent("rollout-x-xyz.jsonl")
+      try Data().write(to: file)
+      try FileManager.default.setAttributes([.modificationDate: date], ofItemAtPath: file.path)
+      return file
+    }
+    let original = try rollout(in: "one", at: Date(timeIntervalSince1970: 1_000))
+    let copy = try rollout(in: "two", at: Date(timeIntervalSince1970: 2_000))
+    let homes = AgentHomes()
+    homes.replace(claudeHomes: [:], codexHomes: ["account.2": root.appendingPathComponent("two")])
+    let locator = AgentTranscriptLocator(
+      codexSessions: root.appendingPathComponent("one/sessions"), homes: homes)
+    func found(by providerID: String) -> [String] {
+      locator.codexRollouts(for: "xyz", providerID: providerID, since: day, until: day).map {
+        $0.resolvingSymlinksInPath().path
+      }
+    }
+    #expect(found(by: "codex") == [original.resolvingSymlinksInPath().path])
+    #expect(found(by: "account.2") == [copy.resolvingSymlinksInPath().path])
+    #expect(found(by: "account.gone") == [copy.resolvingSymlinksInPath().path])
   }
 }

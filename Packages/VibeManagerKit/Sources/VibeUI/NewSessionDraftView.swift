@@ -28,7 +28,8 @@ public struct NewSessionDraftView: View {
   /// Where the working folder lies in the draft, for a folder dropped on it.
   @State private var folderZone = CGRect.null
 
-  private static let dropSpace = "new-session-draft"
+  /// Read by the geometry's transform, a `Sendable` closure: not isolated to the main actor.
+  private nonisolated static let dropSpace = "new-session-draft"
 
   private static func message(for hover: NewSessionDropHover) -> String {
     switch hover {

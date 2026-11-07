@@ -397,11 +397,26 @@ extension AppModel {
           photos[id] = await archiveSnapshot(of: session, at: date)
         }
       }
-      results.merge(
-        await concurrently(eligible) {
-          await $0.archiveInBatch($1, recordsByHand: !together)
-        }
-      ) { $1 }
+      // A coordinator's children once it is archived: archived after it, they come back with it
+      // when it is unarchived (#525).
+      let (leading, following) = coordinatorsFirst(eligible)
+      let chosen = Set(current.eligible)
+      for wave in [leading, following] {
+        results.merge(
+          await concurrently(wave) { model, id in
+            // One that only follows its coordinator is looked at again, the coordinator's stop
+            // waited out: started meanwhile, it stays. One the user chose goes, as asked.
+            if !chosen.contains(id),
+              let coordinator = model.sessions.first(where: { $0.id == id })?.coordination?
+                .coordinatorID,
+              !model.followsArchive(id, of: coordinator)
+            {
+              return .skipped(.stillRunning)
+            }
+            return await model.archiveInBatch(id, recordsByHand: !together)
+          }
+        ) { $1 }
+      }
       if together {
         let archived = eligible.filter { results[$0]?.isDone == true }.compactMap {
           photos[$0]
@@ -418,7 +433,12 @@ extension AppModel {
           return SessionArchiveUndo(id: id, taskStatus: column, wasSelected: id == shown)
         })
     case .unarchive:
-      for id in current.eligible { results[id] = await restoreInBatch(id) }
+      for id in current.eligible {
+        // A coordinator's children archived with it come back with it (#525).
+        let children = childrenArchived(with: id)
+        results[id] = await restoreInBatch(id)
+        if results[id]?.isDone == true { await restoreChildren(children) }
+      }
     case .restart:
       // One after the other, as the restoration does: several agents starting at once on a cold
       // disk is an application that stops answering.

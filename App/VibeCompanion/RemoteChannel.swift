@@ -5,12 +5,6 @@ import Observation
 import Security
 import UIKit
 
-/// A creation that did not happen: all that was asked, and why.
-struct ReturnedCreation: Equatable {
-  let request: RemoteNewSession
-  let error: String
-}
-
 /// The phone's end of the direct channel (#399, #400): the Mac's sessions, the conversation shown,
 /// and what the user does to them, over iroh while the application is in the foreground.
 ///
@@ -223,6 +217,7 @@ final class RemoteChannel {
       macProtocolVersion = version
     case .sessions(let sessions):
       self.sessions = sessions
+      if let answer = creation.listed(sessions, noAnswer: Self.noAnswer) { settle(answer) }
     case .conversation(let conversation):
       guard conversation.sessionID == shownSessionID else { return }
       self.conversation = conversation
@@ -429,21 +424,45 @@ final class RemoteChannel {
   }
 
   func create(_ session: RemoteNewSession) {
-    if creation.submit(session) { write(.createSession(session)) }
+    if creation.submit(session, listed: sessions) { write(.createSession(session)) }
     awaitCreation()
   }
 
-  /// No answer in this time, and the form comes back: the Mac may be asleep, or out of reach.
+  /// A creation that came back: what to show now, on the waiting screen; kept otherwise, for
+  /// `takeKeptCreation`.
+  func show(_ returned: ReturnedCreation, isWaiting: Bool) -> ReturnedCreation? {
+    creation.returned(returned, isWaiting: isWaiting)
+  }
+
+  /// What New Session opens with: a creation that came back while the user was elsewhere, once.
+  func takeKeptCreation() -> ReturnedCreation? {
+    creation.takeKept()
+  }
+
+  /// No answer in this time, and the form comes back: the Mac may be asleep, or out of reach. One
+  /// asked before the channel closed may have been made, until the Mac's first list on the next
+  /// connection says: the form says to look at the list rather than to try again.
   private func awaitCreation() {
     creationTimeout?.cancel()
     creationTimeout = Task { [weak self] in
       try? await Task.sleep(for: .seconds(30))
-      guard !Task.isCancelled, let self, let request = self.creation.expire() else { return }
+      guard !Task.isCancelled, let self else { return }
+      let mayExist = self.creation.isUnanswered
+      guard let request = self.creation.expire() else { return }
       self.returnedCreation = ReturnedCreation(
         request: request,
-        error: String(
-          localized: "The Mac didn’t answer. Check that it’s awake, then try again."))
+        error: mayExist
+          ? String(
+            localized:
+              "The connection to the Mac was lost before it answered. The session may already exist: check the list before trying again."
+          )
+          : Self.noAnswer)
     }
+  }
+
+  /// Why a creation came back when nothing says the Mac received it.
+  private static var noAnswer: String {
+    String(localized: "The Mac didn’t answer. Check that it’s awake, then try again.")
   }
 
   private func settle(_ answer: RemoteCreation.Answer) {

@@ -29,6 +29,7 @@ extension AppModel {
     sessions.filter { $0.status != .archived }.map { session in
       ArchiveCandidate(
         session: session, project: groupName(of: session),
+        ownFolderName: ownFolderName(of: session),
         isRunning: launcher?.isRunning(session.id) == true
           || !runningDrawerCommands(of: session.id).isEmpty
           || archivingSessionIDs.contains(session.id))
@@ -39,6 +40,16 @@ extension AppModel {
   func groupName(of session: WorkSession) -> String? {
     guard let key = folderKey(for: session) else { return nil }
     return folderLabels[key] ?? URL(fileURLWithPath: key.path).lastPathComponent
+  }
+
+  /// The name of the folder a session works in, when it is filed under another: a worktree's,
+  /// under its repository (#525). The project a rule written before named it by.
+  func ownFolderName(of session: WorkSession) -> String? {
+    guard let path = session.repositories.first?.path, !path.isEmpty,
+      let key = folderKey(for: session)
+    else { return nil }
+    let own = SessionFolderKey.lexical(path)
+    return own == key ? nil : URL(fileURLWithPath: own.path).lastPathComponent
   }
 
   /// The colours of the palette by their names, the symbols' names and the agents'.
@@ -73,11 +84,11 @@ extension AppModel {
       agents: agentNames.keys.sorted())
   }
 
-  /// The candidates in Done, with the branch and the state of their folder read from Git.
+  /// The candidates, with the branch and the state of their folder read from Git. Those in Done
+  /// are the ones a rule archives; a coordinator's child follows it from any column (#525).
   func withGitFacts(_ candidates: [ArchiveCandidate]) async -> [ArchiveCandidate] {
     guard let reader = archiveRules?.gitReader else { return candidates }
-    let folders = Set(
-      candidates.filter { $0.session.taskStatus == .done }.compactMap(\.folder))
+    let folders = Set(candidates.compactMap(\.folder))
     // Several folders at a time: one slow to answer does not hold up the others.
     let facts = await withTaskGroup(of: (String, String?, Bool)?.self) { group in
       var facts: [String: (branch: String?, isDirty: Bool)] = [:]
@@ -105,9 +116,7 @@ extension AppModel {
       return facts
     }
     return candidates.map { candidate in
-      guard candidate.session.taskStatus == .done, let folder = candidate.folder,
-        let fact = facts[folder]
-      else { return candidate }
+      guard let folder = candidate.folder, let fact = facts[folder] else { return candidate }
       var candidate = candidate
       candidate.branch = fact.branch
       candidate.isDirty = fact.isDirty
@@ -183,7 +192,10 @@ extension AppModel {
     let conditions = runs.compactMap(\.rule.condition) + protections.map(\.condition)
     let readsGit = conditions.contains(where: \.readsGit)
     if readsGit {
-      candidates = await model.readGitFacts(candidates)
+      // Those in Done: a rule archives no other.
+      let read = await model.readGitFacts(candidates.filter { $0.session.taskStatus == .done })
+      let facts = Dictionary(read.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+      candidates = candidates.map { facts[$0.id] ?? $0 }
     }
     var archivedAny = false
     for run in runs {
@@ -197,7 +209,9 @@ extension AppModel {
         // Reading Git and archiving take time: the user may have started, moved or protected a
         // session since the plan. Each is looked at again, as it stands now, right before.
         await reload()
-        for id in plan.archived {
+        // A coordinator before its children, whatever their dates in Done (#525).
+        let (leading, following) = coordinatorsFirst(plan.archived)
+        for id in leading + following {
           guard var live = archiveCandidates().first(where: { $0.id == id }) else { continue }
           // Its folder too: a file changed since the plan keeps a session with changes.
           if readsGit {
@@ -217,11 +231,16 @@ extension AppModel {
             archived.append(id)
             photos.append(photo)
             // A coordinator's children go with it (#525), in the same batch: those a protection
-            // names stay, as anything else running does.
-            for child in childrenFollowingRule(of: id, protections: protections, now: now) {
-              guard archivingSessionIDs.insert(child.id).inserted else { continue }
+            // names stay, as anything else running does. Each looked at again right before, as
+            // the coordinator was: one started again meanwhile stays.
+            for child in childrenFollowingArchive(of: id) {
+              guard
+                let live = await followingRule(
+                  child.id, of: id, protections: protections, now: now),
+                archivingSessionIDs.insert(child.id).inserted
+              else { continue }
               defer { archivingSessionIDs.remove(child.id) }
-              let photo = await archiveSnapshot(of: child, at: now)
+              let photo = await archiveSnapshot(of: live, at: now)
               if await archiveByRule(child.id, run: run) {
                 archived.append(child.id)
                 photos.append(photo)
@@ -239,9 +258,12 @@ extension AppModel {
           guard let candidate = candidates.first(where: { $0.id == id }) else { continue }
           photos.append(await archiveSnapshot(of: candidate.session, at: now))
           // And the children that would go with it (#525).
-          for child in childrenFollowingRule(of: id, protections: protections, now: now)
-          where listed.insert(child.id).inserted {
-            photos.append(await archiveSnapshot(of: child, at: now))
+          for child in childrenFollowingArchive(of: id) where !listed.contains(child.id) {
+            guard
+              let live = await followingRule(child.id, of: id, protections: protections, now: now)
+            else { continue }
+            listed.insert(child.id)
+            photos.append(await archiveSnapshot(of: live, at: now))
           }
         }
       }
@@ -281,18 +303,27 @@ extension AppModel {
 }
 
 extension AppModel {
-  /// The children that go to the archive with a coordinator a rule archives (#525): those that
-  /// would go with it by hand, but the ones a protection names.
-  func childrenFollowingRule(
-    of id: SessionID, protections: [ArchiveProtection], now: Date
-  ) -> [WorkSession] {
-    let calendar = archiveRules?.calendar() ?? .autoupdatingCurrent
-    let candidates = archiveCandidates()
-    return childrenFollowingArchive(of: id).filter { child in
-      guard let candidate = candidates.first(where: { $0.id == child.id }) else { return false }
-      return ArchiveRuleEvaluation.protection(
-        of: candidate, among: protections, now: now, calendar: calendar) == nil
+  /// A child that goes to the archive with a coordinator a rule archives (#525), as it stands now:
+  /// as it would go by hand, unless a protection names it — its folder read from Git when a
+  /// protection asks, as the coordinator's was, whatever its column. `nil` when it stays.
+  func followingRule(
+    _ child: SessionID, of id: SessionID, protections: [ArchiveProtection], now: Date
+  ) async -> WorkSession? {
+    guard followsArchive(child, of: id),
+      var candidate = archiveCandidates().first(where: { $0.id == child })
+    else { return nil }
+    if protections.contains(where: \.condition.readsGit), let model = archiveRules {
+      guard let read = await model.readGitFacts([candidate]).first else { return nil }
+      candidate = read
     }
+    let calendar = archiveRules?.calendar() ?? .autoupdatingCurrent
+    guard
+      ArchiveRuleEvaluation.protection(
+        of: candidate, among: protections, now: now, calendar: calendar) == nil,
+      // Git takes its time: the child may have been started again meanwhile.
+      followsArchive(child, of: id)
+    else { return nil }
+    return candidate.session
   }
 
   /// Archives one session for a rule, as an archive by hand does but without ⌘Z: a rule's archive

@@ -268,4 +268,17 @@ struct CodexAgentProviderTests {
     #expect(capabilities.supportsResume)
     #expect(capabilities.reportsUsage)
   }
+
+  /// #478: `codex login` signs ChatGPT in, and would replace a key with it.
+  @Test("Signing in again is offered for ChatGPT only, read from `codex login status`")
+  func signInRoute() {
+    func route(_ status: String) -> AgentSignInRoute { CodexLoginStatus.signInRoute(in: status) }
+    #expect(route("Logged in using ChatGPT\n") == .browser)
+    #expect(route("Not logged in\n") == .browser)
+    let key = "API key configured - sk-proj-***ABCDE\nAuthentication is checked when you send…"
+    #expect(route(key) == .elsewhere)
+    #expect(route("Logged in using access token\n") == .elsewhere)
+    #expect(route("Logged in using Amazon Bedrock API key\n") == .elsewhere)
+    #expect(route("") == .browser)
+  }
 }

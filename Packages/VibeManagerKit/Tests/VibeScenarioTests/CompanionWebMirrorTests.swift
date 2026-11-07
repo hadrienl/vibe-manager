@@ -1,4 +1,5 @@
 import CompanionCore
+import CompanionWire
 import Foundation
 import Testing
 import VibeCompanionLink
@@ -107,6 +108,63 @@ struct CompanionWebMirrorTests {
     }
   }
 
+  @Test("A hard link to a file elsewhere is not read")
+  func hardLink() async throws {
+    let (root, artifact) = try folder()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let secret = root.appendingPathComponent("id_ed25519")
+    try Data("key".utf8).write(to: secret)
+    let link = artifact.appendingPathComponent("key.txt")
+    try FileManager.default.linkItem(at: secret, to: link)
+    #expect(await get(link, in: [artifact]).failure == CompanionStrings.addressRefused)
+  }
+
+  @Test("A page of the Mac's too large for a frame answers 413; one at the limit fits the link")
+  func largePage() async throws {
+    // This test alone registers the page, which another test removing it would pull away.
+    #expect(URLProtocol.registerClass(LocalPage.self))
+    defer { URLProtocol.unregisterClass(LocalPage.self) }
+    func fetch(_ size: Int, saysLength: Bool) async -> RemoteHTTPResponse {
+      let url = "http://localhost/vibe-mirror-test/\(saysLength ? "said" : "unsaid")/\(size)"
+      return await CompanionWebMirror.fetch(
+        RemoteHTTPRequest(id: 1, url: url, method: "GET", headers: [:], body: nil))
+    }
+    func answer(_ size: Int, saysLength: Bool) async -> String {
+      let response = await fetch(size, saysLength: saysLength)
+      return "\(response.status) \(response.body.count) \(response.failure ?? "")"
+    }
+    let limit = CompanionWebMirror.maximumFileLength
+    #expect(await answer(5, saysLength: false) == "200 5 ")
+    // Bytes of 0xFF, all `/` in base64, which JSON escapes: the most a byte can weigh.
+    let page = await fetch(limit, saysLength: true)
+    #expect(page.status == 200)
+    #expect(page.body.count == limit)
+    #expect(try fitsTheLink(page))
+    #expect(await answer(limit + 1, saysLength: true) == "413 0 ")
+    #expect(await answer(limit + 1, saysLength: false) == "413 0 ")
+  }
+
+  @Test("A file at the limit, the worst for JSON, fits a frame and then the link")
+  func worstCaseFile() async throws {
+    let (root, artifact) = try folder()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let blob = artifact.appendingPathComponent("blob.bin")
+    try Data(repeating: 0xFF, count: CompanionWebMirror.maximumFileLength).write(to: blob)
+    let file = await get(blob, in: [artifact])
+    #expect(file.status == 200)
+    #expect(try fitsTheLink(file))
+  }
+
+  /// Whether a response to a phone fits the channel's frame, and the link the companion's agent
+  /// gets it by.
+  private func fitsTheLink(_ response: RemoteHTTPResponse) throws -> Bool {
+    let message = RemoteMessage.httpResponse(response)
+    let wrapped = try JSONEncoder().encode(
+      CompanionLinkMessage.remoteSend(peer: "abcdefghij-12345", message))
+    return RemoteFrame.encode(message).count - 4 <= RemoteFrame.maximumLength
+      && wrapped.count <= CompanionLinkWire.maximumPayloadLength
+  }
+
   @Test("A folder holding too much else opens nothing")
   func broadFolders() async {
     let home = URL(fileURLWithPath: NSHomeDirectory())
@@ -119,6 +177,19 @@ struct CompanionWebMirrorTests {
     #expect(!CompanionWebMirror.isTooBroad(home.appendingPathComponent("Documents/report").path))
     let key = home.appendingPathComponent(".ssh/id_rsa")
     #expect(!CompanionWebMirror.isReadable(key, in: [home]))
+  }
+
+  @Test("Nothing in ~/Library is opened: browsers' profiles, iCloud Drive")
+  func library() {
+    let library = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent("Library")
+    for folder in [
+      "Application Support", "Application Support/Google/Chrome/Default",
+      "Mobile Documents/com~apple~CloudDocs", "Mobile Documents/com~apple~CloudDocs/Site",
+    ].map(library.appendingPathComponent) {
+      #expect(CompanionWebMirror.isTooBroad(folder.path), "\(folder.path)")
+      let page = folder.appendingPathComponent("index.html")
+      #expect(!CompanionWebMirror.isReadable(page, in: [folder]), "\(page.path)")
+    }
   }
 
   @Test("A file not sent answers with its status, the channel stays up")
@@ -148,5 +219,32 @@ struct CompanionWebMirrorTests {
     #expect(type("app.wasm", Data([0xFF])) == "application/wasm")
     #expect(type("blob", Data([0xFF])) == "application/octet-stream")
     #expect(type("latin.txt", Data([0xE9])) == "text/plain")
+  }
+}
+
+/// A page of the Mac's own: `http://localhost/vibe-mirror-test/<said|unsaid>/<size>` answers that
+/// many bytes, its length in a header or not.
+private final class LocalPage: URLProtocol {
+  override class func canInit(with request: URLRequest) -> Bool {
+    request.url?.host == "localhost" && request.url?.path.hasPrefix("/vibe-mirror-test/") == true
+  }
+
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+  override func startLoading() {
+    guard let url = request.url, let size = Int(url.lastPathComponent) else { return }
+    let saysLength = url.deletingLastPathComponent().lastPathComponent == "said"
+    guard
+      let response = HTTPURLResponse(
+        url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+        headerFields: saysLength ? ["Content-Length": String(size)] : [:])
+    else { return }
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Data(repeating: 0xFF, count: size))
+    client?.urlProtocolDidFinishLoading(self)
+  }
+
+  override func stopLoading() {
+    // Everything was handed over at the start.
   }
 }

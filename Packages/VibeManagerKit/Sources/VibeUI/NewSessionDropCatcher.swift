@@ -114,19 +114,60 @@ struct NewSessionDropCatcher: NSViewRepresentable {
 
   /// Receives what a drag brings with no file of the disk, images first as `DropReader` does: a
   /// promise may fail where the bytes are there. `receiving` tells how many deliveries to expect,
-  /// `received` is called once for each: a promise is delivered by its source, after the drop.
+  /// `received` is called once for each, on the main actor: an image is converted and written,
+  /// and a promise delivered by its source, away from it, after the drop. A folder nothing came
+  /// to is removed.
   func receiveFiles(on pasteboard: NSPasteboard) {
-    guard let folder = Self.newFolder() else {
+    // The bytes are read now: the drag's pasteboard does not outlive the drop.
+    let offered = Self.images(on: pasteboard)
+    let images = offered.compactMap { image in
+      image.item.data(forType: image.type).map { (data: $0, type: image.uti) }
+    }
+    let promises = images.isEmpty ? Self.promises(on: pasteboard) : []
+    guard !images.isEmpty || !promises.isEmpty, let folder = Self.newFolder() else {
       receiving(1)
       received([], true)
       return
     }
+    let received = received
+    if !images.isEmpty {
+      receiving(1)
+      let unreadable = images.count < offered.count
+      Task.detached(priority: .userInitiated) {
+        let written = Self.write(images, into: folder)
+        await received(written.files, written.failed || unreadable)
+      }
+      return
+    }
+    let deliveries = PromisedDeliveries(
+      promises.reduce(0) { $0 + max($1.fileNames.count, 1) }, into: folder)
+    receiving(deliveries.left)
+    // Not on the main queue, as Apple advises: a source slow to write its file holds nothing up.
+    let queue = OperationQueue()
+    queue.qualityOfService = .userInitiated
+    for promise in promises {
+      promise.receivePromisedFiles(atDestination: folder, options: [:], operationQueue: queue) {
+        @Sendable url, error in
+        let file = error == nil ? url : nil
+        Task { @MainActor in
+          received(file.map { [$0] } ?? [], file == nil)
+          deliveries.delivered(file)
+        }
+      }
+    }
+  }
+
+  /// Each image in a format the agents read, written in `folder` — away from the main thread:
+  /// converting a photo takes its time. The folder goes when none could be written.
+  private nonisolated static func write(
+    _ images: [(data: Data, type: UTType)], into folder: URL
+  ) -> (files: [URL], failed: Bool) {
     var files: [URL] = []
     var failed = false
-    for image in Self.images(on: pasteboard) {
-      guard let data = image.item.data(forType: image.type),
+    for image in images {
+      guard
         case .data(let bytes, let name) = DropReader.imageItem(
-          data, type: image.uti, suggestedName: nil)
+          image.data, type: image.type, suggestedName: nil)
       else {
         failed = true
         continue
@@ -137,25 +178,8 @@ struct NewSessionDropCatcher: NSViewRepresentable {
         })
       if (try? bytes.write(to: file)) == nil { failed = true } else { files.append(file) }
     }
-    if !files.isEmpty {
-      receiving(1)
-      received(files, failed)
-      return
-    }
-    let promises = Self.promises(on: pasteboard)
-    guard !promises.isEmpty else {
-      receiving(1)
-      received([], true)
-      return
-    }
-    receiving(promises.reduce(0) { $0 + max($1.fileNames.count, 1) })
-    let received = received
-    for promise in promises {
-      promise.receivePromisedFiles(atDestination: folder, options: [:], operationQueue: .main) {
-        url, error in
-        MainActor.assumeIsolated { received(error == nil ? [url] : [], error != nil) }
-      }
-    }
+    if files.isEmpty { try? FileManager.default.removeItem(at: folder) }
+    return (files, failed)
   }
 
   final class CatcherView: NSView {
@@ -226,5 +250,25 @@ struct NewSessionDropCatcher: NSViewRepresentable {
       files = []
       receivesFile = false
     }
+  }
+}
+
+/// The deliveries a drop's promises still owe: the folder they are received in goes when none
+/// brought a file.
+@MainActor
+private final class PromisedDeliveries {
+  private(set) var left: Int
+  private let folder: URL
+  private var receivedAny = false
+
+  init(_ count: Int, into folder: URL) {
+    left = count
+    self.folder = folder
+  }
+
+  func delivered(_ file: URL?) {
+    left -= 1
+    receivedAny = receivedAny || file != nil
+    if left == 0, !receivedAny { try? FileManager.default.removeItem(at: folder) }
   }
 }

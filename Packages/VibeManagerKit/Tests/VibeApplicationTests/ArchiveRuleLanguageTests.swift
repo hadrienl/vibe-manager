@@ -335,6 +335,31 @@ struct ArchiveRuleEvaluationTests {
         == .archive)
   }
 
+  @Test("A worktree's session is its repository's project, and still the worktree's (#525)")
+  func worktreeProject() throws {
+    let candidate = ArchiveCandidate(
+      session: done(), project: "mairie", ownFolderName: "mairie-hotfix", isDirty: false)
+    let all = #"rule "All" archive done sessions on daily at 18:00"#
+    for protection in [
+      #"protect where project = "mairie-hotfix""#, #"protect where project = "Mairie""#,
+      #"protect where project in ["api", "mairie-hotfix"]"#,
+      #"protect where project ~ "*-hotfix""#,
+    ] {
+      if case .protected = try verdict(candidate, "\(protection)\n\(all)") {
+      } else {
+        Issue.record("Not protected by \(protection)")
+      }
+    }
+    // Different from a name only when it is neither.
+    #expect(try verdict(candidate, #"protect where project != "mairie"\#n\#(all)"#) == .archive)
+    #expect(
+      try verdict(candidate, #"protect where project != "mairie-hotfix"\#n\#(all)"#) == .archive)
+    if case .protected = try verdict(candidate, #"protect where project != "api"\#n\#(all)"#) {
+    } else {
+      Issue.record("Not protected by a project it is not")
+    }
+  }
+
   @Test("Done counts from the last time in Done, and texts ignore case and accents")
   func doneSinceAndTexts() throws {
     var session = done("Écrire le SPIKE", doneAt: "2026-11-10 18:00")

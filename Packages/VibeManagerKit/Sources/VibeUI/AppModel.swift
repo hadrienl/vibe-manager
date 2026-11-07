@@ -1672,12 +1672,15 @@ public final class AppModel {
   }
 
   /// Brings a session back among the current ones, and starts nothing: it comes back closed,
-  /// which is what Restart works from.
+  /// which is what Restart works from. A coordinator brings back the children archived with it
+  /// (#525), as ⌘Z does.
   public func restore(_ id: SessionID) async {
+    let children = childrenArchived(with: id)
     do {
       _ = try await restoreSession(id: id)
       diagnostics.record(
         .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(id)])
+      await restoreChildren(children)
     } catch {
       reportAction(error, .restore, on: id) { [weak self] in await self?.restore(id) }
     }
@@ -2908,6 +2911,7 @@ public final class AppModel {
     await loadSigningInAgents()
     await loadHookTrustingAgents()
     await loadSigningAgents()
+    await loadCoordinatingAgents()
   }
 
   /// Detection never fails the application: an unavailable agent is data, not an error.

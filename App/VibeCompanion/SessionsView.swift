@@ -75,8 +75,10 @@ struct SessionsView: View {
           Button("Settings", systemImage: "gearshape") { showsSettings = true }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          Button("New Session", systemImage: "plus") { newSessionForm = NewSessionForm() }
-            .disabled(channel.phase != .connected || channel.pendingCreation != nil)
+          Button("New Session", systemImage: "plus") {
+            newSessionForm = NewSessionForm(returned: channel.takeKeptCreation())
+          }
+          .disabled(channel.phase != .connected || channel.pendingCreation != nil)
         }
       }
       .overlay(alignment: .bottomTrailing) {
@@ -118,6 +120,11 @@ struct SessionsView: View {
       .onChange(of: channel.returnedCreation) { _, returned in
         guard let returned else { return }
         channel.returnedCreation = nil
+        // Never over another screen: left behind, it waits for the next New Session.
+        guard
+          let returned = channel.show(
+            returned, isWaiting: path.last == CreatingSessionView.id)
+        else { return }
         path.removeAll { $0 == CreatingSessionView.id }
         showsSearch = false
         showsSettings = false
