@@ -155,6 +155,39 @@ struct RecentFolderHistoryTests {
     #expect(await store.load() == model.recentFolders)
   }
 
+  @Test("A worktree whose repository was not recorded gives the one its path names (#529)")
+  func creationInAWorktreeReadsTheRepositoryInThePath() async throws {
+    let repository = FileManager.default.temporaryDirectory.appendingPathComponent(
+      UUID().uuidString
+    ).path
+    let worktree = repository + "/.claude/worktrees/feat-1"
+    try FileManager.default.createDirectory(atPath: worktree, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(atPath: repository) }
+    let store = InMemoryRecentFolderStore(RecentFolders())
+    let model = AppModel(repository: HistoryRepository(values: []), recentFolderStore: store)
+    await model.load()
+
+    await model.complete(
+      SessionCreation(session: session(in: worktree), plan: plan(worktree)), launching: false)
+
+    #expect(model.recentFolders.entries.map(\.path) == [repository])
+  }
+
+  @Test("A coordinator's child leaves the history as it was (#529)")
+  func childCreationRecordsNothing() async {
+    let store = InMemoryRecentFolderStore(RecentFolders(recent("/work/other")))
+    let model = AppModel(repository: HistoryRepository(values: []), recentFolderStore: store)
+    await model.load()
+    var child = session(in: "/work/app")
+    child.coordination = .child(of: SessionID())
+
+    await model.complete(
+      SessionCreation(session: child, plan: plan("/work/app")), launching: false)
+
+    #expect(model.offeredRecentFolders.map(\.path) == ["/work/other"])
+    #expect(await store.load() == RecentFolders(recent("/work/other")))
+  }
+
   @Test("A history written with worktrees is rewritten with their repositories at launch (#529)")
   func storedWorktreesAreReplaced() async {
     let store = InMemoryRecentFolderStore(

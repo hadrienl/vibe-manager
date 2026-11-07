@@ -104,6 +104,29 @@ struct RecentFoldersTests {
     #expect(folders.entries.map(\.path) == ["/code/app", "/code/web"])
   }
 
+  @Test("A coordinator's child gives the history nothing: its agent chose the folder (#529)")
+  func childrenGiveNoFolder() {
+    let coordinator = session(folder: "/code/app", createdAt: 1)
+    var child = session(folder: "/scratch/task", createdAt: 2)
+    child.coordination = .child(of: coordinator.id)
+
+    #expect(RecentFolders.folder(of: child) == nil)
+    #expect(RecentFolders.seeded(from: [coordinator, child]).entries.map(\.path) == ["/code/app"])
+  }
+
+  @Test("A worktree reached through a link gives way to its repository's own entry (#529)")
+  func replacingWorktreesThroughALink() {
+    let folders = RecentFolders([
+      folder("/link/app/.claude/worktrees/feat-1", key: "/real/app/.claude/worktrees/feat-1"),
+      folder("/real/app"),
+      folder("/link/web/.claude/worktrees/fix-2", key: "/real/web/.claude/worktrees/fix-2"),
+    ]).replacingWorktrees()
+
+    // A repository without an entry keeps the identity read on disk, not its spelling.
+    #expect(
+      folders.entries == [folder("/real/app"), folder("/link/web", key: "/real/web")])
+  }
+
   @Test("Worktrees already in the history give way to their repository, listed once (#529)")
   func replacingWorktrees() {
     let folders = RecentFolders([

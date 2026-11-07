@@ -29,9 +29,12 @@ public enum WorktreeRepository {
   /// repository, `.claude/worktrees` and `.worktrees`. Codex keeps its own under its home folder,
   /// away from the repository: nothing can be read there. `nil` for any other folder.
   public static func inPath(of folder: String) -> String? {
-    for marker in ["/.claude/worktrees/", "/.worktrees/"] {
-      // The first one: a worktree made from another worktree still hangs from the clone.
-      guard let range = folder.range(of: marker) else { continue }
+    // The first one in the path, whichever it is: a worktree made from another worktree still
+    // hangs from the clone.
+    let markers = ["/.claude/worktrees/", "/.worktrees/"]
+      .compactMap { folder.range(of: $0) }
+      .sorted { $0.lowerBound < $1.lowerBound }
+    for range in markers {
       let repository = String(folder[..<range.lowerBound])
       let name = folder[range.upperBound...].split(separator: "/")
       guard !repository.isEmpty, !name.isEmpty else { continue }

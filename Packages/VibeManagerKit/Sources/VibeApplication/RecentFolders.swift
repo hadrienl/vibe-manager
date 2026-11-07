@@ -68,24 +68,39 @@ public struct RecentFolders: Equatable, Sendable {
     return RecentFolders(folders)
   }
 
-  /// The folder a session gives the history (#529): never a worktree — a task's folder, gone with
-  /// it, and no place to start the next session from — but the repository it belongs to, recorded
-  /// with the session (#525) or read in the path of one created before. `nil` for none.
+  /// The folder a session gives the history (#529): one the user started a session in. A
+  /// coordinator's child gives none: its agent chose the folder, often a worktree of its own. A
+  /// worktree the user chose gives the repository it belongs to — a task's folder, gone with it,
+  /// is no place to start the next one from — recorded with the session (#525), or read in the
+  /// path of one created before. `nil` for none.
   public static func folder(of session: WorkSession) -> String? {
-    SessionFolderKey.primaryPath(of: session).map { WorktreeRepository.inPath(of: $0) ?? $0 }
+    guard session.coordination?.coordinatorID == nil,
+      let path = SessionFolderKey.primaryPath(of: session), !path.isEmpty
+    else { return nil }
+    return WorktreeRepository.inPath(of: path) ?? path
   }
 
-  /// The history with each worktree its sessions wrote in it replaced by its repository, read in
-  /// the path (#529). The repository is listed where it, or one of its worktrees, was used last.
+  /// The history with each worktree replaced by its repository, read in the path (#529): what
+  /// coordinators' children wrote in it before. The repository is listed where it, or one of its
+  /// worktrees, was used last, under the identity its own entry had.
   public func replacingWorktrees() -> RecentFolders {
-    RecentFolders(
+    var known: [String: RecentFolder] = [:]
+    for entry in entries {
+      for name in [entry.key, RecentFolder.lexicalKey(of: entry.path)] where known[name] == nil {
+        known[name] = entry
+      }
+    }
+    return RecentFolders(
       entries.map { entry in
-        guard let repository = WorktreeRepository.inPath(of: entry.path) else { return entry }
+        // The key was read on disk: through a link, the spelling alone names another folder.
+        let canonical = WorktreeRepository.inPath(of: entry.key)
+        guard let repository = WorktreeRepository.inPath(of: entry.path) ?? canonical else {
+          return entry
+        }
         let spelling = RecentFolder.lexicalKey(of: repository)
-        // The entry the repository already has keeps the identity read on disk.
-        return entries.first {
-          $0.key == spelling || RecentFolder.lexicalKey(of: $0.path) == spelling
-        } ?? RecentFolder(lexicalPath: repository)
+        let identity = canonical ?? spelling
+        return known[identity] ?? known[spelling]
+          ?? RecentFolder(path: repository, key: identity)
       })
   }
 }
