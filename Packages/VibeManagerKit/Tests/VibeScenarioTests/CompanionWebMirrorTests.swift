@@ -118,6 +118,23 @@ struct CompanionWebMirrorTests {
     #expect(await get(link, in: [artifact]).failure == CompanionStrings.addressRefused)
   }
 
+  @Test("A page of the Mac's too large for a frame answers 413, its length said or not")
+  func largePage() async {
+    #expect(URLProtocol.registerClass(LocalPage.self))
+    defer { URLProtocol.unregisterClass(LocalPage.self) }
+    func answer(_ size: Int, saysLength: Bool) async -> String {
+      let url = "http://localhost/vibe-mirror-test/\(saysLength ? "said" : "unsaid")/\(size)"
+      let response = await CompanionWebMirror.fetch(
+        RemoteHTTPRequest(id: 1, url: url, method: "GET", headers: [:], body: nil))
+      return "\(response.status) \(response.body.count) \(response.failure ?? "")"
+    }
+    let limit = CompanionWebMirror.maximumFileLength
+    #expect(await answer(5, saysLength: false) == "200 5 ")
+    #expect(await answer(limit, saysLength: true) == "200 \(limit) ")
+    #expect(await answer(limit + 1, saysLength: true) == "413 0 ")
+    #expect(await answer(limit + 1, saysLength: false) == "413 0 ")
+  }
+
   @Test("A folder holding too much else opens nothing")
   func broadFolders() async {
     let home = URL(fileURLWithPath: NSHomeDirectory())
@@ -172,5 +189,32 @@ struct CompanionWebMirrorTests {
     #expect(type("app.wasm", Data([0xFF])) == "application/wasm")
     #expect(type("blob", Data([0xFF])) == "application/octet-stream")
     #expect(type("latin.txt", Data([0xE9])) == "text/plain")
+  }
+}
+
+/// A page of the Mac's own: `http://localhost/vibe-mirror-test/<said|unsaid>/<size>` answers that
+/// many bytes, its length in a header or not.
+private final class LocalPage: URLProtocol {
+  override class func canInit(with request: URLRequest) -> Bool {
+    request.url?.host == "localhost" && request.url?.path.hasPrefix("/vibe-mirror-test/") == true
+  }
+
+  override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+  override func startLoading() {
+    guard let url = request.url, let size = Int(url.lastPathComponent) else { return }
+    let saysLength = url.deletingLastPathComponent().lastPathComponent == "said"
+    guard
+      let response = HTTPURLResponse(
+        url: url, statusCode: 200, httpVersion: "HTTP/1.1",
+        headerFields: saysLength ? ["Content-Length": String(size)] : [:])
+    else { return }
+    client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+    client?.urlProtocol(self, didLoad: Data(count: size))
+    client?.urlProtocolDidFinishLoading(self)
+  }
+
+  override func stopLoading() {
+    // Everything was handed over at the start.
   }
 }

@@ -211,8 +211,8 @@ final class CompanionWebMirror {
   // MARK: - The phone's requests
 
   /// A request of the phone's web view for a page of the Mac's own: made here, the answer sent
-  /// back whole. Only to the Mac itself or its local network, never anywhere a phone could reach
-  /// on its own.
+  /// back whole, up to `maximumFileLength` — `413` beyond. Only to the Mac itself or its local
+  /// network, never anywhere a phone could reach on its own.
   ///
   /// A file is read only in `fileFolders` (see ``fileFolders``), and only to be shown.
   static func fetch(_ request: RemoteHTTPRequest, fileFolders: [URL] = []) async
@@ -232,7 +232,10 @@ final class CompanionWebMirror {
       urlRequest.setValue(value, forHTTPHeaderField: name)
     }
     do {
-      let (data, response) = try await URLSession.shared.data(for: urlRequest)
+      let (body, response) = try await load(urlRequest)
+      guard let data = body else {
+        return RemoteHTTPResponse(id: request.id, status: 413, headers: [:], body: Data())
+      }
       let http = response as? HTTPURLResponse
       var headers: [String: String] = [:]
       for (name, value) in http?.allHeaderFields ?? [:] {
@@ -248,6 +251,30 @@ final class CompanionWebMirror {
         id: request.id, status: 0, headers: [:], body: Data(),
         failure: error.localizedDescription)
     }
+  }
+
+  /// Makes a request away from the main actor, its body read no further than `maximumFileLength`:
+  /// `nil` past it, as it would fit no frame.
+  nonisolated private static func load(_ request: URLRequest) async throws -> (
+    body: Data?, response: URLResponse
+  ) {
+    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+    var body = Data()
+    if response.expectedContentLength > 0 {
+      guard response.expectedContentLength <= maximumFileLength else {
+        bytes.task.cancel()
+        return (nil, response)
+      }
+      body.reserveCapacity(Int(response.expectedContentLength))
+    }
+    for try await byte in bytes {
+      guard body.count < maximumFileLength else {
+        bytes.task.cancel()
+        return (nil, response)
+      }
+      body.append(byte)
+    }
+    return (body, response)
   }
 
   /// A file of the Mac's for the phone's web view, with its type for WebKit to show it. Its script
@@ -288,8 +315,9 @@ final class CompanionWebMirror {
     case refused
   }
 
-  /// The largest file sent: as base64 in one frame, a larger one would not fit
-  /// `RemoteFrame.maximumLength` and would close the whole channel.
+  /// The largest file or page sent: as base64 in one frame, a larger one would not fit
+  /// `RemoteFrame.maximumLength` nor, on its way to the companion's agent,
+  /// `CompanionLinkWire.maximumPayloadLength` — which would end the agent, and every phone's channel.
   nonisolated static let maximumFileLength = 20 * 1024 * 1024
 
   /// Reads the file that was opened, checked once open: a link swapped after the path was checked
@@ -316,8 +344,11 @@ final class CompanionWebMirror {
     // anything anywhere on the volume, `~/.ssh/id_ed25519` too.
     guard info.st_nlink == 1 else { return .refused }
     guard info.st_size <= maximumFileLength else { return .status(413) }
-    guard let data = try? handle.readToEnd() else { return info.st_size == 0 ? .data(Data()) : .status(403) }
-    return .data(data)
+    // No further than the limit: a file that grows meanwhile is not read whole.
+    guard let data = try? handle.read(upToCount: maximumFileLength + 1) else {
+      return info.st_size == 0 ? .data(Data()) : .status(403)
+    }
+    return data.count <= maximumFileLength ? .data(data) : .status(413)
   }
 
   /// What the phone needs to show a file: text said to be UTF-8 when it is, and text with no known
