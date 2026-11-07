@@ -200,3 +200,32 @@ func creationHoldEnds() {
   #expect(creation.expire() == request)
   #expect(creation.submit(request) == true)
 }
+
+@Test("A creation back on the waiting screen shows; elsewhere it waits for New Session, once")
+func creationReturnedElsewhere() {
+  var creation = RemoteCreation()
+  let returned = ReturnedCreation(request: request, error: "Non")
+  #expect(creation.returned(returned, isWaiting: true) == returned)
+  #expect(creation.takeKept() == nil)
+  #expect(creation.returned(returned, isWaiting: false) == nil)
+  #expect(creation.takeKept() == returned)
+  #expect(creation.takeKept() == nil)
+}
+
+@Test("A creation kept is forgotten once another is asked, or once the session turns up")
+func creationKeptForgotten() {
+  var creation = RemoteCreation()
+  let returned = ReturnedCreation(request: request, error: "Non")
+  _ = creation.returned(returned, isWaiting: false)
+  #expect(creation.submit(request) == true)
+  #expect(creation.takeKept() == nil)
+
+  #expect(creation.created("S") == .created("S"))
+  #expect(creation.submit(request, listed: [session("A", named: "x")]) == true)
+  creation.connectionLost()
+  _ = creation.expire()
+  _ = creation.returned(returned, isWaiting: false)
+  #expect(
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .created("S"))
+  #expect(creation.takeKept() == nil)
+}

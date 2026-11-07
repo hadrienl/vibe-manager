@@ -5,12 +5,6 @@ import Observation
 import Security
 import UIKit
 
-/// A creation that did not happen: all that was asked, and why.
-struct ReturnedCreation: Equatable {
-  let request: RemoteNewSession
-  let error: String
-}
-
 /// The phone's end of the direct channel (#399, #400): the Mac's sessions, the conversation shown,
 /// and what the user does to them, over iroh while the application is in the foreground.
 ///
@@ -435,6 +429,17 @@ final class RemoteChannel {
   func create(_ session: RemoteNewSession) {
     if creation.submit(session, listed: sessions) { write(.createSession(session)) }
     awaitCreation()
+  }
+
+  /// A creation that came back: what to show now, on the waiting screen; kept otherwise, for
+  /// `takeKeptCreation`.
+  func show(_ returned: ReturnedCreation, isWaiting: Bool) -> ReturnedCreation? {
+    creation.returned(returned, isWaiting: isWaiting)
+  }
+
+  /// What New Session opens with: a creation that came back while the user was elsewhere, once.
+  func takeKeptCreation() -> ReturnedCreation? {
+    creation.takeKept()
   }
 
   /// No answer in this time on an open channel, and the form comes back: the Mac may be asleep, or

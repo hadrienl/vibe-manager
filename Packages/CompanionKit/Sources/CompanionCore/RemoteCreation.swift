@@ -1,5 +1,16 @@
 import Foundation
 
+/// A creation that did not happen: all that was asked, and why.
+public struct ReturnedCreation: Equatable, Sendable {
+  public let request: RemoteNewSession
+  public let error: String
+
+  public init(request: RemoteNewSession, error: String) {
+    self.request = request
+    self.error = error
+  }
+}
+
 /// A session asked of the Mac from the phone (#470), from the moment the form closes to the Mac's
 /// answer. The protocol does not say which request an answer is for, so one is in flight at a time:
 /// a request given up on still counts until the Mac answers it, the connection goes, or a request
@@ -30,8 +41,27 @@ public struct RemoteCreation: Sendable {
   /// The sessions the Mac listed when the request in flight was written: the one it makes is none
   /// of them.
   private var known: Set<String> = []
+  /// A creation that came back once the user had left the waiting screen: never shown over
+  /// another screen, it waits for the next New Session.
+  private var kept: ReturnedCreation?
 
   public init() {}
+
+  /// A creation that came back (#470): what to show now, on the waiting screen; elsewhere `nil`,
+  /// and it is kept for the next New Session.
+  public mutating func returned(_ creation: ReturnedCreation, isWaiting: Bool)
+    -> ReturnedCreation?
+  {
+    kept = isWaiting ? nil : creation
+    return isWaiting ? creation : nil
+  }
+
+  /// What New Session opens with: the creation kept, once. Another asked meanwhile, or the session
+  /// found after all, and nothing is.
+  public mutating func takeKept() -> ReturnedCreation? {
+    defer { kept = nil }
+    return kept
+  }
 
   /// Whether what is shown as being created went out on a connection lost before the Mac answered:
   /// the session may exist, and asking again could make a second one.
@@ -45,6 +75,7 @@ public struct RemoteCreation: Sendable {
   public mutating func submit(_ request: RemoteNewSession, listed: [RemoteSession] = []) -> Bool {
     guard pending == nil else { return false }
     pending = request
+    kept = nil
     isWritten = givenUp == nil
     if isWritten {
       known = Set(listed.map(\.id))
@@ -83,6 +114,8 @@ public struct RemoteCreation: Sendable {
     guard pending != nil || wasGivenUp != nil else { return nil }
     pending = nil
     isWritten = false
+    // Made after all: a form kept for it would make a second.
+    kept = nil
     return .created(id)
   }
 
