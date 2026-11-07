@@ -88,6 +88,73 @@ struct RecentFoldersTests {
     #expect(folders.entries.first?.key == NSHomeDirectory() + "/code")
   }
 
+  @Test("A session started in a worktree gives the history nothing (#529)")
+  func seededWithoutWorktrees() {
+    // A worktree as creation read it on disk, wherever it is.
+    var recorded = session(folder: "/elsewhere/feat-1", createdAt: 3)
+    recorded.repositories[0].mainRepositoryPath = "/code/app"
+    let sessions = [
+      recorded,
+      // Created before the repository was kept with the session: named by its path.
+      session(folder: "/code/app/.claude/worktrees/fix-2", createdAt: 2),
+      session(folder: "/code/app", createdAt: 1),
+    ]
+
+    let folders = RecentFolders.seeded(from: sessions)
+
+    #expect(folders.entries.map(\.path) == ["/code/app"])
+  }
+
+  @Test("A repository kept empty is no repository: the session's own folder is given")
+  func emptyRepositoryFallsBackToTheFolder() {
+    var recorded = session(folder: "/code/app", createdAt: 1)
+    recorded.repositories[0].mainRepositoryPath = ""
+
+    #expect(RecentFolders.folder(of: recorded) == "/code/app")
+  }
+
+  @Test("A coordinator's child gives the history nothing: its agent chose the folder (#529)")
+  func childrenGiveNoFolder() {
+    let coordinator = session(folder: "/code/app", createdAt: 1)
+    var child = session(folder: "/scratch/task", createdAt: 2)
+    child.coordination = .child(of: coordinator.id)
+
+    #expect(RecentFolders.folder(of: child) == nil)
+    #expect(RecentFolders.seeded(from: [coordinator, child]).entries.map(\.path) == ["/code/app"])
+  }
+
+  @Test("Worktrees already in the history are left out, their repository not put back (#529)")
+  func droppingWorktrees() {
+    let folders = RecentFolders([
+      folder("/code/app/.claude/worktrees/feat-1"),
+      folder("/code/web"),
+      folder("/code/app/.worktrees/fix-2"),
+      // Through a link: only the key, read on disk, names the worktree.
+      folder("/Users/me/feat-3", key: "/code/api/.claude/worktrees/feat-3"),
+      folder("/plain"),
+    ]).droppingWorktrees(recordedIn: [])
+
+    #expect(folders.entries.map(\.path) == ["/code/web", "/plain"])
+  }
+
+  @Test("A worktree placed anywhere is left out once a session recorded its repository (#529)")
+  func droppingWorktreesNamedBySessions() {
+    var recorded = session(folder: "~/Worktrees/app/feat-1", createdAt: 1)
+    recorded.repositories[0].mainRepositoryPath = "/code/app"
+
+    let folders = RecentFolders([folder("~/Worktrees/app/feat-1"), folder("/code/web")])
+      .droppingWorktrees(recordedIn: [recorded])
+
+    #expect(folders.entries.map(\.path) == ["/code/web"])
+  }
+
+  @Test("A history without worktrees is left as it is")
+  func noWorktreeToDrop() {
+    let folders = RecentFolders([folder("/a"), folder("/b")])
+
+    #expect(folders.droppingWorktrees(recordedIn: [session(folder: "/a", createdAt: 1)]) == folders)
+  }
+
   @Test("The first history stays within the limit")
   func seedingIsBounded() {
     let sessions = (0..<30).map { session(folder: "/f\($0)", createdAt: TimeInterval($0)) }
