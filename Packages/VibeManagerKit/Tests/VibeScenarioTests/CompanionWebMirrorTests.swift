@@ -1,4 +1,5 @@
 import CompanionCore
+import CompanionWire
 import Foundation
 import Testing
 import VibeCompanionLink
@@ -118,21 +119,50 @@ struct CompanionWebMirrorTests {
     #expect(await get(link, in: [artifact]).failure == CompanionStrings.addressRefused)
   }
 
-  @Test("A page of the Mac's too large for a frame answers 413, its length said or not")
-  func largePage() async {
+  @Test("A page of the Mac's too large for a frame answers 413; one at the limit fits the link")
+  func largePage() async throws {
+    // This test alone registers the page, which another test removing it would pull away.
     #expect(URLProtocol.registerClass(LocalPage.self))
     defer { URLProtocol.unregisterClass(LocalPage.self) }
-    func answer(_ size: Int, saysLength: Bool) async -> String {
+    func fetch(_ size: Int, saysLength: Bool) async -> RemoteHTTPResponse {
       let url = "http://localhost/vibe-mirror-test/\(saysLength ? "said" : "unsaid")/\(size)"
-      let response = await CompanionWebMirror.fetch(
+      return await CompanionWebMirror.fetch(
         RemoteHTTPRequest(id: 1, url: url, method: "GET", headers: [:], body: nil))
+    }
+    func answer(_ size: Int, saysLength: Bool) async -> String {
+      let response = await fetch(size, saysLength: saysLength)
       return "\(response.status) \(response.body.count) \(response.failure ?? "")"
     }
     let limit = CompanionWebMirror.maximumFileLength
     #expect(await answer(5, saysLength: false) == "200 5 ")
-    #expect(await answer(limit, saysLength: true) == "200 \(limit) ")
+    // Bytes of 0xFF, all `/` in base64, which JSON escapes: the most a byte can weigh.
+    let page = await fetch(limit, saysLength: true)
+    #expect(page.status == 200)
+    #expect(page.body.count == limit)
+    #expect(try fitsTheLink(page))
     #expect(await answer(limit + 1, saysLength: true) == "413 0 ")
     #expect(await answer(limit + 1, saysLength: false) == "413 0 ")
+  }
+
+  @Test("A file at the limit, the worst for JSON, fits a frame and then the link")
+  func worstCaseFile() async throws {
+    let (root, artifact) = try folder()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let blob = artifact.appendingPathComponent("blob.bin")
+    try Data(repeating: 0xFF, count: CompanionWebMirror.maximumFileLength).write(to: blob)
+    let file = await get(blob, in: [artifact])
+    #expect(file.status == 200)
+    #expect(try fitsTheLink(file))
+  }
+
+  /// Whether a response to a phone fits the channel's frame, and the link the companion's agent
+  /// gets it by.
+  private func fitsTheLink(_ response: RemoteHTTPResponse) throws -> Bool {
+    let message = RemoteMessage.httpResponse(response)
+    let wrapped = try JSONEncoder().encode(
+      CompanionLinkMessage.remoteSend(peer: "abcdefghij-12345", message))
+    return RemoteFrame.encode(message).count - 4 <= RemoteFrame.maximumLength
+      && wrapped.count <= CompanionLinkWire.maximumPayloadLength
   }
 
   @Test("A folder holding too much else opens nothing")
@@ -210,7 +240,7 @@ private final class LocalPage: URLProtocol {
         headerFields: saysLength ? ["Content-Length": String(size)] : [:])
     else { return }
     client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-    client?.urlProtocol(self, didLoad: Data(count: size))
+    client?.urlProtocol(self, didLoad: Data(repeating: 0xFF, count: size))
     client?.urlProtocolDidFinishLoading(self)
   }
 

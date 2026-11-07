@@ -315,10 +315,10 @@ final class CompanionWebMirror {
     case refused
   }
 
-  /// The largest file or page sent: as base64 in one frame, a larger one would not fit
-  /// `RemoteFrame.maximumLength` nor, on its way to the companion's agent,
-  /// `CompanionLinkWire.maximumPayloadLength` — which would end the agent, and every phone's channel.
-  nonisolated static let maximumFileLength = 20 * 1024 * 1024
+  /// The largest file or page sent: what one frame holds at worst, wrapped for the link to the
+  /// companion's agent as well. A larger one would be dropped on its way, and the phone's page
+  /// would never finish loading.
+  nonisolated static let maximumFileLength = RemoteFrame.maximumBinaryLength
 
   /// Reads the file that was opened, checked once open: a link swapped after the path was checked
   /// reads nothing outside `folders`.

@@ -519,12 +519,8 @@ public struct RemoteFile: Codable, Hashable, Sendable {
     self.data = data
   }
 
-  /// The most a message's files may weigh together. In base64, with JSON escaping each `/` of it
-  /// — twice the size at worst — 12 MB take 32 000 000 bytes: the rest of a frame's 32 MiB
-  /// (`RemoteFrame.maximumLength`, and the link's once the companion's agent wraps it for the
-  /// application) is left to the text, the names and the envelopes. A larger frame would close the
-  /// link, and the agent with it.
-  public static let maximumTotalLength = 12_000_000
+  /// The most a message's files may weigh together: what a frame holds at worst.
+  public static let maximumTotalLength = RemoteFrame.maximumBinaryLength
 
   /// Whether `length` more bytes can join `files` in one message.
   public static func fits(_ length: Int, joining files: [RemoteFile]) -> Bool {
@@ -767,6 +763,12 @@ public enum RemoteFrame {
   /// A conversation of a long session, whole, fits; a corrupt length cannot make an end allocate
   /// a gigabyte.
   public static let maximumLength = 32 << 20
+  /// The most bytes one message may carry — a message's files, a file or a page for the phone's
+  /// web view. In base64, with JSON escaping each `/` of it — twice the size at worst, bytes of
+  /// 0xFF — 12 MB take 32 000 556 bytes: the rest of `maximumLength`, and of the link's once the
+  /// companion's agent wraps the frame for the application, is left to the text, the names, the
+  /// headers and the envelopes. A larger frame would close the link, or be dropped on its way.
+  public static let maximumBinaryLength = 12_000_000
 
   public static func encode(_ message: RemoteMessage) -> Data {
     let payload = (try? JSONEncoder().encode(message)) ?? Data()
