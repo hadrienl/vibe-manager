@@ -721,7 +721,13 @@ extension AppModel {
         models.isEmpty
         ? "its own default model"
         : models.map { $0.isDefault ? "\($0.id) (default)" : $0.id }.joined(separator: ", ")
-      lines.append("- \(descriptor.id.rawValue): \(descriptor.displayName); models: \(list)")
+      // Every agent but the coordinator's own is the user's to ask for: the other CLI, an account
+      // or an endpoint, whose name can look like the project's and once led a coordinator to
+      // start its children on another account (#523).
+      let note =
+        descriptor.id.rawValue == coordinator.agent?.providerID
+        ? " (your own, the default for a child)" : " (only when the user asks for it)"
+      lines.append("- \(descriptor.id.rawValue): \(descriptor.displayName)\(note); models: \(list)")
     }
     let limit = coordination.maximumRunningChildren
     lines.append(
@@ -734,7 +740,7 @@ extension AppModel {
   {
     let name = try Self.string("name", in: arguments)
     let folder = (try Self.string("folder", in: arguments) as NSString).expandingTildeInPath
-    let agent = try Self.string("agent", in: arguments)
+    let agent = Self.optionalString("agent", in: arguments) ?? coordinator.agent?.providerID
     let mission = try Self.string("mission", in: arguments)
     let start = arguments["start"]?.boolValue ?? true
     var isDirectory: ObjCBool = false
@@ -763,7 +769,7 @@ extension AppModel {
       name: name,
       initialPrompt: CoordinationPolicy.fromCoordinator(mission, coordinatorName: coordinator.name),
       providerID: agent,
-      modelID: arguments["model"]?.stringValue.flatMap { $0.isEmpty ? nil : $0 },
+      modelID: Self.optionalString("model", in: arguments),
       workingDirectoryPath: folder,
       ticketText: arguments["ticket"]?.stringValue ?? "",
       palette: appearancePalette.offered,
@@ -1020,9 +1026,17 @@ extension AppModel {
   // MARK: Helpers
 
   private static func string(_ key: String, in arguments: JSONValue) throws -> String {
+    guard let value = optionalString(key, in: arguments) else {
+      throw CoordinationRefusal.invalidArgument("\(key) is required.")
+    }
+    return value
+  }
+
+  /// An argument that may be left out: blank is left out, and stray spaces are not part of it.
+  private static func optionalString(_ key: String, in arguments: JSONValue) -> String? {
     guard let value = arguments[key]?.stringValue?.trimmingCharacters(in: .whitespacesAndNewlines),
       !value.isEmpty
-    else { throw CoordinationRefusal.invalidArgument("\(key) is required.") }
+    else { return nil }
     return value
   }
 
