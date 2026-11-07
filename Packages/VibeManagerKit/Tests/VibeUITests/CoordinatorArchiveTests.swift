@@ -194,6 +194,6 @@ struct CoordinatorArchiveTests {
     }
     #expect(name == "Reds")
     #expect(await repository.session(id: protected.id)?.status == .closed)
-    #expect(try await store.load().rules.first?.lastRun?.archived == 2)
+    #expect(await store.load().rules.first?.lastRun?.archived == 2)
   }
 }
