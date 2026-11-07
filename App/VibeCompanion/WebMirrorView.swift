@@ -432,8 +432,9 @@ private struct SyncedWebView: UIViewRepresentable {
 /// them.
 private final class MacSchemeHandler: NSObject, WKURLSchemeHandler {
   private let channel: RemoteChannel
-  /// The tasks WebKit stopped: answering one of them would raise.
-  private var stopped: Set<ObjectIdentifier> = []
+  /// The tasks WebKit started and has not stopped, until answered: answering a stopped one would
+  /// raise. Each leaves once settled, for a later task at the same address to be answered.
+  private var running: Set<ObjectIdentifier> = []
 
   init(channel: RemoteChannel) {
     self.channel = channel
@@ -443,6 +444,7 @@ private final class MacSchemeHandler: NSObject, WKURLSchemeHandler {
     let request = task.request
     guard let url = request.url else { return }
     let key = ObjectIdentifier(task)
+    running.insert(key)
     var headers = request.allHTTPHeaderFields ?? [:]
     headers["Accept-Encoding"] = nil
     let body = request.httpBody
@@ -450,7 +452,7 @@ private final class MacSchemeHandler: NSObject, WKURLSchemeHandler {
       let response = await channel.fetch(
         url: RemoteWebAddress.unproxied(url), method: request.httpMethod ?? "GET",
         headers: headers, body: body)
-      guard !stopped.contains(key) else { return }
+      guard running.remove(key) != nil else { return }
       if let failure = response.failure {
         task.didFailWithError(
           NSError(
@@ -468,6 +470,6 @@ private final class MacSchemeHandler: NSObject, WKURLSchemeHandler {
   }
 
   func webView(_ webView: WKWebView, stop task: any WKURLSchemeTask) {
-    stopped.insert(ObjectIdentifier(task))
+    running.remove(ObjectIdentifier(task))
   }
 }
