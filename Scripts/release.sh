@@ -281,6 +281,9 @@ readonly update_key="$(defaults read "$app/Contents/Info.plist" SUPublicEDKey 2>
 # The mobile companion's agent (#397): embedded, with its profile, and in CloudKit's Production —
 # the only environment a Developer ID signature reaches. Its entitlements are its own; the
 # application's, checked above, stay the microphone's alone.
+for bridge in sim-bridge emu-bridge; do
+  codesign --verify --strict "$app/Contents/MacOS/$bridge" || fail "$bridge is missing or unsigned"
+done
 readonly agent="$app/Contents/Helpers/Vibe Manager Companion.app"
 [[ -d "$agent" ]] || fail "the companion agent is not embedded"
 [[ -f "$agent/Contents/embedded.provisionprofile" ]] \

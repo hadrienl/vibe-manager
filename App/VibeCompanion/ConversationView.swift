@@ -35,6 +35,8 @@ struct ConversationView: View {
   }
   /// Kept while a conversation reloads, so that the colours do not flash.
   @State private var lastTheme: RemoteTheme?
+  @State private var showsWeb = false
+  @State private var showsDevices = false
 
   var body: some View {
     ScrollView {
@@ -88,10 +90,18 @@ struct ConversationView: View {
     .navigationBarTitleDisplayMode(.inline)
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
-        NavigationLink {
-          WebMirrorView(sessionID: sessionID)
+        Button("Web View", systemImage: "globe") { showsWeb = true }
+      }
+      ToolbarItem(placement: .topBarTrailing) {
+        // A view of its own here, one view showing at a time on the phone.
+        Button {
+          showsDevices = true
         } label: {
-          Label("Web View", systemImage: "globe")
+          Label {
+            Text("Simulators")
+          } icon: {
+            Image(systemName: "iphone")
+          }
         }
       }
       ToolbarItem(placement: .topBarTrailing) {
@@ -110,8 +120,15 @@ struct ConversationView: View {
     } message: {
       Text("The agent stops. The session keeps its conversation and can be restarted.")
     }
-    .onAppear { channel.show(sessionID) }
-    .onDisappear { if channel.conversation?.sessionID == sessionID { channel.show(nil) } }
+    .navigationDestination(isPresented: $showsWeb) { WebMirrorView(sessionID: sessionID) }
+    .navigationDestination(isPresented: $showsDevices) { DeviceListScreen() }
+    .onAppear { if channel.conversation?.sessionID != sessionID { channel.show(sessionID) } }
+    // Still followed under a view pushed on top: coming back shows it at once, nothing reloads.
+    .onDisappear {
+      if !showsWeb, !showsDevices, channel.conversation?.sessionID == sessionID {
+        channel.show(nil)
+      }
+    }
   }
 
   private var subtitle: String {

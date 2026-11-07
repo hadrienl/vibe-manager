@@ -32,6 +32,7 @@
 		A00000000000000000000017 /* VibeCompanionApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000012 /* VibeCompanionApp.swift */; };
 		A00000000000000000000018 /* CompanionModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000013 /* CompanionModel.swift */; };
 		A00000000000000000000019 /* CompanionScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000014 /* CompanionScreen.swift */; };
+		A00000000000000000480002 /* DeviceMirrorScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000480002 /* DeviceMirrorScreen.swift */; };
 		A0000000000000000000C008 /* WebMirrorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000C008 /* WebMirrorView.swift */; };
 		A0000000000000000000C007 /* NewSessionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000C007 /* NewSessionSheet.swift */; };
 		A0000000000000000000C006 /* StatusSwipe.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000C006 /* StatusSwipe.swift */; };
@@ -46,10 +47,12 @@
 		A0000000000000000000001C /* Vibe Manager Companion.app in Embed the companion agent */ = {isa = PBXBuildFile; fileRef = B00000000000000000000011 /* Vibe Manager Companion.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		A0000000000000000000001D /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001B /* Assets.xcassets */; };
 		A0000000000000000000001E /* CompanionIroh.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001C /* CompanionIroh.swift */; };
+		A00000000000000000480001 /* CompanionMirrorServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000480001 /* CompanionMirrorServer.swift */; };
 		A0000000000000000000001F /* CompanionEchoServer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001D /* CompanionEchoServer.swift */; };
 		A00000000000000000000020 /* CompanionIroh.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001C /* CompanionIroh.swift */; };
 		A00000000000000000000021 /* CompanionChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001E /* CompanionChannel.swift */; };
 		A00000000000000000000022 /* ChannelSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001F /* ChannelSection.swift */; };
+		A00000000000000000480003 /* VibeDevices in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000480001 /* VibeDevices */; };
 		A00000000000000000000023 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000010 /* IrohLib */; };
 		A00000000000000000000024 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000011 /* IrohLib */; };
 		A00000000000000000000025 /* CompanionNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* CompanionNotifications.swift */; };
@@ -82,6 +85,7 @@
 		B00000000000000000000012 /* VibeCompanionApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeCompanionApp.swift; sourceTree = "<group>"; };
 		B00000000000000000000013 /* CompanionModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionModel.swift; sourceTree = "<group>"; };
 		B00000000000000000000014 /* CompanionScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionScreen.swift; sourceTree = "<group>"; };
+		B00000000000000000480002 /* DeviceMirrorScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceMirrorScreen.swift; sourceTree = "<group>"; };
 		B0000000000000000000C008 /* WebMirrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebMirrorView.swift; sourceTree = "<group>"; };
 		B0000000000000000000C007 /* NewSessionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewSessionSheet.swift; sourceTree = "<group>"; };
 		B0000000000000000000C006 /* StatusSwipe.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StatusSwipe.swift; sourceTree = "<group>"; };
@@ -99,6 +103,7 @@
 		B0000000000000000000001A /* CompanionAgent.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = CompanionAgent.xcconfig; sourceTree = "<group>"; };
 		B0000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B0000000000000000000001C /* CompanionIroh.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionIroh.swift; sourceTree = "<group>"; };
+		B00000000000000000480001 /* CompanionMirrorServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionMirrorServer.swift; sourceTree = "<group>"; };
 		B0000000000000000000001D /* CompanionEchoServer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionEchoServer.swift; sourceTree = "<group>"; };
 		B0000000000000000000001E /* CompanionChannel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CompanionChannel.swift; sourceTree = "<group>"; };
 		B0000000000000000000001F /* ChannelSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChannelSection.swift; sourceTree = "<group>"; };
@@ -193,6 +198,7 @@
 				A00000000000000000000015 /* CompanionWire in Frameworks */,
 				A00000000000000000000016 /* CompanionKit in Frameworks */,
 				A00000000000000000000023 /* IrohLib in Frameworks */,
+				A00000000000000000480003 /* VibeDevices in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -301,6 +307,7 @@
 			children = (
 				B0000000000000000000000E /* CompanionAgentMain.swift */,
 				B0000000000000000000000F /* CompanionAgent.swift */,
+				B00000000000000000480001 /* CompanionMirrorServer.swift */,
 				B0000000000000000000001D /* CompanionEchoServer.swift */,
 				B00000000000000000000010 /* VibeCompanionAgent.entitlements */,
 			);
@@ -313,6 +320,7 @@
 				B00000000000000000000012 /* VibeCompanionApp.swift */,
 				B00000000000000000000013 /* CompanionModel.swift */,
 				B00000000000000000000014 /* CompanionScreen.swift */,
+				B00000000000000000480002 /* DeviceMirrorScreen.swift */,
 				B0000000000000000000C008 /* WebMirrorView.swift */,
 				B0000000000000000000C007 /* NewSessionSheet.swift */,
 				B0000000000000000000C006 /* StatusSwipe.swift */,
@@ -363,6 +371,7 @@
 				D00000000000000000000001 /* Frameworks */,
 				D00000000000000000000002 /* Resources */,
 				D0000000000000000000000C /* Embed the companion agent */,
+				D0000000000000000000480A /* Build the device bridges */,
 			);
 			buildRules = (
 			);
@@ -420,6 +429,7 @@
 				J0000000000000000000000C /* CompanionWire */,
 				J0000000000000000000000D /* CompanionKit */,
 				J00000000000000000000010 /* IrohLib */,
+				J00000000000000000480001 /* VibeDevices */,
 			);
 			productName = VibeCompanionAgent;
 			productReference = B00000000000000000000011 /* Vibe Manager Companion.app */;
@@ -592,6 +602,28 @@
 			shellPath = /bin/sh;
 			shellScript = "# An ad-hoc signature gets a new code identity at every build, and macOS keys privacy\n# permissions to that identity: Full Disk Access, and every folder ever allowed, are asked for\n# again after each compilation. Warned rather than failed: a fresh clone must still build.\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -z \"${DEVELOPMENT_TEAM}\" ]; then\n  echo \"warning: No DEVELOPMENT_TEAM, so this build is signed ad hoc and macOS will forget every permission granted to it at the next build. Copy Configuration/Local.xcconfig.example to Configuration/Local.xcconfig and put your team in it.\"\nfi\n";
 		};
+		D0000000000000000000480A /* Build the device bridges */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+				"$(SRCROOT)/Scripts/device-mirror/sim-bridge.m",
+				"$(SRCROOT)/Scripts/device-mirror/emu-bridge.m",
+			);
+			name = "Build the device bridges";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/sim-bridge",
+				"$(TARGET_BUILD_DIR)/$(EXECUTABLE_FOLDER_PATH)/emu-bridge",
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# The bridges to the simulators and emulators (#480): processes of their own, next to the\n# executable, signed before the application is.\nset -e\nout=\"${TARGET_BUILD_DIR}/${EXECUTABLE_FOLDER_PATH}\"\narches=\"\"\nfor arch in ${ARCHS}; do arches=\"$arches -arch $arch\"; done\ncommon=\"-fobjc-arc -O2 -w $arches -framework Foundation -framework VideoToolbox -framework CoreMedia -framework CoreVideo\"\nxcrun clang $common -framework IOSurface \"${SRCROOT}/Scripts/device-mirror/sim-bridge.m\" -o \"$out/sim-bridge\"\nxcrun clang $common -framework Accelerate \"${SRCROOT}/Scripts/device-mirror/emu-bridge.m\" -o \"$out/emu-bridge\"\n# Signed as the application is, when it is: the unsigned builds of the CI sign nothing.\nif [ \"${CODE_SIGNING_ALLOWED}\" = \"YES\" ] && [ -n \"${EXPANDED_CODE_SIGN_IDENTITY}\" ]; then\n  for bridge in sim-bridge emu-bridge; do\n    codesign --force --options runtime --timestamp=none --sign \"${EXPANDED_CODE_SIGN_IDENTITY}\" \"$out/$bridge\"\n  done\nfi\n";
+		};
 /* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -619,6 +651,7 @@
 			files = (
 				A00000000000000000000012 /* CompanionAgentMain.swift in Sources */,
 				A00000000000000000000013 /* CompanionAgent.swift in Sources */,
+				A00000000000000000480001 /* CompanionMirrorServer.swift in Sources */,
 				A0000000000000000000001F /* CompanionEchoServer.swift in Sources */,
 				A0000000000000000000001E /* CompanionIroh.swift in Sources */,
 			);
@@ -631,6 +664,7 @@
 				A00000000000000000000017 /* VibeCompanionApp.swift in Sources */,
 				A00000000000000000000018 /* CompanionModel.swift in Sources */,
 				A00000000000000000000019 /* CompanionScreen.swift in Sources */,
+				A00000000000000000480002 /* DeviceMirrorScreen.swift in Sources */,
 				A0000000000000000000C008 /* WebMirrorView.swift in Sources */,
 				A0000000000000000000C007 /* NewSessionSheet.swift in Sources */,
 				A0000000000000000000C006 /* StatusSwipe.swift in Sources */,
@@ -904,6 +938,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		J00000000000000000480001 /* VibeDevices */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
+			productName = VibeDevices;
+		};
 		J00000000000000000000001 /* VibeUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;

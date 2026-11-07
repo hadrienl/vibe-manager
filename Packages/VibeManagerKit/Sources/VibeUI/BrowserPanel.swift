@@ -3,6 +3,7 @@ import SwiftUI
 import VibeApplication
 import VibeBrowser
 import VibeConversationUI
+import VibeDevices
 import VibeDomain
 import WebKit
 
@@ -39,7 +40,24 @@ struct BrowserPanel: View {
 
   @ViewBuilder
   private var content: some View {
-    if let tab = browser.activeTab {
+    if let udid = browser.activeTab?.deviceUDID {
+      DeviceMirrorView(udid: udid)
+        .overlay(alignment: .topTrailing) {
+          Button {
+            model.closeWebTab()
+            Task { await DeviceCatalog.stop(udid) }
+          } label: {
+            Image(systemName: "stop.fill")
+              .foregroundStyle(.white)
+              .frame(width: 28, height: 28)
+              .background(.black.opacity(0.55), in: Circle())
+          }
+          .buttonStyle(.plain)
+          .padding(8)
+          .instantTooltip(Text("Stop Simulator", bundle: .module))
+          .accessibilityLabel(Text("Stop Simulator", bundle: .module))
+        }
+    } else if let tab = browser.activeTab {
       ZStack {
         BrowserWebViewHost(
           workspace: workspace, tab: tab, focusRequest: model.webViewFocusRequest,

@@ -124,6 +124,14 @@ extension AppModel {
     addressBarFocusRequest += 1
   }
 
+  /// A simulator in a new tab.
+  func openDeviceTab(_ url: URL, title: String) {
+    guard let browser, let id = selectedSessionID, isWebViewAvailable else { return }
+    browser.open(url, in: id, openedBy: .user)
+    activeWebTab?.nameDevice(title)
+    showWebView()
+  }
+
   /// The tab in front of the selected session.
   public var activeWebTab: BrowserTabModel? {
     selectedBrowser?.activeTab

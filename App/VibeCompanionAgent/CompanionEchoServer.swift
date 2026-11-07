@@ -61,7 +61,8 @@ actor CompanionEchoServer {
       let key = try Self.secretKey(at: keyURL)
       endpoint = try await Endpoint.bind(
         options: CompanionIroh.options(
-          secretKey: key, alpns: [CompanionIroh.alpn, CompanionIroh.remoteALPN]))
+          secretKey: key,
+          alpns: [CompanionIroh.alpn, CompanionIroh.remoteALPN, CompanionIroh.mirrorALPN]))
     } catch {
       CompanionIroh.logger.error(
         "echo: no endpoint: \(CompanionIroh.describe(error), privacy: .public)")
@@ -119,6 +120,15 @@ actor CompanionEchoServer {
     let remote = connection.remoteId().fmtShort()
     if connection.alpn() == CompanionIroh.remoteALPN {
       await serveRemote(connection)
+      return
+    }
+    if connection.alpn() == CompanionIroh.mirrorALPN {
+      // The same admission as the direct channel's.
+      guard await authorize(connection.remoteId().description) else {
+        try? connection.close(errorCode: 2, reason: Data("not paired".utf8))
+        return
+      }
+      await CompanionMirrorServer.serve(connection)
       return
     }
     guard connection.alpn() == CompanionIroh.alpn else {

@@ -27,23 +27,48 @@ struct WebMirrorView: View {
     state?.tabs.first { $0.id == state?.activeTabID }
   }
 
+  /// The tabs showing a page: the simulators have their own view here.
+  private var webTabs: [RemoteWebTab] {
+    (state?.tabs ?? []).filter { URL(string: $0.url)?.scheme != "vibe-device" }
+  }
+
   var body: some View {
     VStack(spacing: 0) {
-      addressBar
-      if let tab = activeTab, let url = URL(string: tab.url) {
-        SyncedWebView(
-          url: url, isMacLoading: tab.isLoading, typed: typed, scroll: state?.scroll ?? 0,
-          channel: channel, page: page,
-          navigated: { channel.web(.navigate($0.absoluteString), in: sessionID) },
-          scrolled: { channel.web(.scrollTo($0), in: sessionID) })
-      } else if state != nil {
+      if let tab = activeTab, let url = URL(string: tab.url), url.scheme == "vibe-device",
+        let id = url.host
+      {
+        // A tab on the Mac, a view of its own here.
         ContentUnavailableView {
-          Label("No Page", systemImage: "globe")
-        } description: {
-          Text("Type an address to open a page, here and on the Mac.")
+          Label {
+            Text(verbatim: tab.title)
+          } icon: {
+            Image(systemName: "iphone")
+          }
+        } actions: {
+          NavigationLink {
+            DeviceMirrorScreen(device: CompanionMirror.Device(id: id, name: tab.title))
+          } label: {
+            Text("Open Simulator")
+          }
+          .buttonStyle(.borderedProminent)
         }
       } else {
-        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        addressBar
+        if let tab = activeTab, let url = URL(string: tab.url) {
+          SyncedWebView(
+            url: url, isMacLoading: tab.isLoading, typed: typed, scroll: state?.scroll ?? 0,
+            channel: channel, page: page,
+            navigated: { channel.web(.navigate($0.absoluteString), in: sessionID) },
+            scrolled: { channel.web(.scrollTo($0), in: sessionID) })
+        } else if state != nil {
+          ContentUnavailableView {
+            Label("No Page", systemImage: "globe")
+          } description: {
+            Text("Type an address to open a page, here and on the Mac.")
+          }
+        } else {
+          ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
       }
     }
     .navigationTitle("Web View")
@@ -52,7 +77,7 @@ struct WebMirrorView: View {
     .toolbar {
       ToolbarItem(placement: .topBarTrailing) {
         Menu("Tabs", systemImage: "square.on.square") {
-          ForEach(state?.tabs ?? []) { tab in
+          ForEach(webTabs) { tab in
             Button {
               page.attach()
               channel.web(.selectTab(tab.id), in: sessionID)
@@ -65,7 +90,8 @@ struct WebMirrorView: View {
             }
           }
         }
-        .disabled((state?.tabs.count ?? 0) < 2)
+        .disabled(
+          webTabs.isEmpty || (webTabs.count == 1 && webTabs.first?.id == state?.activeTabID))
       }
       ToolbarItemGroup(placement: .bottomBar) {
         Button("Back", systemImage: "chevron.backward") {
