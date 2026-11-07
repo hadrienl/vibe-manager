@@ -51,6 +51,14 @@ struct SignInWorkspaceTests {
     return (model, subject)
   }
 
+  /// The question about the account, whenever it was asked.
+  private func question(_ progress: AgentSignInProgress?) -> AgentSignInProgress? {
+    guard case .otherAccount(let expected, let actual, let detail, _)? = progress else {
+      return progress
+    }
+    return .otherAccount(expected: expected, actual: actual, detail: detail, at: .distantPast)
+  }
+
   /// The turn stopped on `StopFailure`, its error `authentication_failed`.
   private func stoppedOnSignIn(_ id: SessionID) -> AgentActivityState {
     AgentActivityMachine.reduce(
@@ -127,6 +135,65 @@ struct SignInWorkspaceTests {
     #expect(await supervisor.startCount == started)
   }
 
+  @Test("The question about the account goes with its page, or with the next expiry (#478)")
+  func questionDoesNotOutliveItsSignIn() async throws {
+    let (model, subject) = try await running()
+    let stub = AgentProviderID("stub")
+    // Changed on purpose from the settings, no session waiting: the page left, nothing is asked.
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: "perso@x.io")
+    #expect(model.signIns[stub] != nil)
+    model.leaveSignIn(of: stub)
+    #expect(model.signIns[stub] == nil)
+
+    // A session waits on the answer: it is still asked in its conversation.
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: "perso@x.io")
+    model.leaveSignIn(of: stub)
+    #expect(
+      model.signInNotice(for: subject.id)?.state
+        == .otherAccount(expected: "pro@x.io", actual: "perso@x.io"))
+
+    // Its sign-in expires again: that is told, and the question cannot be answered any more.
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+    #expect(model.signInNotice(for: subject.id)?.state == .expired)
+    model.publishSignIn(for: subject.id)
+    #expect(model.signIns[stub] == nil)
+  }
+
+  @Test("A page left before the CLI said how it is signed in changes nothing (#478)")
+  func cancelledReading() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    model.signInRoutes[stub] = (.elsewhere, Date())
+    model.signedInAddresses[stub] = "pro@x.io"
+    let reading = Task { await model.refreshSignedInAccount(of: stub) }
+    reading.cancel()
+    await reading.value
+    #expect(model.signInRoutes[stub]?.route == .elsewhere)
+    #expect(model.signedInAddresses[stub] == "pro@x.io")
+  }
+
+  @Test("An account signed in to the account of another agent of its CLI is told so (#478)")
+  func sameAccountAsAnotherAgent() async throws {
+    let (model, _) = try await running()
+    let account = AgentAccount(
+      name: "Claude 2", harness: .claudeCode, configurationDirectory: "~/.claude-2")
+    model.agentAccounts = AgentAccountsSettingsModel(
+      repository: InMemoryAgentAccountRepository([account]), home: "/Users/someone",
+      defaultDirectories: [:])
+    let added = AgentProviderID(account.providerID)
+    model.signedInAccounts.remember("pro@x.io", of: AgentProviderID("claude-code"))
+
+    await model.signInEnded(added, outcome: .signedIn, after: "Pro@x.io")
+    #expect(model.signIns[added] == .sameAccount(as: "claude-code"))
+    model.leaveSignIn(of: added)
+    #expect(model.signIns[added] == nil)
+
+    model.signedInAccounts.remember(nil, of: added)
+    await model.signInEnded(added, outcome: .signedIn, after: "perso@x.io")
+    #expect(model.signIns[added] == nil)
+  }
+
   @Test("An account changed outside the application is not taken for a mistake (#478)")
   func changedOutside() async throws {
     let (model, _) = try await running()
@@ -147,7 +214,9 @@ struct SignInWorkspaceTests {
     await model.signInEnded(stub, outcome: .signedIn, before: max, after: ultra)
     #expect(model.signIns[stub] == nil)
     await model.signInEnded(stub, outcome: .signedIn, before: ultra, after: team)
-    #expect(model.signIns[stub] == .otherAccount(expected: ultra, actual: team))
+    #expect(
+      question(model.signIns[stub])
+        == .otherAccount(expected: ultra, actual: team, at: .distantPast))
   }
 
   @Test("An account that cannot be read after signing in resumes nothing (#478)")
@@ -155,7 +224,9 @@ struct SignInWorkspaceTests {
     let (model, _) = try await running()
     let stub = AgentProviderID("stub")
     await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: nil)
-    #expect(model.signIns[stub] == .otherAccount(expected: "pro@x.io", actual: nil))
+    #expect(
+      question(model.signIns[stub])
+        == .otherAccount(expected: "pro@x.io", actual: nil, at: .distantPast))
     model.keepSignedInAccount(of: stub)
     #expect(model.signIns[stub] == nil)
     #expect(model.signedInAccounts.account(of: stub) == nil)
