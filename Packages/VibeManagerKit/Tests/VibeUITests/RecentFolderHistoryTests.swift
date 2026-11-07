@@ -134,6 +134,75 @@ struct RecentFolderHistoryTests {
     #expect(await store.load() == model.recentFolders)
   }
 
+  @Test("A session created in a worktree leaves the history as it was (#529)")
+  func creationInAWorktreeRecordsNothing() async {
+    let store = InMemoryRecentFolderStore(RecentFolders(recent("/work/other")))
+    let model = AppModel(repository: HistoryRepository(values: []), recentFolderStore: store)
+    await model.load()
+    // Read on disk at creation, wherever the worktree is…
+    var linked = session(in: "/elsewhere/feat-1")
+    linked.repositories[0].mainRepositoryPath = "/work/app"
+    // …or named by its path.
+    let named = session(in: "/work/app/.claude/worktrees/feat-2")
+
+    for created in [linked, named] {
+      let folder = created.repositories[0].path
+      await model.complete(
+        SessionCreation(session: created, plan: plan(folder)), launching: false)
+    }
+
+    #expect(model.offeredRecentFolders.map(\.path) == ["/work/other"])
+    #expect(await store.load() == RecentFolders(recent("/work/other")))
+  }
+
+  @Test("Seeded from the sessions, the history leaves their worktrees out (#529)")
+  func seedingLeavesWorktreesOut() async {
+    let store = InMemoryRecentFolderStore()
+    let model = AppModel(
+      repository: HistoryRepository(values: [
+        session(in: "/work/api/.claude/worktrees/feat-1", createdAt: 2),
+        session(in: "/work/web", createdAt: 1),
+      ]),
+      recentFolderStore: store)
+
+    await model.load()
+
+    #expect(model.recentFolders.entries.map(\.path) == ["/work/web"])
+    #expect(await store.load() == model.recentFolders)
+  }
+
+  @Test("A coordinator's child leaves the history as it was (#529)")
+  func childCreationRecordsNothing() async {
+    let store = InMemoryRecentFolderStore(RecentFolders(recent("/work/other")))
+    let model = AppModel(repository: HistoryRepository(values: []), recentFolderStore: store)
+    await model.load()
+    var child = session(in: "/work/app")
+    child.coordination = .child(of: SessionID())
+
+    await model.complete(
+      SessionCreation(session: child, plan: plan("/work/app")), launching: false)
+
+    #expect(model.offeredRecentFolders.map(\.path) == ["/work/other"])
+    #expect(await store.load() == RecentFolders(recent("/work/other")))
+  }
+
+  @Test("A history written with worktrees is written again without them at launch (#529)")
+  func storedWorktreesAreDropped() async {
+    var recorded = session(in: "/elsewhere/feat-3")
+    recorded.repositories[0].mainRepositoryPath = "/work/api"
+    let store = InMemoryRecentFolderStore(
+      RecentFolders(
+        recent(
+          "/work/api/.claude/worktrees/feat-1", "/work/web", "/elsewhere/feat-3",
+          "/work/api/.claude/worktrees/fix-2")))
+    let model = AppModel(repository: HistoryRepository(values: [recorded]), recentFolderStore: store)
+
+    await model.load()
+
+    #expect(model.recentFolders.entries.map(\.path) == ["/work/web"])
+    #expect(await store.load() == model.recentFolders)
+  }
+
   @Test("Cancelling the sheet remembers nothing")
   func cancellingRecordsNothing() async {
     let store = InMemoryRecentFolderStore(RecentFolders())
