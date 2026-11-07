@@ -322,11 +322,18 @@ public struct RepositoryContext: Identifiable, Hashable, Codable, Sendable {
   public let id: RepositoryID
   public var path: String
   public var git: GitSnapshot?
+  /// The repository `path` is a worktree of, recorded when the session was created there (#525):
+  /// the session is filed under it, and stays in its project's group once the worktree is gone.
+  public var mainRepositoryPath: String?
 
-  public init(id: RepositoryID = RepositoryID(), path: String, git: GitSnapshot? = nil) {
+  public init(
+    id: RepositoryID = RepositoryID(), path: String, git: GitSnapshot? = nil,
+    mainRepositoryPath: String? = nil
+  ) {
     self.id = id
     self.path = path
     self.git = git
+    self.mainRepositoryPath = mainRepositoryPath
   }
 }
 

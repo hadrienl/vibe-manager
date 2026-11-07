@@ -47,10 +47,10 @@ extension AppModel {
   }
 
   /// The folder a session is filed under: where the disk says it is once it has been asked, its
-  /// path as written until then.
+  /// path as written until then — a worktree's brought back to its repository (#525).
   public func folderKey(for session: WorkSession) -> SessionFolderKey? {
     guard let path = SessionFolderKey.primaryPath(of: session) else { return nil }
-    return folderResolution.keys[path] ?? .lexical(path)
+    return folderResolution.keys[path] ?? .provisional(path)
   }
 
   /// A search unfolds everything, without touching what is stored: looking for a session a fold

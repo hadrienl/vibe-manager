@@ -210,6 +210,126 @@ struct SessionFolderKeyDiskTests {
     #expect(grouped[0].isMissing)
     #expect(grouped[0].folderName == "api")
   }
+
+  /// A repository at `root/name` and a linked worktree of it, its `.git` a file as Git writes it.
+  private func worktree(
+    _ worktree: URL, of repository: URL, relative: Bool = false
+  ) throws {
+    let gitDirectory = repository.appendingPathComponent(
+      ".git/worktrees/\(worktree.lastPathComponent)")
+    try FileManager.default.createDirectory(at: gitDirectory, withIntermediateDirectories: true)
+    try FileManager.default.createDirectory(at: worktree, withIntermediateDirectories: true)
+    let target =
+      relative
+      ? String(repeating: "../", count: worktree.pathComponents.count - 1)
+        + gitDirectory.path.dropFirst()
+      : gitDirectory.path
+    try "gitdir: \(target)\n".write(
+      to: worktree.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+  }
+
+  @Test("A worktree, wherever it is, is filed under its repository (#525)")
+  func worktreeIsFiledUnderItsRepository() async throws {
+    let root = try makeDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("mairie", isDirectory: true)
+    let inside = repository.appendingPathComponent(".claude/worktrees/TICKET-185")
+    let outside = root.appendingPathComponent("mairie-worktrees/15-release")
+    let relative = root.appendingPathComponent("elsewhere/TICKET-190")
+    try worktree(inside, of: repository)
+    try worktree(outside, of: repository)
+    try worktree(relative, of: repository, relative: true)
+
+    let resolution = await SessionFolderResolution.resolve([
+      repository.path, inside.path, outside.path, relative.path,
+    ])
+
+    let key = try #require(resolution.keys[repository.path])
+    #expect(resolution.keys[inside.path] == key)
+    #expect(resolution.keys[outside.path] == key)
+    #expect(resolution.keys[relative.path] == key)
+    #expect(resolution.missing.isEmpty)
+  }
+
+  @Test("A worktree removed since is filed under the repository its path names (#525)")
+  func removedWorktreeIsFiledUnderItsRepository() async throws {
+    let root = try makeDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("mairie", isDirectory: true)
+    try FileManager.default.createDirectory(at: repository, withIntermediateDirectories: true)
+    let claude = repository.appendingPathComponent(".claude/worktrees/TICKET-186").path
+    let plain = repository.appendingPathComponent(".worktrees/fix-54").path
+    let elsewhere = root.appendingPathComponent("mairie-worktrees/15-release").path
+
+    let resolution = await SessionFolderResolution.resolve([
+      repository.path, claude, plain, elsewhere,
+    ])
+
+    let key = try #require(resolution.keys[repository.path])
+    #expect(resolution.keys[claude] == key)
+    #expect(resolution.keys[plain] == key)
+    #expect(!resolution.missing.contains(key))
+    // Nothing in its path names its repository: it stays under its own, missing.
+    let lost = try #require(resolution.keys[elsewhere])
+    #expect(lost.path.hasSuffix("/15-release"))
+    #expect(resolution.missing.contains(lost))
+  }
+
+  @Test("A clone and a submodule are their own folders")
+  func cloneAndSubmoduleStayThemselves() async throws {
+    let root = try makeDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let clone = root.appendingPathComponent("api", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: clone.appendingPathComponent(".git"), withIntermediateDirectories: true)
+    let submodule = clone.appendingPathComponent("vendor/lib", isDirectory: true)
+    try FileManager.default.createDirectory(at: submodule, withIntermediateDirectories: true)
+    try "gitdir: ../../.git/modules/lib\n".write(
+      to: submodule.appendingPathComponent(".git"), atomically: true, encoding: .utf8)
+
+    let resolution = await SessionFolderResolution.resolve([clone.path, submodule.path])
+
+    #expect(resolution.keys[clone.path] == .canonical(clone.path))
+    #expect(resolution.keys[submodule.path] == .canonical(submodule.path))
+  }
+}
+
+@Suite("The repository of a worktree (#525)")
+struct WorktreeRepositoryTests {
+  @Test("Its path names it under .claude/worktrees and .worktrees, never under Codex's home")
+  func inPath() {
+    #expect(WorktreeRepository.inPath(of: "/w/mairie/.claude/worktrees/TICKET-185") == "/w/mairie")
+    #expect(WorktreeRepository.inPath(of: "/w/mairie/.worktrees/fix-54/backoffice") == "/w/mairie")
+    // A worktree made from another hangs from the clone.
+    #expect(
+      WorktreeRepository.inPath(of: "/w/api/.claude/worktrees/a/.claude/worktrees/b") == "/w/api")
+    #expect(WorktreeRepository.inPath(of: "/Users/me/.codex/worktrees/1a2b/api") == nil)
+    #expect(WorktreeRepository.inPath(of: "/w/mairie/.claude/worktrees/") == nil)
+    #expect(WorktreeRepository.inPath(of: "/w/mairie") == nil)
+  }
+
+  @Test("A session started in a worktree is filed under the repository it recorded")
+  func recordedRepositoryWins() {
+    let child = WorkSession(
+      name: "TICKET-185",
+      createdAt: Date(timeIntervalSince1970: 10),
+      updatedAt: Date(timeIntervalSince1970: 10),
+      repositories: [
+        RepositoryContext(
+          path: "/w/elsewhere/TICKET-185", mainRepositoryPath: "/w/mairie")
+      ])
+
+    #expect(SessionFolderKey.primaryPath(of: child) == "/w/mairie")
+    #expect(child.repositories[0].path == "/w/elsewhere/TICKET-185")
+  }
+
+  @Test("Before the disk answers, a worktree's path already files it under its repository")
+  func provisionalKey() {
+    #expect(
+      SessionFolderKey.provisional("/w/mairie/.claude/worktrees/TICKET-185")
+        == .lexical("/w/mairie"))
+    #expect(SessionFolderKey.provisional("~/w/api/") == .lexical("~/w/api"))
+  }
 }
 
 @Suite("Keeping the grouped sidebar in the layout")

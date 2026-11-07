@@ -72,28 +72,13 @@ public enum WorktreeInstructions {
   /// The folder of the main repository the session works in: the one a worktree belongs to.
   public static func mainRepository(of session: WorkSession) -> String? {
     guard let context = session.repositories.first else { return nil }
-    let folder = context.git?.repositoryRootPath ?? context.path
+    let folder = context.mainRepositoryPath ?? context.git?.repositoryRootPath ?? context.path
     return mainRepository(of: folder)
   }
 
   /// A worktree's `.git` is a file, `gitdir: <main>/.git/worktrees/<name>`.
   public static func mainRepository(of folder: String) -> String {
-    let folder = (folder as NSString).standardizingPath
-    let dotGit = (folder as NSString).appendingPathComponent(".git")
-    guard let content = try? String(contentsOfFile: dotGit, encoding: .utf8),
-      content.hasPrefix("gitdir:")
-    else { return folder }
-    var gitDirectory = content.dropFirst("gitdir:".count)
-      .trimmingCharacters(in: .whitespacesAndNewlines)
-    // `worktree.useRelativePaths` writes it relative to the worktree.
-    if !gitDirectory.hasPrefix("/") {
-      gitDirectory = (folder as NSString).appendingPathComponent(gitDirectory)
-    }
-    gitDirectory = (gitDirectory as NSString).standardizingPath
-    guard let range = gitDirectory.range(of: "/.git/worktrees/", options: .backwards) else {
-      return folder
-    }
-    return String(gitDirectory[..<range.lowerBound])
+    WorktreeRepository.onDisk(of: folder) ?? (folder as NSString).standardizingPath
   }
 
   /// `2026-10-27`, in the Mac's time zone.

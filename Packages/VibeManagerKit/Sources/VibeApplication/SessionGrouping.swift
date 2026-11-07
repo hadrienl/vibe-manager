@@ -53,10 +53,22 @@ public struct SessionFolderKey: Hashable, Comparable, Codable, Sendable, CustomS
   }
 
   /// The folder a session is filed under: the one its agent starts in, never a worktree the agent
-  /// made nor a second repository (#12). `nil` for a session written before folders were required.
+  /// made nor a second repository (#12). Started in a worktree — a coordinator's child, most often —
+  /// it is the repository the worktree was recorded to belong to (#525); one recorded before that
+  /// is brought back to its repository by `SessionFolderResolution`. `nil` for a session written
+  /// before folders were required.
   public static func primaryPath(of session: WorkSession) -> String? {
-    guard let path = session.repositories.first?.path, !path.isEmpty else { return nil }
-    return path
+    guard let repository = session.repositories.first, !repository.path.isEmpty else {
+      return nil
+    }
+    return repository.mainRepositoryPath ?? repository.path
+  }
+
+  /// The folder a session working in `path` is filed under, before the disk has been asked: the
+  /// repository a worktree's path names, or the folder itself.
+  public static func provisional(_ path: String) -> SessionFolderKey {
+    let folder = lexical(path)
+    return WorktreeRepository.inPath(of: folder.path).map(lexical) ?? folder
   }
 }
 
@@ -257,7 +269,7 @@ public struct SessionFolderResolution: Equatable, Sendable {
     await Task.detached(priority: .utility) {
       var resolution = SessionFolderResolution()
       for path in paths {
-        let key = SessionFolderKey.canonical(path)
+        let key = SessionFolderKey.canonical(filingFolder(of: path))
         resolution.keys[path] = key
         var isDirectory: ObjCBool = false
         if !FileManager.default.fileExists(atPath: key.path, isDirectory: &isDirectory)
@@ -268,5 +280,19 @@ public struct SessionFolderResolution: Equatable, Sendable {
       }
       return resolution
     }.value
+  }
+
+  /// The folder a session working in `path` is filed under (#525): the repository a worktree
+  /// belongs to — read on disk while it is there, in its path once it is gone — or the folder
+  /// itself. Touches the disk.
+  static func filingFolder(of path: String) -> String {
+    let folder = SessionFolderKey.lexical(path).path
+    var isDirectory: ObjCBool = false
+    if FileManager.default.fileExists(atPath: folder, isDirectory: &isDirectory),
+      isDirectory.boolValue
+    {
+      return WorktreeRepository.onDisk(of: folder) ?? folder
+    }
+    return WorktreeRepository.inPath(of: folder) ?? folder
   }
 }

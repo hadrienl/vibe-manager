@@ -51,6 +51,8 @@ public struct CreateSession: Sendable {
   private let drops: (any SessionDropStore)?
   /// The resolvers in use when Create is pressed, or `nil` when ticket titles are off (#89).
   private let ticketResolvers: (@Sendable () async -> TicketResolverSet?)?
+  /// The repository a folder is a worktree of, `nil` for any other folder (#525).
+  private let worktreeRepository: @Sendable (String) -> String?
   private let diagnostics: Diagnostics
 
   /// - Parameter icons: where the project icon a draft wears is copied. Without it, a session is
@@ -64,6 +66,7 @@ public struct CreateSession: Sendable {
     icons: (any SessionIconStore)? = nil,
     drops: (any SessionDropStore)? = nil,
     ticketResolvers: (@Sendable () async -> TicketResolverSet?)? = nil,
+    worktreeRepository: @escaping @Sendable (String) -> String? = WorktreeRepository.onDisk(of:),
     diagnostics: Diagnostics = .disabled
   ) {
     self.repository = repository
@@ -74,6 +77,7 @@ public struct CreateSession: Sendable {
     self.icons = icons
     self.drops = drops
     self.ticketResolvers = ticketResolvers
+    self.worktreeRepository = worktreeRepository
     self.diagnostics = diagnostics
   }
 
@@ -112,6 +116,11 @@ public struct CreateSession: Sendable {
     // session is stored, and its web view opens on it (#69).
     if session.ticket == nil, let url = tickets.first?.url {
       session.ticket = SessionTicket(url: url, source: .detected)
+    }
+    // Recorded while the worktree is there: the session stays filed under its project once the
+    // worktree is removed (#525).
+    if let folder = session.repositories.first?.path, let main = worktreeRepository(folder) {
+      session.repositories[0].mainRepositoryPath = main
     }
     try await repository.save(session)
     let files = draft.sentAttachments

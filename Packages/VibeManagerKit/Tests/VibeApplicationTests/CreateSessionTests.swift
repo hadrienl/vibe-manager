@@ -131,6 +131,27 @@ struct CreateSessionTests {
     #expect(await repository.savedSessions.count == 1)
   }
 
+  @Test("A session started in a worktree records its repository; one in a clone, nothing (#525)")
+  func worktreeRecordsItsRepository() async throws {
+    let repository = SpyRepository()
+    let create = CreateSession(
+      repository: repository,
+      agents: StubRegistry(providers: [StubProvider()]),
+      folders: StubFolders(status: .usable),
+      clock: FixedClock(),
+      worktreeRepository: { $0 == "/w/mairie/.claude/worktrees/TICKET-185" ? "/w/mairie" : nil }
+    )
+
+    let child = try await create(draft(path: "/w/mairie/.claude/worktrees/TICKET-185"))
+    let clone = try await create(draft(path: "/w/mairie"))
+
+    #expect(child.session.repositories.first?.path == "/w/mairie/.claude/worktrees/TICKET-185")
+    #expect(child.session.repositories.first?.mainRepositoryPath == "/w/mairie")
+    #expect(clone.session.repositories.first?.mainRepositoryPath == nil)
+    #expect(
+      await repository.savedSessions.first?.repositories.first?.mainRepositoryPath == "/w/mairie")
+  }
+
   @Test("The effort chosen in the draft is launched with, and kept on the session (#411)")
   func draftEffortIsLaunched() async throws {
     let (create, _) = makeSubject()
