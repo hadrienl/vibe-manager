@@ -1,4 +1,5 @@
 import CompanionCore
+import Foundation
 import Testing
 
 private let request = RemoteNewSession(
@@ -94,6 +95,98 @@ func creationHeldDifferent() {
   _ = creation.expire()
   #expect(creation.submit(other) == false)
   #expect(creation.created("S") == .send(other))
+  #expect(creation.pending == other)
+  #expect(creation.created("T") == .created("T"))
+}
+
+private func session(
+  _ id: String, named name: String, coordinatorID: String? = nil, isCoordinator: Bool = false
+) -> RemoteSession {
+  RemoteSession(
+    id: id, name: name, folderPath: "/f", folderName: "f", agentName: "Claude", status: .doing,
+    activity: .working, appearance: RemoteAppearance(symbol: "star", color: "#FFFFFF"),
+    coordinatorID: coordinatorID, isCoordinator: isCoordinator, updatedAt: .now)
+}
+
+@Test("A session made while the connection was lost is found in the Mac's next list")
+func creationFoundInList() {
+  var creation = RemoteCreation()
+  let old = session("A", named: "Bonjour")
+  #expect(creation.submit(request, listed: [old]) == true)
+  // On a live connection, only the Mac's answer counts.
+  #expect(creation.listed([old, session("S", named: "Bonjour")]) == nil)
+  creation.connectionLost()
+  #expect(creation.isUnanswered)
+  #expect(creation.listed([old]) == nil)
+  #expect(creation.pending == request)
+  // Another name, a coordinator's child, a coordinator: not what was asked.
+  #expect(
+    creation.listed([
+      old, session("B", named: "Autre"), session("C", named: "Bonjour", coordinatorID: "A"),
+      session("D", named: "Bonjour", isCoordinator: true),
+    ]) == nil)
+  #expect(creation.listed([old, session("S", named: "Bonjour")]) == .created("S"))
+  #expect(creation.pending == nil)
+  #expect(creation.listed([old, session("S", named: "Bonjour")]) == nil)
+}
+
+@Test("A request perhaps made says so when it expires, and is still found after")
+func creationUnansweredExpires() {
+  var creation = RemoteCreation()
+  #expect(creation.submit(request, listed: [session("A", named: "x")]) == true)
+  #expect(!creation.isUnanswered)
+  creation.connectionLost()
+  #expect(creation.isUnanswered)
+  #expect(creation.expire() == request)
+  #expect(!creation.isUnanswered)
+  #expect(
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .created("S"))
+  #expect(creation.submit(request) == true)
+}
+
+@Test("The session is named as the Mac names it: the name typed, the message, else the folder")
+func creationNamedAsTheMacDoes() {
+  func found(_ asked: RemoteNewSession, as name: String) -> Bool {
+    var creation = RemoteCreation()
+    _ = creation.submit(asked, listed: [session("A", named: "x")])
+    creation.connectionLost()
+    return creation.listed([session("A", named: "x"), session("S", named: name)]) != nil
+  }
+  func asked(name: String = "", prompt: String = "") -> RemoteNewSession {
+    RemoteNewSession(
+      name: name, folder: "/Users/me/projet", agentID: "a", modelID: nil, prompt: prompt,
+      start: true, coordinates: false)
+  }
+  #expect(found(asked(name: "  Ma\tsession \n"), as: "Ma session"))
+  #expect(found(asked(prompt: "\n  Corrige le bug  \nensuite"), as: "Corrige le bug"))
+  #expect(
+    found(asked(prompt: String(repeating: "a", count: 80)), as: String(repeating: "a", count: 60)))
+  #expect(found(asked(), as: "projet"))
+  #expect(!found(asked(name: "Autre"), as: "projet"))
+}
+
+@Test("Another Mac's list is no answer")
+func creationOtherMacList() {
+  var creation = RemoteCreation()
+  #expect(creation.submit(request, listed: [session("A", named: "x")]) == true)
+  creation.connectionLost()
+  #expect(creation.listed([session("Z", named: "x"), session("S", named: "Bonjour")]) == nil)
+  #expect(
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .created("S"))
+}
+
+@Test("A different request held back goes once the one lost is found")
+func creationHeldBehindLost() {
+  var creation = RemoteCreation()
+  let other = RemoteNewSession(
+    name: "Autre", folder: "/g", agentID: "a", modelID: nil, prompt: "", start: true,
+    coordinates: false)
+  #expect(creation.submit(request, listed: [session("A", named: "x")]) == true)
+  _ = creation.expire()
+  #expect(creation.submit(other) == false)
+  creation.connectionLost()
+  #expect(
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .send(other))
   #expect(creation.pending == other)
   #expect(creation.created("T") == .created("T"))
 }

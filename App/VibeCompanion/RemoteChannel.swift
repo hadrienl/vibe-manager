@@ -116,6 +116,8 @@ final class RemoteChannel {
     }
     fetches = [:]
     creation.connectionLost()
+    // No answer comes while the channel is closed: the next connection gets the whole delay.
+    creationTimeout?.cancel()
     attempt += 1
     tasks.forEach { $0.cancel() }
     tasks = []
@@ -173,6 +175,7 @@ final class RemoteChannel {
       CompanionIroh.logger.notice(
         "remote: connected, \(CompanionIroh.describe(connection.paths()), privacy: .public)")
       folderCreations = []
+      if creation.pending != nil { awaitCreation() }
       write(.hello(protocolVersion: CompanionRemote.protocolVersion, deviceName: deviceName))
       if let shownSessionID { write(.show(sessionID: shownSessionID)) }
       if let webSessionID { write(.showWeb(sessionID: webSessionID)) }
@@ -223,6 +226,7 @@ final class RemoteChannel {
       macProtocolVersion = version
     case .sessions(let sessions):
       self.sessions = sessions
+      if let answer = creation.listed(sessions) { settle(answer) }
     case .conversation(let conversation):
       guard conversation.sessionID == shownSessionID else { return }
       self.conversation = conversation
@@ -429,20 +433,28 @@ final class RemoteChannel {
   }
 
   func create(_ session: RemoteNewSession) {
-    if creation.submit(session) { write(.createSession(session)) }
+    if creation.submit(session, listed: sessions) { write(.createSession(session)) }
     awaitCreation()
   }
 
-  /// No answer in this time, and the form comes back: the Mac may be asleep, or out of reach.
+  /// No answer in this time on an open channel, and the form comes back: the Mac may be asleep, or
+  /// out of reach. One asked before the channel closed may have been made: the form says to look
+  /// at the list rather than to try again.
   private func awaitCreation() {
     creationTimeout?.cancel()
     creationTimeout = Task { [weak self] in
       try? await Task.sleep(for: .seconds(30))
-      guard !Task.isCancelled, let self, let request = self.creation.expire() else { return }
+      guard !Task.isCancelled, let self else { return }
+      let mayExist = self.creation.isUnanswered
+      guard let request = self.creation.expire() else { return }
       self.returnedCreation = ReturnedCreation(
         request: request,
-        error: String(
-          localized: "The Mac didn’t answer. Check that it’s awake, then try again."))
+        error: mayExist
+          ? String(
+            localized:
+              "The connection to the Mac was lost before it answered. The session may already exist: check the list before trying again."
+          )
+          : String(localized: "The Mac didn’t answer. Check that it’s awake, then try again."))
     }
   }
 
