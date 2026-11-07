@@ -20,19 +20,22 @@ struct SessionsView: View {
   /// The coordinators whose children are folded away, by a long press on their row.
   @State private var foldedCoordinators: Set<String> = []
   @State private var foldTicks = 0
-  /// The coordinator held down, while it is.
-  @State private var pressedRow: String?
+  /// The coordinator held down, while it is: cleared by the gesture itself, however it ends.
+  @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.3)))
+  private var pressedRow: String?
   /// How long a coordinator is held down to fold: shorter than the system's half second, since
   /// the row answers from the first touch.
   private static let foldPress: Double = 0.35
 
   var body: some View {
+    let families = RemoteSessionFamilies(channel.sessions)
+    let groups = families.groups(in: filter, showingDone: showingDone, folded: foldedCoordinators)
     NavigationStack(path: $path) {
       List {
         Section {
           Picker("Status", selection: $filter) {
             ForEach(RemoteTaskStatus.columns, id: \.self) { status in
-              Text("\(Text(status.label)) \(count(status))").tag(status)
+              Text("\(Text(status.label)) \(families.count(in: status))").tag(status)
             }
           }
           .pickerStyle(.segmented)
@@ -154,26 +157,40 @@ struct SessionsView: View {
   @ViewBuilder private func rowView(_ row: RemoteSessionRow) -> some View {
     switch row.content {
     case .session(let session, let ownStatus):
-      // Gestures rather than a Button: a Button also opens the session when a long press ends.
       let canFold = row.line == .parent || row.foldedChildren > 0
-      SessionRow(
+      let label = SessionRow(
         session: session, indented: row.isChild, ownStatus: ownStatus,
-        foldedChildren: row.foldedChildren
-      )
-      .contentShape(Rectangle())
-      .onTapGesture { path.append(session.id) }
-      .onLongPressGesture(minimumDuration: Self.foldPress) {
-        if canFold { toggleFold(of: session.id) }
-      } onPressingChanged: { pressing in
-        guard canFold, pressing || pressedRow == row.id else { return }
-        // Every change of the list in one animated transaction: one made without an animation in
-        // the same update would remove the children at once.
-        withAnimation(pressing ? .easeOut(duration: Self.foldPress) : .spring(duration: 0.3)) {
-          pressedRow = pressing ? row.id : nil
+        foldedChildren: row.foldedChildren)
+      Group {
+        if canFold {
+          // Gestures rather than a Button: in a List, a gesture added to a Button's row keeps its
+          // tap from opening anything. Held down, the row sinks in, in place of the highlight.
+          label
+            .contentShape(Rectangle())
+            .onTapGesture { path.append(session.id) }
+            .gesture(
+              LongPressGesture(minimumDuration: Self.foldPress)
+                .updating($pressedRow) { _, pressed, transaction in
+                  pressed = row.id
+                  transaction.animation = .easeOut(duration: Self.foldPress)
+                }
+                .onEnded { _ in toggleFold(of: session.id) }
+            )
+            .accessibilityAddTraits(.isButton)
+            .accessibilityAction { path.append(session.id) }
+        } else {
+          // Any other row opens however long it is held, from anywhere in its cell.
+          Button {
+            path.append(session.id)
+          } label: {
+            label
+          }
+          .foregroundStyle(.primary)
         }
       }
-      .accessibilityAddTraits(.isButton)
-      .accessibilityAction { path.append(session.id) }
+      .accessibilityValue(
+        canFold ? Text(row.foldedChildren > 0 ? "Collapsed" : "Expanded") : Text(verbatim: "")
+      )
       .accessibilityActions {
         if canFold {
           Button(row.foldedChildren > 0 ? "Show Children" : "Hide Children") {
@@ -196,9 +213,10 @@ struct SessionsView: View {
   }
 
   private func toggleFold(of id: String) {
+    // Every change of the list in one animated transaction: one made without an animation in the
+    // same update would remove the children at once.
     withAnimation {
       foldTicks += 1
-      pressedRow = nil
       if foldedCoordinators.contains(id) {
         foldedCoordinators.remove(id)
       } else {
@@ -207,15 +225,6 @@ struct SessionsView: View {
     }
   }
 
-  private var families: RemoteSessionFamilies { RemoteSessionFamilies(channel.sessions) }
-
-  private func count(_ status: RemoteTaskStatus) -> Int {
-    families.count(in: status)
-  }
-
-  private var groups: [RemoteSessionGroup] {
-    families.groups(in: filter, showingDone: showingDone, folded: foldedCoordinators)
-  }
 }
 
 /// “Show Done Sessions (3)” under a coordinator's children, as on the Mac (#468).
@@ -271,6 +280,8 @@ struct FamilyLineView: View {
       }
       .stroke(Color(.systemGray4), lineWidth: 1.5)
     }
+    // Drawn from the leading edge, as the badges are laid out: on the right in Arabic.
+    .flipsForRightToLeftLayoutDirection(true)
     .allowsHitTesting(false)
     .accessibilityHidden(true)
   }
@@ -381,12 +392,14 @@ struct SessionRow: View {
           }
           if foldedChildren > 0 {
             HStack(spacing: 2) {
-              Text(verbatim: "\(foldedChildren)")
-              Image(systemName: "chevron.right")
+              Text(foldedChildren, format: .number)
+              Image(systemName: "chevron.forward")
                 .font(.caption2.weight(.semibold))
             }
             .font(.caption)
             .foregroundStyle(.secondary)
+            // Said by the row's value instead: Collapsed.
+            .accessibilityHidden(true)
           }
           Text(verbatim: ShortDate.text(session.updatedAt))
             .font(.caption)

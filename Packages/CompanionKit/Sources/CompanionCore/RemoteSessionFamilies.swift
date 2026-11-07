@@ -55,8 +55,9 @@ public struct RemoteSessionFamilies: Sendable {
     listed = sessions
   }
 
-  /// The coordinator a session is listed under. One archived lists none, nor one listed under
-  /// another itself: the session would show in no column.
+  /// The coordinator a session is listed under. An archived session is listed under none, as on
+  /// the Mac (`CoordinationPolicy`); nor is one under an archived coordinator, or under one listed
+  /// under another itself: the session would show in no column.
   private func parent(of session: RemoteSession) -> RemoteSession? {
     guard let parent = listedCoordinator(of: session), listedCoordinator(of: parent) == nil else {
       return nil
@@ -65,16 +66,14 @@ public struct RemoteSessionFamilies: Sendable {
   }
 
   private func listedCoordinator(of session: RemoteSession) -> RemoteSession? {
-    guard let id = session.coordinatorID, let parent = byID[id], parent.status != .archived else {
-      return nil
-    }
+    guard session.status != .archived, let id = session.coordinatorID, let parent = byID[id],
+      parent.status != .archived
+    else { return nil }
     return parent
   }
 
   private func isListed(_ session: RemoteSession, in column: RemoteTaskStatus) -> Bool {
-    // An archived child stays out of its coordinator's family, as on the Mac.
-    guard session.status != .archived else { return column == .archived }
-    return (parent(of: session)?.status ?? session.status) == column
+    (parent(of: session)?.status ?? session.status) == column
   }
 
   /// How many sessions a column lists, its done children included.

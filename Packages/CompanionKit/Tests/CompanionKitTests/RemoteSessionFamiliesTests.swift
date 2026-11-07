@@ -89,6 +89,9 @@ func archivedChild() {
   let families = RemoteSessionFamilies([session("c"), session("k", .archived, under: "c")])
   #expect(ids(families.groups(in: .doing, showingDone: [])) == ["c"])
   #expect(families.count(in: .doing) == 1)
+  // In the archived column it stands alone, as many rows as it counts.
+  #expect(ids(families.groups(in: .archived, showingDone: [])) == ["k"])
+  #expect(families.count(in: .archived) == 1)
 }
 
 @Test("A folded coordinator draws no line and counts its children, done ones included")
