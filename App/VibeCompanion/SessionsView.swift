@@ -20,6 +20,11 @@ struct SessionsView: View {
   /// The coordinators whose children are folded away, by a long press on their row.
   @State private var foldedCoordinators: Set<String> = []
   @State private var foldTicks = 0
+  /// The coordinator held down, while it is.
+  @State private var pressedRow: String?
+  /// How long a coordinator is held down to fold: shorter than the system's half second, since
+  /// the row answers from the first touch.
+  private static let foldPress: Double = 0.35
 
   var body: some View {
     NavigationStack(path: $path) {
@@ -39,11 +44,16 @@ struct SessionsView: View {
           Section(isExpanded: expansion(of: group.path)) {
             ForEach(group.rows) { row in
               rowView(row)
+                // A coordinator held down sinks in until it folds, as a row does before its menu;
+                // the line stays where it is, tied to the rows around.
+                .scaleEffect(pressedRow == row.id ? 0.96 : 1)
                 .background {
                   if let line = row.line { FamilyLineView(line: line) }
                 }
-                // The line runs from row to row: no separator across it.
-                .listRowSeparator(row.line == nil ? .automatic : .hidden)
+                // The line runs from row to row: no separator across it, but the ones around the
+                // family stay, folded or not.
+                .listRowSeparator(row.separatorAbove, edges: .top)
+                .listRowSeparator(row.separatorBelow, edges: .bottom)
             }
           } header: {
             FolderHeader(name: group.name, isExpanded: expansion(of: group.path))
@@ -152,8 +162,15 @@ struct SessionsView: View {
       )
       .contentShape(Rectangle())
       .onTapGesture { path.append(session.id) }
-      .onLongPressGesture {
+      .onLongPressGesture(minimumDuration: Self.foldPress) {
         if canFold { toggleFold(of: session.id) }
+      } onPressingChanged: { pressing in
+        guard canFold, pressing || pressedRow == row.id else { return }
+        // Every change of the list in one animated transaction: one made without an animation in
+        // the same update would remove the children at once.
+        withAnimation(pressing ? .easeOut(duration: Self.foldPress) : .spring(duration: 0.3)) {
+          pressedRow = pressing ? row.id : nil
+        }
       }
       .accessibilityAddTraits(.isButton)
       .accessibilityAction { path.append(session.id) }
@@ -179,8 +196,9 @@ struct SessionsView: View {
   }
 
   private func toggleFold(of id: String) {
-    foldTicks += 1
     withAnimation {
+      foldTicks += 1
+      pressedRow = nil
       if foldedCoordinators.contains(id) {
         foldedCoordinators.remove(id)
       } else {
@@ -295,6 +313,22 @@ struct CreatingSessionView: View {
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .navigationTitle(Text(verbatim: title))
     .navigationBarTitleDisplayMode(.inline)
+  }
+}
+
+extension RemoteSessionRow {
+  /// The separator between a row and the one before: none inside a family.
+  fileprivate var separatorAbove: Visibility {
+    if case .child = line { return .hidden }
+    return .automatic
+  }
+
+  /// The separator between a row and the one after: none inside a family.
+  fileprivate var separatorBelow: Visibility {
+    switch line {
+    case .parent, .child(isLast: false): .hidden
+    case .child(isLast: true), nil: .automatic
+    }
   }
 }
 
