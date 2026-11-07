@@ -263,6 +263,8 @@ struct NewSessionDropTests {
 
     #expect(outcome.destination === workspace.catcher)
     #expect(outcome.taken)
+    // Written away from the main thread, then joined.
+    await waitUntil { workspace.draft?.isReceivingAttachments == false }
     let file = try #require(workspace.draft?.draft.attachments.first)
     #expect(file.pathExtension == "png")
     #expect(FileManager.default.fileExists(atPath: file.path))
@@ -288,8 +290,8 @@ struct NewSessionDropTests {
     _ = try drop(
       images, at: field.convert(NSPoint(x: field.bounds.midX, y: field.bounds.midY), to: nil),
       on: workspace)
+    await waitUntil { workspace.draft?.isReceivingAttachments == false }
     #expect(Set(workspace.draft?.draft.attachments ?? []).count == 2)
-    #expect(workspace.draft?.isReceivingAttachments == false)
   }
 
   @Test("A floating screenshot is joined as a copy; any other file as itself")
