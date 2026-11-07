@@ -56,6 +56,10 @@ final class RemoteChannel {
   var createdSessionID: String?
   /// The session a tapped notification is about (#401): the list opens it.
   var notifiedSessionID: String?
+  /// The parents of the new folders asked for, until their listing comes back.
+  @ObservationIgnored private var folderCreations: [String] = []
+  /// Why the folder asked for wasn't created, for the alert of the sheet that asked.
+  var folderFailure: RemoteFailure?
   /// The last thing the Mac could not do, for an alert.
   var failure: RemoteFailure?
   /// This phone's endpoint, once bound: what pairing writes.
@@ -146,6 +150,7 @@ final class RemoteChannel {
       path = CompanionIroh.pathKind(connection.paths())
       CompanionIroh.logger.notice(
         "remote: connected, \(CompanionIroh.describe(connection.paths()), privacy: .public)")
+      folderCreations = []
       write(.hello(protocolVersion: CompanionRemote.protocolVersion, deviceName: deviceName))
       if let shownSessionID { write(.show(sessionID: shownSessionID)) }
       if let webSessionID { write(.showWeb(sessionID: webSessionID)) }
@@ -221,16 +226,21 @@ final class RemoteChannel {
       try? png.write(to: Self.iconFolder.appendingPathComponent("\(id).png"))
     case .folderListing(let listing):
       folderListings[listing.path] = listing
-      if pendingHome {
+      if let reply = folderCreations.firstIndex(of: listing.path) {
+        // The answer to a new folder, not the home folder being waited for.
+        folderCreations.remove(at: reply)
+      } else if pendingHome {
         pendingHome = false
         homePath = listing.path
       }
+    case .folderNotCreated(let reason):
+      folderFailure = reason
     case .created(let id):
       createdSessionID = id
     case .failure(let reason):
       failure = reason
     case .hello, .show, .send, .sendFiles, .answer, .answers, .setStatus, .search, .newSessionOptions,
-      .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart,
+      .createSession, .listFolder, .createFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart,
       .httpRequest, .folderIcon, .close:
       break
     }
@@ -379,6 +389,21 @@ final class RemoteChannel {
   func list(_ path: String?) {
     if path == nil { pendingHome = true }
     write(.listFolder(path: path))
+  }
+
+  /// Whether a folder can be asked for now: the channel is up, to a Mac that reads the request.
+  var canCreateFolders: Bool {
+    guard case .connected = phase else { return false }
+    return CompanionRemote.takesFolderCreation(macProtocolVersion)
+  }
+
+  func createFolder(named name: String, in parent: String) {
+    guard sending != nil else {
+      folderFailure = .other(String(localized: "Not connected to the Mac"))
+      return
+    }
+    folderCreations.append(parent)
+    write(.createFolder(parent: parent, name: name))
   }
 
   func create(_ session: RemoteNewSession) {
