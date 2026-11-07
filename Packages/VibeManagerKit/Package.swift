@@ -18,6 +18,7 @@ let package = Package(
     .library(name: "VibeGit", targets: ["VibeGit"]),
     .library(name: "VibeTerminalUI", targets: ["VibeTerminalUI"]),
     .library(name: "VibeBrowser", targets: ["VibeBrowser"]),
+    .library(name: "VibeDevices", targets: ["VibeDevices"]),
     .library(name: "VibeConversationUI", targets: ["VibeConversationUI"]),
     .library(name: "VibeAvatar", targets: ["VibeAvatar"]),
     .library(name: "VibeUI", targets: ["VibeUI"]),
@@ -88,8 +89,11 @@ let package = Package(
     // user-facing sentence either — what it says is said to the agent, in English.
     .target(
       name: "VibeBrowser",
-      dependencies: ["VibeApplication", "VibeDomain", "VibeProcess", "VibeTerminal"]
+      dependencies: ["VibeApplication", "VibeDevices", "VibeDomain", "VibeProcess", "VibeTerminal"]
     ),
+    // The simulators and emulators running on the Mac, and the bridges that show them (#480):
+    // shared by the web view's tabs and the companion agent's mirror.
+    .target(name: "VibeDevices", dependencies: ["VibeProcess"]),
     // The conversation view of #38: Markdown, code and diffs drawn from a transcript. Its own
     // module, so that the Markdown parser stays out of everything else, as SwiftTerm does.
     .target(
@@ -110,7 +114,8 @@ let package = Package(
     .target(
       name: "VibeUI",
       dependencies: [
-        "VibeApplication", "VibeBrowser", "VibeDomain", "VibeTerminalUI", "VibeConversationUI",
+        "VibeApplication", "VibeBrowser", "VibeDevices", "VibeDomain", "VibeTerminalUI",
+        "VibeConversationUI", .product(name: "CompanionCore", package: "CompanionKit"),
       ],
       resources: [.process("Localizable.xcstrings")]
     ),
@@ -185,6 +190,7 @@ let package = Package(
     .testTarget(
       name: "VibeDomainTests", dependencies: ["VibeDomain", "VibeLocalizationTesting"]),
     .testTarget(name: "VibeProcessTests", dependencies: ["VibeProcess"]),
+    .testTarget(name: "VibeDevicesTests", dependencies: ["VibeDevices"]),
     .testTarget(
       name: "VibeApplicationTests",
       dependencies: [

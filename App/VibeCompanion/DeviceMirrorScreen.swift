@@ -60,8 +60,12 @@ struct DeviceMirrorScreen: View {
       if let failure = session.failure {
         VStack(spacing: 12) {
           Text(verbatim: failure).foregroundStyle(.white).multilineTextAlignment(.center)
-          Button { attempt += 1 } label: { Text("Reconnect") }
-            .buttonStyle(.borderedProminent)
+          Button {
+            attempt += 1
+          } label: {
+            Text("Reconnect")
+          }
+          .buttonStyle(.borderedProminent)
         }
         .padding()
         .frame(maxHeight: .infinity)
@@ -140,7 +144,8 @@ final class MirrorVideoView: UIView {
   override func didMoveToWindow() {
     super.didMoveToWindow()
     if window != nil {
-      navigation = sequence(first: self as UIResponder, next: \.next)
+      navigation =
+        sequence(first: self as UIResponder, next: \.next)
         .compactMap { $0 as? UINavigationController }.first
     }
     navigation?.interactivePopGestureRecognizer?.isEnabled = window == nil
@@ -225,23 +230,13 @@ final class DeviceMirrorClient {
     size: @Sendable (CGSize) async -> Void
   ) async throws {
     nonisolated(unsafe) let layer = layer
-    var format: CMVideoFormatDescription?
+    var decoder = CompanionMirror.FrameDecoder()
     while !Task.isCancelled {
       let length = try await receiving.readExact(size: 4).reduce(0) { $0 << 8 | UInt32($1) }
       let payload = try await receiving.readExact(size: length)
-      guard let isKey = payload.first else { continue }
-      var offset = 1
-      if isKey != 0 {
-        guard let sets = parameterSets(in: payload, offset: &offset),
-          let made = makeFormat(sps: sets.0, pps: sets.1)
-        else { return }
-        format = made
-        let dimensions = CMVideoFormatDescriptionGetDimensions(made)
-        await size(CGSize(width: Int(dimensions.width), height: Int(dimensions.height)))
-      }
-      guard let format,
-        let sample = makeSample(payload.subdata(in: offset..<payload.count), format: format)
-      else { continue }
+      let known = decoder.size
+      guard let sample = decoder.sample(from: payload) else { continue }
+      if let shown = decoder.size, shown != known { await size(shown) }
       nonisolated(unsafe) let unsafeSample = sample
       await MainActor.run {
         if layer?.sampleBufferRenderer.status == .failed { layer?.sampleBufferRenderer.flush() }
@@ -249,72 +244,4 @@ final class DeviceMirrorClient {
       }
     }
   }
-
-  private nonisolated static func parameterSets(in payload: Data, offset: inout Int) -> (Data, Data)? {
-    func next(_ offset: inout Int) -> Data? {
-      guard payload.count >= offset + 2 else { return nil }
-      let length = Int(payload[offset]) << 8 | Int(payload[offset + 1])
-      offset += 2
-      guard payload.count >= offset + length else { return nil }
-      defer { offset += length }
-      return payload.subdata(in: offset..<offset + length)
-    }
-    guard let sps = next(&offset), let pps = next(&offset) else { return nil }
-    return (sps, pps)
-  }
-
-  private nonisolated static func makeFormat(sps: Data, pps: Data) -> CMVideoFormatDescription? {
-    var format: CMVideoFormatDescription?
-    let status = sps.withUnsafeBytes { spsBytes in
-      pps.withUnsafeBytes { ppsBytes in
-        let pointers = [
-          spsBytes.bindMemory(to: UInt8.self).baseAddress!,
-          ppsBytes.bindMemory(to: UInt8.self).baseAddress!,
-        ]
-        return CMVideoFormatDescriptionCreateFromH264ParameterSets(
-          allocator: nil, parameterSetCount: 2, parameterSetPointers: pointers,
-          parameterSetSizes: [sps.count, pps.count], nalUnitHeaderLength: 4,
-          formatDescriptionOut: &format)
-      }
-    }
-    return status == noErr ? format : nil
-  }
-
-  private nonisolated static func makeSample(
-    _ data: Data, format: CMVideoFormatDescription
-  ) -> CMSampleBuffer? {
-    var block: CMBlockBuffer?
-    guard
-      CMBlockBufferCreateWithMemoryBlock(
-        allocator: nil, memoryBlock: nil, blockLength: data.count, blockAllocator: nil,
-        customBlockSource: nil, offsetToData: 0, dataLength: data.count,
-        flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block) == noErr,
-      let block,
-      data.withUnsafeBytes({
-        CMBlockBufferReplaceDataBytes(
-          with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0,
-          dataLength: data.count)
-      }) == noErr
-    else { return nil }
-    var sample: CMSampleBuffer?
-    var size = data.count
-    guard
-      CMSampleBufferCreateReady(
-        allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1,
-        sampleTimingEntryCount: 0, sampleTimingArray: nil, sampleSizeEntryCount: 1,
-        sampleSizeArray: &size, sampleBufferOut: &sample) == noErr,
-      let sample
-    else { return nil }
-    if let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true),
-      CFArrayGetCount(attachments) > 0
-    {
-      let first = unsafeBitCast(
-        CFArrayGetValueAtIndex(attachments, 0), to: CFMutableDictionary.self)
-      CFDictionarySetValue(
-        first, Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
-        Unmanaged.passUnretained(kCFBooleanTrue).toOpaque())
-    }
-    return sample
-  }
 }
-

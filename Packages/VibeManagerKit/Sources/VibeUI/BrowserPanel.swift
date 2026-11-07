@@ -3,6 +3,7 @@ import SwiftUI
 import VibeApplication
 import VibeBrowser
 import VibeConversationUI
+import VibeDevices
 import VibeDomain
 import WebKit
 
@@ -44,7 +45,7 @@ struct BrowserPanel: View {
         .overlay(alignment: .topTrailing) {
           Button {
             model.closeWebTab()
-            Task.detached { DeviceCatalog.stop(udid) }
+            Task { await DeviceCatalog.stop(udid) }
           } label: {
             Image(systemName: "stop.fill")
               .foregroundStyle(.white)

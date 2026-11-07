@@ -61,7 +61,8 @@ actor CompanionEchoServer {
       let key = try Self.secretKey(at: keyURL)
       endpoint = try await Endpoint.bind(
         options: CompanionIroh.options(
-          secretKey: key, alpns: [CompanionIroh.alpn, CompanionIroh.remoteALPN, CompanionIroh.mirrorALPN]))
+          secretKey: key,
+          alpns: [CompanionIroh.alpn, CompanionIroh.remoteALPN, CompanionIroh.mirrorALPN]))
     } catch {
       CompanionIroh.logger.error(
         "echo: no endpoint: \(CompanionIroh.describe(error), privacy: .public)")

@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import VibeApplication
+import VibeDevices
 import VibeDomain
 import WebKit
 
@@ -28,14 +29,14 @@ extension BrowserWorkspace: BrowserToolRunning {
       case "tab_open":
         return try await openTab(arguments, browser: browser, tool: tool)
       case "devices_list":
-        let devices = await Task.detached { DeviceCatalog.running() }.value
+        let devices = await DeviceCatalog.running()
         return .text(
           JSONValue.array(
             devices.map { ["id": .string($0.id), "name": .string($0.name)] }
           ).jsonText)
       case "device_open":
         let id = arguments["device"]?.stringValue ?? ""
-        let devices = await Task.detached { DeviceCatalog.running() }.value
+        let devices = await DeviceCatalog.running()
         guard let device = devices.first(where: { $0.id == id }),
           let url = DeviceCatalog.url(of: id)
         else {

@@ -237,6 +237,23 @@ public enum BoundedProcess {
     output: Int32,
     error: Int32
   ) throws -> pid_t {
+    try spawn(
+      path: request.executablePath, arguments: request.arguments,
+      environment: request.environment, workingDirectoryPath: request.workingDirectoryPath,
+      input: input, output: output, error: error)
+  }
+
+  /// The launch every child of `VibeProcess` shares: `BoundedProcess`'s commands and
+  /// `StreamingProcess`'s. A `nil` input or error is `/dev/null`.
+  static func spawn(
+    path: String,
+    arguments: [String],
+    environment: [String: String],
+    workingDirectoryPath: String?,
+    input: Int32?,
+    output: Int32,
+    error: Int32?
+  ) throws -> pid_t {
     // The posix_spawn family returns its error code and leaves errno alone.
     var fileActions: posix_spawn_file_actions_t?
     var result = posix_spawn_file_actions_init(&fileActions)
@@ -251,9 +268,13 @@ public enum BoundedProcess {
     guard result == 0 else { throw BoundedProcessError.launchFailed(code: result) }
     result = posix_spawn_file_actions_adddup2(&fileActions, output, 1)
     guard result == 0 else { throw BoundedProcessError.launchFailed(code: result) }
-    result = posix_spawn_file_actions_adddup2(&fileActions, error, 2)
+    if let error {
+      result = posix_spawn_file_actions_adddup2(&fileActions, error, 2)
+    } else {
+      result = posix_spawn_file_actions_addopen(&fileActions, 2, "/dev/null", O_WRONLY, 0)
+    }
     guard result == 0 else { throw BoundedProcessError.launchFailed(code: result) }
-    if let directory = request.workingDirectoryPath {
+    if let directory = workingDirectoryPath {
       result = posix_spawn_file_actions_addchdir_np(&fileActions, directory)
       guard result == 0 else { throw BoundedProcessError.launchFailed(code: result) }
     }
@@ -277,9 +298,8 @@ public enum BoundedProcess {
       | POSIX_SPAWN_SETSIGMASK
     posix_spawnattr_setflags(&attributes, Int16(flags))
 
-    let path = request.executablePath
-    let arguments = [path] + request.arguments
-    let environment = request.environment.map { "\($0.key)=\($0.value)" }.sorted()
+    let arguments = [path] + arguments
+    let environment = environment.map { "\($0.key)=\($0.value)" }.sorted()
 
     var processIdentifier: pid_t = 0
     result = withCStrings(arguments) { argv in

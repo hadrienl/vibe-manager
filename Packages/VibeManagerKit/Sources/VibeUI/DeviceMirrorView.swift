@@ -1,7 +1,8 @@
 import AVFoundation
 import AppKit
+import CompanionCore
 import SwiftUI
-import VibeBrowser
+import VibeDevices
 
 /// A simulator in a tab of the web view. `sim-bridge`, a process of its own, holds the
 /// private frameworks; this view shows its H.264 and sends it the mouse as touches.
@@ -78,10 +79,9 @@ final class DeviceMirrorNSView: NSView {
   }
 }
 
-/// The bridge's process and the thread that reads it.
+/// The bridge and the thread that reads it.
 private final class DeviceMirrorSession: @unchecked Sendable {
-  private let process = Process()
-  private let input = Pipe()
+  private let bridge: DeviceBridge?
   private let video: AVSampleBufferDisplayLayer
   private let lock = NSLock()
   private var size: CGSize?
@@ -93,136 +93,32 @@ private final class DeviceMirrorSession: @unchecked Sendable {
   init(udid: String, video: AVSampleBufferDisplayLayer) {
     self.video = video
     video.sampleBufferRenderer.flush()
-    let isAndroid = udid.hasPrefix("android-")
-    guard let bridge = Bundle.main.url(forAuxiliaryExecutable: isAndroid ? "emu-bridge" : "sim-bridge")
-    else { return }
-    let output = Pipe()
-    process.executableURL = bridge
-    process.arguments = [isAndroid ? String(udid.dropFirst("android-".count)) : udid]
-    if isAndroid,
-      let token = DeviceCatalog.emulators().first(where: { $0.id == udid })?.token
-    {
-      process.environment = ["EMU_TOKEN": token]
+    bridge = Bundle.main.executableURL.flatMap {
+      try? DeviceBridge(device: udid, bridgesIn: $0.deletingLastPathComponent())
     }
-    process.standardInput = input
-    process.standardOutput = output
-    // A bridge gone must cost the next touch an error, not a `SIGPIPE` that ends the app.
-    _ = fcntl(input.fileHandleForWriting.fileDescriptor, F_SETNOSIGPIPE, 1)
-    do { try process.run() } catch { return }
-    let reading = output.fileHandleForReading
-    Thread.detachNewThread { [self] in read(reading) }
+    guard let bridge else { return }
+    Thread.detachNewThread { [self] in read(bridge) }
   }
 
   func stop() {
-    try? input.fileHandleForWriting.close()
-    if process.isRunning { process.terminate() }
+    bridge?.stop()
   }
 
   func send(_ line: String) {
-    try? input.fileHandleForWriting.write(contentsOf: Data(line.utf8))
+    bridge?.send(line)
   }
 
-  private func read(_ handle: FileHandle) {
-    var format: CMVideoFormatDescription?
-    while let header = Self.exactly(4, from: handle) {
-      let length = header.reduce(0) { $0 << 8 | Int($1) }
-      guard let payload = Self.exactly(length, from: handle), let isKey = payload.first else {
-        return
-      }
-      var offset = 1
-      if isKey != 0 {
-        guard let sets = Self.parameterSets(in: payload, offset: &offset),
-          let made = Self.format(sps: sets.0, pps: sets.1)
-        else { return }
-        format = made
-        let dimensions = CMVideoFormatDescriptionGetDimensions(made)
-        lock.withLock { size = CGSize(width: Int(dimensions.width), height: Int(dimensions.height)) }
-      }
-      guard let format,
-        let sample = Self.sample(payload.subdata(in: offset..<payload.count), format: format)
-      else { continue }
+  private func read(_ bridge: DeviceBridge) {
+    var decoder = CompanionMirror.FrameDecoder()
+    while let frame = bridge.nextFrame() {
+      guard let sample = decoder.sample(from: frame) else { continue }
+      let shown = decoder.size
+      lock.withLock { size = shown }
       video.sampleBufferRenderer.enqueue(sample)
     }
   }
-
-  private static func exactly(_ count: Int, from handle: FileHandle) -> Data? {
-    var data = Data(capacity: count)
-    while data.count < count {
-      guard let part = try? handle.read(upToCount: count - data.count), !part.isEmpty else {
-        return nil
-      }
-      data.append(part)
-    }
-    return data
-  }
-
-  private static func parameterSets(in payload: Data, offset: inout Int) -> (Data, Data)? {
-    func next(_ offset: inout Int) -> Data? {
-      guard payload.count >= offset + 2 else { return nil }
-      let length = Int(payload[offset]) << 8 | Int(payload[offset + 1])
-      offset += 2
-      guard payload.count >= offset + length else { return nil }
-      defer { offset += length }
-      return payload.subdata(in: offset..<offset + length)
-    }
-    guard let sps = next(&offset), let pps = next(&offset) else { return nil }
-    return (sps, pps)
-  }
-
-  private static func format(sps: Data, pps: Data) -> CMVideoFormatDescription? {
-    var format: CMVideoFormatDescription?
-    let status = sps.withUnsafeBytes { spsBytes in
-      pps.withUnsafeBytes { ppsBytes in
-        let pointers = [
-          spsBytes.bindMemory(to: UInt8.self).baseAddress!,
-          ppsBytes.bindMemory(to: UInt8.self).baseAddress!,
-        ]
-        return CMVideoFormatDescriptionCreateFromH264ParameterSets(
-          allocator: nil, parameterSetCount: 2, parameterSetPointers: pointers,
-          parameterSetSizes: [sps.count, pps.count], nalUnitHeaderLength: 4,
-          formatDescriptionOut: &format)
-      }
-    }
-    return status == noErr ? format : nil
-  }
-
-  private static func sample(_ data: Data, format: CMVideoFormatDescription) -> CMSampleBuffer? {
-    var block: CMBlockBuffer?
-    guard
-      CMBlockBufferCreateWithMemoryBlock(
-        allocator: nil, memoryBlock: nil, blockLength: data.count, blockAllocator: nil,
-        customBlockSource: nil, offsetToData: 0, dataLength: data.count,
-        flags: kCMBlockBufferAssureMemoryNowFlag, blockBufferOut: &block) == noErr,
-      let block,
-      data.withUnsafeBytes({
-        CMBlockBufferReplaceDataBytes(
-          with: $0.baseAddress!, blockBuffer: block, offsetIntoDestination: 0,
-          dataLength: data.count)
-      }) == noErr
-    else { return nil }
-    var sample: CMSampleBuffer?
-    var size = data.count
-    guard
-      CMSampleBufferCreateReady(
-        allocator: nil, dataBuffer: block, formatDescription: format, sampleCount: 1,
-        sampleTimingEntryCount: 0, sampleTimingArray: nil, sampleSizeEntryCount: 1,
-        sampleSizeArray: &size, sampleBufferOut: &sample) == noErr,
-      let sample
-    else { return nil }
-    if let attachments = CMSampleBufferGetSampleAttachmentsArray(sample, createIfNecessary: true),
-      CFArrayGetCount(attachments) > 0
-    {
-      let first = unsafeBitCast(
-        CFArrayGetValueAtIndex(attachments, 0), to: CFMutableDictionary.self)
-      CFDictionarySetValue(
-        first, Unmanaged.passUnretained(kCMSampleAttachmentKey_DisplayImmediately).toOpaque(),
-        Unmanaged.passUnretained(kCFBooleanTrue).toOpaque())
-    }
-    return sample
-  }
 }
 
-/// The simulators running now, to open one in a tab.
 /// Beside the web view's button, what opens a simulator in one of its tabs.
 struct DeviceMirrorToolbarButton: View {
   let model: AppModel
@@ -269,7 +165,7 @@ struct DeviceMirrorPicker: View {
     .padding(6)
     .frame(minWidth: 200, alignment: .leading)
     .task {
-      devices = await Task.detached { DeviceCatalog.running().map { ($0.id, $0.name) } }.value
+      devices = await DeviceCatalog.running().map { ($0.id, $0.name) }
     }
   }
 

@@ -52,6 +52,7 @@
 		A00000000000000000000020 /* CompanionIroh.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001C /* CompanionIroh.swift */; };
 		A00000000000000000000021 /* CompanionChannel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001E /* CompanionChannel.swift */; };
 		A00000000000000000000022 /* ChannelSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = B0000000000000000000001F /* ChannelSection.swift */; };
+		A00000000000000000480003 /* VibeDevices in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000480001 /* VibeDevices */; };
 		A00000000000000000000023 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000010 /* IrohLib */; };
 		A00000000000000000000024 /* IrohLib in Frameworks */ = {isa = PBXBuildFile; productRef = J00000000000000000000011 /* IrohLib */; };
 		A00000000000000000000025 /* CompanionNotifications.swift in Sources */ = {isa = PBXBuildFile; fileRef = B00000000000000000000020 /* CompanionNotifications.swift */; };
@@ -197,6 +198,7 @@
 				A00000000000000000000015 /* CompanionWire in Frameworks */,
 				A00000000000000000000016 /* CompanionKit in Frameworks */,
 				A00000000000000000000023 /* IrohLib in Frameworks */,
+				A00000000000000000480003 /* VibeDevices in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -427,6 +429,7 @@
 				J0000000000000000000000C /* CompanionWire */,
 				J0000000000000000000000D /* CompanionKit */,
 				J00000000000000000000010 /* IrohLib */,
+				J00000000000000000480001 /* VibeDevices */,
 			);
 			productName = VibeCompanionAgent;
 			productReference = B00000000000000000000011 /* Vibe Manager Companion.app */;
@@ -935,6 +938,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		J00000000000000000480001 /* VibeDevices */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;
+			productName = VibeDevices;
+		};
 		J00000000000000000000001 /* VibeUI */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = I00000000000000000000001 /* XCLocalSwiftPackageReference "VibeManagerKit" */;

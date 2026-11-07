@@ -52,22 +52,22 @@ struct WebMirrorView: View {
           .buttonStyle(.borderedProminent)
         }
       } else {
-      addressBar
-      if let tab = activeTab, let url = URL(string: tab.url) {
-        SyncedWebView(
-          url: url, isMacLoading: tab.isLoading, typed: typed, scroll: state?.scroll ?? 0,
-          channel: channel, page: page,
-          navigated: { channel.web(.navigate($0.absoluteString), in: sessionID) },
-          scrolled: { channel.web(.scrollTo($0), in: sessionID) })
-      } else if state != nil {
-        ContentUnavailableView {
-          Label("No Page", systemImage: "globe")
-        } description: {
-          Text("Type an address to open a page, here and on the Mac.")
+        addressBar
+        if let tab = activeTab, let url = URL(string: tab.url) {
+          SyncedWebView(
+            url: url, isMacLoading: tab.isLoading, typed: typed, scroll: state?.scroll ?? 0,
+            channel: channel, page: page,
+            navigated: { channel.web(.navigate($0.absoluteString), in: sessionID) },
+            scrolled: { channel.web(.scrollTo($0), in: sessionID) })
+        } else if state != nil {
+          ContentUnavailableView {
+            Label("No Page", systemImage: "globe")
+          } description: {
+            Text("Type an address to open a page, here and on the Mac.")
+          }
+        } else {
+          ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-      } else {
-        ProgressView().frame(maxWidth: .infinity, maxHeight: .infinity)
-      }
       }
     }
     .navigationTitle("Web View")
@@ -89,7 +89,8 @@ struct WebMirrorView: View {
             }
           }
         }
-        .disabled(webTabs.isEmpty || (webTabs.count == 1 && webTabs.first?.id == state?.activeTabID))
+        .disabled(
+          webTabs.isEmpty || (webTabs.count == 1 && webTabs.first?.id == state?.activeTabID))
       }
       ToolbarItemGroup(placement: .bottomBar) {
         Button("Back", systemImage: "chevron.backward") {
