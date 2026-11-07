@@ -95,6 +95,35 @@ struct AgentUsageReaderTests {
     #expect(!buckets.contains { $0.model == "<synthetic>" })
   }
 
+  /// `cp -R ~/.claude ~/.claude-2`, then the account added (#478): the copy is newer than the
+  /// conversations it holds, which are still the agent's own.
+  @Test("A folder copied to start an account does not count the agent's conversations twice")
+  func copiedAccountFolder() async throws {
+    let root = home()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let identifier = UUID().uuidString.lowercased()
+    let original = root.appendingPathComponent("projects/-repo/\(identifier).jsonl")
+    try write([assistant(id: "m1", request: "r1", input: 10, output: 1)], to: original)
+    let homes = AgentHomes()
+    let subject = AgentUsageReader(
+      locator: AgentTranscriptLocator(
+        claudeProjects: root.appendingPathComponent("projects"),
+        codexSessions: root.appendingPathComponent("sessions"), homes: homes),
+      calendar: calendar)
+    let session = claudeSession(identifier)
+    var snapshot = await subject.refresh([session], from: .empty, isTracked: { _ in true })
+
+    let copy = root.appendingPathComponent("copy")
+    let copied = copy.appendingPathComponent("projects/-repo/\(identifier).jsonl")
+    try write([assistant(id: "m1", request: "r1", input: 10, output: 1)], to: copied)
+    try FileManager.default.setAttributes(
+      [.modificationDate: Date().addingTimeInterval(60)], ofItemAtPath: copied.path)
+    homes.replace(claudeHomes: ["account.2": copy], codexHomes: [:])
+    snapshot = await subject.refresh([session], from: snapshot, isTracked: { _ in true })
+
+    #expect(snapshot.buckets.map(\.tokens.input).reduce(0, +) == 10)
+  }
+
   @Test("Reading goes on where it stopped, and a replaced file is read again")
   func incremental() async throws {
     let root = home()

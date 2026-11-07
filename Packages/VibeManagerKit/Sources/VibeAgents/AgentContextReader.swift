@@ -27,12 +27,16 @@ extension AgentUsageReader: ContextWindowReading {
     let isCodex: Bool
     switch conversation.transcriptProviderID {
     case ClaudeCodeAgentProvider.id.rawValue:
-      candidates = locator.claudeTranscripts(for: identifier).filter {
+      candidates = locator.claudeTranscripts(
+        for: identifier, providerID: conversation.providerID
+      ).filter {
         $0.lastPathComponent == "\(identifier).jsonl"
       }
       isCodex = false
     case CodexAgentProvider.id.rawValue:
-      candidates = locator.codexRollouts(for: identifier, since: session.createdAt, until: now())
+      candidates = locator.codexRollouts(
+        for: identifier, providerID: conversation.providerID, since: session.createdAt,
+        until: now())
       isCodex = true
     default:
       return nil

@@ -51,10 +51,13 @@ public struct AgentUsageReader: TokenUsageReading {
         let isCodex: Bool
         switch conversation.transcriptProviderID {
         case ClaudeCodeAgentProvider.id.rawValue:
-          files = locator.claudeTranscripts(for: identifier)
+          files = locator.claudeTranscripts(
+            for: identifier, providerID: conversation.providerID)
           isCodex = false
         case CodexAgentProvider.id.rawValue:
-          files = locator.codexRollouts(for: identifier, since: session.createdAt, until: now)
+          files = locator.codexRollouts(
+            for: identifier, providerID: conversation.providerID, since: session.createdAt,
+            until: now)
           isCodex = true
         default:
           continue
