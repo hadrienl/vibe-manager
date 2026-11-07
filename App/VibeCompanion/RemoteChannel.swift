@@ -5,6 +5,12 @@ import Observation
 import Security
 import UIKit
 
+/// A creation that did not happen: all that was asked, and why.
+struct ReturnedCreation: Equatable {
+  let request: RemoteNewSession
+  let error: String
+}
+
 /// The phone's end of the direct channel (#399, #400): the Mac's sessions, the conversation shown,
 /// and what the user does to them, over iroh while the application is in the foreground.
 ///
@@ -54,8 +60,18 @@ final class RemoteChannel {
   @ObservationIgnored private var askedIcons: Set<String> = []
   /// The session just created from the phone, for the list to show it.
   var createdSessionID: String?
+  /// What is being created, from the form's closing to the Mac's answer (#470).
+  var pendingCreation: RemoteNewSession? { creation.pending }
+  /// A creation that failed, for its form to come back.
+  var returnedCreation: ReturnedCreation?
+  private var creation = RemoteCreation()
+  @ObservationIgnored private var creationTimeout: Task<Void, Never>?
   /// The session a tapped notification is about (#401): the list opens it.
   var notifiedSessionID: String?
+  /// The parents of the new folders asked for, until their listing comes back.
+  @ObservationIgnored private var folderCreations: [String] = []
+  /// Why the folder asked for wasn't created, for the alert of the sheet that asked.
+  var folderFailure: RemoteFailure?
   /// The last thing the Mac could not do, for an alert.
   var failure: RemoteFailure?
   /// This phone's endpoint, once bound: what pairing writes.
@@ -99,6 +115,7 @@ final class RemoteChannel {
           failure: String(localized: "Connection lost")))
     }
     fetches = [:]
+    creation.connectionLost()
     attempt += 1
     tasks.forEach { $0.cancel() }
     tasks = []
@@ -146,6 +163,7 @@ final class RemoteChannel {
       path = CompanionIroh.pathKind(connection.paths())
       CompanionIroh.logger.notice(
         "remote: connected, \(CompanionIroh.describe(connection.paths()), privacy: .public)")
+      folderCreations = []
       write(.hello(protocolVersion: CompanionRemote.protocolVersion, deviceName: deviceName))
       if let shownSessionID { write(.show(sessionID: shownSessionID)) }
       if let webSessionID { write(.showWeb(sessionID: webSessionID)) }
@@ -221,16 +239,21 @@ final class RemoteChannel {
       try? png.write(to: Self.iconFolder.appendingPathComponent("\(id).png"))
     case .folderListing(let listing):
       folderListings[listing.path] = listing
-      if pendingHome {
+      if let reply = folderCreations.firstIndex(of: listing.path) {
+        // The answer to a new folder, not the home folder being waited for.
+        folderCreations.remove(at: reply)
+      } else if pendingHome {
         pendingHome = false
         homePath = listing.path
       }
+    case .folderNotCreated(let reason):
+      folderFailure = reason
     case .created(let id):
-      createdSessionID = id
+      if let answer = creation.created(id) { settle(answer) }
     case .failure(let reason):
-      failure = reason
+      if let answer = creation.failed(reason) { settle(answer) } else { failure = reason }
     case .hello, .show, .send, .sendFiles, .answer, .answers, .setStatus, .search, .newSessionOptions,
-      .createSession, .listFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart,
+      .createSession, .listFolder, .createFolder, .icon, .interrupt, .showWeb, .web, .attachmentImage, .restart,
       .httpRequest, .folderIcon, .close:
       break
     }
@@ -381,8 +404,52 @@ final class RemoteChannel {
     write(.listFolder(path: path))
   }
 
+  /// Whether a folder can be asked for now: the channel is up, to a Mac that reads the request.
+  var canCreateFolders: Bool {
+    guard case .connected = phase else { return false }
+    return CompanionRemote.takesFolderCreation(macProtocolVersion)
+  }
+
+  func createFolder(named name: String, in parent: String) {
+    guard sending != nil else {
+      folderFailure = .other(String(localized: "Not connected to the Mac"))
+      return
+    }
+    folderCreations.append(parent)
+    write(.createFolder(parent: parent, name: name))
+  }
+
   func create(_ session: RemoteNewSession) {
-    write(.createSession(session))
+    if creation.submit(session) { write(.createSession(session)) }
+    awaitCreation()
+  }
+
+  /// No answer in this time, and the form comes back: the Mac may be asleep, or out of reach.
+  private func awaitCreation() {
+    creationTimeout?.cancel()
+    creationTimeout = Task { [weak self] in
+      try? await Task.sleep(for: .seconds(30))
+      guard !Task.isCancelled, let self, let request = self.creation.expire() else { return }
+      self.returnedCreation = ReturnedCreation(
+        request: request,
+        error: String(
+          localized: "The Mac didn’t answer. Check that it’s awake, then try again."))
+    }
+  }
+
+  private func settle(_ answer: RemoteCreation.Answer) {
+    if creation.pending == nil { creationTimeout?.cancel() }
+    switch answer {
+    case .created(let id):
+      createdSessionID = id
+    case .failed(let request, let reason):
+      returnedCreation = ReturnedCreation(request: request, error: reason.text)
+    case .send(let request):
+      write(.createSession(request))
+      awaitCreation()
+    case .ignored:
+      break
+    }
   }
 
   // MARK: - Key

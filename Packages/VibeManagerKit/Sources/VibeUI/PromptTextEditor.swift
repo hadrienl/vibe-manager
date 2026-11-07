@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import UniformTypeIdentifiers
 import VibeConversationUI
 import VibeDomain
 
@@ -30,6 +31,7 @@ public struct PromptTextEditor: View {
   /// The list of skills and commands a `/` typed first opens (#219): its keys go first while it
   /// is open.
   private let commands: ComposerCommands?
+  private var leavesFileDrags = false
   @State private var height: CGFloat?
 
   public init(
@@ -73,7 +75,8 @@ public struct PromptTextEditor: View {
       onSubmit: onSubmit,
       onCancel: onCancel,
       commands: commands,
-      token: commands?.insertedInvocation
+      token: commands?.insertedInvocation,
+      leavesFileDrags: leavesFileDrags
     )
     .frame(height: height ?? PromptTextStyle.height(forLines: minimumLines))
     .overlay(alignment: .topLeading) {
@@ -111,6 +114,14 @@ public struct PromptTextEditor: View {
 }
 
 extension PromptTextEditor {
+  /// The field without the drags of files and images, for what lies behind it to take them: it
+  /// would type a file's path and do nothing of an image. A text still lands in it.
+  func leavingFileDrags() -> Self {
+    var editor = self
+    editor.leavesFileDrags = true
+    return editor
+  }
+
   /// The text, invisible, then the hint: laid out as the text is, the hint follows its end.
   fileprivate static func hinted(_ text: String, _ hint: String) -> AttributedString {
     var shown = AttributedString(text)
@@ -158,6 +169,25 @@ private final class OverlayScrollView: NSScrollView {
   }
 }
 
+/// A text view that takes text only from a drag. AppKit gives a drag to the frontmost view
+/// registered for its types, whatever SwiftUI lays over this one.
+private final class FileLeavingTextView: NSTextView {
+  override var acceptableDragTypes: [NSPasteboard.PasteboardType] {
+    let left = Set(NewSessionDropCatcher.fileTypes)
+    return super.acceptableDragTypes.filter { !left.contains($0) && !Self.isFileOrImage($0) }
+  }
+
+  private static func isFileOrImage(_ type: NSPasteboard.PasteboardType) -> Bool {
+    guard let uti = UTType(type.rawValue) else {
+      return [
+        "NSFilenamesPboardType", "Apple URL pasteboard type", "Apple PNG pasteboard type",
+        "NeXT TIFF v4.0 pasteboard type",
+      ].contains(type.rawValue)
+    }
+    return uti.conforms(to: .image) || uti.conforms(to: .fileURL)
+  }
+}
+
 private struct GrowingTextView: NSViewRepresentable {
   @Binding var text: String
   @Binding var height: CGFloat?
@@ -174,13 +204,17 @@ private struct GrowingTextView: NSViewRepresentable {
   let commands: ComposerCommands?
   /// The command inserted from the list, tinted as a token.
   let token: String?
+  let leavesFileDrags: Bool
 
   func makeCoordinator() -> Coordinator {
     Coordinator()
   }
 
   func makeNSView(context: Context) -> NSScrollView {
-    let textView = SessionNotesEditor.makeTextView()
+    let textView =
+      leavesFileDrags
+      ? SessionNotesEditor.makeTextView(FileLeavingTextView(usingTextLayoutManager: false))
+      : SessionNotesEditor.makeTextView()
     // Written for an agent: nothing is corrected, and a pasted colour stays out.
     textView.isContinuousSpellCheckingEnabled = false
     textView.usesFindBar = false

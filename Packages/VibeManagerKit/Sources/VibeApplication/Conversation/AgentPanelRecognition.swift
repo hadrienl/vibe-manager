@@ -48,7 +48,7 @@ public enum AgentPanelRecognition {
     guard
       let prompt = lines.indices.last(where: { index in
         index > 0 && lines[index].hasPrefix("❯")
-          && PromptInputRecognition.isRule(lines[index - 1])
+          && PromptInputRecognition.isOpeningRule(lines[index - 1])
       }),
       let end = lines[(prompt + 1)...].firstIndex(where: PromptInputRecognition.isRule)
     else { return false }

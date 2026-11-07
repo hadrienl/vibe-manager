@@ -13,7 +13,6 @@ struct NewSessionSheet: View {
   @State private var start = true
   @State private var coordinates = false
   @State private var prompt = ""
-  @State private var isCreating = false
   /// The icon picked; `nil` leaves it to the Mac.
   @State private var appearance: RemoteAppearance?
   @State private var showsIcons = false
@@ -21,6 +20,23 @@ struct NewSessionSheet: View {
   @State private var extraFolders: [String] = []
   /// The browser's way down, emptied when a folder is chosen.
   @State private var browsing: [String] = []
+  /// Why the form came back, or why it can't send.
+  @State private var error: String?
+
+  init(returned: ReturnedCreation? = nil) {
+    guard let returned else { return }
+    let request = returned.request
+    _folder = State(initialValue: request.folder)
+    _name = State(initialValue: request.name)
+    _agentID = State(initialValue: request.agentID)
+    _modelID = State(initialValue: request.modelID)
+    _start = State(initialValue: request.start)
+    _coordinates = State(initialValue: request.coordinates)
+    _prompt = State(initialValue: request.prompt)
+    _appearance = State(initialValue: request.appearance)
+    _extraFolders = State(initialValue: [request.folder])
+    _error = State(initialValue: returned.error)
+  }
 
   private var shownFolders: [String] {
     let recent = (options?.folders ?? []).filter { !extraFolders.contains($0) }
@@ -35,6 +51,11 @@ struct NewSessionSheet: View {
   var body: some View {
     NavigationStack(path: $browsing) {
       Form {
+        if let error {
+          Section {
+            Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+          }
+        }
         if let options {
           Section("Folder") {
             if options.folders.isEmpty {
@@ -133,7 +154,7 @@ struct NewSessionSheet: View {
         }
         ToolbarItem(placement: .confirmationAction) {
           Button("Create", systemImage: "checkmark") { create() }
-            .disabled(folder == nil || agentID == nil || isCreating)
+            .disabled(folder == nil || agentID == nil)
         }
       }
       .navigationDestination(for: String.self) { path in
@@ -156,25 +177,46 @@ struct NewSessionSheet: View {
       .onChange(of: options, initial: true) { _, options in
         guard let options else { return }
         if folder == nil { folder = options.folders.first }
-        if agentID == nil { agentID = options.agents.first?.id }
+        // A form that came back may name an agent the Mac no longer has.
+        if !options.agents.contains(where: { $0.id == agentID }) {
+          agentID = options.agents.first?.id
+        }
       }
       .onChange(of: agentID) { _, _ in modelID = nil }
+      .onChange(of: folder) { _, _ in error = nil }
+      .onChange(of: channel.phase) { _, phase in
+        if phase == .connected { error = nil }
+      }
       .onChange(of: folder, initial: true) { _, folder in
         if let folder { channel.askFolderIcon(folder) }
       }
-      .onChange(of: channel.failure) { _, failure in
-        if failure != nil { isCreating = false }
-      }
+    }
+    // An answer that came after the sheet that asked was gone isn't this sheet's.
+    .onAppear { channel.folderFailure = nil }
+    // On the stack, not the form under it: the browser that asked is pushed above the form.
+    .alert(
+      "The Folder Couldn’t Be Created",
+      isPresented: Binding(
+        get: { channel.folderFailure != nil },
+        set: { if !$0 { channel.folderFailure = nil } })
+    ) {
+      Button("OK", role: .cancel) { /* The alert dismisses itself. */  }
+    } message: {
+      Text(verbatim: channel.folderFailure?.text ?? "")
     }
   }
 
   private func create() {
     guard let folder, let agentID else { return }
-    isCreating = true
+    guard channel.phase == .connected else {
+      error = String(localized: "Not connected to the Mac")
+      return
+    }
     channel.create(
       RemoteNewSession(
         name: name, folder: folder, agentID: agentID, modelID: modelID, prompt: prompt,
         start: start, coordinates: coordinates, appearance: appearance))
+    dismiss()
   }
 
   /// A template fills in the message, and its folder and icon when it has them; its `{{fields}}`
@@ -208,6 +250,8 @@ struct FolderBrowser: View {
   let choose: (String) -> Void
   @Environment(RemoteChannel.self) private var channel
   @Environment(\.dismiss) private var dismiss
+  @State private var asksFolderName = false
+  @State private var newFolderName = ""
 
   private var resolved: String? { path ?? channel.homePath }
   private var listing: RemoteFolderListing? { resolved.flatMap { channel.folderListings[$0] } }
@@ -233,6 +277,26 @@ struct FolderBrowser: View {
       resolved.map { ($0 as NSString).lastPathComponent } ?? String(localized: "Folders")
     )
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      if channel.canCreateFolders, let listing, !listing.isUnreadable {
+        ToolbarItem(placement: .primaryAction) {
+          Button("New Folder", systemImage: "folder.badge.plus") {
+            newFolderName = ""
+            asksFolderName = true
+          }
+        }
+      }
+    }
+    .alert("New Folder", isPresented: $asksFolderName) {
+      TextField("Folder Name", text: $newFolderName)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+      Button("Cancel", role: .cancel) { /* The alert dismisses itself. */  }
+      Button("Create") {
+        if let listing { channel.createFolder(named: newFolderName, in: listing.path) }
+      }
+      .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
     .safeAreaInset(edge: .bottom) {
       if let resolved {
         Button {

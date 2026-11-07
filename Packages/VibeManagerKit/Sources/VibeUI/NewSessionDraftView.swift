@@ -179,6 +179,15 @@ public struct NewSessionDraftView: View {
           }
           model.attach(files)
           moveFocus(to: .draft(.initialPrompt))
+        },
+        receiving: { count in
+          // Now, not as they arrive: the user may be elsewhere by then.
+          NSApp?.activate()
+          model.beginReceivingAttachments(count)
+          moveFocus(to: .draft(.initialPrompt))
+        },
+        received: { files, failed in
+          model.finishReceivingAttachment(files, failed: failed)
         })
     }
     // The tour's bubble, over everything in the draft, next to what it describes (#338).
@@ -781,6 +790,14 @@ public struct NewSessionDraftView: View {
             }
             .accessibilityIdentifier("new-session-attachments")
           }
+          if model.isReceivingAttachments {
+            ProgressView().controlSize(.small)
+          }
+          if model.attachmentFailed {
+            Text("Some of what was dropped could not be read and was left out.", bundle: .module)
+              .font(.caption)
+              .foregroundStyle(.secondary)
+          }
           PromptTextEditor(
             text: $model.draft.initialPrompt,
             minimumLines: 3,
@@ -795,6 +812,7 @@ public struct NewSessionDraftView: View {
             onCancel: discarded,
             commands: model.commands
           )
+          .leavingFileDrags()
           .focused($focus, equals: .draft(.initialPrompt))
           .accessibilityIdentifier("new-session-prompt")
         }

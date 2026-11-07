@@ -232,6 +232,9 @@ extension RemoteFailure {
           "The Mac can’t resume this conversation and asks what to do. Answer on the Mac.")
     case .folderMissing: String(localized: "This folder doesn’t exist on the Mac.")
     case .noAgent: String(localized: "The Mac knows no agent.")
+    case .folderNameInvalid: String(localized: "This name can’t be used for a folder.")
+    case .folderExists: String(localized: "A folder with this name already exists.")
+    case .folderNotAllowed: String(localized: "The Mac doesn’t allow creating a folder here.")
     case .other(let words): words
     }
   }
