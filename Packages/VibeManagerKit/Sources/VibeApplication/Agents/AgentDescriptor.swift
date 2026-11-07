@@ -1,3 +1,5 @@
+import VibeDomain
+
 public struct AgentProviderID: Hashable, Codable, Sendable, CustomStringConvertible {
   public let rawValue: String
 
@@ -13,6 +15,11 @@ public struct AgentProviderID: Hashable, Codable, Sendable, CustomStringConverti
   public static let endpointPrefix = "endpoint."
 
   public var isEndpoint: Bool { rawValue.hasPrefix(Self.endpointPrefix) }
+
+  /// Every extra account of an agent registers as `account.<uuid>` (#478).
+  public static let accountPrefix = AgentAccount.providerPrefix
+
+  public var isAccount: Bool { rawValue.hasPrefix(Self.accountPrefix) }
 }
 
 public struct AgentVersion: Hashable, Comparable, Sendable, CustomStringConvertible {

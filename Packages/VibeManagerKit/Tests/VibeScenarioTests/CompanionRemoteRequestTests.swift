@@ -101,3 +101,61 @@ struct CompanionRemoteRequestTests {
         == .allowAlways)
   }
 }
+
+/// What the phone may create on the Mac (#469): one visible name in the folder it shows.
+@MainActor
+@Suite("The phone's new folders")
+struct CompanionRemoteFolderTests {
+  private func withParent(_ body: (URL) throws -> Void) throws {
+    let root = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    let parent = root.appendingPathComponent("parent", isDirectory: true)
+    try FileManager.default.createDirectory(at: parent, withIntermediateDirectories: true)
+    defer {
+      try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: parent.path)
+      try? FileManager.default.removeItem(at: root)
+    }
+    try body(parent)
+  }
+
+  @Test("A name creates its folder, which the listing then shows")
+  func created() throws {
+    try withParent { parent in
+      #expect(CompanionRemoteServer.createFolder(named: "  Nouveau été ", in: parent.path) == nil)
+      #expect(CompanionRemoteServer.listing(of: parent.path).folders == ["Nouveau été"])
+      // Joiners are part of a name, in an emoji or in Hindi.
+      #expect(CompanionRemoteServer.createFolder(named: "👨‍💻 Projets", in: parent.path) == nil)
+      #expect(CompanionRemoteServer.isFolderName("क्\u{200D}ष"))
+    }
+  }
+
+  @Test(
+    "A name can't leave the folder, hide, or be no name",
+    arguments: [
+      "", "   ", ".", "..", "../evil", "a/b", "/tmp/evil", "..%2F", ".hidden", "a:b", "a\nb",
+      String(repeating: "é", count: 128),
+    ])
+  func refused(name: String) throws {
+    // "..%2F" starts with a dot, so hidden, and refused as such: never decoded.
+    try withParent { parent in
+      #expect(CompanionRemoteServer.createFolder(named: name, in: parent.path) == .folderNameInvalid)
+      let around = try FileManager.default.contentsOfDirectory(
+        atPath: parent.deletingLastPathComponent().path)
+      #expect(around == ["parent"])
+      #expect(try FileManager.default.contentsOfDirectory(atPath: parent.path).isEmpty)
+    }
+  }
+
+  @Test("What the Mac refuses is told apart")
+  func failures() throws {
+    try withParent { parent in
+      #expect(CompanionRemoteServer.createFolder(named: "a", in: parent.path) == nil)
+      #expect(CompanionRemoteServer.createFolder(named: "a", in: parent.path) == .folderExists)
+      let gone = parent.appendingPathComponent("gone").path
+      #expect(CompanionRemoteServer.createFolder(named: "b", in: gone) == .folderMissing)
+      try FileManager.default.setAttributes(
+        [.posixPermissions: 0o555], ofItemAtPath: parent.path)
+      #expect(CompanionRemoteServer.createFolder(named: "c", in: parent.path) == .folderNotAllowed)
+    }
+  }
+}

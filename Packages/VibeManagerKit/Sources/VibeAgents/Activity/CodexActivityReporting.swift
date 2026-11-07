@@ -248,8 +248,9 @@ extension CodexAgentProvider: AgentActivityReporting {
     -> any AgentSignalDecoding
   {
     guard let workingDirectoryPath else { return CodexSignalDecoder() }
-    let sessions = CodexHome.sessionsDirectory(
-      environment: ProcessInfo.processInfo.environment.merging(environment) { $1 })
+    var variables = ProcessInfo.processInfo.environment.merging(environment) { $1 }
+    if let accountHome { variables[CodexHome.overrideKey] = accountHome }
+    let sessions = CodexHome.sessionsDirectory(environment: variables)
     return CodexSignalDecoder { since in
       CodexQuestionWatch(
         sessionsDirectory: sessions, workingDirectoryPath: workingDirectoryPath, since: since

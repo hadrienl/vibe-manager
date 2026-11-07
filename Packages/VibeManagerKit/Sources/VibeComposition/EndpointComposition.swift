@@ -76,6 +76,45 @@ struct EndpointGatewayAdapter: EndpointGatewayControlling {
   }
 }
 
+/// The extra accounts as agents (#478): read from their file, registered beside the command line
+/// agents, their folders told to everything that looks for a transcript.
+@MainActor
+final class AgentAccountCatalog {
+  let repository: any AgentAccountRepository
+  private let homes: AgentHomes
+  private let environment: [String: String]
+  private let diagnostics: any DiagnosticLog
+  private let transcriptLocations: TranscriptLocationCache
+  private let shell: LoginShellEnvironment
+
+  init(
+    repository: any AgentAccountRepository, homes: AgentHomes, environment: [String: String],
+    diagnostics: any DiagnosticLog, transcriptLocations: TranscriptLocationCache,
+    shell: LoginShellEnvironment
+  ) {
+    self.repository = repository
+    self.homes = homes
+    self.environment = environment
+    self.diagnostics = diagnostics
+    self.transcriptLocations = transcriptLocations
+    self.shell = shell
+  }
+
+  func providers(for accounts: [AgentAccount]) -> [any AgentProvider] {
+    AgentAccountProviders.updateHomes(homes, for: accounts, environment: environment)
+    return accounts.compactMap {
+      AgentAccountProviders.make(
+        $0, environment: environment, diagnostics: diagnostics, shellEnvironment: shell,
+        transcriptLocations: transcriptLocations)
+    }
+  }
+
+  func reload(into registry: AgentProviderRegistry) async {
+    let accounts = (try? await repository.accounts()) ?? []
+    await registry.replaceAccounts(providers(for: accounts))
+  }
+}
+
 /// The endpoints as agents: read from their file, registered beside the command line agents, and
 /// registered again each time they are saved.
 @MainActor

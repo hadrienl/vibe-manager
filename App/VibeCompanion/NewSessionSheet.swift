@@ -191,6 +191,19 @@ struct NewSessionSheet: View {
         if let folder { channel.askFolderIcon(folder) }
       }
     }
+    // An answer that came after the sheet that asked was gone isn't this sheet's.
+    .onAppear { channel.folderFailure = nil }
+    // On the stack, not the form under it: the browser that asked is pushed above the form.
+    .alert(
+      "The Folder Couldn’t Be Created",
+      isPresented: Binding(
+        get: { channel.folderFailure != nil },
+        set: { if !$0 { channel.folderFailure = nil } })
+    ) {
+      Button("OK", role: .cancel) { /* The alert dismisses itself. */  }
+    } message: {
+      Text(verbatim: channel.folderFailure?.text ?? "")
+    }
   }
 
   private func create() {
@@ -237,6 +250,8 @@ struct FolderBrowser: View {
   let choose: (String) -> Void
   @Environment(RemoteChannel.self) private var channel
   @Environment(\.dismiss) private var dismiss
+  @State private var asksFolderName = false
+  @State private var newFolderName = ""
 
   private var resolved: String? { path ?? channel.homePath }
   private var listing: RemoteFolderListing? { resolved.flatMap { channel.folderListings[$0] } }
@@ -262,6 +277,26 @@ struct FolderBrowser: View {
       resolved.map { ($0 as NSString).lastPathComponent } ?? String(localized: "Folders")
     )
     .navigationBarTitleDisplayMode(.inline)
+    .toolbar {
+      if channel.canCreateFolders, let listing, !listing.isUnreadable {
+        ToolbarItem(placement: .primaryAction) {
+          Button("New Folder", systemImage: "folder.badge.plus") {
+            newFolderName = ""
+            asksFolderName = true
+          }
+        }
+      }
+    }
+    .alert("New Folder", isPresented: $asksFolderName) {
+      TextField("Folder Name", text: $newFolderName)
+        .textInputAutocapitalization(.never)
+        .autocorrectionDisabled()
+      Button("Cancel", role: .cancel) { /* The alert dismisses itself. */  }
+      Button("Create") {
+        if let listing { channel.createFolder(named: newFolderName, in: listing.path) }
+      }
+      .disabled(newFolderName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
     .safeAreaInset(edge: .bottom) {
       if let resolved {
         Button {

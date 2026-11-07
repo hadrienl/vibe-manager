@@ -317,3 +317,37 @@ struct ProcessArgumentsTests {
     #expect(ProcessArguments.of(-1) == nil)
   }
 }
+
+@Suite("Messages kept for a child at rest (#464)")
+struct OutboxWaitTests {
+  let start = Date(timeIntervalSince1970: 1_000)
+
+  @Test("Told once, after two minutes, only for a child kept from them at rest")
+  func stuck() {
+    var wait = OutboxWait(since: start, block: .promptText)
+    #expect(!wait.isStuck(at: start.addingTimeInterval(119)))
+    #expect(wait.isStuck(at: start.addingTimeInterval(120)))
+    wait.told = true
+    #expect(!wait.isStuck(at: start.addingTimeInterval(600)))
+    #expect(!OutboxWait(since: start, block: .working).isStuck(at: start.addingTimeInterval(600)))
+    #expect(!OutboxWait(since: start).isStuck(at: start.addingTimeInterval(600)))
+    #expect(
+      !OutboxWait(since: start, block: .awaitingUser).isStuck(at: start.addingTimeInterval(600)))
+  }
+
+  @Test("The coordinator is told why, and to call the user when only they can clear it")
+  func line() {
+    let id = SessionID()
+    let event = CoordinationEvent(
+      childID: id, childName: "API", kind: .messagesStuck(2, .promptText), date: start)
+    #expect(event.line.contains("The 2 messages you sent “API”"))
+    #expect(event.line.contains("its prompt holds text the user left there"))
+    #expect(event.line.contains("call them"))
+    let one = CoordinationEvent(
+      childID: id, childName: "API", kind: .messagesStuck(1, .recentKeyboard), date: start)
+    #expect(
+      one.line.contains("The message you sent “API” (\(id.rawValue.uuidString)) is still not typed")
+    )
+    #expect(!one.line.contains("call them"))
+  }
+}

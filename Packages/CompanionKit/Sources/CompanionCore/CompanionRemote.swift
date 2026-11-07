@@ -6,9 +6,14 @@ public enum CompanionRemote {
   /// 2: a request carries all its questions, and `answers` answers each (#428). Both ends still
   /// read version 1: a Mac of version 1 gets `answer`, which it knows, and the phone shows a
   /// version 1 request's single question.
-  public static let protocolVersion = 2
+  ///
+  /// 3: the phone can create a folder (#469). A Mac older than that would skip the message without
+  /// a word, so the phone doesn't offer it there.
+  public static let protocolVersion = 3
   /// Whether a Mac speaking `version` reads `answers`.
   public static func takesAnswers(_ version: Int?) -> Bool { (version ?? 1) >= 2 }
+  /// Whether a Mac speaking `version` reads `createFolder`.
+  public static func takesFolderCreation(_ version: Int?) -> Bool { (version ?? 1) >= 3 }
   /// The channel's protocol, offered at the iroh handshake beside the trials' echo. Unchanged by
   /// `protocolVersion`: both ends read the other's older messages.
   public static let alpn = "vibe-manager/remote/1"
@@ -51,6 +56,10 @@ public enum RemoteFailure: Codable, Hashable, Sendable {
   case restartNeedsMac
   case folderMissing
   case noAgent
+  /// A folder's name that isn't a single visible name of the folder it would go in.
+  case folderNameInvalid
+  case folderExists
+  case folderNotAllowed
   /// The Mac's own words, already in its language: a draft it refused, a request that failed.
   case other(String)
 }
@@ -615,12 +624,16 @@ public enum RemoteWebAddress {
     }
   }
 
+  /// The schemes the phone hands to the Mac: its local servers, and its files — a page an agent
+  /// wrote, such as an artifact, which only the Mac can read.
+  public static let proxiedSchemes = ["http", "https", "file"]
+
   /// The phone's own spelling of a Mac-local address: its scheme prefixed, for the web view to hand
   /// it to the channel rather than to the network.
   public static let proxiedPrefix = "vibemac-"
 
   public static func proxied(_ url: URL) -> URL {
-    guard isMacLocal(url), let scheme = url.scheme, !scheme.hasPrefix(proxiedPrefix),
+    guard isMacLocal(url) || url.isFileURL, let scheme = url.scheme, !scheme.hasPrefix(proxiedPrefix),
       var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
     else { return url }
     components.scheme = proxiedPrefix + scheme
@@ -695,6 +708,9 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case createSession(RemoteNewSession)
   /// A folder's subfolders; `nil` for the user's home.
   case listFolder(path: String?)
+  /// A new subfolder, named by one name alone: the Mac answers with `parent`'s listing, then
+  /// `folderNotCreated` if it wasn't created.
+  case createFolder(parent: String, name: String)
   /// A project icon's PNG.
   case icon(id: String)
   /// A folder's project icon, which a new session there wears unless another is picked.
@@ -720,6 +736,7 @@ public enum RemoteMessage: Codable, Equatable, Sendable {
   case searchResults(token: Int, [RemoteSearchResult])
   case newSessionOffer(RemoteNewSessionOptions)
   case folderListing(RemoteFolderListing)
+  case folderNotCreated(RemoteFailure)
   case iconData(id: String, png: Data)
   case attachmentData(path: String, jpeg: Data)
   /// `nil` for a folder without one.

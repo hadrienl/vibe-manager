@@ -94,6 +94,84 @@ struct SignInWorkspaceTests {
 
     """.utf8)
 
+  @Test("Signed in to another account, nothing resumes until the user says (#478)")
+  func anotherAccount() async throws {
+    let supervisor = WorkspaceSupervisor()
+    let (model, subject) = try await running(supervisor: supervisor)
+    model.activityCells.set(stoppedOnSignIn(subject.id), for: subject.id)
+    let stub = AgentProviderID("stub")
+    let started = await supervisor.startCount
+
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: "perso@x.io")
+    #expect(
+      model.signInNotice(for: subject.id)?.state
+        == .otherAccount(expected: "pro@x.io", actual: "perso@x.io"))
+    #expect(await supervisor.startCount == started)
+    // Whatever the CLI says before a second try, the expected account stays the first.
+    #expect(model.signedInAccounts.account(of: stub) == "pro@x.io")
+
+    model.keepSignedInAccount(of: stub)
+    #expect(model.signedInAccounts.account(of: stub) == "perso@x.io")
+    #expect(model.signIns[stub] == nil)
+    // From there it is the sign-in of #410: this screen's prompt cannot be read, so Resume is offered.
+    await model.reload()
+    let deadline = ContinuousClock.now + .seconds(10)
+    while model.signInNotice(for: subject.id)?.state != .signedIn(canResume: true, waiting: .text(nil)),
+      ContinuousClock.now < deadline
+    {
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(
+      model.signInNotice(for: subject.id)?.state
+        == .signedIn(canResume: true, waiting: .text(nil)))
+    #expect(await supervisor.startCount == started)
+  }
+
+  @Test("An account changed outside the application is not taken for a mistake (#478)")
+  func changedOutside() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    model.signedInAccounts.remember("old@x.io", of: stub)
+    await model.signInEnded(stub, outcome: .signedIn, before: "new@x.io", after: "new@x.io")
+    #expect(model.signIns[stub] == nil)
+    #expect(model.signedInAccounts.account(of: stub) == "new@x.io")
+  }
+
+  @Test("A plan or a name that changed is the same account, another organization is not (#478)")
+  func organizations() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    let max = AgentSignedInAccount(label: "a@x.io · Max", email: "a@x.io", organizationID: "1")
+    let ultra = AgentSignedInAccount(label: "a@x.io · Ultra", email: "a@x.io", organizationID: "1")
+    let team = AgentSignedInAccount(label: "a@x.io · Team", email: "a@x.io", organizationID: "2")
+    await model.signInEnded(stub, outcome: .signedIn, before: max, after: ultra)
+    #expect(model.signIns[stub] == nil)
+    await model.signInEnded(stub, outcome: .signedIn, before: ultra, after: team)
+    #expect(model.signIns[stub] == .otherAccount(expected: ultra, actual: team))
+  }
+
+  @Test("An account that cannot be read after signing in resumes nothing (#478)")
+  func unreadableAccount() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    await model.signInEnded(stub, outcome: .signedIn, before: "pro@x.io", after: nil)
+    #expect(model.signIns[stub] == .otherAccount(expected: "pro@x.io", actual: nil))
+    model.keepSignedInAccount(of: stub)
+    #expect(model.signIns[stub] == nil)
+    #expect(model.signedInAccounts.account(of: stub) == nil)
+  }
+
+  @Test("Signed in to the same account, or by a CLI that names none, it resumes (#478)")
+  func sameAccount() async throws {
+    let (model, _) = try await running()
+    let stub = AgentProviderID("stub")
+    await model.signInEnded(stub, outcome: .signedIn, before: "Pro@x.io", after: "pro@x.io")
+    #expect(model.signIns[stub] == nil)
+    model.signedInAccounts.remember(nil, of: stub)
+    await model.signInEnded(stub, outcome: .signedIn)
+    #expect(model.signIns[stub] == nil)
+  }
+
   @Test("Text left in the prompt is shown, and Resume sends it once the agent is restarted")
   func textWaitingIsSent() async throws {
     let supervisor = WorkspaceSupervisor(history: Self.promptHoldingText)

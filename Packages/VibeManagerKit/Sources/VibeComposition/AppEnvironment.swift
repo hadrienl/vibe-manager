@@ -153,12 +153,19 @@ public final class AppEnvironment {
     let notes = FileSessionNotesStore(directory: data.notes, diagnostics: diagnostics)
     // Where the transcripts are, remembered once for the conversation view and the branch
     // report (#276).
-    let transcriptLocations = TranscriptLocationCache()
+    let accountsURL = data.store.deletingLastPathComponent()
+      .appendingPathComponent("agent-accounts.json")
+    let agentHomes = AgentHomes()
+    let transcriptLocations = TranscriptLocationCache(
+      locator: AgentTranscriptLocator(homes: agentHomes))
+    // One shell for every agent and account.
+    let loginShell = LoginShellEnvironment(
+      inherited: configuration.environment, probe: SystemProcessProbe())
     let providers =
       configuration.providers?(diagnostics.log)
       ?? Self.providers(
         environment: configuration.environment, diagnostics: diagnostics.log,
-        transcriptLocations: transcriptLocations)
+        transcriptLocations: transcriptLocations, shell: loginShell)
     // The endpoints (#107): registered beside the command line agents from the start — a session
     // the terminal host kept is adopted as soon as the workspace loads, and must find its agent —
     // their secrets in the keychain, their sessions reaching them through the gateway.
@@ -172,8 +179,14 @@ public final class AppEnvironment {
         launch: Self.gatewayLaunch(
           location: gatewayLocation,
           keychainService: Self.keychainService(isolated: data.defaultsSuite != nil))))
+    let agentAccounts = AgentAccountCatalog(
+      repository: FileAgentAccountRepository(storeURL: accountsURL),
+      homes: agentHomes, environment: configuration.environment, diagnostics: diagnostics.log,
+      transcriptLocations: transcriptLocations, shell: loginShell)
     let registry = AgentProviderRegistry(
       providers: providers,
+      accounts: agentAccounts.providers(
+        for: (try? FileAgentAccountRepository.read(accountsURL)) ?? []),
       endpoints: EndpointCatalog.providers(
         for: (try? FileEndpointRepository.read(data.endpoints)) ?? [], among: providers,
         gateway: gateway, secrets: endpointSecrets, gatewayDirectory: gatewayLocation.directory))
@@ -220,7 +233,7 @@ public final class AppEnvironment {
     let usageLedger = FileUsageLedger(directory: data.usage)
     let usageTracking = FileUsageTrackingStore(directory: data.usage)
     let usageRecorder = UsageRecorder(ledger: usageLedger, tracking: usageTracking)
-    let usageReader = AgentUsageReader()
+    let usageReader = AgentUsageReader(locator: AgentTranscriptLocator(homes: agentHomes))
     let usage = UsageService(
       recorder: usageRecorder,
       ledger: usageLedger,
@@ -393,7 +406,7 @@ public final class AppEnvironment {
     let journal = SessionJournalModel(
       monitor: SessionJournalMonitor(
         store: FileSessionJournalStore(directory: data.journal),
-        reader: SessionJournalReader(),
+        reader: SessionJournalReader(homes: agentHomes),
         repositories: GitRepositoryIdentityResolver(
           git: ProcessGitCommandRunner(timeout: .seconds(10), diagnostics: diagnostics.log)),
         summarizers: AgentSessionSummarizers(agents: registry),
@@ -596,6 +609,20 @@ public final class AppEnvironment {
         await appModel?.refreshAgents()
         await appModel?.conversations.refreshReadableAgents()
       })
+    appModel.agentAccounts = AgentAccountsSettingsModel(
+      repository: agentAccounts.repository,
+      home: AgentHomeDirectory.home(in: configuration.environment),
+      defaultDirectories: [
+        .claudeCode: ClaudeCodeHome.directory(environment: configuration.environment).path,
+        .codex: CodexHome.directory(environment: configuration.environment).path,
+      ],
+      didSave: { [weak appModel] in
+        await agentAccounts.reload(into: registry)
+        await appModel?.refreshAgentsAfterChange()
+        await appModel?.conversations.refreshReadableAgents()
+      })
+    appModel.signedInAccounts = SignedInAccountMemory(
+      defaults: defaultsSuite.flatMap(UserDefaults.init(suiteName:)) ?? .standard)
     // The mobile companion (#347): the active sessions to the agent embedded in the bundle, which
     // alone holds the iCloud entitlement, and the phone's tests back as alerts.
     companion = CompanionComposition.start(
@@ -938,14 +965,13 @@ public final class AppEnvironment {
   /// on a Mac with Claude Code or Codex installed, they would otherwise come first.
   private static func providers(
     environment: [String: String], diagnostics: any DiagnosticLog,
-    transcriptLocations: TranscriptLocationCache
+    transcriptLocations: TranscriptLocationCache, shell: LoginShellEnvironment
   ) -> [any AgentProvider] {
     if environment["VIBE_ENABLE_MOCK_AGENT"] == "only" {
       return [MockAgentProvider(environment: environment)]
     }
-    // One shell for both agents, asked as soon as the application starts: by the time the first
+    // One shell, asked as soon as the application starts: by the time the first
     // session is launched, its answer is usually there.
-    let shell = LoginShellEnvironment(inherited: environment, probe: SystemProcessProbe())
     shell.warmUp()
     var providers: [any AgentProvider] = [
       ClaudeCodeAgentProvider.make(
