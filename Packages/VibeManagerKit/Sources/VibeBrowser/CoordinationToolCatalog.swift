@@ -50,7 +50,8 @@ public enum CoordinationToolCatalog {
           ],
           "agent": [
             "type": "string",
-            "description": "An agent id from agents_list. Omitted: your own agent.",
+            "description":
+              "An agent id from agents_list, when the user asked for it. Omitted: your own agent.",
           ],
           "model": [
             "type": "string",

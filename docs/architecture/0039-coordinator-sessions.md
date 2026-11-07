@@ -1,6 +1,7 @@
 # 0039 — Coordinator sessions
 
-- Status: accepted
+- Status: accepted; amended by [#523](https://github.com/hadrienl/vibe-manager/issues/523): a child
+  runs its coordinator's agent unless the user asks for another
 - Date: 2026-10-10
 - Issue: [#352](https://github.com/hadrienl/vibe-manager/issues/352)
 
@@ -60,8 +61,8 @@ server's tools and says why a call fails.
 
 | Tool | What it does |
 |---|---|
-| `agents_list` | The agents usable on this Mac, their models, and how many children run against the limit |
-| `session_create` | A child, through `CreateSession` and the same publication as the sheet's, started or left in To Do |
+| `agents_list` | The agents usable on this Mac, their models, which one is the caller's own, and how many children run against the limit |
+| `session_create` | A child, through `CreateSession` and the same publication as the sheet's, started or left in To Do, on the caller's agent unless another is named |
 | `sessions_list` | The caller's children: state, task status, request waited on, ticket, branch, pull requests |
 | `session_read` | A child's state, its activity summary, and the last entries of its conversation, at most 12 000 characters |
 | `session_send` | A message typed into a child as its composer would |
@@ -148,3 +149,18 @@ running asks whether they stop too.
 - Left out, and possible later without undoing anything: a budget in tokens or time, an agent
   imposed or excluded in the settings, descriptions of what each agent is good at, archiving by the
   coordinator, answering clarifying questions in the user's place.
+
+## Amendment — a child runs its coordinator's agent (#523)
+
+A coordinator on the default account started its children on a second account of the user's
+(#478), whose name looked like the project's, and only said so in one line of its plan. The
+children stopped at a question of the CLI that account's folder had not answered yet.
+
+The coordinator no longer chooses its children's agent. `session_create` gives a child the
+coordinator's own agent when none is named, and `agents_list` marks that agent as the default and
+every other as the user's to ask for: the other CLI, another account, an endpoint. Seen from a
+second account, the default account is one of those others. The instructions say the same. The user
+still chooses another agent, through the coordinator.
+
+It stays a rule the coordinator is told, not one the application enforces. Explicit requests have
+to keep working, and a field the coordinator filled in to say the user asked would prove nothing.

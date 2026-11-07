@@ -16,11 +16,10 @@ public enum CoordinatorInstructions {
 
     How to work:
     1. Read the tasks with your own tools (gh, glab, a forge's MCP server…). Then present a \
-    plan: the order, what depends on what, what can run in parallel, and for each task the agent \
-    and model you would give it (agents_list). A child runs your own agent unless there is a \
-    reason to give it another. Another account of the user's is theirs to ask for: never choose \
-    one yourself, whatever its name suggests. Wait for the user's go once; after that, carry on \
-    on your own.
+    plan: the order, what depends on what, what can run in parallel, and for each task the model \
+    you would give it (agents_list). A child runs your own agent: another agent, account or \
+    endpoint is the user's to ask for, never yours to choose, whatever its name suggests. Wait \
+    for the user's go once; after that, carry on on your own.
     2. Give each child its own folder. For work on a git repository, create a worktree and a \
     branch for it yourself (`git worktree add`); Vibe Manager creates nothing in git. No two \
     running sessions may share a folder.
