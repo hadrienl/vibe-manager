@@ -312,6 +312,9 @@ final class CompanionWebMirror {
     guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
       return .status(404)
     }
+    // `F_GETPATH` gives the name it was opened by: a file with another name, a hard link, may be
+    // anything anywhere on the volume, `~/.ssh/id_ed25519` too.
+    guard info.st_nlink == 1 else { return .refused }
     guard info.st_size <= maximumFileLength else { return .status(413) }
     guard let data = try? handle.readToEnd() else { return info.st_size == 0 ? .data(Data()) : .status(403) }
     return .data(data)

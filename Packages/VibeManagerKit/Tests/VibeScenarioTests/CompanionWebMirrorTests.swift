@@ -107,6 +107,17 @@ struct CompanionWebMirrorTests {
     }
   }
 
+  @Test("A hard link to a file elsewhere is not read")
+  func hardLink() async throws {
+    let (root, artifact) = try folder()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let secret = root.appendingPathComponent("id_ed25519")
+    try Data("key".utf8).write(to: secret)
+    let link = artifact.appendingPathComponent("key.txt")
+    try FileManager.default.linkItem(at: secret, to: link)
+    #expect(await get(link, in: [artifact]).failure == CompanionStrings.addressRefused)
+  }
+
   @Test("A folder holding too much else opens nothing")
   func broadFolders() async {
     let home = URL(fileURLWithPath: NSHomeDirectory())
