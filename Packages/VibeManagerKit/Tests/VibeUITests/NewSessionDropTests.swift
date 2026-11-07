@@ -113,11 +113,11 @@ struct NewSessionDropTests {
     pasteboard.writeObjects(objects)
     let types = pasteboard.types ?? []
     let root = try #require(workspace.window.contentView?.superview)
-    let destination = try #require(Self.dropDestination(in: root, at: location, for: types))
-    // AppKit's own choice, where it can be asked: the same view.
-    if let chosen = Self.appKitDestination(in: workspace.window, at: location, for: types) {
-      #expect(chosen === destination)
-    }
+    // AppKit's own choice, where it can be asked: the reading below does not see the views SwiftUI
+    // draws over others, and missed the prompt's field taking every drag.
+    let destination = try #require(
+      Self.appKitDestination(in: workspace.window, at: location, for: types)
+        ?? Self.dropDestination(in: root, at: location, for: types))
     let drag = PasteboardDrag(
       pasteboard: pasteboard, location: location, window: workspace.window,
       sourceMask: sourceMask)
@@ -242,6 +242,89 @@ struct NewSessionDropTests {
     #expect(draft.draft.initialPrompt.isEmpty)
     #expect(draft.draft.attachments.isEmpty)
     #expect(workspace.model.dropNotice == nil)
+  }
+
+  @Test("An image with no file let go on the draft becomes a chip, a file of its own")
+  func imageWithoutFile() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let bitmap = try #require(
+      NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1, bitsPerSample: 8, samplesPerPixel: 4,
+        hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0,
+        bitsPerPixel: 0))
+    let image = NSPasteboardItem()
+    image.setData(try #require(bitmap.representation(using: .png, properties: [:])), forType: .png)
+    let field = try #require(workspace.promptField)
+
+    let outcome = try drop(
+      [image], at: field.convert(NSPoint(x: field.bounds.midX, y: field.bounds.midY), to: nil),
+      on: workspace)
+
+    #expect(outcome.destination === workspace.catcher)
+    #expect(outcome.taken)
+    let file = try #require(workspace.draft?.draft.attachments.first)
+    #expect(file.pathExtension == "png")
+    #expect(FileManager.default.fileExists(atPath: file.path))
+    #expect(field.string.isEmpty)
+  }
+
+  @Test("Images with no file let go together each become a chip")
+  func severalImages() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let bitmap = try #require(
+      NSBitmapImageRep(
+        bitmapDataPlanes: nil, pixelsWide: 1, pixelsHigh: 1, bitsPerSample: 8, samplesPerPixel: 4,
+        hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0,
+        bitsPerPixel: 0))
+    let png = try #require(bitmap.representation(using: .png, properties: [:]))
+    let images = (0..<2).map { _ in
+      let item = NSPasteboardItem()
+      item.setData(png, forType: .png)
+      return item
+    }
+    let field = try #require(workspace.promptField)
+    _ = try drop(
+      images, at: field.convert(NSPoint(x: field.bounds.midX, y: field.bounds.midY), to: nil),
+      on: workspace)
+    #expect(Set(workspace.draft?.draft.attachments ?? []).count == 2)
+    #expect(workspace.draft?.isReceivingAttachments == false)
+  }
+
+  @Test("A floating screenshot is joined as a copy; any other file as itself")
+  func floatingScreenshot() throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent("TemporaryItems/\(UUID().uuidString)", isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    let shot = folder.appendingPathComponent("shot.png")
+    try Data("a".utf8).write(to: shot)
+    let kept = NewSessionDropCatcher.kept(shot)
+    #expect(kept != shot)
+    try FileManager.default.removeItem(at: shot)
+    #expect(FileManager.default.fileExists(atPath: kept.path))
+    let plain = URL(fileURLWithPath: "/Users/someone/plan.md")
+    #expect(NewSessionDropCatcher.kept(plain) == plain)
+  }
+
+  @Test("Send waits for a file on its way; one that never comes does not hold the draft")
+  func promisedFiles() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    let draft = try #require(workspace.draft)
+    #expect(draft.isPristine)
+    draft.beginReceivingAttachments(1, giveUpAfter: .seconds(600))
+    #expect(draft.isReceivingAttachments)
+    #expect(!draft.canSubmit)
+    #expect(!draft.isPristine)
+    draft.finishReceivingAttachment([], failed: true)
+    #expect(!draft.isReceivingAttachments)
+    #expect(draft.attachmentFailed)
+
+    draft.beginReceivingAttachments(1, giveUpAfter: .zero)
+    await waitUntil { !draft.isReceivingAttachments }
+    #expect(!draft.isReceivingAttachments)
   }
 
   @Test("A text let go on the prompt's field goes to the field")

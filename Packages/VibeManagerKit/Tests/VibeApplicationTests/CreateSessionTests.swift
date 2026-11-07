@@ -35,6 +35,35 @@ struct CreateSessionTests {
     return (create, repository)
   }
 
+  @Test("A file a drop received is moved to the session's drops; any other stays the original")
+  func receivedDropsAreKept() async throws {
+    let temporary = FileManager.default.temporaryDirectory
+      .appendingPathComponent(CreateSession.receivedDropsFolder, isDirectory: true)
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
+    let received = temporary.appendingPathComponent("shot.png")
+    try Data("a".utf8).write(to: received)
+    let kept = FileManager.default.temporaryDirectory
+      .appendingPathComponent("kept-\(UUID().uuidString).png")
+    defer { try? FileManager.default.removeItem(at: kept) }
+    let drops = CopyingDropStore(destination: kept)
+    let create = CreateSession(
+      repository: SpyRepository(), agents: StubRegistry(providers: [StubProvider()]),
+      folders: StubFolders(status: .usable), clock: FixedClock(), drops: drops)
+    let original = URL(fileURLWithPath: "/workspace/plan.md")
+    var draft = draft(prompt: "Look at")
+    draft.attachments = [received, original]
+
+    let creation = try await create(draft)
+
+    #expect(creation.firstMessage?.attachments == [kept, original])
+    #expect(creation.session.initialPrompt.contains(kept.lastPathComponent))
+    #expect(!creation.session.initialPrompt.contains("shot.png"))
+    #expect(await drops.keptFor == [creation.session.id])
+    #expect(FileManager.default.fileExists(atPath: kept.path))
+    #expect(!FileManager.default.fileExists(atPath: temporary.path))
+  }
+
   @Test("The tickets the fields name are recognised, and the first one becomes the ticket (#89)")
   func ticketsAreRecognised() async throws {
     let repository = SpyRepository()
@@ -453,4 +482,20 @@ private struct StubRegistry: AgentProviderResolving {
     }
     return result
   }
+}
+
+private actor CopyingDropStore: SessionDropStore {
+  let destination: URL
+  private(set) var keptFor: [SessionID] = []
+
+  init(destination: URL) { self.destination = destination }
+
+  func save(_: Data, suggestedName _: String, for _: SessionID) throws -> URL { destination }
+  func copy(_ file: URL, suggestedName _: String, for id: SessionID) throws -> URL {
+    keptFor.append(id)
+    try FileManager.default.copyItem(at: file, to: destination)
+    return destination
+  }
+  func remove(_: SessionID) {}
+  func sweep(keeping _: Set<SessionID>) {}
 }

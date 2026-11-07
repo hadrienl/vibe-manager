@@ -23,6 +23,10 @@ public final class NewSessionModel {
   public private(set) var effortLevels: [String] = []
   public private(set) var issues: [SessionDraftIssue] = []
   public private(set) var isSubmitting = false
+  private var receivingAttachments = 0
+  private var receptionGeneration = 0
+  public var isReceivingAttachments: Bool { receivingAttachments > 0 }
+  public private(set) var attachmentFailed = false
   public private(set) var isLoadingAgents = false
   /// Problems are shown once the user has asked for the session, then kept live: a form that
   /// turns red while the first character is being typed is a form that nags.
@@ -212,7 +216,7 @@ public final class NewSessionModel {
   /// The name is not asked for (#177): left empty, the session is named after its prompt, its
   /// template or its folder. What must be chosen is where the agent works, and which agent.
   public var canSubmit: Bool {
-    !isSubmitting && missingRequirement == nil
+    !isSubmitting && !isReceivingAttachments && missingRequirement == nil
   }
 
   /// What still keeps the draft from being sent, said as what to do: the first one only, since the
@@ -256,7 +260,7 @@ public final class NewSessionModel {
       && draft.conversationTheme == nil
       && draft.coordination == nil
       && draft.initialPrompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-      && draft.attachments.isEmpty
+      && draft.attachments.isEmpty && !isReceivingAttachments
       && draft.templateFill == nil
       && draft.ticketText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
   }
@@ -292,6 +296,36 @@ public final class NewSessionModel {
     for file in files where ShellPath.isWritable(file.path) && !draft.attachments.contains(file) {
       draft.attachments.append(file)
     }
+  }
+
+  /// Files promised by a drop are on their way: Send waits for them, the session would start
+  /// without. A source that never delivers does not hold the draft for good.
+  func beginReceivingAttachments(_ count: Int, giveUpAfter limit: Duration = .seconds(120)) {
+    receivingAttachments += count
+    attachmentFailed = false
+    receptionGeneration += 1
+    let generation = receptionGeneration
+    Task { [weak self] in
+      try? await Task.sleep(for: limit)
+      guard let self, self.receptionGeneration == generation, self.isReceivingAttachments
+      else { return }
+      self.receivingAttachments = 0
+      self.noteAttachmentFailure()
+    }
+  }
+
+  func finishReceivingAttachment(_ files: [URL], failed: Bool) {
+    attach(files)
+    receivingAttachments = max(0, receivingAttachments - 1)
+    if failed { noteAttachmentFailure() }
+  }
+
+  private func noteAttachmentFailure() {
+    attachmentFailed = true
+    Announcer.announce(
+      String(
+        localized: "Some of what was dropped could not be read and was left out.",
+        bundle: .module))
   }
 
   public func removeAttachment(_ file: URL) {
