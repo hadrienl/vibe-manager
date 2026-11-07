@@ -150,18 +150,28 @@ public struct CreateSession: Sendable {
   /// The draft, its files received from a drop moved out of the temporary folder macOS empties:
   /// the session's prompt names them, and it can be resumed days later. One that cannot be kept
   /// stays where it is: the agent can still read it now.
+  ///
+  /// A drop receives all its files in one folder — two photos from Photos, two attachments from
+  /// Mail — so a folder goes once every file of it is kept, and stays while one of them is not.
   private func keepingDrops(of draft: SessionDraft, for id: SessionID) async -> SessionDraft {
     guard let drops else { return draft }
     var draft = draft
+    var emptied: Set<URL> = []
+    var stillHolding: Set<URL> = []
     for (index, file) in draft.attachments.enumerated()
     where file.path.contains("/\(Self.receivedDropsFolder)/") {
+      let folder = file.deletingLastPathComponent()
       do {
         draft.attachments[index] = try await drops.copy(
           file, suggestedName: file.lastPathComponent, for: id)
-        try? FileManager.default.removeItem(at: file.deletingLastPathComponent())
+        emptied.insert(folder)
       } catch {
+        stillHolding.insert(folder)
         diagnostics.record(.session, .error, "session.dropNotKept")
       }
+    }
+    for folder in emptied.subtracting(stillHolding) {
+      try? FileManager.default.removeItem(at: folder)
     }
     return draft
   }
