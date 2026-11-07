@@ -1083,6 +1083,36 @@ extension AppModel {
   public func cancelCoordinatorStop() {
     pendingCoordinatorStop = nil
   }
+
+  /// The children that go to the archive with their coordinator (#525): every one not archived
+  /// yet, but those where something still runs — a child left running when the coordinator alone
+  /// was stopped goes on, in its own column, and finds its coordinator when it comes back.
+  func childrenFollowingArchive(of id: SessionID) -> [WorkSession] {
+    children(of: id).filter { child in
+      launcher?.isRunning(child.id) != true && runningDrawerCommands(of: child.id).isEmpty
+        && !archivingSessionIDs.contains(child.id)
+    }
+  }
+
+  /// Archives the children of a coordinator the user just archived (#525), as they would one by
+  /// one. Those archived, as they stood before: ⌘Z brings them back with it.
+  func archiveChildren(of id: SessionID, recordsByHand: Bool = true) async -> [WorkSession] {
+    var archived: [WorkSession] = []
+    for child in childrenFollowingArchive(of: id) {
+      guard archivingSessionIDs.insert(child.id).inserted else { continue }
+      defer { archivingSessionIDs.remove(child.id) }
+      do {
+        let archival = try await archiveProcess(child.id, recordsByHand: recordsByHand)
+        report(archival.detachment, for: archival.session, action: .archived)
+        archived.append(child)
+      } catch {
+        diagnostics.record(
+          .session, .error, "coordination.childNotArchived",
+          ["session": diagnostics.pseudonym(child.id)])
+      }
+    }
+    return archived
+  }
 }
 
 // MARK: - The runner
