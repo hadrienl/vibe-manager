@@ -40,7 +40,26 @@ public final class AgentAccountsSettingsModel {
 
   public func issues(of account: AgentAccount) -> [AgentAccount.ValidationIssue] {
     account.validationIssues(
-      among: accounts, home: home, defaultDirectory: defaultDirectories[account.harness])
+      among: accounts, home: home, defaultDirectory: defaultDirectories[account.harness],
+      canonical: Self.canonicalPath)
+  }
+
+  /// The folder a path names on the disk, from the deepest folder of it that exists: links
+  /// followed, in the case the file system keeps — `~/.Claude`, or a link to `~/.claude`, is
+  /// `~/.claude` on a disk that ignores case.
+  nonisolated static func canonicalPath(_ path: String) -> String {
+    var existing = URL(fileURLWithPath: path)
+    var missing: [String] = []
+    while existing.path != "/" {
+      if let resolved = realpath(existing.path, nil) {
+        defer { free(resolved) }
+        let found = String(cString: resolved)
+        return missing.reversed().reduce(found) { ($0 as NSString).appendingPathComponent($1) }
+      }
+      missing.append(existing.lastPathComponent)
+      existing.deleteLastPathComponent()
+    }
+    return path
   }
 
   /// Creates the folder if need be, and registers the account. `false`, with `storeError` said,
