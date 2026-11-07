@@ -68,6 +68,9 @@ final class CompanionAgent {
   private var timers: [Timer] = []
   private var isDeparting = false
   private var isPolling = false
+  /// From a write of the Mac's record until an update shows it: the updates between say it is
+  /// missing, which is no removal to answer.
+  private var isWritingMac = false
   /// Keeps App Nap away: a process without a window is its first candidate, and a napping agent's
   /// heartbeat could come later than the phone's tolerance. The Mac may still sleep.
   private var activity: (any NSObjectProtocol)?
@@ -153,6 +156,7 @@ final class CompanionAgent {
       Self.logger.notice(
         "link: hello from \(id, privacy: .public), \(buildLabel, privacy: .public)")
       installation = Installation(id: id, version: version, buildLabel: buildLabel)
+      isWritingMac = true
       sentStatus = nil
       sentDevices = nil
       reportDevices()
@@ -290,6 +294,28 @@ final class CompanionAgent {
     }
     answerTests()
     giveAnswers()
+    restoreMacIfRemoved()
+  }
+
+  /// The phone took this Mac off its list (#521): it is back at once, not at the next heartbeat.
+  /// The deletion can also reach a launch whose first write waits to be sent, which it cancels.
+  private func restoreMacIfRemoved() {
+    guard let installation, !isDeparting else { return }
+    if CompanionMacRemoval.isListed(macID: installation.id, among: records) {
+      isWritingMac = false
+      return
+    }
+    guard !isWritingMac else { return }
+    isWritingMac = true
+    Self.logger.notice("the Mac's record is gone: written again")
+    Task {
+      // Queued behind a departure, this would overwrite its `online: false`.
+      guard !isDeparting else { return }
+      await writeMac(online: true)
+      // Its sessions went with it, and no snapshot comes before one of them changes.
+      await mergeSessions()
+      sendSoon()
+    }
   }
 
   /// The answers the phone wrote from a notification (#401): handed to the application, which

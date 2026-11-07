@@ -28,6 +28,8 @@ final class CompanionModel {
   private var isStarted = false
   /// The endpoint this launch already wrote.
   private var registeredEndpointID: String?
+  /// The whole zone, as the last update had it: what `remove(_:)` looks through.
+  @ObservationIgnored private var records: [CompanionRecord] = []
 
   init(sync: any CompanionSyncing, deviceName: String) {
     self.sync = sync
@@ -79,6 +81,14 @@ final class CompanionModel {
     await sync.sendChanges()
   }
 
+  /// Takes a Mac off the list, with what it left in iCloud (#521). A copy launched again writes
+  /// itself back: this is no unregistering, there is no registering to undo.
+  func remove(_ mac: CompanionMac) async {
+    if selectedMacID == mac.installationID { selectedMacID = nil }
+    await sync.delete(CompanionMacRemoval.recordNames(macID: mac.installationID, among: records))
+    await sync.sendChanges()
+  }
+
   func notePush() async {
     await sync.notePush()
     await sync.fetchChanges()
@@ -109,6 +119,7 @@ final class CompanionModel {
     now = Date()
     status = update.status
     journal = update.journal
+    records = update.records
     var pongs: [CompanionPong] = []
     var macs: [CompanionMac] = []
     var sessions: [CompanionSession] = []
