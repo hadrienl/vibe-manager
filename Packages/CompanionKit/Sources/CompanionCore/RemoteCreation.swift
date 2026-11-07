@@ -17,8 +17,8 @@ public struct ReturnedCreation: Equatable, Sendable {
 /// held behind it expires too.
 ///
 /// The Mac answers on the connection that asked. A request whose connection closed before the
-/// answer — the phone locked a second after Create — may still have been made: the Mac's list of
-/// sessions, on the next connection, is then the only answer left.
+/// answer — the phone locked a second after Create — may still have been made: the Mac's first
+/// list of sessions, on the next connection, is then the only answer left.
 public struct RemoteCreation: Sendable {
   public enum Answer: Equatable, Sendable {
     /// What is being created now exists, or one given up on does after all.
@@ -36,7 +36,7 @@ public struct RemoteCreation: Sendable {
   private var isWritten = false
   private var givenUp: RemoteNewSession?
   /// The request written on a connection that closed before the Mac answered it: perhaps made, which
-  /// only the Mac's list can still tell.
+  /// only the Mac's first list on the next connection can still tell.
   private var unanswered: RemoteNewSession?
   /// The sessions the Mac listed when the request in flight was written: the one it makes is none
   /// of them.
@@ -137,16 +137,21 @@ public struct RemoteCreation: Sendable {
     return .failed(request, failure)
   }
 
-  /// The Mac's sessions, as each connection lists them: the one an unanswered request made, if it
-  /// is there, taken as the Mac's answer. `nil` while it is not.
-  public mutating func listed(_ sessions: [RemoteSession]) -> Answer? {
+  /// The Mac's sessions, as each connection lists them. The first list after a connection lost
+  /// settles its unanswered request: the session it made, if there, is taken as the Mac's answer;
+  /// otherwise it was never made, and a form kept for it says so with `noAnswer`. No later list
+  /// does: a session of that name made long after is not that one.
+  public mutating func listed(_ sessions: [RemoteSession], noAnswer: String) -> Answer? {
     guard let request = unanswered else { return nil }
+    unanswered = nil
     let ids = Set(sessions.map(\.id))
     // A list that shares none of the sessions known then is another Mac's.
     guard known.isEmpty || !known.isDisjoint(with: ids),
       let made = sessions.last(where: { !known.contains($0.id) && Self.isMade(request, as: $0) })
-    else { return nil }
-    unanswered = nil
+    else {
+      if kept?.request == request { kept = ReturnedCreation(request: request, error: noAnswer) }
+      return nil
+    }
     givenUp = request
     return created(made.id)
   }

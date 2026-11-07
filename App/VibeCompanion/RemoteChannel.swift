@@ -110,8 +110,6 @@ final class RemoteChannel {
     }
     fetches = [:]
     creation.connectionLost()
-    // No answer comes while the channel is closed: the next connection gets the whole delay.
-    creationTimeout?.cancel()
     attempt += 1
     tasks.forEach { $0.cancel() }
     tasks = []
@@ -169,7 +167,6 @@ final class RemoteChannel {
       CompanionIroh.logger.notice(
         "remote: connected, \(CompanionIroh.describe(connection.paths()), privacy: .public)")
       folderCreations = []
-      if creation.pending != nil { awaitCreation() }
       write(.hello(protocolVersion: CompanionRemote.protocolVersion, deviceName: deviceName))
       if let shownSessionID { write(.show(sessionID: shownSessionID)) }
       if let webSessionID { write(.showWeb(sessionID: webSessionID)) }
@@ -220,7 +217,7 @@ final class RemoteChannel {
       macProtocolVersion = version
     case .sessions(let sessions):
       self.sessions = sessions
-      if let answer = creation.listed(sessions) { settle(answer) }
+      if let answer = creation.listed(sessions, noAnswer: Self.noAnswer) { settle(answer) }
     case .conversation(let conversation):
       guard conversation.sessionID == shownSessionID else { return }
       self.conversation = conversation
@@ -442,9 +439,9 @@ final class RemoteChannel {
     creation.takeKept()
   }
 
-  /// No answer in this time on an open channel, and the form comes back: the Mac may be asleep, or
-  /// out of reach. One asked before the channel closed may have been made: the form says to look
-  /// at the list rather than to try again.
+  /// No answer in this time, and the form comes back: the Mac may be asleep, or out of reach. One
+  /// asked before the channel closed may have been made, until the Mac's first list on the next
+  /// connection says: the form says to look at the list rather than to try again.
   private func awaitCreation() {
     creationTimeout?.cancel()
     creationTimeout = Task { [weak self] in
@@ -459,8 +456,13 @@ final class RemoteChannel {
             localized:
               "The connection to the Mac was lost before it answered. The session may already exist: check the list before trying again."
           )
-          : String(localized: "The Mac didn’t answer. Check that it’s awake, then try again."))
+          : Self.noAnswer)
     }
+  }
+
+  /// Why a creation came back when nothing says the Mac received it.
+  private static var noAnswer: String {
+    String(localized: "The Mac didn’t answer. Check that it’s awake, then try again.")
   }
 
   private func settle(_ answer: RemoteCreation.Answer) {

@@ -99,6 +99,8 @@ func creationHeldDifferent() {
   #expect(creation.created("T") == .created("T"))
 }
 
+private let noAnswer = "Pas de réponse"
+
 private func session(
   _ id: String, named name: String, coordinatorID: String? = nil, isCoordinator: Bool = false
 ) -> RemoteSession {
@@ -108,29 +110,43 @@ private func session(
     coordinatorID: coordinatorID, isCoordinator: isCoordinator, updatedAt: .now)
 }
 
-@Test("A session made while the connection was lost is found in the Mac's next list")
+@Test("A session made while the connection was lost is found in the first list after it")
 func creationFoundInList() {
   var creation = RemoteCreation()
   let old = session("A", named: "Bonjour")
   #expect(creation.submit(request, listed: [old]) == true)
   // On a live connection, only the Mac's answer counts.
-  #expect(creation.listed([old, session("S", named: "Bonjour")]) == nil)
+  #expect(creation.listed([old, session("S", named: "Bonjour")], noAnswer: noAnswer) == nil)
   creation.connectionLost()
   #expect(creation.isUnanswered)
-  #expect(creation.listed([old]) == nil)
   #expect(creation.pending == request)
-  // Another name, a coordinator's child, a coordinator: not what was asked.
   #expect(
-    creation.listed([
-      old, session("B", named: "Autre"), session("C", named: "Bonjour", coordinatorID: "A"),
-      session("D", named: "Bonjour", isCoordinator: true),
-    ]) == nil)
-  #expect(creation.listed([old, session("S", named: "Bonjour")]) == .created("S"))
+    creation.listed([old, session("S", named: "Bonjour")], noAnswer: noAnswer) == .created("S"))
   #expect(creation.pending == nil)
-  #expect(creation.listed([old, session("S", named: "Bonjour")]) == nil)
 }
 
-@Test("A request perhaps made says so when it expires, and is still found after")
+@Test("Not in the first list after the connection, it was never made: no later list counts")
+func creationNotInFirstList() {
+  var creation = RemoteCreation()
+  let old = session("A", named: "Bonjour")
+  #expect(creation.submit(request, listed: [old]) == true)
+  creation.connectionLost()
+  // Another name, a coordinator's child, a coordinator: not what was asked.
+  #expect(
+    creation.listed(
+      [
+        old, session("B", named: "Autre"), session("C", named: "Bonjour", coordinatorID: "A"),
+        session("D", named: "Bonjour", isCoordinator: true),
+      ], noAnswer: noAnswer) == nil)
+  #expect(!creation.isUnanswered)
+  #expect(creation.pending == request)
+  // One of that name made later is not taken for the answer.
+  #expect(creation.listed([old, session("S", named: "Bonjour")], noAnswer: noAnswer) == nil)
+  #expect(creation.expire() == request)
+  #expect(creation.submit(request) == true)
+}
+
+@Test("A request perhaps made says so when it expires, and the first list still finds it")
 func creationUnansweredExpires() {
   var creation = RemoteCreation()
   #expect(creation.submit(request, listed: [session("A", named: "x")]) == true)
@@ -140,8 +156,20 @@ func creationUnansweredExpires() {
   #expect(creation.expire() == request)
   #expect(!creation.isUnanswered)
   #expect(
-    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .created("S"))
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")], noAnswer: noAnswer)
+      == .created("S"))
   #expect(creation.submit(request) == true)
+}
+
+@Test("A form kept for a request the first list shows was never made says the Mac didn't answer")
+func creationKeptNotMade() {
+  var creation = RemoteCreation()
+  #expect(creation.submit(request, listed: [session("A", named: "x")]) == true)
+  creation.connectionLost()
+  _ = creation.expire()
+  _ = creation.returned(ReturnedCreation(request: request, error: "Peut-être"), isWaiting: false)
+  #expect(creation.listed([session("A", named: "x")], noAnswer: noAnswer) == nil)
+  #expect(creation.takeKept() == ReturnedCreation(request: request, error: noAnswer))
 }
 
 @Test("The session is named as the Mac names it: the name typed, the message, else the folder")
@@ -150,7 +178,8 @@ func creationNamedAsTheMacDoes() {
     var creation = RemoteCreation()
     _ = creation.submit(asked, listed: [session("A", named: "x")])
     creation.connectionLost()
-    return creation.listed([session("A", named: "x"), session("S", named: name)]) != nil
+    return creation.listed([session("A", named: "x"), session("S", named: name)], noAnswer: "")
+      != nil
   }
   func asked(name: String = "", prompt: String = "") -> RemoteNewSession {
     RemoteNewSession(
@@ -165,14 +194,17 @@ func creationNamedAsTheMacDoes() {
   #expect(!found(asked(name: "Autre"), as: "projet"))
 }
 
-@Test("Another Mac's list is no answer")
+@Test("Another Mac's list is no answer, and settles the request as never made")
 func creationOtherMacList() {
   var creation = RemoteCreation()
   #expect(creation.submit(request, listed: [session("A", named: "x")]) == true)
   creation.connectionLost()
-  #expect(creation.listed([session("Z", named: "x"), session("S", named: "Bonjour")]) == nil)
   #expect(
-    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .created("S"))
+    creation.listed([session("Z", named: "x"), session("S", named: "Bonjour")], noAnswer: noAnswer)
+      == nil)
+  #expect(
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")], noAnswer: noAnswer)
+      == nil)
 }
 
 @Test("A different request held back goes once the one lost is found")
@@ -186,7 +218,8 @@ func creationHeldBehindLost() {
   #expect(creation.submit(other) == false)
   creation.connectionLost()
   #expect(
-    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .send(other))
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")], noAnswer: noAnswer)
+      == .send(other))
   #expect(creation.pending == other)
   #expect(creation.created("T") == .created("T"))
 }
@@ -226,6 +259,7 @@ func creationKeptForgotten() {
   _ = creation.expire()
   _ = creation.returned(returned, isWaiting: false)
   #expect(
-    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")]) == .created("S"))
+    creation.listed([session("A", named: "x"), session("S", named: "Bonjour")], noAnswer: noAnswer)
+      == .created("S"))
   #expect(creation.takeKept() == nil)
 }
