@@ -81,6 +81,24 @@ func connectionsExchangeMessages() async throws {
   #expect(await iterator.next() == nil)
 }
 
+@Test("A message's files at their limit, the worst for JSON, fit a frame and then the link")
+func filesFitTheLink() {
+  // Bytes of 0xFF are all `/` in base64, which JSON escapes: the most a byte can weigh.
+  let half = RemoteFile.maximumTotalLength / 2
+  let files = [
+    RemoteFile(name: String(repeating: "\"", count: 255), data: Data(repeating: 0xFF, count: half)),
+    RemoteFile(name: "b", data: Data(repeating: 0xFF, count: half)),
+  ]
+  #expect(RemoteFile.fits(0, joining: files))
+  #expect(!RemoteFile.fits(1, joining: files))
+  #expect(!RemoteFile.fits(RemoteFile.maximumTotalLength + 1, joining: []))
+  let message = RemoteMessage.sendFiles(
+    sessionID: UUID().uuidString, text: String(repeating: "\"\n", count: 100_000), files: files)
+  #expect(RemoteFrame.encode(message).count - 4 <= RemoteFrame.maximumLength)
+  let wrapped = CompanionLinkFrame.encode(.remoteReceived(peer: "abcdefghij-12345", message))
+  #expect(wrapped.count - CompanionLinkWire.headerLength <= CompanionLinkWire.maximumPayloadLength)
+}
+
 @Test("Accepting with no connection waiting returns at once instead of holding the caller")
 func acceptWithoutConnectionReturns() throws {
   let path = NSTemporaryDirectory() + "companion-\(getpid()).sock"

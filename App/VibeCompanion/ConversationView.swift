@@ -246,14 +246,14 @@ struct ConversationView: View {
           guard let data = try? await item.loadTransferable(type: Data.self),
             let jpeg = Self.jpeg(UIImage(data: data))
           else { continue }
-          files.append(RemoteFile(name: "photo-\(Self.stamp())-\(index + 1).jpg", data: jpeg))
+          join(RemoteFile(name: "photo-\(Self.stamp())-\(index + 1).jpg", data: jpeg))
         }
       }
     }
     .fullScreenCover(isPresented: $showsCamera) {
       CameraPicker { image in
         if let jpeg = Self.jpeg(image) {
-          files.append(RemoteFile(name: "photo-\(Self.stamp()).jpg", data: jpeg))
+          join(RemoteFile(name: "photo-\(Self.stamp()).jpg", data: jpeg))
         }
       }
       .ignoresSafeArea()
@@ -270,9 +270,19 @@ struct ConversationView: View {
             String(localized: "“\(url.lastPathComponent)” is too large to send (6 MB at most)."))
           continue
         }
-        files.append(RemoteFile(name: url.lastPathComponent, data: data))
+        join(RemoteFile(name: url.lastPathComponent, data: data))
       }
     }
+  }
+
+  /// Joins a file to the next message, unless the message would then be too large to send.
+  private func join(_ file: RemoteFile) {
+    guard RemoteFile.fits(file.data.count, joining: files) else {
+      channel.failure = .other(
+        String(localized: "“\(file.name)” can’t be joined: a message carries 12 MB at most."))
+      return
+    }
+    files.append(file)
   }
 
   /// A photo as the agent reads it: 2048 pixels at most, in JPEG.

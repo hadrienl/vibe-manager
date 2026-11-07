@@ -518,6 +518,18 @@ public struct RemoteFile: Codable, Hashable, Sendable {
     self.name = name
     self.data = data
   }
+
+  /// The most a message's files may weigh together. In base64, with JSON escaping each `/` of it
+  /// — twice the size at worst — 12 MB take 32 000 000 bytes: the rest of a frame's 32 MiB
+  /// (`RemoteFrame.maximumLength`, and the link's once the companion's agent wraps it for the
+  /// application) is left to the text, the names and the envelopes. A larger frame would close the
+  /// link, and the agent with it.
+  public static let maximumTotalLength = 12_000_000
+
+  /// Whether `length` more bytes can join `files` in one message.
+  public static func fits(_ length: Int, joining files: [RemoteFile]) -> Bool {
+    files.reduce(length) { $0 + $1.data.count } <= maximumTotalLength
+  }
 }
 
 /// A tab of a session's web view.
