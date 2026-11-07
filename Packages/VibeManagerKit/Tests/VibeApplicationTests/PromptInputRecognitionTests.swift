@@ -117,4 +117,20 @@ struct PromptInputRecognitionTests {
     #expect(PromptInputRecognition.text(of: ["Regarde ça[Image #1]"]) == nil)
     #expect(PromptInputRecognition.text(of: ["[Pasted text #1 +40 lines]"]) == nil)
   }
+
+  @Test("A prompt under a rule holding the session's name, whole or cut, is read")
+  func namedRule() {
+    for rule in ["───────── Deploy ─", " Une session au nom très lon… ─"] {
+      let screen = "\(rule)\n❯ fix the login\n──────────────────"
+      #expect(PromptInputRecognition.input(screen: screen) == ["fix the login"])
+    }
+  }
+
+  @Test("Words over a pointer, with no rule's end, open no prompt")
+  func notAnOpeningRule() {
+    #expect(!PromptInputRecognition.isOpeningRule("Résumé du déploiement"))
+    #expect(!PromptInputRecognition.isOpeningRule("── Résumé"))
+    #expect(!PromptInputRecognition.isOpeningRule("Il reste à voir… "))
+    #expect(!PromptInputRecognition.isOpeningRule(""))
+  }
 }
