@@ -11,7 +11,8 @@ struct SessionsView: View {
   @State private var path: [String] = []
   @State private var showsSearch = false
   @State private var showsSettings = false
-  @State private var showsNewSession = false
+  /// The form shown, which comes back with the creation that failed.
+  @State private var newSessionForm: NewSessionForm?
   /// The folders folded away, by path.
   @State private var collapsed: Set<String> = []
 
@@ -56,8 +57,8 @@ struct SessionsView: View {
           Button("Settings", systemImage: "gearshape") { showsSettings = true }
         }
         ToolbarItem(placement: .topBarTrailing) {
-          Button("New Session", systemImage: "plus") { showsNewSession = true }
-            .disabled(channel.phase != .connected)
+          Button("New Session", systemImage: "plus") { newSessionForm = NewSessionForm() }
+            .disabled(channel.phase != .connected || channel.pendingCreation != nil)
         }
       }
       .overlay(alignment: .bottomTrailing) {
@@ -74,7 +75,11 @@ struct SessionsView: View {
         .padding(20)
       }
       .navigationDestination(for: String.self) { id in
-        ConversationView(sessionID: id)
+        if id == CreatingSessionView.id {
+          CreatingSessionView()
+        } else {
+          ConversationView(sessionID: id)
+        }
       }
       .sheet(isPresented: $showsSearch) {
         SearchSheet { id in
@@ -86,22 +91,39 @@ struct SessionsView: View {
       .sheet(isPresented: $showsSettings) {
         SettingsSheet()
       }
-      .sheet(isPresented: $showsNewSession) {
-        NewSessionSheet()
+      .sheet(item: $newSessionForm) { form in
+        NewSessionSheet(returned: form.returned)
+      }
+      .onChange(of: channel.pendingCreation != nil) { _, isCreating in
+        if isCreating { path.append(CreatingSessionView.id) }
+      }
+      .onChange(of: channel.returnedCreation) { _, returned in
+        guard let returned else { return }
+        channel.returnedCreation = nil
+        path.removeAll { $0 == CreatingSessionView.id }
+        showsSearch = false
+        showsSettings = false
+        newSessionForm = NewSessionForm(returned: returned)
       }
       .onChange(of: channel.notifiedSessionID, initial: true) { _, id in
         guard let id else { return }
         channel.notifiedSessionID = nil
         showsSearch = false
         showsSettings = false
-        showsNewSession = false
+        newSessionForm = nil
         path = [id]
       }
       .onChange(of: channel.createdSessionID) { _, id in
         guard let id else { return }
         channel.createdSessionID = nil
-        showsNewSession = false
-        path.append(id)
+        // Someone who left the waiting screen, or cancelled the form, is not taken back; a form
+        // opened for another session stays.
+        let isReturned = newSessionForm?.returned != nil
+        let isWaiting = path.contains(CreatingSessionView.id) || isReturned
+        if isReturned { newSessionForm = nil }
+        var shown = path.filter { $0 != CreatingSessionView.id }
+        if isWaiting { shown.append(id) }
+        path = shown
       }
     }
   }
@@ -159,6 +181,34 @@ struct SessionsView: View {
       }
       return Group(path: path, name: sessions.first?.folderName ?? path, rows: rows)
     }
+  }
+}
+
+/// One showing of the new session form.
+struct NewSessionForm: Identifiable {
+  let id = UUID()
+  var returned: ReturnedCreation?
+}
+
+/// A session being created (#470), until the Mac says it exists.
+struct CreatingSessionView: View {
+  /// Its place in the navigation path, which no session of the Mac has: those are UUIDs.
+  static let id = "creating"
+  @Environment(RemoteChannel.self) private var channel
+
+  private var title: String {
+    guard let request = channel.pendingCreation else { return "" }
+    return request.name.isEmpty ? (request.folder as NSString).lastPathComponent : request.name
+  }
+
+  var body: some View {
+    VStack(spacing: 12) {
+      ProgressView()
+      Text("Creating the Session…").foregroundStyle(.secondary)
+    }
+    .frame(maxWidth: .infinity, maxHeight: .infinity)
+    .navigationTitle(Text(verbatim: title))
+    .navigationBarTitleDisplayMode(.inline)
   }
 }
 
