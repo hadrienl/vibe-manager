@@ -129,9 +129,12 @@
       source.resume()
     }
 
-    /// Queues a message and returns at once.
+    /// Queues a message and returns at once. One longer than the other end reads is dropped:
+    /// written, it would make that end close the link — and the companion's agent quit.
     public func send(_ message: CompanionLinkMessage) {
       let bytes = CompanionLinkFrame.encode(message)
+      guard bytes.count - CompanionLinkWire.headerLength <= CompanionLinkWire.maximumPayloadLength
+      else { return }
       writeQueue.async { [weak self] in
         self?.writeAll(bytes)
       }

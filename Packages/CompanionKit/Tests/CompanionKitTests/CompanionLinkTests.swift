@@ -99,6 +99,23 @@ func filesFitTheLink() {
   #expect(wrapped.count - CompanionLinkWire.headerLength <= CompanionLinkWire.maximumPayloadLength)
 }
 
+@Test("A message too long for the other end is not written: the link stays up")
+func tooLongMessageIsDropped() async throws {
+  let (left, right) = try socketPair()
+  let application = CompanionLinkConnection(descriptor: left)
+  let agent = CompanionLinkConnection(descriptor: right)
+  defer {
+    application.close()
+    agent.close()
+  }
+  let file = RemoteFile(name: "a", data: Data(repeating: 0xFF, count: 25 << 20))
+  application.send(
+    .remoteSend(peer: "p", .sendFiles(sessionID: "s", text: "", files: [file])))
+  application.send(.welcome(protocolVersion: 1))
+  var iterator = agent.messages.makeAsyncIterator()
+  #expect(await iterator.next() == .welcome(protocolVersion: 1))
+}
+
 @Test("Accepting with no connection waiting returns at once instead of holding the caller")
 func acceptWithoutConnectionReturns() throws {
   let path = NSTemporaryDirectory() + "companion-\(getpid()).sock"
