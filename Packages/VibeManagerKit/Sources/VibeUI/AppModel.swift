@@ -2761,6 +2761,9 @@ public final class AppModel {
     restoreTask = nil
     // The dialogs of the starts held back meanwhile come together.
     requestsDidChange()
+    for session in sessions where activity(for: session.id)?.requests.isEmpty == false {
+      shownActivityChanged(session.id)
+    }
 
     let lines = outcomes.compactMap { outcome -> RestoreReport.Line? in
       guard let sentence = outcome.sentence else { return nil }

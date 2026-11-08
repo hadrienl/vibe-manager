@@ -32,7 +32,8 @@ extension AppModel {
             update.sessionID, from: previous, to: state, isReplayed: update.isReplayed)
           self.readStartupDialog(of: state, previous: previous)
         }
-        self.conversations.activityChanged(update.sessionID, to: update.state)
+        self.conversations.activityChanged(
+          update.sessionID, to: self.shownActivity(for: update.sessionID))
         self.requestAnswering = self.requestAnswering.filter {
           $0.key.sessionID != update.sessionID
         }.merging(update.answering) { $1 }
@@ -73,10 +74,18 @@ extension AppModel {
       await answerRequest.followStartupDialog(id) { @MainActor [weak self] in
         self?.readStartupGuesses.insert(id)
         self?.requestsDidChange()
+        self?.shownActivityChanged(id.sessionID)
       }
       self?.readStartupGuesses.remove(id)
       self?.requestsDidChange()
+      self?.shownActivityChanged(id.sessionID)
     }
+  }
+
+  /// A dialog of the start shown or hidden without the activity changing: the conversation, which
+  /// is handed the activity rather than reading it, is handed it again.
+  func shownActivityChanged(_ id: SessionID) {
+    conversations.activityChanged(id, to: shownActivity(for: id))
   }
 
   /// Follows the application coming to the front and leaving it. Not the scene's phase: on macOS

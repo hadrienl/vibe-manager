@@ -119,7 +119,7 @@ extension AppModel {
       count: children.count,
       running: running(children).count,
       needingUser: children.filter {
-        if case .awaitingUser = activity(for: $0.id)?.activity { return true }
+        if case .awaitingUser = shownActivity(for: $0.id)?.activity { return true }
         return false
       }.count)
   }
@@ -191,7 +191,7 @@ extension AppModel {
     switch (previous?.activity, state.activity) {
     case (.working?, .idle):
       kind = .turnEnded
-    case (let before, .awaitingUser) where !Self.isAwaitingUser(before):
+    case (_, .awaitingUser) where Self.waitsForUser(state) && !Self.waitsForUser(previous):
       kind = .awaitingUser(
         state.requests.first.map(CoordinationDigest.summary(of:)) ?? "an answer in its terminal")
     default:
@@ -203,9 +203,13 @@ extension AppModel {
       CoordinationEvent(childID: id, childName: child.name, kind: kind, date: coordination.now()))
   }
 
-  private static func isAwaitingUser(_ activity: AgentActivity?) -> Bool {
-    if case .awaitingUser = activity { return true }
-    return false
+  /// Whether the agent waits for the user: a dialog of its start only guessed is an agent still
+  /// starting, as dozens resumed together on a busy Mac are, not one to tell its coordinator of
+  /// (#474). The real request that follows the guess is.
+  static func waitsForUser(_ state: AgentActivityState?) -> Bool {
+    guard case .awaitingUser = state?.activity else { return false }
+    guard case .inTerminal(let prompt) = state?.requests.first?.content else { return true }
+    return prompt.kind != .startup
   }
 
   /// A session's agent stopped on its own: what was owed to it is told at its next launch, by its
@@ -816,9 +820,9 @@ extension AppModel {
       if let model = child.agent?.modelID { item["model"] = .string(model) }
       if let folder = child.repositories.first?.path { item["folder"] = .string(folder) }
       if launcher?.isRunning(child.id) == true {
-        item["agentState"] = .string(Self.state(of: activity(for: child.id)?.activity))
+        item["agentState"] = .string(Self.state(of: shownActivity(for: child.id)?.activity))
       }
-      if let request = activity(for: child.id)?.requests.first {
+      if let request = shownActivity(for: child.id)?.requests.first {
         item["waitingFor"] = .string(CoordinationDigest.summary(of: request))
       }
       if let ticket = child.ticket?.url { item["ticket"] = .string(ticket.absoluteString) }
@@ -837,9 +841,9 @@ extension AppModel {
     let running = launcher?.isRunning(child.id) == true
     var parts = [
       "“\(child.name)” — status \(child.taskStatus.rawValue), agent "
-        + (running ? Self.state(of: activity(for: child.id)?.activity) : "stopped") + "."
+        + (running ? Self.state(of: shownActivity(for: child.id)?.activity) : "stopped") + "."
     ]
-    if let request = activity(for: child.id)?.requests.first {
+    if let request = shownActivity(for: child.id)?.requests.first {
       parts.append("Waiting for the user: \(CoordinationDigest.summary(of: request))")
     }
     if let waiting = coordination.outbox[child.id]?.count, waiting > 0 {
