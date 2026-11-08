@@ -244,17 +244,19 @@ struct DialogOnScreenTests {
     #expect(await !fixture.tracker.waitsOnStartupDialog(guessed.id))
   }
 
-  @Test("A start that drew nothing waits on no dialog: the guess shows once it draws (#474)")
-  func blankStart() async throws {
+  @Test("A start that drew no dialog waits on none: the guess shows once one is (#474)")
+  func startStillDrawing() async throws {
     let clock = TestClock(t1)
     let fixture = Fixture(clock: clock)
     await fixture.tracker.processStarted(fixture.id, decoder: CodexLikeDecoder())
     clock.advance(11)
     await fixture.tracker.tick()
     let guessed = try #require(await fixture.tracker.state(for: fixture.id)?.requests.first)
-    // A busy Mac, dozens of sessions resumed at once: the agent has drawn nothing yet, and its
-    // hooks have not spoken either.
+    // A busy Mac, dozens of sessions resumed at once: the agent has drawn nothing yet, then its
+    // banner, and its hooks have not spoken.
     await fixture.screen.show("\n   \n")
+    #expect(await !fixture.answer.readStartupDialog(guessed.id))
+    await fixture.screen.show(" ▐▛███▜▌   Claude Code v2.1.319\n▝▜█████▛▘  Opus 5.5\n  ~/p")
     #expect(await !fixture.answer.readStartupDialog(guessed.id))
     let drawn = Count()
     let following = Task {
@@ -262,8 +264,8 @@ struct DialogOnScreenTests {
     }
     #expect(await fixture.tracker.waitsOnStartupDialog(guessed.id))
     #expect(await drawn.value == 0)
-    // A dialog drawn at last, of no kind the keymap knows: now it may wait on the user.
-    await fixture.screen.show("Do you trust this folder?\n› 1. Yes")
+    // A dialog drawn at last, of no kind the keymap knows: now one waits on the user.
+    await fixture.screen.show("Resume from a summary?\n\n❯ 1. Yes\n  2. No")
     #expect(await eventually { await drawn.value == 1 })
     await fixture.screen.show("Resumed.\n› ")
     await following.value
