@@ -212,7 +212,7 @@ final class CompanionRemoteServer {
       let label =
         appModel.folderLabels[SessionFolderKey(path: path)]
         ?? (path.isEmpty ? "" : (path as NSString).lastPathComponent)
-      let state = appModel.activity(for: session.id)
+      let state = appModel.shownActivity(for: session.id)
       let providerID = session.agent?.providerID ?? ""
       var coordinatorID: String?
       var isCoordinator = false
@@ -281,7 +281,7 @@ final class CompanionRemoteServer {
       RemoteConversation(
         sessionID: id.rawValue.uuidString,
         entries: Self.entries(model.snapshot.entries.suffix(Self.entryLimit)),
-        request: appModel.activity(for: id)?.requests.first.flatMap(Self.request(of:)),
+        request: appModel.shownActivity(for: id)?.requests.first.flatMap(Self.request(of:)),
         theme: Self.theme(of: appModel.sessions.first { $0.id == id }, in: appModel))
     } onChange: { [weak self] in
       Task { @MainActor in

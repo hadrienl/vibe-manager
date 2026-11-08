@@ -201,8 +201,8 @@ public final class AppModel {
   @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var postedRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var announcedRequestIDs: Set<AgentRequestID> = []
-  /// The guesses of a dialog at a start whose screen has been read once: shown only then, a
-  /// resumed session's prompt at rest taking the guess away before anyone sees it.
+  /// The guesses of a dialog at a start whose screen showed one: shown only then, a banner or a
+  /// resumed session's prompt being an agent still starting (#474).
   var readStartupGuesses: Set<AgentRequestID> = []
   /// While the requests read back at launch, or replayed, are taken in: they were there before,
   /// and make no alert sound (#393).
@@ -1127,7 +1127,7 @@ public final class AppModel {
       paneStatus: pane?.status,
       resolution: resolution(forID: session.id),
       wasStoppedOnPurpose: pane?.wasStoppedOnPurpose == true,
-      activity: activity(for: session.id),
+      activity: shownActivity(for: session.id),
       launchFailed: pane?.failure != nil
     )
   }

@@ -81,6 +81,17 @@ extension AppModel {
     return prompt.kind != .startup || readStartupGuesses.contains(request.id)
   }
 
+  /// A session's activity as the user is told of it, in the sidebar and on the phone: a dialog of
+  /// the start no card shows — only guessed, or held back while sessions are restored — is an agent
+  /// still starting, not one waiting for the user (#474).
+  public func shownActivity(for id: SessionID) -> AgentActivityState? {
+    guard var state = activity(for: id) else { return nil }
+    guard state.requests.contains(where: { !showsStartupDialog($0) }) else { return state }
+    state.requests.removeAll { !showsStartupDialog($0) }
+    if state.requests.isEmpty, case .awaitingUser = state.activity { state.activity = .idle }
+    return state
+  }
+
   var allPendingRequests: [PendingRequest] {
     var result: [PendingRequest] = []
     for session in sessions where session.taskStatus != .archived {

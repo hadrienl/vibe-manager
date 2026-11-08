@@ -48,6 +48,18 @@ struct StartupDialogRequestsTests {
     #expect(model.pendingRequests.count == 1)
   }
 
+  @Test("A guess no card shows waits on no one, in the sidebar or on the phone (#474)")
+  func guessNotWaitingUntilShown() async {
+    let (model, subject) = await model()
+    model.activityCells.set(waiting(subject.id, on: .startup), for: subject.id)
+    #expect(model.shownActivity(for: subject.id)?.activity == .idle)
+    #expect(model.shownActivity(for: subject.id)?.requests.isEmpty == true)
+    #expect(!model.statusPresentation(for: subject).needsAttention)
+    model.readStartupGuesses.insert(AgentRequestID(sessionID: subject.id, key: "startup"))
+    #expect(model.shownActivity(for: subject.id)?.activity == .awaitingUser(.approval))
+    #expect(model.shownActivity(for: subject.id)?.requests.count == 1)
+  }
+
   @Test("During a restoration, the dialogs of the starts wait for its end, to come together")
   func heldDuringRestoration() async {
     let (model, subject) = await model()
