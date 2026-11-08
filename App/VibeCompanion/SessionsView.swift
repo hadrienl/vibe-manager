@@ -20,9 +20,8 @@ struct SessionsView: View {
   /// The coordinators whose children are folded away, by a long press on their row.
   @State private var foldedCoordinators: Set<String> = []
   @State private var foldTicks = 0
-  /// The coordinator held down, while it is: cleared by the gesture itself, however it ends.
-  @GestureState(resetTransaction: Transaction(animation: .spring(duration: 0.3)))
-  private var pressedRow: String?
+  /// The coordinator held down, while it is.
+  @State private var pressedRow: String?
   /// How long a coordinator is held down to fold: shorter than the system's half second, since
   /// the row answers from the first touch.
   private static let foldPress: Double = 0.35
@@ -175,14 +174,18 @@ struct SessionsView: View {
           label
             .contentShape(Rectangle())
             .onTapGesture { path.append(session.id) }
-            .gesture(
-              LongPressGesture(minimumDuration: Self.foldPress)
-                .updating($pressedRow) { _, pressed, transaction in
-                  pressed = row.id
-                  transaction.animation = .easeOut(duration: Self.foldPress)
-                }
-                .onEnded { _ in toggleFold(of: session.id) }
-            )
+            // The modifier, not a LongPressGesture in `.gesture`: that one took the touch from the
+            // list, which no longer scrolled from a coordinator, and only said it was pressed once
+            // the press was long enough, so the row no longer sank in.
+            .onLongPressGesture(minimumDuration: Self.foldPress) {
+              toggleFold(of: session.id)
+            } onPressingChanged: { pressing in
+              guard pressing || pressedRow == row.id else { return }
+              withAnimation(pressing ? .easeOut(duration: Self.foldPress) : .spring(duration: 0.3))
+              {
+                pressedRow = pressing ? row.id : nil
+              }
+            }
             .accessibilityAddTraits(.isButton)
             .accessibilityAction { path.append(session.id) }
         } else {
@@ -224,6 +227,7 @@ struct SessionsView: View {
     // same update would remove the children at once.
     withAnimation {
       foldTicks += 1
+      pressedRow = nil
       if foldedCoordinators.contains(id) {
         foldedCoordinators.remove(id)
       } else {
