@@ -178,10 +178,11 @@
   "card.sound.title": "Un suono che ti chiama",
   "card.sound.text": "Scegli il suono di una sessione che ha bisogno di te, importa il tuo o descrivilo a un agente che lo compone.",
   "card.context.title": "Impegno e contesto sott'occhio",
-  "card.context.text": "Regola l'impegno dell'agente dalla barra di stato e guarda quanta parte della finestra di contesto occupa la conversazione prima della compattazione.",
   "new.more_send": "«Invia ora» durante un turno",
   "new.more_zip": "Temi importati da un .zip",
   "new.more_worktrees": "Posizione dei worktree a scelta",
   "coord.shot_alt": "Una sessione coordinatrice nella barra laterale di Vibe Manager, collegata da una linea alle sue tre sessioni figlie.",
-  "card.companion.cta": "Partecipa alla beta TestFlight"
+  "card.companion.cta": "Partecipa alla beta TestFlight",
+  "card.accounts.title": "Più account per agente",
+  "card.accounts.text": "Il tuo abbonamento personale e quello di lavoro, fianco a fianco: ogni account di Claude Code o Codex ha la sua cartella di configurazione e si sceglie come un agente quando crei una sessione."
 }

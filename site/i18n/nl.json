@@ -178,10 +178,11 @@
   "card.sound.title": "Een geluid dat je roept",
   "card.sound.text": "Kies het geluid van een sessie die je nodig heeft, importeer je eigen geluid, of beschrijf het aan een agent die het componeert.",
   "card.context.title": "Inspanning en context in beeld",
-  "card.context.text": "Stel de inspanning van de agent in vanuit de statusbalk, en zie hoeveel van het contextvenster het gesprek vult vóór het compacteren.",
   "new.more_send": "‘Nu versturen’ tijdens een beurt",
   "new.more_zip": "Thema’s geïmporteerd uit een .zip",
   "new.more_worktrees": "Locatie van worktrees naar keuze",
   "coord.shot_alt": "Een coördinerende sessie in de zijbalk van Vibe Manager, met een lijn verbonden aan haar drie kindsessies.",
-  "card.companion.cta": "Doe mee met de TestFlight-bèta"
+  "card.companion.cta": "Doe mee met de TestFlight-bèta",
+  "card.accounts.title": "Meerdere accounts per agent",
+  "card.accounts.text": "Je persoonlijke abonnement en dat van je werk, naast elkaar: elk account van Claude Code of Codex heeft een eigen configuratiemap, en je kiest het als een agent wanneer je een sessie maakt."
 }

@@ -178,10 +178,11 @@
   "card.sound.title": "呼んでくれるサウンド",
   "card.sound.text": "あなたを必要とするセッションのサウンドを選んだり、自分の音を読み込んだり、エージェントに説明して作曲してもらったりできます。",
   "card.context.title": "エフォートとコンテキストをひと目で",
-  "card.context.text": "ステータスバーからエージェントのエフォートを調整し、コンパクション前に会話がコンテキストウィンドウをどれだけ使っているかを確認できます。",
   "new.more_send": "ターン中の「今すぐ送信」",
   "new.more_zip": ".zip から読み込んだテーマ",
   "new.more_worktrees": "worktree の保存場所を自由に選択",
   "coord.shot_alt": "Vibe Manager のサイドバーにあるコーディネーターセッション。3 つの子セッションと線でつながっている。",
-  "card.companion.cta": "TestFlight ベータに参加"
+  "card.companion.cta": "TestFlight ベータに参加",
+  "card.accounts.title": "エージェントごとに複数のアカウント",
+  "card.accounts.text": "個人のサブスクリプションと仕事用を並べて使えます。Claude Code や Codex の各アカウントは専用の設定フォルダを持ち、セッション作成時にエージェントと同じように選べます。"
 }

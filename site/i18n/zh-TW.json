@@ -178,10 +178,11 @@
   "card.sound.title": "呼喚你的提示音",
   "card.sound.text": "為需要你的工作階段挑選提示音，匯入你自己的聲音，或描述給代理，讓它來創作。",
   "card.context.title": "努力程度與上下文一目了然",
-  "card.context.text": "在狀態列調整代理的努力程度，並查看壓縮前對話佔用了多少上下文視窗。",
   "new.more_send": "輪次進行中「立即傳送」",
   "new.more_zip": "從 .zip 匯入主題",
   "new.more_worktrees": "worktree 位置自由選擇",
   "coord.shot_alt": "Vibe Manager 側邊欄中的協調工作階段，以一條線連接著它的三個子工作階段。",
-  "card.companion.cta": "加入 TestFlight 測試版"
+  "card.companion.cta": "加入 TestFlight 測試版",
+  "card.accounts.title": "每個代理可用多個帳號",
+  "card.accounts.text": "個人訂閱和工作訂閱並行使用：每個 Claude Code 或 Codex 帳號都有自己的設定資料夾，建立工作階段時像選擇代理一樣選擇它。"
 }

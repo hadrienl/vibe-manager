@@ -178,10 +178,11 @@
   "card.sound.title": "Seni çağıran bir ses",
   "card.sound.text": "Sana ihtiyaç duyan oturumun sesini seç, kendi sesini içe aktar ya da onu besteleyen bir ajana tarif et.",
   "card.context.title": "Efor ve bağlam göz önünde",
-  "card.context.text": "Ajanın eforunu durum çubuğundan ayarla ve sıkıştırmadan önce konuşmanın bağlam penceresinin ne kadarını doldurduğunu gör.",
   "new.more_send": "Bir tur sırasında \"Şimdi gönder\"",
   "new.more_zip": "Bir .zip'ten içe aktarılan temalar",
   "new.more_worktrees": "Worktree konumu dilediğin gibi",
   "coord.shot_alt": "Vibe Manager kenar çubuğunda, bir çizgiyle üç alt oturumuna bağlı bir koordinatör oturum.",
-  "card.companion.cta": "TestFlight betasına katıl"
+  "card.companion.cta": "TestFlight betasına katıl",
+  "card.accounts.title": "Ajan başına birden çok hesap",
+  "card.accounts.text": "Kişisel aboneliğin ve iş aboneliğin yan yana: her Claude Code veya Codex hesabının kendi yapılandırma klasörü var ve oturum oluştururken bir ajan gibi seçilir."
 }

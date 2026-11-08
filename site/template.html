@@ -51,6 +51,7 @@
     <symbol id="i-list" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2" fill="currentColor"/><circle cx="4.5" cy="12" r="1.2" fill="currentColor"/><circle cx="4.5" cy="18" r="1.2" fill="currentColor"/></g></symbol>
     <symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></g></symbol>
     <symbol id="i-archive" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="4.5" rx="1.2"/><path d="M5 8.5V19a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8.5M10 12.5h4"/></g></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M15.5 4.8a3.5 3.5 0 0 1 0 6.4M18 14.3a6.5 6.5 0 0 1 3.5 5.7"/></g></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="6.5" y="2.5" width="11" height="19" rx="2.5"/><path d="M11 18.5h2"/></g></symbol>
     <symbol id="i-lang" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 6h9M8 4v2c0 4-2 7-4.5 8.5M5.5 9.5c1.5 2.5 3.5 4 6 5M13 20l3.5-8 3.5 8M14.2 17.5h4.6"/></g></symbol>
     <symbol id="i-bell" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2h-15zM10 20.5h4"/></g></symbol>
@@ -162,6 +163,11 @@
           <a class="btn btn-ghost btn-sm" href="https://testflight.apple.com/join/DsJgybUh"><svg aria-hidden="true"><use href="#i-phone"/></svg><span data-i18n="card.companion.cta">Rejoindre la bêta TestFlight</span></a>
         </article>
         <article class="card">
+          <span class="ico" style="background:var(--ink)"><svg aria-hidden="true"><use href="#i-users"/></svg></span>
+          <h3 data-i18n="card.accounts.title">Plusieurs comptes par agent</h3>
+          <p data-i18n="card.accounts.text">Votre abonnement perso et celui du travail, côte à côte : chaque compte de Claude Code ou de Codex a son dossier de configuration, et se choisit comme un agent à la création d'une session.</p>
+        </article>
+        <article class="card">
           <span class="ico" style="background:var(--amber)"><svg aria-hidden="true"><use href="#i-lang"/></svg></span>
           <h3 data-i18n="card.langs.title">17 langues</h3>
           <p data-i18n="card.langs.text">De l'anglais au japonais en passant par l'arabe, avec l'interface en miroir : l'app suit la langue de votre Mac.</p>
@@ -171,13 +177,9 @@
           <h3 data-i18n="card.sound.title">Un son qui vous appelle</h3>
           <p data-i18n="card.sound.text">Choisissez le son d'une session qui a besoin de vous, importez le vôtre, ou décrivez-le à un agent qui le compose.</p>
         </article>
-        <article class="card">
-          <span class="ico" style="background:var(--ink)"><svg aria-hidden="true"><use href="#i-gauge"/></svg></span>
-          <h3 data-i18n="card.context.title">Effort et contexte sous les yeux</h3>
-          <p data-i18n="card.context.text">Réglez l'effort de l'agent depuis la barre d'état, et voyez quelle part de la fenêtre de contexte la conversation occupe avant le compactage.</p>
-        </article>
       </div>
       <div class="chips new-more">
+        <span class="chip" data-i18n="card.context.title">Effort et contexte sous les yeux</span>
         <span class="chip" data-i18n="new.more_send">« Envoyer maintenant » pendant un tour</span>
         <span class="chip" data-i18n="new.more_zip">Thèmes importés depuis un .zip</span>
         <span class="chip" data-i18n="new.more_worktrees">Emplacement des worktrees au choix</span>

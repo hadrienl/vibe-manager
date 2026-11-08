@@ -178,10 +178,11 @@
   "card.sound.title": "Dźwięk, który cię woła",
   "card.sound.text": "Wybierz dźwięk sesji, która cię potrzebuje, zaimportuj własny albo opisz go agentowi, który go skomponuje.",
   "card.context.title": "Wysiłek i kontekst na widoku",
-  "card.context.text": "Ustaw wysiłek agenta z paska stanu i zobacz, jaką część okna kontekstu zajmuje rozmowa przed kompaktowaniem.",
   "new.more_send": "„Wyślij teraz” w trakcie tury",
   "new.more_zip": "Motywy importowane z pliku .zip",
   "new.more_worktrees": "Dowolna lokalizacja worktree",
   "coord.shot_alt": "Sesja koordynująca na pasku bocznym Vibe Manager, połączona linią z trzema sesjami podrzędnymi.",
-  "card.companion.cta": "Dołącz do bety w TestFlight"
+  "card.companion.cta": "Dołącz do bety w TestFlight",
+  "card.accounts.title": "Kilka kont na agenta",
+  "card.accounts.text": "Prywatna subskrypcja i ta służbowa, obok siebie: każde konto Claude Code lub Codex ma własny folder konfiguracji, a przy tworzeniu sesji wybierasz je jak agenta."
 }
