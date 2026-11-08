@@ -10,15 +10,17 @@
 <h2 id="children">Child sessions</h2>
 <p>A child session is a session like any other: its agent, its folder or worktree, its terminal, its notes, its status. You can open it, write to it and answer its requests yourself. The coordinator can:</p>
 <ul>
-  <li>create a child session, with its name, folder, agent and first prompt;</li>
+  <li>create a child session, with its name, folder and first prompt. The child runs on its coordinator's agent and account, unless you ask for another agent or another <a href="agents.html#accounts">account</a>;</li>
   <li>send it a message, read its conversation and wait for the end of its turn;</li>
   <li>change its status, and close or restart it.</li>
 </ul>
+<p>A coordinator never merges a pull request on its own. Ask for it explicitly, for instance “merge the child's PR once CI is green”: it waits for CI, respects the branch's protections, then reports back.</p>
 <p>A coordinator never answers a child's permissions and questions for you: they wait for you in the <a href="requests.html">Pending Requests</a> palette, like those of any session.</p>
 <p>Coordination has only one level: a child session does not coordinate in turn. What a coordinator did in a child shows in that child's history, under “Coordinated by…”.</p>
 
 <h2 id="sidebar">In the sidebar</h2>
 <p>Children show under their coordinator, indented, linked to it by a thin line. Collapse the coordinator to hide its children. When a search or a filter singles out a child, it shows on its own, without the line.</p>
+<p>Archiving a coordinator archives its children with it, except those where something is still running; <kbd>⌘Z</kbd> brings them back. Unarchiving it brings back the children archived with it, not those you had archived on their own before. Grouped by folder, the sidebar files a child that works in a worktree under its repository's group.</p>
 
 <h2 id="settings">Settings</h2>
 <p><strong>Settings › Coordination › Children running at once</strong> limits how many agents a coordinator runs at the same time: each takes memory and tokens. An <a href="archive.html">automatic archive</a> rule can target coordinators or children with <code>coordination</code>.</p>

@@ -39973,7 +39973,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Ajoute Branche, Ticket ou Session : sinon deux tâches partageraient le même dossier."
+            "value" : "Ajoutez Branche, Ticket ou Session : sinon deux tâches partageraient le même dossier."
           }
         },
         "hi" : {
@@ -57609,7 +57609,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Clique sur une variable pour l’ajouter, tape du texte entre elles, glisse une variable pour la déplacer."
+            "value" : "Cliquez sur une variable pour l’ajouter, tapez du texte entre elles, glissez une variable pour la déplacer."
           }
         },
         "hi" : {
@@ -76528,7 +76528,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Indique un chemin absolu ou commençant par ~/."
+            "value" : "Indiquez un chemin absolu ou commençant par ~/."
           }
         },
         "hi" : {
@@ -84172,7 +84172,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Donne un nom à ce compte."
+            "value" : "Donnez un nom à ce compte."
           }
         },
         "hi" : {
@@ -178226,7 +178226,7 @@
         "fr" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "C’est le dossier de %@. Choisis-en un autre."
+            "value" : "C’est le dossier de %@. Choisissez-en un autre."
           }
         },
         "hi" : {

@@ -9,19 +9,20 @@
 <ol>
   <li>On the Mac, open <strong>Settings › iPhone Companion</strong> and turn on <strong>Use Vibe Manager from your iPhone</strong>; the helper ships with Vibe Manager and is off by default.</li>
   <li><strong>How to install the alpha…</strong> opens the instructions to join the TestFlight test and install the app on the iPhone.</li>
-  <li>Open the app on the iPhone, with the same iCloud account as the Mac: it shows in the list of iPhones. <strong>Remove…</strong> takes it off.</li>
+  <li>Open the app on the iPhone, with the same iCloud account as the Mac: it shows in the list of iPhones. <strong>Remove…</strong> takes it off. In the iPhone app, swipe the row of a Mac that is gone to remove it from the list.</li>
 </ol>
 <p>On an Intel Mac, the page says the companion is not available.</p>
 
 <h2 id="use">What the companion does</h2>
 <ul>
-  <li>The list of your sessions, their status and what each agent is doing, grouped as on the Mac.</li>
+  <li>The list of your sessions, their status and what each agent is doing, grouped as on the Mac. Children show under their <a href="coordination.html">coordinator</a>; a long press on the coordinator folds them.</li>
+  <li><strong>New Session</strong>, in a recent folder or any folder of the Mac, which you can create from the iPhone (<strong>New Folder</strong>). The session opens as soon as you confirm, without waiting for the Mac.</li>
   <li>Notifications when an agent needs you: <strong>Allow</strong> (after Face ID or the passcode) or <strong>Deny</strong> without opening the app.</li>
   <li>Questions, including those that ask several at once, which you answer from the iPhone.</li>
 </ul>
 
 <h2 id="web">The web view</h2>
-<p>In a conversation, the <strong>Web View</strong> button opens the session's web view. It shows the Mac's active page and follows it, and the tabs menu switches between the Mac's tabs. The subtitle says <strong>In sync with the Mac</strong>. The Mac and the iPhone don't share a session: each has its own cookies.</p>
+<p>In a conversation, the <strong>Web View</strong> button opens the session's web view. It shows the Mac's active page and follows it, local pages (<code>file://</code>) included, and the tabs menu switches between the Mac's tabs. The subtitle says <strong>In sync with the Mac</strong>. The Mac and the iPhone don't share a session: each has its own cookies.</p>
 <ul>
   <li>Only your own navigations are sent to the Mac, meaning an address you type or a link you touch. Redirects, reloads and form answers stay on the iPhone.</li>
   <li>On a sign-in page (GitHub, GitLab, Google, Microsoft, Apple, Okta, Auth0, Keycloak…), the view detaches by itself: the <strong>Not Synced</strong> badge shows in the address bar, and the iPhone stops following the Mac and sends it nothing. It attaches again by itself when the sign-in lands back on a page of the site. Touch the badge to attach it sooner.</li>

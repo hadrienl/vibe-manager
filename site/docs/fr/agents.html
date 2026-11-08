@@ -5,6 +5,16 @@
 <p>Vibe Manager fait tourner <strong>Claude Code</strong> et <strong>Codex CLI</strong>, chacun dans sa propre interface de terminal, avec votre compte et votre configuration. Il ne passe aucune option qui réduise les permissions réglées pour votre CLI, et ne lit aucun identifiant de leur compte. La seule clé qu’il connaisse est celle d’un <a href="#endpoints">endpoint</a> que vous avez déclaré vous-même. Ce qu’un agent a le droit de faire dans une session relève de sa propre configuration : Vibe Manager ne l’élargit ni ne la restreint.</p>
 <p>Deux ajouts sont faits au lancement, pour ce lancement seulement : les <strong>hooks</strong> de l’agent signalent son activité — il travaille, attend, a terminé — une fois que vous les avez approuvés (<a href="settings.html#agents">Réglages › Agents</a>), et son <strong>serveur d’outils</strong> <code>vibe-browser</code> lui donne la <a href="terminals.html#agent-browser">vue web</a>.</p>
 
+<h2 id="accounts">Plusieurs comptes</h2>
+<p>Un même agent peut tourner sur plusieurs comptes : votre abonnement personnel et celui de votre entreprise, par exemple. Un compte, c’est Claude Code ou Codex avec son propre dossier de configuration.</p>
+<ol>
+  <li><strong>Réglages › Ajouter un compte…</strong>, sous la liste des agents.</li>
+  <li>Choisissez l’agent, donnez un nom au compte et indiquez son <strong>dossier de configuration</strong>. Le dossier est créé s’il n’existe pas.</li>
+  <li>Connectez-vous depuis la page du compte. Il apparaît ensuite parmi les agents, à la création d’une session comme dans <a href="#switch">Changer d’agent</a>.</li>
+</ol>
+<div class="callout"><p>Un nouveau compte part de zéro : il n’a ni les serveurs MCP, ni les plugins, ni les skills du compte principal de l’agent. Ajoutez-les dans son dossier.</p></div>
+<p>La page de chaque compte indique à quel compte il est connecté, organisation comprise. Vibe Manager vous prévient quand deux agents sont connectés au même compte, ou quand un agent s’est reconnecté à un autre compte que le sien : <strong>Se reconnecter</strong> ou <strong>Garder ce compte</strong>. Supprimer un compte le retire de la liste ; son dossier et ses conversations restent sur le disque.</p>
+
 <h2 id="endpoints">Agents sur un endpoint</h2>
 <p>Un <strong>endpoint</strong> est un serveur de modèles joignable en HTTP : sur ce Mac (Ollama, LM Studio) ou dans le cloud (OpenRouter, la passerelle de votre entreprise). Ses modèles apparaissent à côté de Claude Code et de Codex quand vous créez une session, et la session fait tourner Claude Code ou Codex sur eux : même terminal, même vue conversation, mêmes demandes, même reprise après une relance.</p>
 <ol>

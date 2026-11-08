@@ -10,15 +10,17 @@
 <h2 id="children">Les sessions enfants</h2>
 <p>Une session enfant est une session comme une autre : son agent, son dossier ou son worktree, son terminal, ses notes, son statut. Vous pouvez l’ouvrir, lui écrire et répondre à ses demandes vous-même. La coordinatrice, elle, peut :</p>
 <ul>
-  <li>créer une session enfant, avec son nom, son dossier, son agent et son premier prompt ;</li>
+  <li>créer une session enfant, avec son nom, son dossier et son premier prompt. L’enfant tourne sur l’agent et le compte de sa coordinatrice, sauf si vous demandez un autre agent ou un autre <a href="agents.html#accounts">compte</a> ;</li>
   <li>lui envoyer un message, lire sa conversation et attendre la fin de son tour ;</li>
   <li>changer son statut, et la fermer ou la relancer.</li>
 </ul>
+<p>Une coordinatrice ne fusionne jamais une pull request d’elle-même. Demandez-le explicitement, par exemple « fusionne la PR de l’enfant quand la CI est verte » : elle attend la CI, respecte les protections de la branche, puis vous rend compte.</p>
 <p>Une coordinatrice ne répond jamais à votre place aux autorisations et aux questions d’un enfant : elles vous attendent dans la palette <a href="requests.html">Demandes en attente</a>, comme celles de toute session.</p>
 <p>La coordination n’a qu’un niveau : une session enfant ne coordonne pas à son tour. Ce qu’une coordinatrice a fait dans un enfant s’affiche dans l’historique de cet enfant, sous « Coordonnée par… ».</p>
 
 <h2 id="sidebar">Dans la barre latérale</h2>
 <p>Les enfants s’affichent sous leur coordinatrice, en retrait, reliés à elle par un filet. Repliez la coordinatrice pour masquer ses enfants. Quand une recherche ou un filtre isole un enfant, il s’affiche seul, sans le filet.</p>
+<p>Archiver une coordinatrice archive ses enfants avec elle, sauf ceux où quelque chose tourne encore ; <kbd>⌘Z</kbd> les ramène. La désarchiver ramène les enfants archivés avec elle, pas ceux que vous aviez archivés seuls avant. Groupée par dossier, la barre latérale range un enfant qui travaille dans un worktree sous le groupe de son dépôt.</p>
 
 <h2 id="settings">Réglages</h2>
 <p><strong>Réglages › Coordination › Enfants en même temps</strong> limite le nombre d’agents qu’une coordinatrice fait tourner en même temps : chacun prend de la mémoire et des jetons. Une règle d’<a href="archive.html">archivage automatique</a> peut viser les coordinatrices ou les enfants avec <code>coordination</code>.</p>
