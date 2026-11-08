@@ -64,6 +64,58 @@ struct CreateSessionTests {
     #expect(!FileManager.default.fileExists(atPath: temporary.path))
   }
 
+  @Test("Every file of one drop is kept, not only the first: they share its folder")
+  func everyFileOfADropIsKept() async throws {
+    let (temporary, received) = try receivedDrop(named: ["one.png", "two.png"])
+    let kept = (1...2).map {
+      FileManager.default.temporaryDirectory.appendingPathComponent("kept-\($0)-\(UUID()).png")
+    }
+    defer { kept.forEach { try? FileManager.default.removeItem(at: $0) } }
+    let create = CreateSession(
+      repository: SpyRepository(), agents: StubRegistry(providers: [StubProvider()]),
+      folders: StubFolders(status: .usable), clock: FixedClock(),
+      drops: CopyingDropStore(destinations: kept))
+    var draft = draft(prompt: "Compare")
+    draft.attachments = received
+
+    let creation = try await create(draft)
+
+    #expect(creation.firstMessage?.attachments == kept)
+    #expect(kept.allSatisfy { FileManager.default.fileExists(atPath: $0.path) })
+    #expect(!FileManager.default.fileExists(atPath: temporary.path))
+  }
+
+  @Test("A file of a drop that cannot be kept stays readable where it was received")
+  func aDropThatCannotBeKeptStays() async throws {
+    let (temporary, received) = try receivedDrop(named: ["one.png", "two.png"])
+    defer { try? FileManager.default.removeItem(at: temporary) }
+    let kept = FileManager.default.temporaryDirectory
+      .appendingPathComponent("kept-\(UUID().uuidString).png")
+    defer { try? FileManager.default.removeItem(at: kept) }
+    let create = CreateSession(
+      repository: SpyRepository(), agents: StubRegistry(providers: [StubProvider()]),
+      folders: StubFolders(status: .usable), clock: FixedClock(),
+      drops: CopyingDropStore(destination: kept))
+    var draft = draft(prompt: "Compare")
+    draft.attachments = received
+
+    let creation = try await create(draft)
+
+    #expect(creation.firstMessage?.attachments == [kept, received[1]])
+    #expect(FileManager.default.fileExists(atPath: received[1].path))
+  }
+
+  /// Files received by one drop: all in one folder of the temporary folder, as the catcher does.
+  private func receivedDrop(named names: [String]) throws -> (folder: URL, files: [URL]) {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent(CreateSession.receivedDropsFolder, isDirectory: true)
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let files = names.map { folder.appendingPathComponent($0) }
+    for file in files { try Data(file.lastPathComponent.utf8).write(to: file) }
+    return (folder, files)
+  }
+
   @Test("The tickets the fields name are recognised, and the first one becomes the ticket (#89)")
   func ticketsAreRecognised() async throws {
     let repository = SpyRepository()
@@ -505,14 +557,18 @@ private struct StubRegistry: AgentProviderResolving {
   }
 }
 
+/// Copies the n-th file it is given to the n-th destination; with no destination left, fails.
 private actor CopyingDropStore: SessionDropStore {
-  let destination: URL
+  let destinations: [URL]
   private(set) var keptFor: [SessionID] = []
 
-  init(destination: URL) { self.destination = destination }
+  init(destination: URL) { self.init(destinations: [destination]) }
+  init(destinations: [URL]) { self.destinations = destinations }
 
-  func save(_: Data, suggestedName _: String, for _: SessionID) throws -> URL { destination }
+  func save(_: Data, suggestedName _: String, for _: SessionID) throws -> URL { destinations[0] }
   func copy(_ file: URL, suggestedName _: String, for id: SessionID) throws -> URL {
+    guard keptFor.count < destinations.count else { throw CocoaError(.fileWriteOutOfSpace) }
+    let destination = destinations[keptFor.count]
     keptFor.append(id)
     try FileManager.default.copyItem(at: file, to: destination)
     return destination

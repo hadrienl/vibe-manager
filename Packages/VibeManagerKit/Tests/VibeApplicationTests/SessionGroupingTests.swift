@@ -292,6 +292,33 @@ struct SessionFolderKeyDiskTests {
     #expect(resolution.keys[clone.path] == .canonical(clone.path))
     #expect(resolution.keys[submodule.path] == .canonical(submodule.path))
   }
+
+  @Test("A folder inside a worktree is filed under its repository, before and after the disk")
+  func folderInsideWorktree() async throws {
+    let root = try makeDirectory()
+    defer { try? FileManager.default.removeItem(at: root) }
+    let repository = root.appendingPathComponent("mairie", isDirectory: true)
+    let worktree = repository.appendingPathComponent(".claude/worktrees/TICKET-187")
+    try self.worktree(worktree, of: repository)
+    let inside = worktree.appendingPathComponent("packages/backoffice", isDirectory: true)
+    try FileManager.default.createDirectory(at: inside, withIntermediateDirectories: true)
+
+    let resolution = await SessionFolderResolution.resolve([repository.path, inside.path])
+
+    let key = try #require(resolution.keys[repository.path])
+    #expect(resolution.keys[inside.path] == key)
+    #expect(SessionFolderKey.canonical(SessionFolderKey.provisional(inside.path).path) == key)
+    #expect(
+      WorktreeRepository.onDisk(of: inside.path)
+        == (repository.path as NSString).standardizingPath)
+    // A clone inside it is its own repository: the walk stops at its `.git` folder.
+    let clone = inside.appendingPathComponent("vendor/lib", isDirectory: true)
+    try FileManager.default.createDirectory(
+      at: clone.appendingPathComponent(".git"), withIntermediateDirectories: true)
+    #expect(WorktreeRepository.onDisk(of: clone.appendingPathComponent("src").path) == nil)
+    // Nor does it go above the home folder.
+    #expect(WorktreeRepository.onDisk(of: inside.path, home: worktree.path) == nil)
+  }
 }
 
 @Suite("The repository of a worktree (#525)")
@@ -306,6 +333,17 @@ struct WorktreeRepositoryTests {
     #expect(WorktreeRepository.inPath(of: "/Users/me/.codex/worktrees/1a2b/api") == nil)
     #expect(WorktreeRepository.inPath(of: "/w/mairie/.claude/worktrees/") == nil)
     #expect(WorktreeRepository.inPath(of: "/w/mairie") == nil)
+  }
+
+  @Test("The home folder is nobody's repository: ~/.worktrees holds those of every one")
+  func homeIsNoRepository() {
+    #expect(WorktreeRepository.inPath(of: "/Users/me/.worktrees/fix-54", home: "/Users/me") == nil)
+    #expect(
+      WorktreeRepository.inPath(of: "/Users/me/.claude/worktrees/a/api", home: "/Users/me/")
+        == nil)
+    #expect(
+      WorktreeRepository.inPath(of: "/Users/me/w/api/.worktrees/fix-54", home: "/Users/me")
+        == "/Users/me/w/api")
   }
 
   @Test("A session started in a worktree is filed under the repository it recorded")

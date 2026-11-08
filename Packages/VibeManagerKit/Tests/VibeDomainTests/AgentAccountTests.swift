@@ -32,6 +32,18 @@ struct AgentAccountTests {
     #expect(other.validationIssues(among: [other], home: home).isEmpty)
   }
 
+  @Test("Two ways of writing one folder are one folder, as the disk tells")
+  func canonicalFolders() {
+    let ignoringCase: (String) -> String = { $0.lowercased() }
+    #expect(
+      account("~/.Claude").validationIssues(among: [], home: home, canonical: ignoringCase)
+        == [.directoryIsDefault])
+    let other = account("/Users/someone/.Two", name: "Two")
+    #expect(
+      account("~/.two").validationIssues(among: [other], home: home, canonical: ignoringCase)
+        == [.directoryTaken(name: "Two")])
+  }
+
   @Test("A name is required")
   func name() {
     #expect(account("~/.two", name: "  ").validationIssues(among: [], home: home) == [.noName])

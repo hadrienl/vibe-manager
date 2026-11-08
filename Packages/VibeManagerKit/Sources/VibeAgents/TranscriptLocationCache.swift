@@ -45,7 +45,10 @@ public final class TranscriptLocationCache: @unchecked Sendable {
   /// Claude Code names the folder after the working directory, else wherever a look through every
   /// project finds it. Its sub-agents' files are not looked for. The look through every project is
   /// not made again for `missRetry` after it found nothing; the working directory's folder is.
-  public func claudeTranscript(for identifier: String, workingDirectory: String?) -> URL? {
+  /// Only the folders of the conversation's agent are looked through, `claudeProjects(of:)`.
+  public func claudeTranscript(
+    for identifier: String, providerID: String? = nil, workingDirectory: String?
+  ) -> URL? {
     let manager = FileManager.default
     let moment = now()
     let (known, missed) = lock.withLock { (claude[identifier], claudeMissed[identifier]) }
@@ -54,7 +57,7 @@ public final class TranscriptLocationCache: @unchecked Sendable {
       return known
     }
     let name = "\(identifier).jsonl"
-    let roots = locator.allClaudeProjects
+    let roots = locator.claudeProjects(of: providerID)
     if let workingDirectory {
       for root in roots {
         let direct =
@@ -87,8 +90,11 @@ public final class TranscriptLocationCache: @unchecked Sendable {
   }
 
   /// Every rollout of a Codex conversation: the days listed before are not listed again, but for
-  /// the last one, and the days since. A rollout deleted since is not given back.
-  public func codexRollouts(for identifier: String, since created: Date) -> [URL] {
+  /// the last one, and the days since. A rollout deleted since is not given back. Only the folders
+  /// of the conversation's agent are listed, `codexSessions(of:)`.
+  public func codexRollouts(for identifier: String, providerID: String? = nil, since created: Date)
+    -> [URL]
+  {
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = .current
     let moment = now()
@@ -104,7 +110,8 @@ public final class TranscriptLocationCache: @unchecked Sendable {
     var found = (known?.found ?? []).filter { manager.fileExists(atPath: $0.path) }
     found.formUnion(
       Signposts.interval("transcripts.list") {
-        locator.codexRollouts(for: identifier, fromDay: first, until: moment)
+        locator.codexRollouts(
+          for: identifier, providerID: providerID, fromDay: first, until: moment)
       })
     let rollouts = CodexRollouts(found: found, listedThrough: calendar.startOfDay(for: moment))
     lock.withLock {

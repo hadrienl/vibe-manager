@@ -120,16 +120,31 @@ public struct AnswerAgentRequest: Sendable {
 
   /// Reads which dialog of its start a session waits on, off its screen: one its keymap answers
   /// — an update offered — takes the place of the request that only guessed one is there.
-  public func readStartupDialog(_ id: AgentRequestID) async {
-    guard let text = await screen(id.sessionID) else { return }
+  ///
+  /// Whether the screen shows a dialog: options numbered, one pointed at, near the bottom — or an
+  /// MCP server's confirmation, or a folder to trust. Anything else is an agent still starting:
+  /// Claude Code draws its banner before its hooks run, and on a busy Mac, dozens of sessions
+  /// resumed together take far longer than the guess waits to draw their prompt (#474).
+  @discardableResult
+  public func readStartupDialog(_ id: AgentRequestID) async -> Bool {
+    guard let text = await screen(id.sessionID) else { return false }
     await tracker.startupDialogOnScreen(text, isFor: id)
+    return AgentDialogScreen(screen: text) != nil
   }
 
   /// Reads the dialog of a session's start again and again, as long as it waits: it may be drawn
   /// after the guess, and it goes when answered in the terminal — the card with it.
-  public func followStartupDialog(_ id: AgentRequestID) async {
+  /// `dialogDrawn` is called once, when the screen first shows a dialog: only then is one known
+  /// to wait there.
+  public func followStartupDialog(
+    _ id: AgentRequestID, dialogDrawn: @escaping @Sendable () async -> Void = {}
+  ) async {
+    var isDrawn = false
     while await tracker.waitsOnStartupDialog(id), !Task.isCancelled {
-      await readStartupDialog(id)
+      if await readStartupDialog(id), !isDrawn {
+        isDrawn = true
+        await dialogDrawn()
+      }
       do {
         try await sleep(Self.startupDialogPollInterval)
       } catch {

@@ -5,6 +5,16 @@
 <p>Vibe Manager runs <strong>Claude Code</strong> and <strong>Codex CLI</strong>, each in its own terminal interface, with your account and your configuration. It passes no flag that lowers the permissions you set for your CLI, and reads no credential of their accounts. The only key it knows is that of an <a href="#endpoints">endpoint</a> you declared yourself. What an agent may do inside a session is its own configuration: Vibe Manager neither widens nor narrows it.</p>
 <p>Two additions are made at launch, for that launch only: the agent's <strong>hooks</strong> report its activity — working, waiting, finished — once you have approved them (<a href="settings.html#agents">Settings › Agents</a>), and its <strong>tool server</strong> <code>vibe-browser</code> gives it the <a href="terminals.html#agent-browser">web view</a>.</p>
 
+<h2 id="accounts">Several accounts</h2>
+<p>The same agent can run on several accounts: your personal subscription and your company's, for instance. An account is Claude Code or Codex with its own configuration folder.</p>
+<ol>
+  <li><strong>Settings › Add an Account…</strong>, below the list of agents.</li>
+  <li>Choose the agent, give the account a name and set its <strong>Configuration Folder</strong>. The folder is created if needed.</li>
+  <li>Sign in from the account's page. It then shows among the agents, when you create a session as in <a href="#switch">Switch Agent</a>.</li>
+</ol>
+<div class="callout"><p>A new account starts from nothing: it has neither the MCP servers, the plugins nor the skills of the agent's own account. Add them to its folder.</p></div>
+<p>Each account's page says which account it is signed in to, organisation included. Vibe Manager tells you when two agents are signed in to the same account, or when an agent signed in again to an account other than its own: <strong>Sign In Again</strong> or <strong>Keep This Account</strong>. Deleting an account removes it from the list; its folder and its conversations stay on the disk.</p>
+
 <h2 id="endpoints">Agents on an endpoint</h2>
 <p>An <strong>endpoint</strong> is a model server reachable over HTTP: on this Mac (Ollama, LM Studio) or in the cloud (OpenRouter, your company's gateway). Its models appear beside Claude Code and Codex when you create a session, and the session runs Claude Code or Codex against them: same terminal, same conversation view, same requests, same resume after a relaunch.</p>
 <ol>

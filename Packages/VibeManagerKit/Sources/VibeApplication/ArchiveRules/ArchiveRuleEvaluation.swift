@@ -7,6 +7,9 @@ public struct ArchiveCandidate: Identifiable, Hashable, Sendable {
   public var session: WorkSession
   /// The name of its group, as the sidebar shows it.
   public var project: String?
+  /// The name of its own folder, when its group is another folder's: a worktree's, filed under
+  /// the repository it belongs to (#525). A rule written for the worktree's name still finds it.
+  public var ownFolderName: String?
   /// Its working folder.
   public var folder: String?
   /// The branch checked out in its folder, if known.
@@ -19,11 +22,12 @@ public struct ArchiveCandidate: Identifiable, Hashable, Sendable {
   public var id: SessionID { session.id }
 
   public init(
-    session: WorkSession, project: String? = nil, folder: String? = nil, branch: String? = nil,
-    isDirty: Bool? = nil, isRunning: Bool = false
+    session: WorkSession, project: String? = nil, ownFolderName: String? = nil,
+    folder: String? = nil, branch: String? = nil, isDirty: Bool? = nil, isRunning: Bool = false
   ) {
     self.session = session
     self.project = project
+    self.ownFolderName = ownFolderName
     self.folder = folder ?? session.repositories.first?.path
     self.branch = branch
     self.isDirty = isDirty
@@ -214,7 +218,8 @@ public enum ArchiveRuleEvaluation {
     case .name:
       return compareText(session.name, test)
     case .project:
-      return compareText(candidate.project, test)
+      // The group's name, or a worktree's own: either is the project the user knows it by (#525).
+      return compareText([candidate.project, candidate.ownFolderName].compactMap { $0 }, test)
     case .folder:
       guard let folder = candidate.folder, case .text(let path) = test.value else { return false }
       return isFolder(folder, under: path)
@@ -306,14 +311,19 @@ public enum ArchiveRuleEvaluation {
 
   /// Texts: compared without regard to case or accents.
   private static func compareText(_ actual: String?, _ test: ArchiveTest) -> Bool {
+    compareText(actual.map { [$0] } ?? [], test)
+  }
+
+  /// The names of one thing: it is any of them, and differs from a text only when all do.
+  private static func compareText(_ names: [String], _ test: ArchiveTest) -> Bool {
     let wanted = values(of: test.value).compactMap(word(of:)).map(folded)
-    guard let actual else { return test.comparison == .notEqual }
-    let text = folded(actual)
+    guard !names.isEmpty else { return test.comparison == .notEqual }
+    let texts = names.map(folded)
     switch test.comparison {
-    case .equal, .in: return wanted.contains(text)
-    case .notEqual: return !wanted.contains(text)
-    case .contains: return wanted.contains { text.contains($0) }
-    case .matches: return wanted.contains { glob($0, matches: text) }
+    case .equal, .in: return texts.contains(where: wanted.contains)
+    case .notEqual: return !texts.contains(where: wanted.contains)
+    case .contains: return texts.contains { text in wanted.contains { text.contains($0) } }
+    case .matches: return texts.contains { text in wanted.contains { glob($0, matches: text) } }
     default: return false
     }
   }

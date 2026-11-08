@@ -12,6 +12,7 @@
   <li><strong>Activer</strong> la met en service ; <strong>Pause</strong> la suspend.</li>
 </ul>
 <p>Les <strong>protections</strong>, décrites de la même façon, désignent les sessions qu’aucune règle ne doit jamais archiver.</p>
+<p>Une règle qui archive une <a href="coordination.html">coordinatrice</a> emmène ses enfants, sauf ceux où quelque chose tourne ou qu’une protection désigne ; ils comptent dans son lot. Une session dans un worktree a pour projet le nom de son dépôt, et répond aussi au nom de son worktree.</p>
 
 <h2 id="batches">Les lots</h2>
 <p>Chaque exécution d’une règle forme un <strong>lot</strong> : les sessions archivées, et celles sautées avec leur raison. Une sélection archivée d’un coup forme son propre lot, et les sessions archivées une à une forment un lot par jour. Un archivage par règle ne s’annule pas avec <kbd>⌘Z</kbd> : désarchivez depuis les archives.</p>

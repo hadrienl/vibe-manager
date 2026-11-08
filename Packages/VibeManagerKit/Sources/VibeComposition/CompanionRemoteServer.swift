@@ -42,6 +42,8 @@ final class CompanionRemoteServer {
   private var searchIndex: SessionSearchIndex?
   /// The files joined to the messages sent to phones: the only ones a phone may ask a picture of.
   private var servedAttachments: Set<String> = []
+  /// The last of the phones' folder requests, which the next one waits for.
+  private var folderWork: Task<Void, Never>?
 
   init(
     appModel: AppModel, macName: String, attachmentsFolder: URL,
@@ -150,13 +152,14 @@ final class CompanionRemoteServer {
         send(peer, .httpResponse(response))
       }
     case .listFolder(let path):
-      let listing = Self.listing(of: path)
-      send(peer, .folderListing(listing))
+      onDisk(for: peer) { [.folderListing(Self.listing(of: path))] }
     case .createFolder(let parent, let name):
-      let failure = Self.createFolder(named: name, in: parent)
-      // Always, for the phone's list not to contradict the refusal.
-      send(peer, .folderListing(Self.listing(of: parent)))
-      if let failure { send(peer, .folderNotCreated(failure)) }
+      onDisk(for: peer) {
+        let failure = Self.createFolder(named: name, in: parent)
+        // Always, for the phone's list not to contradict the refusal.
+        return [.folderListing(Self.listing(of: parent))]
+          + (failure.map { [.folderNotCreated($0)] } ?? [])
+      }
     case .welcome, .sessions, .conversation, .searchResults, .failure, .newSessionOffer, .created,
       .folderListing, .folderNotCreated, .iconData, .webState, .attachmentData, .httpResponse,
       .folderIconData:
@@ -209,7 +212,7 @@ final class CompanionRemoteServer {
       let label =
         appModel.folderLabels[SessionFolderKey(path: path)]
         ?? (path.isEmpty ? "" : (path as NSString).lastPathComponent)
-      let state = appModel.activity(for: session.id)
+      let state = appModel.shownActivity(for: session.id)
       let providerID = session.agent?.providerID ?? ""
       var coordinatorID: String?
       var isCoordinator = false
@@ -278,7 +281,7 @@ final class CompanionRemoteServer {
       RemoteConversation(
         sessionID: id.rawValue.uuidString,
         entries: Self.entries(model.snapshot.entries.suffix(Self.entryLimit)),
-        request: appModel.activity(for: id)?.requests.first.flatMap(Self.request(of:)),
+        request: appModel.shownActivity(for: id)?.requests.first.flatMap(Self.request(of:)),
         theme: Self.theme(of: appModel.sessions.first { $0.id == id }, in: appModel))
     } onChange: { [weak self] in
       Task { @MainActor in
@@ -577,9 +580,21 @@ final class CompanionRemoteServer {
     }
   }
 
+  /// The phone's folder requests, done away from the main actor — a network volume that hangs
+  /// does not freeze the window — one after the other: their answers come in the order asked.
+  private func onDisk(
+    for peer: String, _ work: @escaping @Sendable () -> [RemoteMessage]
+  ) {
+    let previous = folderWork
+    folderWork = Task {
+      await previous?.value
+      for message in await Task.detached(operation: work).value { send(peer, message) }
+    }
+  }
+
   /// The subfolders of a folder of the Mac, hidden ones and packages left out, as the Finder
   /// shows them.
-  static func listing(of path: String?) -> RemoteFolderListing {
+  nonisolated static func listing(of path: String?) -> RemoteFolderListing {
     let folder = URL(
       fileURLWithPath: path.map { ($0 as NSString).expandingTildeInPath }
         ?? FileManager.default.homeDirectoryForCurrentUser.path, isDirectory: true
@@ -600,20 +615,25 @@ final class CompanionRemoteServer {
 
   /// Whether a name is one name of its folder, that the folder's listing would show: never a way
   /// out of it, nor a hidden folder.
-  static func isFolderName(_ name: String) -> Bool {
+  nonisolated static func isFolderName(_ name: String) -> Bool {
     !name.isEmpty && !name.hasPrefix(".") && name.utf8.count <= 255
       && !name.unicodeScalars.contains {
         $0 == "/" || $0 == ":" || $0.properties.generalCategory == .control
       }
   }
 
-  /// Creates a subfolder of `parent`; what kept it from being created, if anything.
-  static func createFolder(named name: String, in parent: String) -> RemoteFailure? {
+  /// Creates a subfolder of `parent`; what kept it from being created, if anything. Never in a
+  /// hidden folder nor in `~/Library`, which the phone's browser does not show: where a folder
+  /// starts a program or holds its settings — `~/Library/LaunchAgents`, `~/.config`.
+  nonisolated static func createFolder(named name: String, in parent: String) -> RemoteFailure? {
     let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
     guard isFolderName(name) else { return .folderNameInvalid }
-    let folder = URL(
-      fileURLWithPath: (parent as NSString).expandingTildeInPath, isDirectory: true
-    ).standardizedFileURL.appendingPathComponent(name, isDirectory: true)
+    let parent = CompanionWebMirror.canonical(
+      URL(fileURLWithPath: (parent as NSString).expandingTildeInPath, isDirectory: true))
+    guard !parent.pathComponents.contains(where: { $0.hasPrefix(".") }),
+      !CompanionWebMirror.isInLibrary(parent.path)
+    else { return .folderNotAllowed }
+    let folder = parent.appendingPathComponent(name, isDirectory: true)
     do {
       try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: false)
       return nil

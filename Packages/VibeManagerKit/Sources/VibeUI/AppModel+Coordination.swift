@@ -119,7 +119,7 @@ extension AppModel {
       count: children.count,
       running: running(children).count,
       needingUser: children.filter {
-        if case .awaitingUser = activity(for: $0.id)?.activity { return true }
+        if case .awaitingUser = shownActivity(for: $0.id)?.activity { return true }
         return false
       }.count)
   }
@@ -191,7 +191,7 @@ extension AppModel {
     switch (previous?.activity, state.activity) {
     case (.working?, .idle):
       kind = .turnEnded
-    case (let before, .awaitingUser) where !Self.isAwaitingUser(before):
+    case (_, .awaitingUser) where Self.waitsForUser(state) && !Self.waitsForUser(previous):
       kind = .awaitingUser(
         state.requests.first.map(CoordinationDigest.summary(of:)) ?? "an answer in its terminal")
     default:
@@ -203,9 +203,13 @@ extension AppModel {
       CoordinationEvent(childID: id, childName: child.name, kind: kind, date: coordination.now()))
   }
 
-  private static func isAwaitingUser(_ activity: AgentActivity?) -> Bool {
-    if case .awaitingUser = activity { return true }
-    return false
+  /// Whether the agent waits for the user: a dialog of its start only guessed is an agent still
+  /// starting, as dozens resumed together on a busy Mac are, not one to tell its coordinator of
+  /// (#474). The real request that follows the guess is.
+  static func waitsForUser(_ state: AgentActivityState?) -> Bool {
+    guard case .awaitingUser = state?.activity else { return false }
+    guard case .inTerminal(let prompt) = state?.requests.first?.content else { return true }
+    return prompt.kind != .startup
   }
 
   /// A session's agent stopped on its own: what was owed to it is told at its next launch, by its
@@ -816,9 +820,9 @@ extension AppModel {
       if let model = child.agent?.modelID { item["model"] = .string(model) }
       if let folder = child.repositories.first?.path { item["folder"] = .string(folder) }
       if launcher?.isRunning(child.id) == true {
-        item["agentState"] = .string(Self.state(of: activity(for: child.id)?.activity))
+        item["agentState"] = .string(Self.state(of: shownActivity(for: child.id)?.activity))
       }
-      if let request = activity(for: child.id)?.requests.first {
+      if let request = shownActivity(for: child.id)?.requests.first {
         item["waitingFor"] = .string(CoordinationDigest.summary(of: request))
       }
       if let ticket = child.ticket?.url { item["ticket"] = .string(ticket.absoluteString) }
@@ -837,9 +841,9 @@ extension AppModel {
     let running = launcher?.isRunning(child.id) == true
     var parts = [
       "“\(child.name)” — status \(child.taskStatus.rawValue), agent "
-        + (running ? Self.state(of: activity(for: child.id)?.activity) : "stopped") + "."
+        + (running ? Self.state(of: shownActivity(for: child.id)?.activity) : "stopped") + "."
     ]
-    if let request = activity(for: child.id)?.requests.first {
+    if let request = shownActivity(for: child.id)?.requests.first {
       parts.append("Waiting for the user: \(CoordinationDigest.summary(of: request))")
     }
     if let waiting = coordination.outbox[child.id]?.count, waiting > 0 {
@@ -1099,13 +1103,30 @@ extension AppModel {
   }
 
   /// The children that go to the archive with their coordinator (#525): every one not archived
-  /// yet, but those where something still runs — a child left running when the coordinator alone
-  /// was stopped goes on, in its own column, and finds its coordinator when it comes back.
+  /// yet, but those where something still runs, or is starting — a child left running when the
+  /// coordinator alone was stopped goes on, in its own column, and finds its coordinator when it
+  /// comes back.
   func childrenFollowingArchive(of id: SessionID) -> [WorkSession] {
     children(of: id).filter { child in
       launcher?.isRunning(child.id) != true && runningDrawerCommands(of: child.id).isEmpty
-        && !archivingSessionIDs.contains(child.id)
+        && !archivingSessionIDs.contains(child.id) && !restartingSessionIDs.contains(child.id)
     }
+  }
+
+  /// Whether a child still follows its coordinator to the archive, looked at again right before
+  /// it goes (#525): one started again while those before it were archived stays.
+  func followsArchive(_ child: SessionID, of id: SessionID) -> Bool {
+    childrenFollowingArchive(of: id).contains { $0.id == child }
+  }
+
+  /// Sessions to archive, the children whose coordinator is among them apart: archived after it,
+  /// a child comes back with it when it is unarchived (#525).
+  func coordinatorsFirst(_ ids: [SessionID]) -> (leading: [SessionID], following: [SessionID]) {
+    let leaving = Set(ids)
+    let following = ids.filter { id in
+      sessions.first { $0.id == id }?.coordination?.coordinatorID.map(leaving.contains) == true
+    }
+    return (ids.filter { !following.contains($0) }, following)
   }
 
   /// Archives the children of a coordinator the user just archived (#525), as they would one by
@@ -1113,7 +1134,8 @@ extension AppModel {
   func archiveChildren(of id: SessionID, recordsByHand: Bool = true) async -> [WorkSession] {
     var archived: [WorkSession] = []
     for child in childrenFollowingArchive(of: id) {
-      guard archivingSessionIDs.insert(child.id).inserted else { continue }
+      guard followsArchive(child.id, of: id), archivingSessionIDs.insert(child.id).inserted
+      else { continue }
       defer { archivingSessionIDs.remove(child.id) }
       do {
         let archival = try await archiveProcess(child.id, recordsByHand: recordsByHand)
@@ -1126,6 +1148,28 @@ extension AppModel {
       }
     }
     return archived
+  }
+
+  /// The children that come back with a coordinator unarchived (#525): those archived with it,
+  /// or after it — a child left running when it went, archived since, would have gone with it.
+  /// One archived on its own before stays archived. Read before the coordinator comes back: its
+  /// archive date goes with it.
+  func childrenArchived(with id: SessionID) -> [SessionID] {
+    guard let archivedAt = sessions.first(where: { $0.id == id })?.archivedAt else { return [] }
+    return sessions.filter { session in
+      session.status == .archived && session.coordination?.coordinatorID == id
+        && (session.archivedAt ?? .distantPast) >= archivedAt
+    }.map(\.id)
+  }
+
+  /// Unarchives the children archived with a coordinator just unarchived (#525): they come back
+  /// closed, in Done, as any session unarchived.
+  func restoreChildren(_ ids: [SessionID]) async {
+    for id in ids {
+      guard case .failed = await restoreInBatch(id) else { continue }
+      diagnostics.record(
+        .session, .error, "coordination.childNotRestored", ["session": diagnostics.pseudonym(id)])
+    }
   }
 }
 

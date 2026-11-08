@@ -69,15 +69,27 @@ extension AppModel {
 
   /// Every request waiting, the session on screen's included: the Dock counts them all, the user
   /// may be in another application.
-  /// A dialog of a start shows once its screen was read — a guess only, the prompt at rest may
-  /// take it away — and once every session to restore has started: they come together, not one
-  /// after the other as the queue reaches them.
+  /// A dialog of a start shows once its screen was read and showed a dialog — a guess only, the
+  /// prompt at rest may take it away, and a banner is an agent still starting (#474) — and
+  /// once every session to restore has started: they come together, not one after the other as
+  /// the queue reaches them.
   private func showsStartupDialog(_ request: AgentRequest) -> Bool {
     guard case .inTerminal(let prompt) = request.content,
       [.startup, .update, .trust].contains(prompt.kind)
     else { return true }
     guard restoration == nil else { return false }
     return prompt.kind != .startup || readStartupGuesses.contains(request.id)
+  }
+
+  /// A session's activity as the user is told of it, in the sidebar and on the phone: a dialog of
+  /// the start no card shows — only guessed, or held back while sessions are restored — is an agent
+  /// still starting, not one waiting for the user (#474).
+  public func shownActivity(for id: SessionID) -> AgentActivityState? {
+    guard var state = activity(for: id) else { return nil }
+    guard state.requests.contains(where: { !showsStartupDialog($0) }) else { return state }
+    state.requests.removeAll { !showsStartupDialog($0) }
+    if state.requests.isEmpty, case .awaitingUser = state.activity { state.activity = .idle }
+    return state
   }
 
   var allPendingRequests: [PendingRequest] {

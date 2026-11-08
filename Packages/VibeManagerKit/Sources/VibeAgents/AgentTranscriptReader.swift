@@ -57,10 +57,12 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       switch conversation.transcriptProviderID {
       case ClaudeCodeAgentProvider.id.rawValue:
         files = claudeTranscripts(
-          for: identifier, workingDirectory: RestartSession.workingDirectoryPath(of: session))
+          for: identifier, providerID: conversation.providerID,
+          workingDirectory: RestartSession.workingDirectoryPath(of: session))
         isCodex = false
       case CodexAgentProvider.id.rawValue:
-        files = codexRollouts(for: identifier, since: session.createdAt)
+        files = codexRollouts(
+          for: identifier, providerID: conversation.providerID, since: session.createdAt)
         isCodex = true
       default:
         continue
@@ -109,17 +111,22 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
   /// directory names it, and not again for two seconds after a look found nothing. A second
   /// transcript the conversation got when resumed from another folder outside the application is
   /// not looked for (#276).
-  private func claudeTranscripts(for identifier: String, workingDirectory: String?) -> [URL] {
+  private func claudeTranscripts(
+    for identifier: String, providerID: String, workingDirectory: String?
+  ) -> [URL] {
     guard
-      let main = locations.claudeTranscript(for: identifier, workingDirectory: workingDirectory)
+      let main = locations.claudeTranscript(
+        for: identifier, providerID: providerID, workingDirectory: workingDirectory)
     else {
       return []
     }
     return [main] + locator.claudeSubagents(of: main, identifier: identifier)
   }
 
-  private func codexRollouts(for identifier: String, since created: Date) -> [URL] {
-    locations.codexRollouts(for: identifier, since: created)
+  private func codexRollouts(for identifier: String, providerID: String, since created: Date)
+    -> [URL]
+  {
+    locations.codexRollouts(for: identifier, providerID: providerID, since: created)
       .sorted { $0.lastPathComponent < $1.lastPathComponent }
   }
 

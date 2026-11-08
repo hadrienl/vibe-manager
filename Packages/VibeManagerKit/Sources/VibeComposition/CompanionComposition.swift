@@ -154,10 +154,11 @@ final class CompanionComposition {
       let names = Dictionary(
         appModel.agentDescriptors.map { ($0.id.rawValue, $0.displayName) },
         uniquingKeysWith: { first, _ in first })
-      // `activity(for:)` per session rather than every activity at once: each session's cell is
-      // then observed, including the first state of a session that just started.
+      // `shownActivity(for:)` per session rather than every activity at once: each session's cell
+      // is then observed, including the first state of a session that just started. A dialog of
+      // the start only guessed is not one the phone is told of (#474).
       return CompanionSnapshot.make(
-        sessions: appModel.sessions, activity: { appModel.activity(for: $0) },
+        sessions: appModel.sessions, activity: { appModel.shownActivity(for: $0) },
         agentName: { names[$0] ?? $0 })
     } onChange: { [weak self] in
       Task { @MainActor in self?.observe() }

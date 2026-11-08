@@ -178,10 +178,11 @@
   "card.sound.title": "召唤你的提示音",
   "card.sound.text": "为需要你的会话挑选提示音，导入你自己的声音，或者描述给智能体，让它来创作。",
   "card.context.title": "努力程度和上下文一目了然",
-  "card.context.text": "在状态栏调整智能体的努力程度，并查看压缩前对话占用了多少上下文窗口。",
   "new.more_send": "轮次进行中“立即发送”",
   "new.more_zip": "从 .zip 导入主题",
   "new.more_worktrees": "worktree 位置自由选择",
   "coord.shot_alt": "Vibe Manager 侧边栏中的协调会话，用一条线连接着它的三个子会话。",
-  "card.companion.cta": "加入 TestFlight 测试版"
+  "card.companion.cta": "加入 TestFlight 测试版",
+  "card.accounts.title": "每个智能体可用多个账户",
+  "card.accounts.text": "个人订阅和工作订阅并行使用：每个 Claude Code 或 Codex 账户都有自己的配置文件夹，创建会话时像选择智能体一样选择它。"
 }

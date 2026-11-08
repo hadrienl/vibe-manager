@@ -159,7 +159,7 @@ final class CompanionWebMirror {
   /// A path as the system spells a file once open, every link resolved. Not
   /// `resolvingSymlinksInPath`, which drops `/private` from `/private/tmp`. A file that does not
   /// exist keeps its name under its folder's real path.
-  nonisolated private static func canonical(_ url: URL) -> URL {
+  nonisolated static func canonical(_ url: URL) -> URL {
     let path = url.standardizedFileURL
     if let real = realpath(path.path, nil) {
       defer { free(real) }
@@ -171,7 +171,8 @@ final class CompanionWebMirror {
   }
 
   /// Whether a folder holds too much else to be opened to the phone for a page in it: the top of
-  /// the disk, the shared temporary folders, the home folder and what sits right in it.
+  /// the disk, the shared temporary folders, the home folder and what sits right in it, and
+  /// anything in `~/Library`.
   nonisolated static func isTooBroad(_ path: String) -> Bool {
     func resolved(_ path: String) -> String {
       canonical(URL(fileURLWithPath: path)).path
@@ -179,10 +180,17 @@ final class CompanionWebMirror {
     let folder = resolved(path)
     let home = resolved(NSHomeDirectory())
     let temporary = ["/tmp", "/var/tmp", NSTemporaryDirectory()].map(resolved)
-    if temporary.contains(folder) { return true }
+    if temporary.contains(folder) || isInLibrary(folder) { return true }
     if URL(fileURLWithPath: folder).pathComponents.count <= 3 { return true }
     return home == folder || home.hasPrefix(folder + "/")
       || URL(fileURLWithPath: folder).deletingLastPathComponent().path == home
+  }
+
+  /// Whether a path, links resolved, is in `~/Library`: the browsers' profiles and cookies, the
+  /// other applications' data, iCloud Drive. Never the phone's to read or write in.
+  nonisolated static func isInLibrary(_ path: String) -> Bool {
+    let library = canonical(URL(fileURLWithPath: NSHomeDirectory())).path + "/Library/"
+    return (canonical(URL(fileURLWithPath: path)).path + "/").hasPrefix(library)
   }
 
   /// Whether a path, links and `..` already resolved, lies in one of `folders` and is no hidden
@@ -203,8 +211,8 @@ final class CompanionWebMirror {
   // MARK: - The phone's requests
 
   /// A request of the phone's web view for a page of the Mac's own: made here, the answer sent
-  /// back whole. Only to the Mac itself or its local network, never anywhere a phone could reach
-  /// on its own.
+  /// back whole, up to `maximumFileLength` — `413` beyond. Only to the Mac itself or its local
+  /// network, never anywhere a phone could reach on its own.
   ///
   /// A file is read only in `fileFolders` (see ``fileFolders``), and only to be shown.
   static func fetch(_ request: RemoteHTTPRequest, fileFolders: [URL] = []) async
@@ -224,7 +232,10 @@ final class CompanionWebMirror {
       urlRequest.setValue(value, forHTTPHeaderField: name)
     }
     do {
-      let (data, response) = try await URLSession.shared.data(for: urlRequest)
+      let (body, response) = try await load(urlRequest)
+      guard let data = body else {
+        return RemoteHTTPResponse(id: request.id, status: 413, headers: [:], body: Data())
+      }
       let http = response as? HTTPURLResponse
       var headers: [String: String] = [:]
       for (name, value) in http?.allHeaderFields ?? [:] {
@@ -240,6 +251,30 @@ final class CompanionWebMirror {
         id: request.id, status: 0, headers: [:], body: Data(),
         failure: error.localizedDescription)
     }
+  }
+
+  /// Makes a request away from the main actor, its body read no further than `maximumFileLength`:
+  /// `nil` past it, as it would fit no frame.
+  nonisolated private static func load(_ request: URLRequest) async throws -> (
+    body: Data?, response: URLResponse
+  ) {
+    let (bytes, response) = try await URLSession.shared.bytes(for: request)
+    var body = Data()
+    if response.expectedContentLength > 0 {
+      guard response.expectedContentLength <= maximumFileLength else {
+        bytes.task.cancel()
+        return (nil, response)
+      }
+      body.reserveCapacity(Int(response.expectedContentLength))
+    }
+    for try await byte in bytes {
+      guard body.count < maximumFileLength else {
+        bytes.task.cancel()
+        return (nil, response)
+      }
+      body.append(byte)
+    }
+    return (body, response)
   }
 
   /// A file of the Mac's for the phone's web view, with its type for WebKit to show it. Its script
@@ -280,9 +315,10 @@ final class CompanionWebMirror {
     case refused
   }
 
-  /// The largest file sent: as base64 in one frame, a larger one would not fit
-  /// `RemoteFrame.maximumLength` and would close the whole channel.
-  nonisolated static let maximumFileLength = 20 * 1024 * 1024
+  /// The largest file or page sent: what one frame holds at worst, wrapped for the link to the
+  /// companion's agent as well. A larger one would be dropped on its way, and the phone's page
+  /// would never finish loading.
+  nonisolated static let maximumFileLength = RemoteFrame.maximumBinaryLength
 
   /// Reads the file that was opened, checked once open: a link swapped after the path was checked
   /// reads nothing outside `folders`.
@@ -304,9 +340,15 @@ final class CompanionWebMirror {
     guard fstat(descriptor, &info) == 0, info.st_mode & S_IFMT == S_IFREG else {
       return .status(404)
     }
+    // `F_GETPATH` gives the name it was opened by: a file with another name, a hard link, may be
+    // anything anywhere on the volume, `~/.ssh/id_ed25519` too.
+    guard info.st_nlink == 1 else { return .refused }
     guard info.st_size <= maximumFileLength else { return .status(413) }
-    guard let data = try? handle.readToEnd() else { return info.st_size == 0 ? .data(Data()) : .status(403) }
-    return .data(data)
+    // No further than the limit: a file that grows meanwhile is not read whole.
+    guard let data = try? handle.read(upToCount: maximumFileLength + 1) else {
+      return info.st_size == 0 ? .data(Data()) : .status(403)
+    }
+    return data.count <= maximumFileLength ? .data(data) : .status(413)
   }
 
   /// What the phone needs to show a file: text said to be UTF-8 when it is, and text with no known

@@ -644,6 +644,9 @@ struct AgentSettingsPage: View {
     }
     .formStyle(.grouped)
     .task(id: agent.id) { await model.refreshSignedInAccount(of: agent.id) }
+    // The page, not one of its sections, which a scroll takes out of a lazy form (#478).
+    .onDisappear { model.leaveSignIn(of: agent.id) }
+    .onChange(of: agent.id) { left, _ in model.leaveSignIn(of: left) }
   }
 
   /// The dot of an agent's state: ready, usable with something to fix, or not usable.

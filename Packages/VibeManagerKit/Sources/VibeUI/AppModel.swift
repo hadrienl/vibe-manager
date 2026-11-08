@@ -201,8 +201,8 @@ public final class AppModel {
   @ObservationIgnored var knownRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var postedRequestIDs: Set<AgentRequestID> = []
   @ObservationIgnored var announcedRequestIDs: Set<AgentRequestID> = []
-  /// The guesses of a dialog at a start whose screen has been read once: shown only then, a
-  /// resumed session's prompt at rest taking the guess away before anyone sees it.
+  /// The guesses of a dialog at a start whose screen showed one: shown only then, a banner or a
+  /// resumed session's prompt being an agent still starting (#474).
   var readStartupGuesses: Set<AgentRequestID> = []
   /// While the requests read back at launch, or replayed, are taken in: they were there before,
   /// and make no alert sound (#393).
@@ -1127,7 +1127,7 @@ public final class AppModel {
       paneStatus: pane?.status,
       resolution: resolution(forID: session.id),
       wasStoppedOnPurpose: pane?.wasStoppedOnPurpose == true,
-      activity: activity(for: session.id),
+      activity: shownActivity(for: session.id),
       launchFailed: pane?.failure != nil
     )
   }
@@ -1672,12 +1672,15 @@ public final class AppModel {
   }
 
   /// Brings a session back among the current ones, and starts nothing: it comes back closed,
-  /// which is what Restart works from.
+  /// which is what Restart works from. A coordinator brings back the children archived with it
+  /// (#525), as ⌘Z does.
   public func restore(_ id: SessionID) async {
+    let children = childrenArchived(with: id)
     do {
       _ = try await restoreSession(id: id)
       diagnostics.record(
         .session, .info, "session.unarchived", ["session": diagnostics.pseudonym(id)])
+      await restoreChildren(children)
     } catch {
       reportAction(error, .restore, on: id) { [weak self] in await self?.restore(id) }
     }
@@ -2758,6 +2761,9 @@ public final class AppModel {
     restoreTask = nil
     // The dialogs of the starts held back meanwhile come together.
     requestsDidChange()
+    for session in sessions where activity(for: session.id)?.requests.isEmpty == false {
+      shownActivityChanged(session.id)
+    }
 
     let lines = outcomes.compactMap { outcome -> RestoreReport.Line? in
       guard let sentence = outcome.sentence else { return nil }
@@ -2908,6 +2914,7 @@ public final class AppModel {
     await loadSigningInAgents()
     await loadHookTrustingAgents()
     await loadSigningAgents()
+    await loadCoordinatingAgents()
   }
 
   /// Detection never fails the application: an unavailable agent is data, not an error.

@@ -56,19 +56,23 @@ public struct AgentAccount: Identifiable, Hashable, Codable, Sendable {
   }
 
   /// What prevents the account from being saved beside `others`, the most useful first.
+  /// - Parameter canonical: the folder a path names on the disk — links followed, in the case the
+  ///   file system keeps it —, so that two ways of writing one folder are one folder.
   public func validationIssues(
-    among others: [AgentAccount], home: String, defaultDirectory: String? = nil
+    among others: [AgentAccount], home: String, defaultDirectory: String? = nil,
+    canonical: (String) -> String = { $0 }
   ) -> [ValidationIssue] {
     var issues: [ValidationIssue] = []
     if name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { issues.append(.noName) }
-    guard let directory = Self.resolvedDirectory(configurationDirectory, home: home) else {
+    guard let typed = Self.resolvedDirectory(configurationDirectory, home: home) else {
       return issues + [.directoryNotAbsolute]
     }
+    let directory = canonical(typed)
     let fallback = (home as NSString).appendingPathComponent(Self.defaultComponent(of: harness))
-    if directory == (defaultDirectory ?? fallback) { issues.append(.directoryIsDefault) }
+    if directory == canonical(defaultDirectory ?? fallback) { issues.append(.directoryIsDefault) }
     if let other = others.first(where: {
       $0.id != id && $0.harness == harness
-        && Self.resolvedDirectory($0.configurationDirectory, home: home) == directory
+        && Self.resolvedDirectory($0.configurationDirectory, home: home).map(canonical) == directory
     }) {
       issues.append(.directoryTaken(name: other.name))
     }

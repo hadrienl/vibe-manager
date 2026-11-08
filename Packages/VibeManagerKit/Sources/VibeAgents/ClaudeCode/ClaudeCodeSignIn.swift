@@ -23,21 +23,28 @@ extension ClaudeCodeAgentProvider: AgentSigningIn {
   }
 
   private func authenticationStatus() async -> String? {
-    let run = OneShotAgentRun(
-      provider: self, runner: BoundedSummaryProcessRunner(), folderPrefix: "vibe-sign-in-",
-      timeout: Self.signInRouteTimeout)
-    return try? await run.run(
-      prepare: { _, _ in
-        OneShotAgentRun.Invocation(
-          arguments: ["auth", "status", "--json"], environment: [:], input: Data())
-      },
-      read: { result, _ in String(decoding: result.standardOutput, as: UTF8.self) })
+    await signInStatus(arguments: ["auth", "status", "--json"]).map {
+      String(decoding: $0.standardOutput, as: UTF8.self)
+    }
   }
 
   static let signInRouteTimeout: Duration = .seconds(15)
 }
 
 extension AgentProvider {
+  /// What the CLI's command `arguments` says of its sign-in; `nil` when it could not run, or was
+  /// cancelled.
+  func signInStatus(arguments: [String]) async -> BoundedProcessResult? {
+    let run = OneShotAgentRun(
+      provider: self, runner: BoundedSummaryProcessRunner(), folderPrefix: "vibe-sign-in-",
+      timeout: ClaudeCodeAgentProvider.signInRouteTimeout)
+    return try? await run.run(
+      prepare: { _, _ in
+        OneShotAgentRun.Invocation(arguments: arguments, environment: [:], input: Data())
+      },
+      read: { result, _ in result })
+  }
+
   /// The CLI's own sign-in, until it ends. Its exit says whether it signed in: `auth status` still
   /// answers `loggedIn` with a token that has expired, which is how the sessions came to fail. The
   /// detection is then told: it is what the settings, and the next launch, read.

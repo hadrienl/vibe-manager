@@ -40,12 +40,14 @@ public enum AgentAccountProviders {
     _ homes: AgentHomes, for accounts: [AgentAccount], environment: [String: String]
   ) {
     let home = AgentHomeDirectory.home(in: environment)
-    func folders(_ harness: EndpointHarness) -> [URL] {
-      accounts.filter { $0.harness == harness }.compactMap {
-        AgentAccount.resolvedDirectory($0.configurationDirectory, home: home).map {
-          URL(fileURLWithPath: $0, isDirectory: true)
-        }
+    func folders(_ harness: EndpointHarness) -> [String: URL] {
+      var folders: [String: URL] = [:]
+      for account in accounts where account.harness == harness {
+        guard let path = AgentAccount.resolvedDirectory(account.configurationDirectory, home: home)
+        else { continue }
+        folders[account.providerID] = URL(fileURLWithPath: path, isDirectory: true)
       }
+      return folders
     }
     homes.replace(claudeHomes: folders(.claudeCode), codexHomes: folders(.codex))
   }

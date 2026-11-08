@@ -321,7 +321,9 @@ public enum ArchiveField: String, Hashable, Sendable, CaseIterable {
     case .badgeSymbol: "The SF Symbol the badge shows, by its name. Never matches a project icon."
     case .badgeKind: "`symbol`, or `projectIcon` when the badge shows the project's icon."
     case .name: "The session's name."
-    case .project: "The name of the session's group (its folder's name, or the name given to it)."
+    case .project:
+      "The name of the session's group (its folder's name, or the name given to it). A session in "
+        + "a git worktree is grouped under its repository; the worktree folder's own name matches too."
     case .folder: "The session's working folder, with `under` and a path (`~` is the home folder)."
     case .agent: "The agent's identifier: one of the agents installed, or an endpoint's."
     case .model: "The model's identifier; a session on the agent's default model has none."
