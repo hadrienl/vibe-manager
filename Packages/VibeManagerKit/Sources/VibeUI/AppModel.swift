@@ -3181,6 +3181,7 @@ public final class AppModel {
       icons: icons,
       recentFolders: offeredRecentFolders,
       forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) },
+      rememberedAgent: { [weak self] folder in self?.rememberedAgent(forFolder: folder) },
       palette: appearancePalette.offered,
       commandCatalog: conversations.commands,
       isThemeAvailable: { [conversations] in conversations.themes.theme($0) != nil }

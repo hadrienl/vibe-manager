@@ -59,6 +59,14 @@ public final class NewSessionModel {
   private var generatedName: String?
   /// The agent the form picked by itself: choosing it is not a change the user made.
   private var defaultProviderID: String?
+  /// Whether the user picked the agent: from then on it no longer follows the folder (#534).
+  private var userChoseAgent = false
+  /// The folder the agent was last proposed for, by spelling, and the proposal waiting for the
+  /// typing to pause.
+  private var agentFolderKey: String?
+  private var agentFollowing: Task<Void, Never>?
+  /// The agent of the last session created in a folder (#534).
+  private let rememberedAgent: (@MainActor (String) -> String?)?
   /// The name `settleName()` gave the draft for sending, taken back if it is refused.
   private var settledName: String?
   /// The folder a template put in the field last, and the one that was there before any did.
@@ -118,6 +126,8 @@ public final class NewSessionModel {
     folderProbe: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
     recentFolderProbeBudget: Duration = .milliseconds(300),
     forgetRecentFolder: (@MainActor (RecentFolder) -> Void)? = nil,
+    /// The agent of the last session created in a folder, proposed again there (#534).
+    rememberedAgent: (@MainActor (String) -> String?)? = nil,
     /// The symbols and colours the Settings offer (#199), and what a name is given among them.
     palette: SessionAppearancePalette = .default,
     /// The skills and commands read from the agents, shared with the conversations (#219).
@@ -134,6 +144,7 @@ public final class NewSessionModel {
     self.folderProbe = folderProbe
     self.recentFolderProbeBudget = recentFolderProbeBudget
     self.forgetRecentFolder = forgetRecentFolder
+    self.rememberedAgent = rememberedAgent
     self.create = create
     self.registry = registry
     self.revalidationDelay = revalidationDelay
@@ -535,6 +546,8 @@ public final class NewSessionModel {
     await checkRecentFolders()
     preselectRecentFolder()
     await agents
+    // The agents may have been listed before the folder was preselected.
+    await proposeAgent()
   }
 
   public func refreshAgents(forceRefresh: Bool) async {
@@ -554,12 +567,7 @@ public final class NewSessionModel {
     coordinatingAgentIDs = coordinating
     agents = detected
 
-    // Every agent stays listed, including the ones that cannot run — disappearing teaches the
-    // user nothing. Only the default selection skips them.
-    if draft.providerID == nil, let first = agents.first(where: \.isUsable) {
-      draft.providerID = first.id.rawValue
-      defaultProviderID = first.id.rawValue
-    }
+    applyAgentProposal()
     await loadModels()
     if hasSubmitted {
       await revalidate()
@@ -595,9 +603,43 @@ public final class NewSessionModel {
     if let effort = draft.effort, !effortLevels.contains(effort) { draft.effort = nil }
   }
 
+  /// The agent the form proposes for the folder in the field (#534): the one of the last session
+  /// created there, or else the first usable agent — until the user picks one, which it never
+  /// replaces. Its models follow it.
+  func proposeAgent() async {
+    guard applyAgentProposal() else { return }
+    await loadModels()
+    await revalidateIfSubmitted()
+  }
+
+  /// Puts the proposed agent in the draft, and says whether that changed it. Every agent stays
+  /// listed, including the ones that cannot run — disappearing teaches the user nothing. Only the
+  /// proposal skips them, the remembered agent included.
+  @discardableResult
+  private func applyAgentProposal() -> Bool {
+    agentFollowing?.cancel()
+    agentFollowing = nil
+    let folder = draft.resolvedWorkingDirectoryPath
+    agentFolderKey = folder.map(RecentFolder.lexicalKey(of:))
+    guard !userChoseAgent else { return false }
+    let usable = agents.filter(\.isUsable)
+    let remembered = folder.flatMap { rememberedAgent?($0) }
+    guard let proposed = usable.first(where: { $0.id.rawValue == remembered }) ?? usable.first
+    else { return false }
+    defaultProviderID = proposed.id.rawValue
+    guard draft.providerID != proposed.id.rawValue else { return false }
+    draft.providerID = proposed.id.rawValue
+    draft.modelID = nil
+    draft.effort = nil
+    return true
+  }
+
   /// Picks an agent and lists that agent's models — the two belong together, so no state exists
   /// where the selected agent and the offered models disagree.
   public func select(agent id: String) async {
+    userChoseAgent = true
+    agentFollowing?.cancel()
+    agentFollowing = nil
     guard draft.providerID != id else { return }
     draft.providerID = id
     draft.modelID = nil
@@ -622,6 +664,19 @@ public final class NewSessionModel {
       iconSearch?.cancel()
       iconFolderPath = nil
       if draft.projectIcon != nil { draft.projectIcon = nil }
+    }
+    // Another folder — typed, or brought by a template — brings its agent once the typing pauses.
+    if !userChoseAgent,
+      draft.resolvedWorkingDirectoryPath.map(RecentFolder.lexicalKey(of:)) != agentFolderKey
+    {
+      agentFollowing?.cancel()
+      agentFollowing = Task { [revalidationDelay] in
+        try? await Task.sleep(for: revalidationDelay)
+        guard !Task.isCancelled else { return }
+        // Not cancelled by the proposal it makes: loading the agent's models must finish.
+        self.agentFollowing = nil
+        await self.proposeAgent()
+      }
     }
     guard hasSubmitted else {
       // Before the first submit the only problems on screen are the ones the open panel came
@@ -656,6 +711,8 @@ public final class NewSessionModel {
     preselectedFolder = nil
     draft.workingDirectoryPath = path
     lookForIcon()
+    await proposeAgent()
+    guard checkedFolderPath == path else { return }
     let checked = draft
     let found = Self.namelessAllowed(await create.problems(with: checked, checkingFolder: true))
     guard checkedFolderPath == path else { return }
@@ -761,6 +818,9 @@ public final class NewSessionModel {
     // A pending debounce would otherwise land after the verdict of this submit and replace it.
     revalidation?.cancel()
     revalidation = nil
+    // The agent sent is the one on screen, not one a folder typed just before would bring.
+    agentFollowing?.cancel()
+    agentFollowing = nil
     hasSubmitted = true
     isSubmitting = true
     defer { isSubmitting = false }
@@ -841,6 +901,7 @@ extension NewSessionModel {
       preselectedFolder = nil
       draft.workingDirectoryPath = option.folder.path
       lookForIconOfRecentFolder()
+      await proposeAgent()
       return
     }
     await folderChosen(option.folder.path)

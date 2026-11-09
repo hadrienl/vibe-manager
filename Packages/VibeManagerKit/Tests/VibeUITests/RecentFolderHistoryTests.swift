@@ -89,6 +89,28 @@ struct RecentFolderHistoryTests {
     #expect(model.recentFolders.entries.first?.key == CanonicalPath.of(folder))
   }
 
+  @Test("A session created in a folder leaves its agent for the next one there (#534)")
+  func creationRemembersTheAgent() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(
+      UUID().uuidString
+    ).path
+    try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(atPath: folder) }
+    let store = InMemoryRecentFolderStore()
+    let model = AppModel(
+      repository: HistoryRepository(values: [session(in: folder)]), recentFolderStore: store)
+    await model.load()
+    #expect(model.rememberedAgent(forFolder: folder) == "stub")
+
+    let codex = SessionDraft(
+      name: "Session", initialPrompt: "", providerID: "codex", workingDirectoryPath: folder
+    ).session(createdAt: Date(timeIntervalSince1970: 1_699_000_100))
+    await model.complete(SessionCreation(session: codex, plan: plan(folder)), launching: false)
+
+    #expect(model.rememberedAgent(forFolder: folder) == "codex")
+    #expect(await store.load()?.entries.first?.providerID == "codex")
+  }
+
   @Test("A history already written is read as it is, even empty")
   func storedHistoryIsNotReseeded() async {
     let store = InMemoryRecentFolderStore(RecentFolders())

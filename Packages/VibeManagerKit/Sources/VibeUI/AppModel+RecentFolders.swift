@@ -45,12 +45,13 @@ extension AppModel {
   /// Its identity is resolved meanwhile, off the main actor, without holding up the launch.
   func noteFolder(of session: WorkSession) {
     guard let path = RecentFolders.folder(of: session) else { return }
-    let noted = RecentFolder(lexicalPath: path)
+    let agent = session.agent?.providerID
+    let noted = RecentFolder(lexicalPath: path, providerID: agent)
     notedFolder = noted
     Task { [weak self] in
       let key = await Task.detached { CanonicalPath.of(noted.key) }.value
       guard let self, self.notedFolder == noted else { return }
-      self.notedFolder = RecentFolder(path: path, key: key)
+      self.notedFolder = RecentFolder(path: path, key: key, providerID: agent)
     }
   }
 
@@ -79,7 +80,7 @@ extension AppModel {
     let key = await Task.detached { CanonicalPath.of(lexical) }.value
     // A folder seeded from the sessions was keyed by its spelling: that entry is this folder too.
     recentFolders = recentFolders.removing(key: lexical).recording(
-      RecentFolder(path: path, key: key))
+      RecentFolder(path: path, key: key, providerID: session.agent?.providerID))
     // In the history now: the note that stood for it goes, in the same step.
     if let noted = notedFolder, RecentFolder.lexicalKey(of: noted.path) == lexical {
       notedFolder = nil
@@ -90,6 +91,15 @@ extension AppModel {
     await recentFolderStore.save(recentFolders)
     diagnostics.record(
       .session, .info, "recentFolders.recorded", ["count": .count(recentFolders.entries.count)])
+  }
+
+  /// The agent a new session in this folder proposes (#534): the one of the last session created
+  /// there — the folder noted while its agent starts first, then the history, then the sessions.
+  func rememberedAgent(forFolder path: String) -> String? {
+    if let noted = notedFolder, noted.names(path), let agent = noted.providerID {
+      return agent
+    }
+    return recentFolders.agent(forFolder: path, sessions: sessions)
   }
 
   /// Remove from Recents, from a card of the sheet.

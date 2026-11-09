@@ -1454,3 +1454,102 @@ struct NewSessionRecentFolderTests {
     #expect(model.recentFolders.map(\.location) == ["/work/client-a", "/work/client-b"])
   }
 }
+
+@MainActor
+@Suite("The agent a new session proposes for its folder (#534)", .timeLimit(.minutes(1)))
+struct NewSessionFolderAgentTests {
+  private func makeModel(
+    providers: [any AgentProvider] = [
+      StubProvider(id: "claude-code", state: .available),
+      StubProvider(id: "codex", state: .available),
+    ],
+    recentFolders: [RecentFolder] = [],
+    remembered: [String: String] = [:]
+  ) -> NewSessionModel {
+    let registry = StubRegistry(providers: providers)
+    return NewSessionModel(
+      create: CreateSession(
+        repository: SpyRepository(), agents: registry, folders: StubFolders(status: .usable)),
+      registry: registry,
+      revalidationDelay: .milliseconds(20),
+      fullDiskAccess: .granted,
+      recentFolders: recentFolders,
+      folderProbe: MappedFolders(),
+      recentFolderProbeBudget: .seconds(3_600),
+      rememberedAgent: { folder in remembered[RecentFolder.lexicalKey(of: folder)] }
+    )
+  }
+
+  @Test("The folder proposed from the recent ones comes with its last agent, and stays pristine")
+  func preselectedFolderBringsItsAgent() async {
+    let model = makeModel(
+      recentFolders: recent("/work/api"), remembered: ["/work/api": "codex"])
+
+    await model.load()
+
+    #expect(model.draft.workingDirectoryPath == "/work/api")
+    #expect(model.draft.providerID == "codex")
+    #expect(model.isPristine)
+  }
+
+  @Test("Another folder brings its own agent, or the first usable one when it has none")
+  func agentFollowsTheFolder() async throws {
+    let model = makeModel(
+      recentFolders: recent("/work/api", "/work/web", "/work/new"),
+      remembered: ["/work/api": "codex", "/work/web": "claude-code"])
+    await model.load()
+
+    await model.chooseRecentFolder(try #require(model.recentFolders.first { $0.id == "/work/web" }))
+    #expect(model.draft.providerID == "claude-code")
+
+    await model.folderChosen("/work/api")
+    #expect(model.draft.providerID == "codex")
+
+    await model.chooseRecentFolder(try #require(model.recentFolders.first { $0.id == "/work/new" }))
+    #expect(model.draft.providerID == "claude-code")
+  }
+
+  @Test("A typed path brings its agent once the typing pauses")
+  func typedPathBringsItsAgent() async {
+    let model = makeModel(remembered: ["/work/api": "codex"])
+    await model.load()
+    #expect(model.draft.providerID == "claude-code")
+
+    model.draft.workingDirectoryPath = ""
+    for character in "/work/api" {
+      model.draft.workingDirectoryPath?.append(character)
+      model.draftChanged()
+    }
+
+    await waitUntil { model.draft.providerID == "codex" }
+  }
+
+  @Test("An agent the user picked is never replaced by the folder's")
+  func pickedAgentIsKept() async {
+    let model = makeModel(
+      recentFolders: recent("/work/api"), remembered: ["/work/api": "codex", "/work/web": "codex"])
+    await model.load()
+
+    await model.select(agent: "claude-code")
+    await model.folderChosen("/work/web")
+
+    #expect(model.draft.providerID == "claude-code")
+  }
+
+  @Test("A remembered agent that can no longer run gives way to the first usable one")
+  func unusableAgentIsSkipped() async {
+    let model = makeModel(
+      providers: [
+        StubProvider(id: "claude-code", state: .available),
+        StubProvider(id: "codex", state: .notFound),
+      ],
+      recentFolders: recent("/work/api", "/work/web"),
+      remembered: ["/work/api": "codex", "/work/web": "gone"])
+
+    await model.load()
+    #expect(model.draft.providerID == "claude-code")
+
+    await model.folderChosen("/work/web")
+    #expect(model.draft.providerID == "claude-code")
+  }
+}
