@@ -10,9 +10,14 @@ import VibeDomain
 struct BrowserTabPickerButton: View {
   let browser: SessionBrowser
   @Binding var isShowingTabs: Bool
+  /// When the list last closed.
+  @State private var closedAt = Date.distantPast
 
   var body: some View {
     Button {
+      // The list closes on the mouse-down outside it, before this button acts on the mouse-up: a
+      // click meant to close it would open it again.
+      guard isShowingTabs || Date().timeIntervalSince(closedAt) > 0.3 else { return }
       isShowingTabs.toggle()
     } label: {
       HStack(spacing: 6) {
@@ -24,6 +29,14 @@ struct BrowserTabPickerButton: View {
           .lineLimit(1)
           .truncationMode(.tail)
           .frame(maxWidth: .infinity, alignment: .leading)
+        // An agent acting in a tab behind: seen without opening the list, as the strip showed it.
+        if isAgentActingBehind {
+          Image(systemName: "sparkle")
+            .foregroundStyle(Color.accentColor)
+            .padding(2)
+            .background(Circle().fill(Color.accentColor.opacity(0.25)))
+            .accessibilityHidden(true)
+        }
         Text(verbatim: "\(browser.allTabs.count)")
           .font(.caption2.weight(.semibold))
           .monospacedDigit()
@@ -51,9 +64,18 @@ struct BrowserTabPickerButton: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
+    .onChange(of: isShowingTabs) { _, isShowing in
+      if !isShowing { closedAt = Date() }
+    }
     .instantTooltip(browser.activeTab.map { Text(verbatim: $0.url.absoluteString) })
-    .accessibilityLabel(Text("Web tabs", bundle: .module))
+    .accessibilityLabel(
+      Text("Show Tabs", bundle: .module, comment: "The web view's button that lists its tabs.")
+    )
     .accessibilityValue(title)
+  }
+
+  private var isAgentActingBehind: Bool {
+    browser.allTabs.contains { $0.isAgentActing && $0.id != browser.activeTab?.id }
   }
 
   /// The ticket's tab goes by its ticket, then its page.
@@ -77,7 +99,8 @@ struct BrowserTabList: View {
   /// The row the arrow keys are on.
   @State private var highlighted: BrowserTabID?
   @State private var dropIndicator: BrowserTabDropIndicator?
-  @State private var rowHeights: [BrowserTabID: CGFloat] = [:]
+  /// The tab being dragged from this list: only a tab of its own is dropped into it.
+  @State private var dragged: BrowserTabID?
   @FocusState private var hasKeyboard: Bool
 
   var body: some View {
@@ -85,7 +108,12 @@ struct BrowserTabList: View {
       // Grows with the tabs, then scrolls.
       ViewThatFits(in: .vertical) {
         rows
-        ScrollView { rows }
+        ScrollViewReader { proxy in
+          ScrollView { rows }
+            .onChange(of: highlighted) { _, id in
+              if let id { proxy.scrollTo(id) }
+            }
+        }
       }
       .frame(maxHeight: 420)
       separator
@@ -113,18 +141,26 @@ struct BrowserTabList: View {
     .focusable()
     .focusEffectDisabled()
     .focused($hasKeyboard)
+    // Only while the list itself has the keyboard: with Full Keyboard Access on a row's button,
+    // the keys are that button's.
     .onKeyPress(.downArrow) {
+      guard hasKeyboard else { return .ignored }
       moveHighlight(by: 1)
       return .handled
     }
     .onKeyPress(.upArrow) {
+      guard hasKeyboard else { return .ignored }
       moveHighlight(by: -1)
       return .handled
     }
     .onKeyPress(.return) {
-      guard let highlighted else { return .ignored }
+      guard hasKeyboard, let highlighted else { return .ignored }
       activate(highlighted)
       return .handled
+    }
+    .clearsWhenDragEnds(dragged != nil || dropIndicator != nil) {
+      dragged = nil
+      dropIndicator = nil
     }
     .onAppear {
       highlighted = browser.activeTab?.id
@@ -134,14 +170,10 @@ struct BrowserTabList: View {
     .accessibilityLabel(Text("Web tabs", bundle: .module))
   }
 
-  /// In the order shown: the ticket's, the pinned tabs, the others.
-  private var ordered: [BrowserTabModel] {
-    browser.allTabs
-  }
-
+  /// In the order the browser keeps them: the ticket's, the pinned tabs, the others.
   private var rows: some View {
-    let pinned = ordered.filter { $0.isPinnedTicket || $0.isPinned }
-    let others = ordered.filter { !$0.isPinnedTicket && !$0.isPinned }
+    let pinned = (browser.ticketTab.map { [$0] } ?? []) + browser.tabs.prefix(browser.pinnedCount)
+    let others = Array(browser.tabs.dropFirst(browser.pinnedCount))
     return VStack(alignment: .leading, spacing: 1) {
       if !pinned.isEmpty {
         header(
@@ -182,22 +214,11 @@ struct BrowserTabList: View {
       tab: tab, browser: browser, model: model,
       isActive: browser.activeTab?.id == tab.id,
       isHighlighted: highlighted == tab.id,
-      dropsAfter: dropIndicator?.target == tab.id ? dropIndicator?.after : nil,
+      dropIndicator: $dropIndicator, dragged: $dragged,
       activate: { activate(tab.id) },
       close: { workspace.close(tab.id, in: browser.sessionID) }
     )
-    .onGeometryChange(for: CGFloat.self) {
-      $0.size.height
-    } action: {
-      rowHeights[tab.id] = $0
-    }
-    .modifier(BrowserTabRowDrag(tab: tab))
-    .onDrop(
-      of: [.text],
-      delegate: BrowserTabDropDelegate(
-        target: tab.id, isTicket: tab.isPinnedTicket, height: rowHeights[tab.id] ?? 0,
-        indicator: $dropIndicator,
-        move: { [browser] id, target, after in browser.move(id, nextTo: target, after: after) }))
+    .id(tab.id)
   }
 
   private func activate(_ id: BrowserTabID) {
@@ -206,7 +227,7 @@ struct BrowserTabList: View {
   }
 
   private func moveHighlight(by offset: Int) {
-    let ids = ordered.map(\.id)
+    let ids = browser.allTabs.map(\.id)
     guard !ids.isEmpty else { return }
     let current = highlighted.flatMap { ids.firstIndex(of: $0) }
     let next = current.map { min(max($0 + offset, 0), ids.count - 1) } ?? 0
@@ -222,11 +243,12 @@ private struct BrowserTabRow: View {
   let model: AppModel
   let isActive: Bool
   let isHighlighted: Bool
-  /// Where a tab dragged over this row would go: after it, before it, or `nil` when none is.
-  let dropsAfter: Bool?
+  @Binding var dropIndicator: BrowserTabDropIndicator?
+  @Binding var dragged: BrowserTabID?
   let activate: () -> Void
   let close: () -> Void
   @State private var isHovering = false
+  @State private var height: CGFloat = 0
   @FocusState private var focus: RowFocus?
 
   /// What has the keyboard in the row, with Full Keyboard Access (#230).
@@ -290,6 +312,19 @@ private struct BrowserTabRow: View {
       }
     }
     .contentShape(Rectangle())
+    .onGeometryChange(for: CGFloat.self) {
+      $0.size.height
+    } action: {
+      height = $0
+    }
+    .modifier(BrowserTabRowDrag(tab: tab, dragged: $dragged))
+    .onDrop(
+      of: [.text],
+      delegate: BrowserTabDropDelegate(
+        target: tab.id, isTicket: tab.isPinnedTicket, height: height, dragged: $dragged,
+        indicator: $dropIndicator,
+        move: { [browser] id, target, after in browser.move(id, nextTo: target, after: after) })
+    )
     .onHover { isHovering = $0 }
     .instantTooltip(Text(verbatim: tab.url.absoluteString))
     .contextMenu {
@@ -312,6 +347,11 @@ private struct BrowserTabRow: View {
         }
       }
     }
+  }
+
+  /// Where a tab dragged over this row would go: after it, before it, or `nil` when none is.
+  private var dropsAfter: Bool? {
+    dropIndicator?.target == tab.id ? dropIndicator?.after : nil
   }
 
   private var background: Color {
@@ -393,12 +433,16 @@ private struct BrowserTabRow: View {
 /// into its agent (#42). The ticket's tab stays where it is.
 private struct BrowserTabRowDrag: ViewModifier {
   let tab: BrowserTabModel
+  @Binding var dragged: BrowserTabID?
 
   func body(content: Content) -> some View {
     if tab.isPinnedTicket {
       content
     } else {
-      content.draggable(BrowserTabDrag.text(for: tab.id))
+      content.onDrag {
+        dragged = tab.id
+        return NSItemProvider(object: BrowserTabDrag.text(for: tab.id) as NSString)
+      }
     }
   }
 }
@@ -409,21 +453,26 @@ struct BrowserTabDropIndicator: Equatable {
   let after: Bool
 }
 
-/// Shows where a tab dragged over a row would go, and moves it there when it is let go.
+/// Shows where a tab dragged over a row would go, and moves it there when it is let go. Only a
+/// tab dragged from the list is taken: text or a link from elsewhere is refused.
 private struct BrowserTabDropDelegate: DropDelegate {
   let target: BrowserTabID
   /// Dropped on the ticket's tab, a tab becomes the first pinned one: after it, always.
   let isTicket: Bool
   let height: CGFloat
+  @Binding var dragged: BrowserTabID?
   @Binding var indicator: BrowserTabDropIndicator?
-  let move: @MainActor @Sendable (BrowserTabID, BrowserTabID, Bool) -> Void
+  let move: (BrowserTabID, BrowserTabID, Bool) -> Void
 
   func validateDrop(info: DropInfo) -> Bool {
-    info.hasItemsConforming(to: [.text])
+    dragged != nil
   }
 
   func dropUpdated(info: DropInfo) -> DropProposal? {
-    indicator = BrowserTabDropIndicator(target: target, after: isAfter(info))
+    guard dragged != nil else { return DropProposal(operation: .forbidden) }
+    let next = BrowserTabDropIndicator(target: target, after: isAfter(info))
+    // Once per change, not on every move of the pointer: each write draws the list again.
+    if indicator != next { indicator = next }
     return DropProposal(operation: .move)
   }
 
@@ -433,14 +482,9 @@ private struct BrowserTabDropDelegate: DropDelegate {
 
   func performDrop(info: DropInfo) -> Bool {
     indicator = nil
-    guard let provider = info.itemProviders(for: [.text]).first else { return false }
-    let target = target
-    let after = isAfter(info)
-    let move = move
-    _ = provider.loadObject(ofClass: NSString.self) { object, _ in
-      guard let text = object as? String, let uuid = BrowserTabDrag.tabID(in: text) else { return }
-      Task { @MainActor in move(BrowserTabID(rawValue: uuid), target, after) }
-    }
+    guard let id = dragged else { return false }
+    dragged = nil
+    move(id, target, isAfter(info))
     return true
   }
 
