@@ -20,6 +20,9 @@ public final class SessionBrowser {
   public private(set) var actionLog = BrowserActionLog()
   /// Agent actions recorded since the trace was last looked at: the badge on its button.
   public private(set) var unseenActionCount = 0
+  /// Tabs opened behind — a link ⌘-clicked in a page (#186), an agent's page — since the user last
+  /// looked at the list of tabs (#536): the tab button says so, the list hiding them.
+  public private(set) var unseenTabIDs: Set<BrowserTabID> = []
   /// An agent opened a page while the session was not on screen: its row says so.
   public internal(set) var hasUnseenAgentPage = false
   /// Whether what was kept has been read back yet.
@@ -108,7 +111,7 @@ public final class SessionBrowser {
     } else {
       tabs.append(tab)
     }
-    if activate { activeTabID = tab.id }
+    if activate { activeTabID = tab.id } else { unseenTabIDs.insert(tab.id) }
     stateDidChange?()
   }
 
@@ -116,6 +119,7 @@ public final class SessionBrowser {
     guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
     let removed = tabs.remove(at: index)
     removed.discard()
+    unseenTabIDs.remove(id)
     if activeTabID == id {
       // The neighbour on the right, as browsers do, else the one on the left, else the ticket.
       activeTabID = tabs.indices.contains(index) ? tabs[index].id : tabs.last?.id
@@ -128,6 +132,7 @@ public final class SessionBrowser {
     // Turning to a tab ends the run of tabs opened from the one before: the next ones line up
     // after their opener again.
     for tab in tabs { tab.openerID = nil }
+    unseenTabIDs.remove(id)
     activeTabID = ticketTab?.id == id ? nil : id
     stateDidChange?()
   }
@@ -249,6 +254,11 @@ public final class SessionBrowser {
     actionLog.append(record, isRead: isRead)
     unseenActionCount += 1
     logDidChange?()
+  }
+
+  /// The list of tabs was opened: every tab is seen.
+  public func markTabsSeen() {
+    if !unseenTabIDs.isEmpty { unseenTabIDs.removeAll() }
   }
 
   public func markTraceSeen() {

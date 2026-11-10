@@ -12,6 +12,7 @@ struct BrowserTabPickerButton: View {
   @Binding var isShowingTabs: Bool
   /// When the list last closed.
   @State private var closedAt = Date.distantPast
+  @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
   var body: some View {
     Button {
@@ -37,13 +38,18 @@ struct BrowserTabPickerButton: View {
             .background(Circle().fill(Color.accentColor.opacity(0.25)))
             .accessibilityHidden(true)
         }
+        // Lit while tabs opened behind wait to be seen: the list hides them (#186).
         Text(verbatim: "\(browser.allTabs.count)")
           .font(.caption2.weight(.semibold))
           .monospacedDigit()
-          .foregroundStyle(.secondary)
+          .contentTransition(.numericText())
+          .foregroundStyle(hasUnseenTabs ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
           .padding(.horizontal, 6)
           .padding(.vertical, 1)
-          .background(Capsule().fill(Color.primary.opacity(0.07)))
+          .background(
+            Capsule().fill(hasUnseenTabs ? Color.accentColor : Color.primary.opacity(0.07))
+          )
+          .animation(reduceMotion ? nil : .snappy, value: browser.allTabs.count)
         Image(systemName: "chevron.down")
           .font(.system(size: 9, weight: .semibold))
           .foregroundStyle(.secondary)
@@ -72,6 +78,10 @@ struct BrowserTabPickerButton: View {
       Text("Show Tabs", bundle: .module, comment: "The web view's button that lists its tabs.")
     )
     .accessibilityValue(title)
+  }
+
+  private var hasUnseenTabs: Bool {
+    !browser.unseenTabIDs.isEmpty
   }
 
   private var isAgentActingBehind: Bool {
@@ -165,6 +175,7 @@ struct BrowserTabList: View {
     .onAppear {
       highlighted = browser.activeTab?.id
       hasKeyboard = true
+      browser.markTabsSeen()
     }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Web tabs", bundle: .module))

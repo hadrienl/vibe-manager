@@ -112,6 +112,25 @@ struct BrowserTabPinningTests {
     #expect(browser.persisted.tabs.map(\.isPinned) == [true, false])
   }
 
+  @Test("A tab opened behind stays unseen until it is shown, closed, or the list is opened")
+  func unseenTabs() {
+    let workspace = BrowserWorkspace()
+    let (browser, ids) = browser(in: workspace)
+    // The four tabs opened behind.
+    #expect(browser.unseenTabIDs == Set(ids))
+
+    browser.activate(ids[0])
+    workspace.close(ids[1], in: session)
+    #expect(browser.unseenTabIDs == [ids[2], ids[3]])
+
+    browser.markTabsSeen()
+    #expect(browser.unseenTabIDs.isEmpty)
+
+    // One in front is seen at once.
+    workspace.open(URL(string: "data:text/html,<p>e</p>")!, in: session, openedBy: .user)
+    #expect(browser.unseenTabIDs.isEmpty)
+  }
+
   @Test("A tab kept before pinning existed is not pinned")
   func decodesWithoutPinning() throws {
     let json = """
