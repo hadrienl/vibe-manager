@@ -49,6 +49,8 @@ public final class BrowserTabModel: NSObject, Identifiable {
   public let openedBy: BrowserTab.Opener
   /// The ticket's tab: first, pinned, never closed.
   public let isPinnedTicket: Bool
+  /// The user pinned the tab (#536): its browser keeps it among the first, after the ticket's.
+  public internal(set) var isPinned: Bool
 
   public private(set) var url: URL
   /// The address of the document the page actually holds: set when a navigation commits, and only
@@ -80,7 +82,8 @@ public final class BrowserTabModel: NSObject, Identifiable {
   @ObservationIgnored var didChange: (@MainActor () -> Void)?
   /// Asked when a page wants a new window, or the user a new tab (#186): it becomes a tab of the
   /// same session, after this one, in front or behind.
-  @ObservationIgnored var openInNewTab: (@MainActor (URL, _ byAgent: Bool, _ activate: Bool) -> Void)?
+  @ObservationIgnored var openInNewTab:
+    (@MainActor (URL, _ byAgent: Bool, _ activate: Bool) -> Void)?
   /// Given the web view WebKit made for a window a page opened — a sign-in pop-up — to show as a
   /// tab of the same session. It stays that page's opener's: the pop-up hands the sign-in back to
   /// it through `window.opener`, which a tab opened on the same address would not have.
@@ -137,6 +140,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
     isAgentDriven: Bool? = nil,
     isOpenedByAgentPage: Bool = false,
     isPinnedTicket: Bool = false,
+    isPinned: Bool = false,
     configuration: BrowserWebConfiguration
   ) {
     self.id = id
@@ -144,6 +148,7 @@ public final class BrowserTabModel: NSObject, Identifiable {
     self.title = title
     self.openedBy = openedBy
     self.isPinnedTicket = isPinnedTicket
+    self.isPinned = isPinned
     self.configuration = configuration
     self.isAgentDriven = (isAgentDriven ?? (openedBy == .agent)) || isOpenedByAgentPage
     self.isOpenedByAgentPage = isOpenedByAgentPage
@@ -153,7 +158,8 @@ public final class BrowserTabModel: NSObject, Identifiable {
   /// What is kept of this tab.
   public var persisted: BrowserTab {
     BrowserTab(
-      id: id, url: url, title: title, openedBy: openedBy, isAgentDriven: asksBeforeEffects)
+      id: id, url: url, title: title, openedBy: openedBy, isAgentDriven: asksBeforeEffects,
+      isPinned: isPinned)
   }
 
   public var isLoaded: Bool {

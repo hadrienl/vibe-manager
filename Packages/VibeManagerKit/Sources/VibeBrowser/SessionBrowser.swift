@@ -9,7 +9,7 @@ import VibeDomain
 @Observable
 public final class SessionBrowser {
   public let sessionID: SessionID
-  /// The tabs after the ticket's, in the order shown.
+  /// The tabs after the ticket's, in the order shown: the pinned ones first (#536).
   public private(set) var tabs: [BrowserTabModel] = []
   /// The ticket's tab, first and pinned, when the session has a ticket.
   public private(set) var ticketTab: BrowserTabModel?
@@ -53,6 +53,11 @@ public final class SessionBrowser {
     allTabs.first { $0.id == id }
   }
 
+  /// How many tabs the user pinned: the first ones of `tabs`.
+  public var pinnedCount: Int {
+    tabs.prefix { $0.isPinned }.count
+  }
+
   /// A tab named by an agent: its short id, or its whole identifier.
   func tab(named name: String) -> BrowserTabModel? {
     let name = name.trimmingCharacters(in: .whitespaces).lowercased()
@@ -77,7 +82,9 @@ public final class SessionBrowser {
   ) {
     // Whatever was opened before the file was read stays, after what was kept.
     let opened = tabs
-    tabs = state.tabs.map(make) + opened
+    let restored = state.tabs.map(make) + opened
+    // Pinned first, whatever the file said: a tab is never kept between pinned ones unpinned.
+    tabs = restored.filter(\.isPinned) + restored.filter { !$0.isPinned }
     if activeTabID == nil { activeTabID = state.activeTabID }
     if !isVisible { isVisible = state.isVisible }
     actionLog = BrowserActionLog(records: records + actionLog.records)
@@ -93,7 +100,8 @@ public final class SessionBrowser {
     isOpener: Bool = false
   ) {
     if let anchor, let index = tabs.firstIndex(where: { $0.id == anchor }) {
-      var position = index + 1
+      // Opened from a pinned tab, it goes first among the others: it is not pinned itself.
+      var position = max(index + 1, pinnedCount)
       while position < tabs.count, tabs[position].openerID == anchor { position += 1 }
       if isOpener { tab.openerID = anchor }
       tabs.insert(tab, at: position)
@@ -124,33 +132,62 @@ public final class SessionBrowser {
     stateDidChange?()
   }
 
-  /// Moves a tab to another place among the unpinned tabs.
-  public func move(_ id: BrowserTabID, to destination: Int) {
-    guard let index = tabs.firstIndex(where: { $0.id == id }) else { return }
+  /// Pins a tab, last of the pinned ones, or unpins it, first of the others (#536).
+  public func setPinned(_ id: BrowserTabID, _ isPinned: Bool) {
+    guard let index = tabs.firstIndex(where: { $0.id == id }), tabs[index].isPinned != isPinned
+    else { return }
     let tab = tabs.remove(at: index)
-    tabs.insert(tab, at: min(max(destination, 0), tabs.count))
+    tab.isPinned = isPinned
+    tabs.insert(tab, at: pinnedCount)
     stateDidChange?()
   }
 
-  /// Moves a tab one place left (`-1`) or right (`1`) among the unpinned tabs: the keyboard's and
-  /// VoiceOver's way to do what dragging it does (#230).
+  /// Moves a tab where it was dropped: before or after `target`, pinned when `target` is (#536).
+  /// Dropped on the ticket's, it becomes the first pinned tab.
+  public func move(_ id: BrowserTabID, nextTo target: BrowserTabID, after: Bool) {
+    guard id != target, let index = tabs.firstIndex(where: { $0.id == id }) else { return }
+    if target == ticketTab?.id {
+      let tab = tabs.remove(at: index)
+      tab.isPinned = true
+      tabs.insert(tab, at: 0)
+      stateDidChange?()
+      return
+    }
+    guard let anchor = tabs.first(where: { $0.id == target }) else { return }
+    let tab = tabs.remove(at: index)
+    tab.isPinned = anchor.isPinned
+    let position = tabs.firstIndex { $0.id == target } ?? tabs.count
+    tabs.insert(tab, at: after ? position + 1 : position)
+    stateDidChange?()
+  }
+
+  /// Moves a tab one place up (`-1`) or down (`1`) among the pinned tabs, or among the others: the
+  /// keyboard's and VoiceOver's way to do what dragging it does (#230). Pinning it is what takes it
+  /// from one group to the other.
   public func moveTab(_ id: BrowserTabID, by offset: Int) {
     guard let index = tabs.firstIndex(where: { $0.id == id }),
-      let destination = Self.place(of: index, movedBy: offset, among: tabs.count)
+      let destination = Self.place(of: index, movedBy: offset, within: group(of: index))
     else { return }
-    move(id, to: destination)
+    let tab = tabs.remove(at: index)
+    tabs.insert(tab, at: destination)
+    stateDidChange?()
   }
 
   /// Whether `moveTab(_:by:)` has somewhere to go.
   public func canMoveTab(_ id: BrowserTabID, by offset: Int) -> Bool {
     guard let index = tabs.firstIndex(where: { $0.id == id }) else { return false }
-    return Self.place(of: index, movedBy: offset, among: tabs.count) != nil
+    return Self.place(of: index, movedBy: offset, within: group(of: index)) != nil
   }
 
-  /// Where a tab at `index` goes when moved by `offset`, or `nil` past either end.
-  static func place(of index: Int, movedBy offset: Int, among count: Int) -> Int? {
+  /// The places of the tabs pinned like the one at `index`.
+  private func group(of index: Int) -> Range<Int> {
+    tabs[index].isPinned ? 0..<pinnedCount : pinnedCount..<tabs.count
+  }
+
+  /// Where a tab at `index` goes when moved by `offset`, or `nil` past either end of its group.
+  static func place(of index: Int, movedBy offset: Int, within group: Range<Int>) -> Int? {
     let destination = index + offset
-    return destination != index && (0..<count).contains(destination) ? destination : nil
+    return destination != index && group.contains(destination) ? destination : nil
   }
 
   /// The tab after, or before, the one in front, around the ends.

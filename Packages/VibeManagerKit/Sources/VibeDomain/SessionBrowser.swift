@@ -39,20 +39,23 @@ public struct BrowserTab: Identifiable, Hashable, Codable, Sendable {
   /// opened it from one of its pages, and the user has not taken it back. Kept between launches:
   /// a page the agent sent the user's tab to stays the agent's once the application relaunches.
   public var isAgentDriven: Bool
+  /// The user pinned the tab (#536): it stays among the first, after the ticket's.
+  public var isPinned: Bool
 
   public init(
     id: BrowserTabID = BrowserTabID(), url: URL, title: String = "", openedBy: Opener,
-    isAgentDriven: Bool? = nil
+    isAgentDriven: Bool? = nil, isPinned: Bool = false
   ) {
     self.id = id
     self.url = url
     self.title = title
     self.openedBy = openedBy
     self.isAgentDriven = isAgentDriven ?? (openedBy == .agent)
+    self.isPinned = isPinned
   }
 
   private enum CodingKeys: String, CodingKey {
-    case id, url, title, openedBy, isAgentDriven
+    case id, url, title, openedBy, isAgentDriven, isPinned
   }
 
   /// An opener written by a later build reads as the agent's, and a tab kept before the agent's
@@ -66,6 +69,7 @@ public struct BrowserTab: Identifiable, Hashable, Codable, Sendable {
       (try? container.decodeIfPresent(String.self, forKey: .openedBy)).flatMap(Opener.init)
       ?? .agent
     isAgentDriven = (try? container.decodeIfPresent(Bool.self, forKey: .isAgentDriven)) ?? true
+    isPinned = (try? container.decodeIfPresent(Bool.self, forKey: .isPinned)) ?? false
   }
 }
 

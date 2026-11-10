@@ -11,7 +11,7 @@ import VibeDomain
 @MainActor
 @Suite("The keyboard reaches tabs and dividers")
 struct KeyboardReachTests {
-  @Test("A web tab moves one place left or right, and no further than the ends")
+  @Test("A web tab moves one place up or down, and no further than the ends")
   func webTabMoves() {
     _ = NSApplication.shared
     let workspace = BrowserWorkspace()

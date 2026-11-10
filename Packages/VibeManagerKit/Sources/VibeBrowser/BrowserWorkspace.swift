@@ -125,7 +125,7 @@ public final class BrowserWorkspace {
       browser.restore(state, records: records) { tab in
         self.makeTab(
           tab.url, id: tab.id, title: tab.title, openedBy: tab.openedBy,
-          isAgentDriven: tab.isAgentDriven, in: id)
+          isAgentDriven: tab.isAgentDriven, isPinned: tab.isPinned, in: id)
       }
       self.restoreTasks[id] = nil
       self.visibilityDidChange?(id)
@@ -308,12 +308,12 @@ public final class BrowserWorkspace {
   func makeTab(
     _ url: URL, id tabID: BrowserTabID = BrowserTabID(), title: String = "",
     openedBy: BrowserTab.Opener, isAgentDriven: Bool? = nil, isOpenedByAgentPage: Bool = false,
-    isPinnedTicket: Bool = false, in id: SessionID
+    isPinnedTicket: Bool = false, isPinned: Bool = false, in id: SessionID
   ) -> BrowserTabModel {
     let tab = BrowserTabModel(
       id: tabID, url: url, title: title, openedBy: openedBy, isAgentDriven: isAgentDriven,
       isOpenedByAgentPage: isOpenedByAgentPage, isPinnedTicket: isPinnedTicket,
-      configuration: configuration)
+      isPinned: isPinned, configuration: configuration)
     tab.didChange = { [weak self] in
       guard !isPinnedTicket else { return }
       self?.scheduleSave(id)
