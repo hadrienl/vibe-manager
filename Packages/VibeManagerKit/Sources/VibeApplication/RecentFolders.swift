@@ -19,12 +19,12 @@ public struct RecentFolder: Hashable, Codable, Sendable {
   }
 
   /// A folder known by its spelling alone, for when the disk may not be read.
-  public init(lexicalPath path: String) {
-    self.init(lexicalPath: path, providerID: nil)
+  public init(lexicalPath path: String, providerID: String? = nil) {
+    self.init(path: path, key: Self.lexicalKey(of: path), providerID: providerID)
   }
 
-  public init(lexicalPath path: String, providerID: String?) {
-    self.init(path: path, key: Self.lexicalKey(of: path), providerID: providerID)
+  public func with(providerID: String?) -> RecentFolder {
+    RecentFolder(path: path, key: key, providerID: providerID)
   }
 
   /// Whether this entry is the folder spelled `path`: by its identity, or by its own spelling.
@@ -88,19 +88,40 @@ public struct RecentFolders: Equatable, Sendable {
   }
 
   /// The agent a new session in `path` proposes (#534): the one the history recorded for the
-  /// folder, or — for a history written before it kept agents, or a folder that has left it — the
-  /// agent of the latest session that gives the folder, by the rule of `folder(of:)`. `nil` when
-  /// neither knows one.
+  /// folder, or — for a folder that has left the history — the agent of its latest session.
+  /// `nil` when neither knows one.
   public func agent(forFolder path: String, sessions: [WorkSession]) -> String? {
-    if let recorded = entries.first(where: { $0.names(path) })?.providerID {
-      return recorded
-    }
+    entries.first(where: { $0.names(path) })?.providerID
+      ?? Self.latestAgent(inFolder: path, sessions: sessions)
+  }
+
+  /// The current agent of the latest session that gives the folder, by the rule of `folder(of:)`:
+  /// neither a worktree nor a coordinator's child speaks for it.
+  public static func latestAgent(inFolder path: String, sessions: [WorkSession]) -> String? {
     let spelling = RecentFolder.lexicalKey(of: path)
     return
       sessions
-      .filter { Self.folder(of: $0).map(RecentFolder.lexicalKey(of:)) == spelling }
+      .filter { folder(of: $0).map(RecentFolder.lexicalKey(of:)) == spelling }
       .max { $0.createdAt < $1.createdAt }?
       .agent?.providerID
+  }
+
+  /// The folder's entry with another agent, where it stands: a switch of agent is a use of the
+  /// folder, not a new folder chosen. A folder the history does not hold is left out of it.
+  public func recordingAgent(_ providerID: String, forFolder path: String) -> RecentFolders {
+    RecentFolders(entries.map { $0.names(path) ? $0.with(providerID: providerID) : $0 })
+  }
+
+  /// A history written before it kept agents, given the agent of each folder's latest session:
+  /// read once at launch, rather than looked up among the sessions at every proposal.
+  public func fillingAgents(from sessions: [WorkSession]) -> RecentFolders {
+    RecentFolders(
+      entries.map { entry in
+        guard entry.providerID == nil,
+          let agent = Self.latestAgent(inFolder: entry.path, sessions: sessions)
+        else { return entry }
+        return entry.with(providerID: agent)
+      })
   }
 
   /// The folder a session gives the history: one the user started a session in, never a worktree

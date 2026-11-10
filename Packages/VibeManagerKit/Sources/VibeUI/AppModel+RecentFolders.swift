@@ -18,7 +18,8 @@ extension AppModel {
     if let stored {
       // Written before #529, it may list the worktrees of coordinators' children. Read by the
       // rule that records folders, it never loses one that recording would keep.
-      base = stored.droppingWorktrees(recordedIn: sessions)
+      // Written before #534, it knows no agent: each folder takes its latest session's.
+      base = stored.droppingWorktrees(recordedIn: sessions).fillingAgents(from: sessions)
     } else if case .loaded(let sessions) = state {
       base = RecentFolders.seeded(from: sessions)
     } else {
@@ -60,10 +61,7 @@ extension AppModel {
   var offeredRecentFolders: [RecentFolder] {
     let entries = recentFolders.entries
     guard let noted = notedFolder else { return entries }
-    let spelling = RecentFolder.lexicalKey(of: noted.path)
-    let isNoted = { (entry: RecentFolder) in
-      entry.key == noted.key || RecentFolder.lexicalKey(of: entry.path) == spelling
-    }
+    let isNoted = { (entry: RecentFolder) in entry.key == noted.key || entry.names(noted.path) }
     let top = entries.first(where: isNoted) ?? noted
     return Array(([top] + entries.filter { !isNoted($0) }).prefix(RecentFolders.limit))
   }
@@ -78,9 +76,13 @@ extension AppModel {
     guard let path = RecentFolders.folder(of: session) else { return }
     let lexical = RecentFolder.lexicalKey(of: path)
     let key = await Task.detached { CanonicalPath.of(lexical) }.value
+    // The agent of the folder's latest session, not necessarily this one's: two sessions started
+    // back to back finish launching in any order, and the later one is the folder's last use.
+    let agent =
+      RecentFolders.latestAgent(inFolder: path, sessions: sessions) ?? session.agent?.providerID
     // A folder seeded from the sessions was keyed by its spelling: that entry is this folder too.
     recentFolders = recentFolders.removing(key: lexical).recording(
-      RecentFolder(path: path, key: key, providerID: session.agent?.providerID))
+      RecentFolder(path: path, key: key, providerID: agent))
     // In the history now: the note that stood for it goes, in the same step.
     if let noted = notedFolder, RecentFolder.lexicalKey(of: noted.path) == lexical {
       notedFolder = nil
@@ -100,6 +102,22 @@ extension AppModel {
       return agent
     }
     return recentFolders.agent(forFolder: path, sessions: sessions)
+  }
+
+  /// The agent a session was just switched to (#534) becomes its folder's, where the folder stands
+  /// in the history: switching is the folder's latest use. A folder the history no longer holds
+  /// is found through its sessions anyway.
+  func rememberAgent(of session: WorkSession) async {
+    guard let path = RecentFolders.folder(of: session), let agent = session.agent?.providerID
+    else { return }
+    if let noted = notedFolder, noted.names(path) {
+      notedFolder = noted.with(providerID: agent)
+    }
+    let updated = recentFolders.recordingAgent(agent, forFolder: path)
+    guard updated != recentFolders else { return }
+    recentFolders = updated
+    guard recentFolderHistory == .ready else { return }
+    await recentFolderStore.save(recentFolders)
   }
 
   /// Remove from Recents, from a card of the sheet.

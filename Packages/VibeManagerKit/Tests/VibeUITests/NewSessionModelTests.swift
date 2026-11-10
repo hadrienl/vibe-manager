@@ -580,17 +580,41 @@ private actor PlanCounter {
   func record() { count += 1 }
 }
 
+/// Holds whoever passes until it is opened.
+private actor ModelsGate {
+  private var isOpen = false
+  private var waiting: [CheckedContinuation<Void, Never>] = []
+  private(set) var arrivals = 0
+
+  func pass() async {
+    arrivals += 1
+    guard !isOpen else { return }
+    await withCheckedContinuation { waiting.append($0) }
+  }
+
+  func open() {
+    isOpen = true
+    waiting.forEach { $0.resume() }
+    waiting = []
+  }
+}
+
 private struct StubProvider: AgentProvider {
   let descriptor: AgentDescriptor
   let state: AgentAvailabilityState
   let catalog: [AgentModel]
   let plans: PlanCounter?
+  /// Counts the reads of the models, and holds them until opened (#534).
+  let modelReads: PlanCounter?
+  let modelsGate: ModelsGate?
 
   init(
     id: String,
     state: AgentAvailabilityState,
     models: [AgentModel] = [],
-    plans: PlanCounter? = nil
+    plans: PlanCounter? = nil,
+    modelReads: PlanCounter? = nil,
+    modelsGate: ModelsGate? = nil
   ) {
     descriptor = AgentDescriptor(
       id: AgentProviderID(id),
@@ -604,6 +628,8 @@ private struct StubProvider: AgentProvider {
     self.state = state
     catalog = models
     self.plans = plans
+    self.modelReads = modelReads
+    self.modelsGate = modelsGate
   }
 
   func availability(forceRefresh: Bool) async -> AgentAvailability {
@@ -621,7 +647,11 @@ private struct StubProvider: AgentProvider {
     )
   }
 
-  func models() async -> [AgentModel] { catalog }
+  func models() async -> [AgentModel] {
+    await modelReads?.record()
+    await modelsGate?.pass()
+    return catalog
+  }
 
   func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
     await plans?.record()
@@ -1094,7 +1124,7 @@ private actor MappedFolders: WorkingDirectoryProbe {
 }
 
 private func recent(_ paths: String...) -> [RecentFolder] {
-  paths.map(RecentFolder.init(lexicalPath:))
+  paths.map { RecentFolder(lexicalPath: $0) }
 }
 
 @MainActor
@@ -1515,13 +1545,86 @@ struct NewSessionFolderAgentTests {
     await model.load()
     #expect(model.draft.providerID == "claude-code")
 
+    // No call from the view: the draft's own change is enough, whatever made it.
     model.draft.workingDirectoryPath = ""
     for character in "/work/api" {
       model.draft.workingDirectoryPath?.append(character)
-      model.draftChanged()
     }
 
     await waitUntil { model.draft.providerID == "codex" }
+  }
+
+  @Test("A model, an effort or Coordinate set by hand keeps the agent they belong to")
+  func handSetOptionsKeepTheAgent() async {
+    let model = makeModel(remembered: ["/work/api": "codex", "/work/web": "codex"])
+    await model.load()
+    model.draft.modelID = "opus"
+    await model.folderChosen("/work/api")
+    #expect(model.draft.providerID == "claude-code")
+    #expect(model.draft.modelID == "opus")
+
+    let coordinating = makeModel(remembered: ["/work/web": "codex"])
+    await coordinating.load()
+    coordinating.draft.coordination = .coordinator
+    await coordinating.folderChosen("/work/web")
+    #expect(coordinating.draft.providerID == "claude-code")
+    #expect(coordinating.draft.coordination == .coordinator)
+  }
+
+  @Test("Send keeps the agent on screen, even with a typed folder about to bring another")
+  func sendHoldsTheAgent() async throws {
+    let model = makeModel(remembered: ["/work/api": "codex"])
+    await model.load()
+
+    model.draft.workingDirectoryPath = "/work/api"
+    model.holdAgentForSending()
+    // Well past the pause the proposal waited for: cancelled, it never comes.
+    try await Task.sleep(for: .milliseconds(200))
+
+    #expect(model.draft.providerID == "claude-code")
+  }
+
+  @Test("Opening on a folder reads the models of its agent only, once")
+  func openingReadsTheModelsOnce() async {
+    let claudeReads = PlanCounter()
+    let codexReads = PlanCounter()
+    let model = makeModel(
+      providers: [
+        StubProvider(id: "claude-code", state: .available, modelReads: claudeReads),
+        StubProvider(id: "codex", state: .available, modelReads: codexReads),
+      ],
+      recentFolders: recent("/work/api"), remembered: ["/work/api": "codex"])
+
+    await model.load()
+
+    #expect(model.draft.providerID == "codex")
+    #expect(await claudeReads.count == 0)
+    #expect(await codexReads.count == 1)
+  }
+
+  @Test("The models of an agent the folder replaced are dropped when they come back late")
+  func lateModelsAreDropped() async {
+    let gate = ModelsGate()
+    let model = makeModel(
+      providers: [
+        StubProvider(
+          id: "claude-code", state: .available,
+          models: [AgentModel(id: "opus", displayName: "Opus")], modelsGate: gate),
+        StubProvider(
+          id: "codex", state: .available, models: [AgentModel(id: "gpt", displayName: "GPT")]),
+      ],
+      remembered: ["/work/api": "codex"])
+    let loading = Task { await model.load() }
+    // Claude Code's models are being read, and held.
+    await waitUntil("Claude Code's models read") { await gate.arrivals == 1 }
+
+    await model.folderChosen("/work/api")
+    #expect(model.models.map(\.id) == ["gpt"])
+    await gate.open()
+    await loading.value
+
+    #expect(model.draft.providerID == "codex")
+    #expect(model.models.map(\.id) == ["gpt"])
   }
 
   @Test("An agent the user picked is never replaced by the folder's")

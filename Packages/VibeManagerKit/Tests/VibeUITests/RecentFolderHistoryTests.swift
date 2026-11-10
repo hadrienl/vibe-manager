@@ -111,6 +111,60 @@ struct RecentFolderHistoryTests {
     #expect(await store.load()?.entries.first?.providerID == "codex")
   }
 
+  @Test("Two sessions started back to back leave the agent of the later one (#534)")
+  func backToBackCreationsKeepTheLatestAgent() async throws {
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent(
+      UUID().uuidString
+    ).path
+    try FileManager.default.createDirectory(atPath: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(atPath: folder) }
+    let model = AppModel(
+      repository: HistoryRepository(values: []), recentFolderStore: InMemoryRecentFolderStore())
+    await model.load()
+    func session(_ agent: String, at seconds: TimeInterval) -> WorkSession {
+      SessionDraft(
+        name: "Session", initialPrompt: "", providerID: agent, workingDirectoryPath: folder
+      ).session(createdAt: Date(timeIntervalSince1970: seconds))
+    }
+    let earlier = session("codex", at: 1_699_000_000)
+    let later = session("claude-code", at: 1_699_000_100)
+
+    // The later one finishes launching first.
+    await model.complete(SessionCreation(session: later, plan: plan(folder)), launching: false)
+    await model.complete(SessionCreation(session: earlier, plan: plan(folder)), launching: false)
+
+    #expect(model.rememberedAgent(forFolder: folder) == "claude-code")
+  }
+
+  @Test("A session switched to another agent leaves that agent to its folder (#534)")
+  func switchedAgentIsRemembered() async throws {
+    let store = InMemoryRecentFolderStore()
+    var session = session(in: "/work/api")
+    let model = AppModel(
+      repository: HistoryRepository(values: [session, self.session(in: "/work/web")]),
+      recentFolderStore: store)
+    await model.load()
+
+    session.agent = SessionAgentConfiguration(providerID: "codex")
+    await model.rememberAgent(of: session)
+
+    #expect(model.rememberedAgent(forFolder: "/work/api") == "codex")
+    #expect(model.recentFolders.entries.map(\.path) == ["/work/web", "/work/api"])
+    #expect(await store.load() == model.recentFolders)
+  }
+
+  @Test("A history written before agents were kept takes them from the sessions (#534)")
+  func olderHistoryIsFilled() async {
+    let store = InMemoryRecentFolderStore(RecentFolders([RecentFolder(lexicalPath: "/work/api")]))
+    let model = AppModel(
+      repository: HistoryRepository(values: [session(in: "/work/api")]), recentFolderStore: store)
+
+    await model.load()
+
+    #expect(model.recentFolders.entries.first?.providerID == "stub")
+    #expect(await store.load() == model.recentFolders)
+  }
+
   @Test("A history already written is read as it is, even empty")
   func storedHistoryIsNotReseeded() async {
     let store = InMemoryRecentFolderStore(RecentFolders())
@@ -217,7 +271,8 @@ struct RecentFolderHistoryTests {
         recent(
           "/work/api/.claude/worktrees/feat-1", "/work/web", "/elsewhere/feat-3",
           "/work/api/.claude/worktrees/fix-2")))
-    let model = AppModel(repository: HistoryRepository(values: [recorded]), recentFolderStore: store)
+    let model = AppModel(
+      repository: HistoryRepository(values: [recorded]), recentFolderStore: store)
 
     await model.load()
 
@@ -251,7 +306,7 @@ struct RecentFolderHistoryTests {
   }
 
   private func recent(_ paths: String...) -> [RecentFolder] {
-    paths.map(RecentFolder.init(lexicalPath:))
+    paths.map { RecentFolder(lexicalPath: $0) }
   }
 }
 

@@ -258,6 +258,36 @@ struct RecentFolderAgentTests {
     #expect(folders.entries.map(\.providerID) == ["claude-code"])
   }
 
+  @Test("A switch of agent changes the folder's agent where it stands, and adds no folder")
+  func recordingAnAgent() {
+    let folders = RecentFolders([
+      RecentFolder(path: "/a", key: "/a", providerID: "codex"),
+      RecentFolder(path: "/b", key: "/b", providerID: "codex"),
+    ])
+
+    let switched = folders.recordingAgent("claude-code", forFolder: "/b/")
+
+    #expect(switched.entries.map(\.path) == ["/a", "/b"])
+    #expect(switched.entries.map(\.providerID) == ["codex", "claude-code"])
+    #expect(folders.recordingAgent("claude-code", forFolder: "/c") == folders)
+  }
+
+  @Test("An older history takes each folder's latest agent, and keeps the ones it knows")
+  func fillingAgents() {
+    let folders = RecentFolders([
+      folder("/a"), RecentFolder(path: "/b", key: "/b", providerID: "codex"), folder("/c"),
+    ])
+    let sessions = [
+      session(folder: "/a", agent: "codex", createdAt: 1),
+      session(folder: "/a", agent: "claude-code", createdAt: 2),
+      session(folder: "/b", agent: "claude-code", createdAt: 3),
+    ]
+
+    #expect(
+      folders.fillingAgents(from: sessions).entries.map(\.providerID)
+        == ["claude-code", "codex", nil])
+  }
+
   @Test("A history written before agents were kept reads as it was")
   func readsAnOlderHistory() throws {
     let json = #"[{"path":"/a","key":"/a"}]"#

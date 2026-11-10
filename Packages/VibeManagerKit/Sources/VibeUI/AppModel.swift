@@ -2414,6 +2414,7 @@ public final class AppModel {
       guard let switched = try await repository.session(id: id) else {
         throw AgentSwitchRefusal.sessionMissing
       }
+      await rememberAgent(of: switched)
 
       // 5. The new agent, in the same pane, under a separator naming both. The attempts are
       // recorded before the launch: a CLI that refuses at once can exit — and its close be
@@ -2495,6 +2496,9 @@ public final class AppModel {
     let suggestion: String
     do {
       try await revertAgentSwitch(id: id, change: change.id, reason: reason)
+      if let reverted = try? await repository.session(id: id) {
+        await rememberAgent(of: reverted)
+      }
       suggestion = String(
         localized: "The session is back on \(previous).", bundle: .module,
         comment: "An agent's name.")
