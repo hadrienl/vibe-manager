@@ -1068,6 +1068,8 @@ public struct NewSessionDraftView: View {
       NSSound.beep()
       return
     }
+    // Before any hop: what is sent is the agent on screen at the click (#534).
+    model.holdAgentForSending()
     Task {
       guard await model.refusesBeforeCreating() else {
         submitted(launching)
