@@ -139,9 +139,10 @@ struct RecentFolderHistoryTests {
   @Test("A session switched to another agent leaves that agent to its folder (#534)")
   func switchedAgentIsRemembered() async throws {
     let store = InMemoryRecentFolderStore()
-    var session = session(in: "/work/api")
+    // Distinct dates: the history lists the newest first, and a tie has no order.
+    var session = session(in: "/work/api", createdAt: 1)
     let model = AppModel(
-      repository: HistoryRepository(values: [session, self.session(in: "/work/web")]),
+      repository: HistoryRepository(values: [session, self.session(in: "/work/web", createdAt: 2)]),
       recentFolderStore: store)
     await model.load()
 
