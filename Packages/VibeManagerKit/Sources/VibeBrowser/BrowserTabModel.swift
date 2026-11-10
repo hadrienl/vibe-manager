@@ -674,7 +674,7 @@ extension BrowserTabModel: WKNavigationDelegate, WKUIDelegate {
     for navigationAction: WKNavigationAction, windowFeatures: WKWindowFeatures
   ) -> WKWebView? {
     let target = navigationAction.request.url ?? URL(string: "about:blank")!
-    // A window a page opens comes to the front, unless the user ⌘-clicked the link that opens it.
+    // A window a page opens comes to the front, unless the user ⇧⌘-clicked the link that opens it.
     let activate: Bool
     if case .newTab(let inFront) = BrowserLinkGesture.decide(
       navigationAction, isAgentDriven: isAgentDriven)

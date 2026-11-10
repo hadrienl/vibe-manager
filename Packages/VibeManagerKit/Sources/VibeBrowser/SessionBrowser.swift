@@ -20,7 +20,7 @@ public final class SessionBrowser {
   public private(set) var actionLog = BrowserActionLog()
   /// Agent actions recorded since the trace was last looked at: the badge on its button.
   public private(set) var unseenActionCount = 0
-  /// Tabs opened behind — a link ⌘-clicked in a page (#186), an agent's page — since the user last
+  /// Tabs opened behind — a link ⇧⌘-clicked in a page (#186), an agent’s page — since the user last
   /// looked at the list of tabs (#536): the tab button says so, the list hiding them.
   public private(set) var unseenTabIDs: Set<BrowserTabID> = []
   /// An agent opened a page while the session was not on screen: its row says so.
@@ -95,7 +95,7 @@ public final class SessionBrowser {
   }
 
   /// A new tab after `anchor`, and after the tabs `anchor` opened before it since the user last
-  /// turned to a tab: three links ⌘-clicked in a page line up in the order they were clicked (#186).
+  /// turned to a tab: three links ⇧⌘-clicked in a page line up in the order they were clicked (#186).
   /// `isOpener`: the tab was opened from `anchor`'s page, rather than only placed after it — a
   /// terminal's link, an agent's page — and later ones from that page line up after it.
   func append(

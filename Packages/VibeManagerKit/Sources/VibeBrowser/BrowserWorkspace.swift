@@ -234,7 +234,7 @@ public final class BrowserWorkspace {
   }
 
   /// A window a page opened, shown as a tab after its opener's: in front, unless the user
-  /// ⌘-clicked the link that opened it.
+  /// ⇧⌘-clicked the link that opened it.
   private func adoptPopup(
     _ popup: WKWebView, url: URL, byAgent: Bool, activate: Bool, from origin: BrowserTabID?,
     in id: SessionID
