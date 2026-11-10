@@ -131,6 +131,18 @@ struct BrowserTabPinningTests {
     #expect(browser.unseenTabIDs.isEmpty)
   }
 
+  @Test("Close All closes the tabs that are not pinned, and brings a pinned one forward")
+  func closeUnpinned() {
+    let workspace = BrowserWorkspace()
+    let (browser, ids) = browser(in: workspace)
+    browser.setPinned(ids[2], true)
+    browser.activate(ids[3])
+
+    workspace.closeUnpinnedTabs(in: session)
+    #expect(browser.tabs.map(\.id) == [ids[2]])
+    #expect(browser.activeTab?.id == ids[2])
+  }
+
   @Test("A tab kept before pinning existed is not pinned")
   func decodesWithoutPinning() throws {
     let json = """

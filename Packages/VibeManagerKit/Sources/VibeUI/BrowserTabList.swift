@@ -192,12 +192,26 @@ struct BrowserTabList: View {
             "Pinned", bundle: .module,
             comment: "A heading in the list of web tabs, above the tabs the user pinned."))
         ForEach(pinned) { row($0) }
-        if !others.isEmpty {
-          separator
+        if !others.isEmpty { separator }
+      }
+      if !others.isEmpty {
+        HStack(alignment: .firstTextBaseline) {
           header(
             Text(
               "Tabs", bundle: .module,
               comment: "A heading in the list of web tabs, above the tabs that are not pinned."))
+          Spacer(minLength: 8)
+          // The pinned tabs and the ticket's stay.
+          Button {
+            workspace.closeUnpinnedTabs(in: browser.sessionID)
+          } label: {
+            Text(
+              "Close All", bundle: .module,
+              comment: "Closes the web tabs that are not pinned, in the list of tabs.")
+          }
+          .buttonStyle(.borderless)
+          .font(.caption)
+          .padding(.trailing, 8)
         }
       }
       ForEach(others) { row($0) }

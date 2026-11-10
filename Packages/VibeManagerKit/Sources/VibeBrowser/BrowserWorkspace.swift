@@ -267,6 +267,12 @@ public final class BrowserWorkspace {
     open(url, in: id, openedBy: .terminalLink)
   }
 
+  /// Closes the tabs the user did not pin (#536): the pinned ones and the ticket's stay.
+  public func closeUnpinnedTabs(in id: SessionID) {
+    guard let browser = browsers[id] else { return }
+    for tab in browser.tabs where !tab.isPinned { close(tab.id, in: id) }
+  }
+
   public func close(_ tabID: BrowserTabID, in id: SessionID) {
     guard let browser = browsers[id], let tab = browser.tab(tabID), !tab.isPinnedTicket else {
       return
