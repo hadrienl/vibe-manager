@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 import VibeDomain
 
@@ -208,6 +209,24 @@ public struct AgentToolPermission: Hashable, Codable, Sendable {
     case terminalInput
     case mcp(server: String, tool: String)
     case other(String)
+  }
+
+  /// The terminal named by a write_stdin hook, kept separate from its input.
+  public var terminalSessionID: String? {
+    guard tool == .terminalInput, let details,
+      let object = try? JSONSerialization.jsonObject(with: Data(details.utf8)) as? [String: Any],
+      let number = object["session_id"] as? NSNumber,
+      CFGetTypeID(number) != CFBooleanGetTypeID()
+    else { return nil }
+    return number.stringValue
+  }
+
+  /// A quoted input keeps Return, tabs and newlines visible instead of drawing control glyphs.
+  public var quotedTerminalInput: String? {
+    guard tool == .terminalInput, let subject,
+      let data = try? JSONEncoder().encode(subject)
+    else { return nil }
+    return String(decoding: data, as: UTF8.self)
   }
 
   public let tool: Tool
@@ -579,8 +598,14 @@ extension AgentActivityState {
     // A dialog drawn that may be this one's: the screen will tell, before anything is typed
     // (#283).
     let mayBeOnScreen =
-      keymap.readsRequestOnScreen && drawnCandidates.contains(request.id)
-      && AgentDrawnDialog.showsWhole(request)
+      keymap.readsRequestOnScreen && AgentDrawnDialog.showsWhole(request)
+      && (drawnCandidates.contains(request.id)
+        || {
+          if case .permission(let permission) = request.content {
+            return permission.tool == .terminalInput && permission.terminalSessionID != nil
+          }
+          return false
+        }())
     // In doubt, a dialog may well be on screen — only not known to be this one's (#280): the
     // answer is given in the session, not waited for.
     guard !isFirstRequestUncertain || mayBeOnScreen else { return .inTerminalOnly(.uncertain) }

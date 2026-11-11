@@ -294,15 +294,14 @@ public struct ClaudeCodeAnswerKeymap: AgentAnswerKeymap {
 /// skips it, `3` skips it until the next version — both checked against 0.159.2. Updating is left
 /// to the terminal, where what it runs is seen.
 ///
-/// `request_permissions` and `write_stdin` are answered in the terminal (#273): Codex says
-/// nothing when it draws the first, and quotes the second cut too short to tell one from another,
-/// so neither is ever known on screen. Escape would not refuse the first anyway: `d` does.
+/// `request_permissions` stays in the terminal: Escape does not refuse it. Terminal input
+/// approvals are checked against the terminal number and the complete quoted input on screen.
 public struct CodexAnswerKeymap: AgentAnswerKeymap {
   public init() {}
 
   public func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> {
     switch content {
-    case .permission(let permission) where [.grant, .terminalInput].contains(permission.tool):
+    case .permission(let permission) where permission.tool == .grant:
       return []
     case .permission(let permission):
       // A host's access says nothing of commands: no "always" there, whatever the tool.
@@ -342,7 +341,7 @@ public struct CodexAnswerKeymap: AgentAnswerKeymap {
     for answer: AgentAnswer, to content: AgentRequestContent, screen: AgentDialogScreen?
   ) -> [[UInt8]]? {
     switch (answer, content) {
-    case (_, .permission(let permission)) where [.grant, .terminalInput].contains(permission.tool):
+    case (_, .permission(let permission)) where permission.tool == .grant:
       return nil
     case (.allowOnce, .permission(let permission)):
       if case .mcp = permission.tool {
