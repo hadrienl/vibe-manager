@@ -1,4 +1,5 @@
 import Foundation
+import VibeDomain
 
 public enum AgentResumeRequest: Hashable, Sendable {
   case none
@@ -16,6 +17,8 @@ public struct AgentLaunchRequest: Hashable, Sendable {
   public var harnessID: String?
   /// The reasoning effort to start the agent with (#411); `nil` leaves the agent's own default.
   public var effort: String?
+  /// An endpoint overrides the native Codex agent’s preference with its own mode.
+  public var codexApprovalMode: CodexApprovalMode?
 
   public init(
     workingDirectoryPath: String,
@@ -24,8 +27,10 @@ public struct AgentLaunchRequest: Hashable, Sendable {
     initialPrompt: String? = nil,
     resume: AgentResumeRequest = .none,
     additionalEnvironment: [String: String] = [:],
-    harnessID: String? = nil
+    harnessID: String? = nil,
+    codexApprovalMode: CodexApprovalMode? = nil
   ) {
+    self.codexApprovalMode = codexApprovalMode
     self.harnessID = harnessID
     self.effort = effort
     self.workingDirectoryPath = workingDirectoryPath

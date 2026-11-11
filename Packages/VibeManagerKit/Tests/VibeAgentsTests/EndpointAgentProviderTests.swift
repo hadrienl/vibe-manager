@@ -106,6 +106,28 @@ struct EndpointAgentProviderTests {
       gateway: gateway, secrets: secrets)
   }
 
+  @Test("Each Codex endpoint applies its own approval mode, including on resume")
+  func approvalModes() async throws {
+    for mode in CodexApprovalMode.allCases {
+      var endpoint = Self.endpoint(wire: .responses, authentication: .none)
+      endpoint.codexApprovalMode = mode
+      let agent = provider(endpoint)
+      for resume in [AgentResumeRequest.none, .identifier("session-123")] {
+        let plan = try await agent.launchPlan(
+          for: AgentLaunchRequest(
+            workingDirectoryPath: "/tmp", resume: resume, harnessID: "codex"))
+        #expect(plan.arguments.contains("--approve-for-me") == (mode == .autoReview))
+      }
+      endpoint.harness = .claudeCode
+      endpoint.codexApprovalMode = .autoReview
+      let claude = try await provider(endpoint).launchPlan(
+        for: AgentLaunchRequest(
+          workingDirectoryPath: "/tmp"))
+      #expect(!claude.arguments.contains("--approve-for-me"))
+      #expect(!claude.arguments.contains("approvals_reviewer=\"user\""))
+    }
+  }
+
   @Test("Registered under its own identifier and name, offering only the models that call tools")
   func describesItself() async {
     let endpoint = Self.endpoint(authentication: .none)
@@ -235,7 +257,8 @@ struct EndpointAgentProviderTests {
   func slashedModel() async throws {
     let gateway = RecordingGateway()
     let endpoint = Self.endpoint(
-      authentication: .none, models: [EndpointModel(id: "qwen/qwen3-coder", contextWindow: 262_144)])
+      authentication: .none, models: [EndpointModel(id: "qwen/qwen3-coder", contextWindow: 262_144)]
+    )
     let provider = EndpointAgentProvider(
       endpoint: endpoint, harness: .claudeCode(Self.claude()), gateway: gateway,
       secrets: InMemoryEndpointSecretStore(), makeToken: { "t" })

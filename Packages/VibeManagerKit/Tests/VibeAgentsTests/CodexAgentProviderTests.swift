@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VibeApplication
+import VibeDomain
 
 @testable import VibeAgents
 
@@ -11,7 +12,8 @@ struct CodexAgentProviderTests {
   private func provider(
     location: ExecutableLocation = .found(
       path: CodexAgentProviderTests.path, source: .candidateDirectory),
-    probe: StubProcessProbe
+    probe: StubProcessProbe,
+    preferences: (any CodexApprovalPreferences)? = nil
   ) -> CodexAgentProvider {
     let environment = ["PATH": "/usr/bin", "HOME": "/Users/test"]
     return CodexAgentProvider(
@@ -32,8 +34,27 @@ struct CodexAgentProviderTests {
       ),
       catalog: CodexModelCatalog(cacheURL: URL(fileURLWithPath: "/nonexistent/models_cache.json")),
       discovery: CodexRolloutSessionDiscovery(
-        sessionsDirectory: URL(fileURLWithPath: "/nonexistent/sessions"))
+        sessionsDirectory: URL(fileURLWithPath: "/nonexistent/sessions")),
+      approvalPreferences: preferences
     )
+  }
+
+  @MainActor
+  @Test("A saved mode is read at every launch and an endpoint can override it")
+  func approvalPreference() async throws {
+    let preferences = InMemoryCodexApprovalPreferences(mode: .autoReview)
+    let agent = provider(probe: StubProcessProbe(), preferences: preferences)
+    let request = AgentLaunchRequest(workingDirectoryPath: "/tmp")
+    let auto = try await agent.launchPlan(for: request)
+    #expect(auto.arguments.contains("--approve-for-me"))
+    preferences.setMode(.manual, for: CodexAgentProvider.id)
+    let manual = try await agent.launchPlan(for: request)
+    #expect(!manual.arguments.contains("--approve-for-me"))
+    #expect(manual.arguments.contains("approvals_reviewer=\"user\""))
+    var overridden = request
+    overridden.codexApprovalMode = .autoReview
+    let endpoint = try await agent.launchPlan(for: overridden)
+    #expect(endpoint.arguments.contains("--approve-for-me"))
   }
 
   @Test("Codex follow-ups steer the active turn; its queue key remains available for commands")
