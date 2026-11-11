@@ -25,6 +25,37 @@ public final class AgentSwitchModel {
     case nothing
   }
 
+  public enum ContextChoice: Hashable {
+    case resume, history, summary
+  }
+
+  /// Explicitly starting afresh also applies to a model change within the same provider.
+  private var startsNewConversation = false
+
+  public var offersContextChoice: Bool {
+    session.hasEverStarted && selectedAgent?.descriptor.capabilities.supportsInitialPrompt == true
+  }
+
+  public var contextChoice: ContextChoice {
+    get {
+      if canResumeConversation && !skipsResume { return .resume }
+      return includesConversationHistory ? .history : .summary
+    }
+    set {
+      switch newValue {
+      case .resume:
+        startsNewConversation = false
+        retriesFailedResume = true
+      case .history:
+        startsNewConversation = true
+        includesConversationHistory = true
+      case .summary:
+        startsNewConversation = true
+        includesConversationHistory = false
+      }
+    }
+  }
+
   public let sessionID: SessionID
   public let sessionName: String
   public let current: SessionAgentConfiguration
@@ -32,11 +63,11 @@ public final class AgentSwitchModel {
   public let stopsRunningAgent: Bool
   /// Whether the agent dropped this conversation within seconds the last time it was resumed.
   public let resumeFailedBefore: Bool
-  /// The user's answer when it did: try resuming it once more, with the new model, rather than
-  /// handing over. Off by default — what failed is not retried unless asked.
+  /// Whether a new conversation is handed copied logs rather than the session summary.
   public var includesConversationHistory = false
   public var offersConversationHistory: Bool { planner.supportsConversationHistory }
 
+  /// Failed resume is retried only when explicitly selected.
   public var retriesFailedResume = false {
     didSet { regenerateUnlessEdited() }
   }
@@ -131,10 +162,9 @@ public final class AgentSwitchModel {
     resumeFailedBefore && canResumeConversation
   }
 
-  /// Whether the switch skips the agent's own resume: it failed last time, and nobody asked to try
-  /// it again.
+  /// Skip native resume when a new conversation was chosen, or a failed resume was not retried.
   public var skipsResume: Bool {
-    offersResumeRetry && !retriesFailedResume
+    startsNewConversation || (offersResumeRetry && !retriesFailedResume)
   }
 
   public var handover: Handover {
@@ -229,7 +259,7 @@ public final class AgentSwitchModel {
           "The new agent will read copies of the available conversation logs, including tool calls and results. Copies are kept on this Mac and may contain sensitive information. Internal state and running operations are not restored.",
         bundle: .module)
     case .summary:
-      if skipsResume {
+      if offersResumeRetry && !retriesFailedResume && !startsNewConversation {
         return String(
           localized: """
             \(currentName) stopped as soon as this conversation was resumed last time, so \

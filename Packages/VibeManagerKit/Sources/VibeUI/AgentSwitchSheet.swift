@@ -43,29 +43,21 @@ struct AgentSwitchSheet: View {
       }
       notice(model.continuityNotice, symbol: "info.circle", tint: .secondary)
 
-      if model.offersResumeRetry {
-        // Off by default: what failed is not retried unless asked. Worth asking when the model
-        // was what the agent refused, and switching it is precisely the fix.
-        Toggle(isOn: $model.retriesFailedResume) {
-          Text("Try resuming the conversation anyway", bundle: .module)
+      if model.offersContextChoice {
+        Picker(selection: $model.contextChoice) {
+          if model.canResumeConversation {
+            Text("Continue the conversation", bundle: .module)
+              .tag(AgentSwitchModel.ContextChoice.resume)
+          }
+          if model.offersConversationHistory {
+            Text("New conversation with history", bundle: .module)
+              .tag(AgentSwitchModel.ContextChoice.history)
+          }
+          Text("New conversation with summary", bundle: .module)
+            .tag(AgentSwitchModel.ContextChoice.summary)
+        } label: {
+          Text("Conversation", bundle: .module)
         }
-        .toggleStyle(.checkbox)
-        .instantTooltip(
-          Text(
-            """
-            Worth trying when the previous model is what the agent refused, rather than the \
-            conversation itself.
-            """,
-            bundle: .module))
-      }
-
-      if model.offersConversationHistory,
-        model.handover == .summary || model.handover == .conversationHistory
-      {
-        Toggle(isOn: $model.includesConversationHistory) {
-          Text("Pass conversation history", bundle: .module)
-        }
-        .toggleStyle(.checkbox)
       }
 
       if model.handover == .summary {

@@ -272,6 +272,7 @@ struct SessionScenarioTests {
     environment.appModel.beginAgentSwitch(id, preselected: AgentTarget(providerID: "mock-b"))
     let sheet = try #require(environment.appModel.pendingSwitch)
     #expect(await eventually { sheet.canSwitch })
+    sheet.contextChoice = .summary
     #expect(sheet.handover == .summary)
     await environment.appModel.confirmAgentSwitch()
 

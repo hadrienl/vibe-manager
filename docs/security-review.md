@@ -133,7 +133,7 @@ pid, so a `git` that started a helper or a login shell whose profile started one
 
 ## Conversation handover snapshots (#539)
 
-Choosing **Pass conversation history** copies the session's available native Claude Code and
+Choosing **New conversation with history** copies the session's available native Claude Code and
 Codex JSONL logs (including endpoint harnesses and Claude and Codex sub-agents) to
 `Handovers/<session UUID>/<snapshot UUID>` beside the session store. Each export creates an
 owner-only directory and 0600 copies and index; raw tool output and messages may contain secrets.

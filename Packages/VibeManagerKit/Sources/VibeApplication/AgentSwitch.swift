@@ -302,8 +302,8 @@ public struct PlanAgentSwitch: Sendable {
   ///   - context: the branch report and Git states known right now, and the agents' names.
   ///   - summaryOverride: the summary as the user left it in the sheet. Empty means "tell it
   ///     nothing"; `nil` means the generated one.
-  ///   - skippingResume: do not try the agent's own resume — it dropped this conversation last
-  ///     time, and the user did not ask to try again.
+  ///   - skippingResume: start a new conversation when the user chose history or summary, or
+  ///     skip a conversation the agent dropped last time unless the user retries it.
   ///   - expecting: the mode the sheet showed. A plan that turns out otherwise is refused rather
   ///     than run: a summary nobody read must not be sent, nor one somebody read be dropped.
   public func callAsFunction(

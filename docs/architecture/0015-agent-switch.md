@@ -22,13 +22,13 @@ running agent can only be told apart from a stopped one, not a busy one from an 
 
 | Switch | What runs | Conversation |
 |---|---|---|
-| Same agent, another model, with a conversation to resume | `--resume <id>` with the new `--model` (`codex resume -m`) | goes on; no text is sent |
+| Same agent, another model, with a conversation to resume and continuation selected (default) | `--resume <id>` with the new `--model` (`codex resume -m`) | goes on; no text is sent |
 | Same agent without an identifier, or another agent | a new process, instructed to read copied logs by default, or handed a summary | logs copied; internal state not transferred |
 | A session that never ran | its first launch, initial prompt included | none existed |
 
 A conversation the agent dropped within seconds the last time it was resumed (#10's
 `resumeRefusals`) is not retried on a change of model unless the user asks: the sheet says so,
-plans a handover, and offers **Try resuming the conversation anyway**, unchecked. The application
+plans a handover, and lets the user explicitly select **Continue the conversation** in the picker. The application
 cannot tell a conversation that is gone from a model the account may not run — both are a quick
 non-zero exit — and only in the second case is switching the model the fix.
 
@@ -106,9 +106,11 @@ behind a switch.
 
 ### Conversation logs are handed over by default (#539)
 
-When a switch needs a new conversation, **Pass conversation history** is selected by default.
-Unchecking it restores the editable summary below. Native resume and first launch bypass this
-choice. Agents that take no initial prompt still receive nothing.
+When a switch needs a new conversation, history is selected by default. The **Conversation**
+picker also offers an editable summary,
+and native continuation when supported. This choice is available when changing models too: an
+explicit history or summary selection skips native resume. Native continuation remains the
+default for a model change when resume has not failed. A first launch bypasses this choice. Agents that take no initial prompt still receive nothing.
 
 `ConversationHandoverExporter` copies the available native JSONL files, without reinterpreting
 or dropping tool results, into `Handovers/<session UUID>/<snapshot UUID>/` beside `sessions.json`.

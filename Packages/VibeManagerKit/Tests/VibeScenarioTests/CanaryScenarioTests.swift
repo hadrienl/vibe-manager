@@ -44,6 +44,7 @@ struct CanaryScenarioTests {
     model.beginAgentSwitch(id, preselected: AgentTarget(providerID: "mock-b"))
     let sheet = try #require(model.pendingSwitch)
     #expect(await eventually { sheet.canSwitch })
+    sheet.contextChoice = .summary
     await model.confirmAgentSwitch()
     #expect(await eventually { await scenario.processIdentifier(id, in: environment) != nil })
 

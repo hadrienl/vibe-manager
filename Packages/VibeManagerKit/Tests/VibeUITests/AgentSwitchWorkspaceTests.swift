@@ -111,6 +111,66 @@ struct AgentSwitchWorkspaceTests {
     #expect(fallback.handover == .resumesConversation)
   }
 
+  @Test("A model change can resume, copy the history or start from the editable summary")
+  func modelChangeContextChoice() async throws {
+    let subject = session(path: folder())
+    let (model, _, _, repository) = await makeWorkspace(
+      session: subject, history: UnavailableHistory())
+    let sheet = try await openSheet(model, for: subject.id)
+    sheet.select(model: "deep")
+    #expect(sheet.offersContextChoice)
+    #expect(sheet.contextChoice == .resume)
+    #expect(sheet.expectedModeKind == .resumeWithModel)
+
+    sheet.contextChoice = .history
+    #expect(sheet.handover == .conversationHistory)
+    #expect(sheet.skipsResume)
+    #expect(sheet.expectedModeKind == .conversationHistory)
+    await model.confirmAgentSwitch()
+    // The exporter refuses: a silent native resume would have launched instead.
+    #expect(model.switchFailure?.message.contains("No conversation logs") == true)
+    #expect(await repository.session(id: subject.id)?.agent == subject.agent)
+
+    let summary = try await openSheet(model, for: subject.id)
+    summary.select(model: "deep")
+    summary.contextChoice = .summary
+    summary.summaryText = "Continue from the parser tests."
+    #expect(summary.handover == .summary)
+    #expect(summary.expectedModeKind == .handover)
+    #expect(summary.skipsResume)
+    #expect(!summary.continuityNotice.contains("stopped as soon"))
+    await model.confirmAgentSwitch()
+    let switched = try #require(await repository.session(id: subject.id))
+    #expect(switched.agent?.modelID == "deep")
+    #expect(switched.agent?.resumeIdentifier != subject.agent?.resumeIdentifier)
+    guard case .summary(_, _, let edited) = switched.agentHistory.last?.handover else {
+      Issue.record("Expected an edited summary instead of native resume")
+      return
+    }
+    #expect(edited)
+  }
+
+  @Test("The explicit context choice survives model changes and can return to native resume")
+  func contextChoiceSurvivesModelSelection() async throws {
+    let subject = session(path: folder())
+    let (model, _, _, _) = await makeWorkspace(session: subject, history: UnavailableHistory())
+    let sheet = try await openSheet(model, for: subject.id)
+    sheet.contextChoice = .summary
+    sheet.summaryText = "Keep these instructions."
+    sheet.select(model: "deep")
+    #expect(sheet.contextChoice == .summary)
+    #expect(sheet.summaryText == "Keep these instructions.")
+    sheet.contextChoice = .history
+    sheet.select(model: nil)
+    #expect(sheet.contextChoice == .history)
+    sheet.contextChoice = .resume
+    #expect(sheet.handover == .resumesConversation)
+    #expect(!sheet.skipsResume)
+    await sheet.select(agent: "other")
+    #expect(!sheet.canResumeConversation)
+    #expect(sheet.contextChoice == .history)
+  }
+
   // MARK: - The sheet
 
   @Test("The sheet opens on the current agent, and offers nothing until something changes")

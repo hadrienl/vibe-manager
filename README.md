@@ -158,7 +158,8 @@ are documented in
 A session can change agent or model without losing its work. Another model of the same agent
 resumes the same conversation and sends nothing; another agent starts a new one, instructed by
 default to read durable copies of the available conversation logs, including tool calls and
-results. Uncheck **Pass conversation history** to send the editable session summary instead.
+results. The **Conversation** menu offers continuing the existing conversation when supported, or starting
+a new one with history or an editable summary, including when only changing models.
 Copies stay on this Mac, outside the repositories; internal state and operations in progress are
 not restored. If no log is available or copying fails, choose the summary or retry.
 Everything that can refuse the switch refuses it while the running agent is
