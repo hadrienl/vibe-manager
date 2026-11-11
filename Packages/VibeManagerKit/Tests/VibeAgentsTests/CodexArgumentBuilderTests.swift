@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VibeApplication
+import VibeDomain
 
 @testable import VibeAgents
 
@@ -26,6 +27,30 @@ struct CodexArgumentBuilderTests {
       descriptor: descriptor
     )
     return try builder.arguments(for: request, promptDelivery: delivery, descriptor: descriptor)
+  }
+
+  @Test(
+    "Approval mode applies to new and resumed sessions before their prompt",
+    arguments: [AgentResumeRequest.none, .identifier("session-123")])
+  func approvalMode(resume: AgentResumeRequest) throws {
+    for mode in CodexApprovalMode.allCases {
+      let request = AgentLaunchRequest(
+        workingDirectoryPath: "/tmp", initialPrompt: "--untrusted-prompt", resume: resume,
+        codexApprovalMode: mode)
+      let args = try builder.arguments(
+        for: request, promptDelivery: .argument, descriptor: descriptor)
+      let separator = try #require(args.firstIndex(of: "--"))
+      if mode == .autoReview {
+        #expect(args[..<separator].contains("--approve-for-me"))
+      } else {
+        #expect(args[..<separator].contains("approvals_reviewer=\"user\""))
+        #expect(args[..<separator].contains("on-request"))
+        #expect(!args.contains("--approve-for-me"))
+      }
+      #expect(!args.contains("--dangerously-bypass-approvals-and-sandbox"))
+      #expect(args.last == "--untrusted-prompt")
+      if case .identifier = resume { #expect(args.first == "resume") }
+    }
   }
 
   @Test("A bare launch only states the working directory")

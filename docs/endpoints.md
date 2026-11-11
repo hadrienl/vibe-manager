@@ -106,3 +106,14 @@ new attempt, shown in the conversation).
 
 `Scripts/agent-bench` runs the reference tasks of `Benchmarks/agent-tasks` on a model through its
 own provider or through an endpoint; see [the benchmark's README](../Benchmarks/agent-tasks/README.md).
+
+## Codex approvals
+
+In Settings → Codex, choose **Manual** or **Automatic** under **Approval mode**. Each additional
+Codex account has its own choice on its agent settings page. For an endpoint driven by Codex
+(including Automatic with the Responses protocol), the same choice is in its **Agent** section.
+
+Manual leaves permission requests to you. Automatic uses Codex’s **Approve for me** mode to review
+requests while keeping the workspace sandbox. It may refuse an action or still require your input.
+The choice is saved per agent and applies to new or restarted sessions, including resumed
+conversations. Existing configurations default to Manual.
