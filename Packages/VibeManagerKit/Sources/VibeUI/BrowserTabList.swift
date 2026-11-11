@@ -111,21 +111,31 @@ struct BrowserTabList: View {
   @State private var dropIndicator: BrowserTabDropIndicator?
   /// The tab being dragged from this list: only a tab of its own is dropped into it.
   @State private var dragged: BrowserTabID?
+  @State private var rowsHeight: CGFloat = 0
   @FocusState private var hasKeyboard: Bool
+
+  static let maxHeight: CGFloat = 420
 
   var body: some View {
     VStack(spacing: 0) {
-      // Grows with the tabs, then scrolls.
-      ViewThatFits(in: .vertical) {
-        rows
-        ScrollViewReader { proxy in
-          ScrollView { rows }
-            .onChange(of: highlighted) { _, id in
-              if let id { proxy.scrollTo(id) }
+      // As tall as its rows, up to `maxHeight`, then it scrolls. Sized from the rows measured, not
+      // by a `maxHeight` frame: in a popover already open, that frame took the size the popover
+      // had, and the list never shrank once tabs were closed.
+      ScrollViewReader { proxy in
+        ScrollView {
+          rows
+            .onGeometryChange(for: CGFloat.self) {
+              $0.size.height
+            } action: {
+              rowsHeight = $0
             }
         }
+        .scrollBounceBehavior(.basedOnSize)
+        .onChange(of: highlighted) { _, id in
+          if let id { proxy.scrollTo(id) }
+        }
       }
-      .frame(maxHeight: 420)
+      .frame(height: min(rowsHeight, Self.maxHeight))
       separator
       Button {
         dismiss()
