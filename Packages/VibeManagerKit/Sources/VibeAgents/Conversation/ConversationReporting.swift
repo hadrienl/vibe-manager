@@ -101,12 +101,12 @@ extension CodexAgentProvider: AgentConversationReporting {
     CodexConversationDecoder(isFork: true)
   }
 
-  /// Return during a turn steers the turn under way; Tab queues the prompt for the next one, which
-  /// is what a prompt typed while the agent works means here.
+  /// Return during a turn steers the work under way: follow-up messages must reach the agent
+  /// without waiting for that turn to finish. Tab remains the queue key for commands.
   /// Its `!` command is written to the rollout once it ended (0.159).
   public var promptFormat: AgentPromptFormat {
     AgentPromptFormat(
-      queueKey: [0x09],
+      queueKey: [0x09], workingMessageKey: [0x0D],
       shellEntry: ShellEntry(
         isRecordedAtStart: false, messageGuard: CodexConversationDecoder.messageGuard))
   }

@@ -36,6 +36,17 @@ struct CodexAgentProviderTests {
     )
   }
 
+  @Test("Codex follow-ups steer the active turn; its queue key remains available for commands")
+  func followUpFormat() {
+    let agent = provider(probe: StubProcessProbe())
+    let format = agent.promptFormat
+    let message = PromptEncoding.keystrokes(
+      for: PromptSubmission(text: "A new bug report"),
+      format: format, whileWorking: true)
+    #expect(message.submit == [0x0D])
+    #expect(format.queueKey == [0x09])
+  }
+
   @Test("A signed in installation is available and reports its version")
   func availableInstallation() async {
     let probe = StubProcessProbe(
