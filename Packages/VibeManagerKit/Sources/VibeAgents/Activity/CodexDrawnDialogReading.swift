@@ -26,6 +26,25 @@ enum CodexDrawnDialogReading {
       $0.trimmingCharacters(in: .whitespaces)
     }
     guard let options = lines.lastIndex(where: isFirstOption) else { return nil }
+    if let start = lines[..<options].lastIndex(where: {
+      $0.hasPrefix("Would you like to send input to terminal ")
+    }) {
+      guard
+        let match = lines[start].wholeMatch(
+          of: #/Would you like to send input to terminal ([0-9]+)\?/#),
+        let inputStart = lines[(start + 1)..<options].firstIndex(where: { $0.hasPrefix("Input: ") }
+        ),
+        !lines[start..<options].contains(where: isLeftOut)
+      else { return nil }
+      let quoted =
+        ([String(lines[inputStart].dropFirst(7))]
+        + lines[(inputStart + 1)..<options]).joined()
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+      guard let input = try? JSONDecoder().decode(String.self, from: Data(quoted.utf8)) else {
+        return nil
+      }
+      return AgentDrawnDialog(.terminalInput(sessionID: String(match.1), input: input))
+    }
     // An MCP tool's form draws the tool's arguments under its title, and an argument may read as
     // a title: the form is read only from the one such line on screen, and never inside another
     // dialog, whose own lines — a command's — may read so as well.

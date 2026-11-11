@@ -27,7 +27,9 @@ struct ToolBlockView: View {
       }
       .buttonStyle(.plain)
       .accessibilityElement(children: .ignore)
-      .accessibilityLabel(Self.accessibilityTitle(of: block))
+      .accessibilityLabel(
+        terminalPermission == nil ? Self.accessibilityTitle(of: block) : title.title
+      )
       .accessibilityValue(
         isExpanded ? Text("expanded", bundle: .module) : Text("collapsed", bundle: .module)
       )
@@ -45,7 +47,23 @@ struct ToolBlockView: View {
         .stroke(borderColor(state).color, lineWidth: state.severity >= 4 ? 1.5 : 1))
   }
 
-  private var title: ToolCallTitle { Self.title(of: block) }
+  private var terminalPermission: AgentToolPermission? {
+    guard calls.count == 1, let request = model.request(for: calls[0]),
+      case .permission(let permission) = request.request.content,
+      permission.tool == .terminalInput
+    else { return nil }
+    return permission
+  }
+
+  private var title: ToolCallTitle {
+    if let permission = terminalPermission {
+      return ToolCallTitle(
+        symbolName: "keyboard",
+        title: String(localized: "theme.terminal", bundle: .module),
+        detail: permission.terminalSessionID)
+    }
+    return Self.title(of: block)
+  }
 
   static func title(of block: ConversationBlock) -> ToolCallTitle {
     switch block {
@@ -129,7 +147,9 @@ struct ToolBlockView: View {
     case .entry(let entry):
       if let call = entry.toolCall {
         VStack(alignment: .leading, spacing: 12) {
-          ToolCallDetails(call: call, model: model)
+          if terminalPermission == nil {
+            ToolCallDetails(call: call, model: model)
+          }
           if let request = model.request(for: call) {
             RequestActions(model: model, request: request, call: call)
           }
@@ -809,7 +829,7 @@ struct RequestActions: View {
     VStack(alignment: .leading, spacing: 8) {
       // What would be allowed, unless the block above shows exactly that.
       if case .permission(let permission) = request.request.content,
-        let subject = permission.subject,
+        let subject = permission.quotedTerminalInput ?? permission.subject,
         !(call.map { ConversationModel.isAbout($0, subject) } ?? false)
       {
         Text(verbatim: DisplaySafeText.visible(subject))
