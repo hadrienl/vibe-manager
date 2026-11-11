@@ -608,7 +608,7 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
     switch mode {
     case .firstLaunch: return .start
     case .resumeWithModel: return .resume
-    case .handover: return .restartWithSummary
+    case .handover, .conversationHistory: return .restartWithSummary
     case .freshWithoutContext: return .restartFresh
     }
   }
@@ -633,6 +633,8 @@ public final class SessionLauncher: SessionRuntime, SessionRestarting, SessionHa
       what = String(
         localized: "first start", bundle: .module,
         comment: "In the line a terminal shows above an agent: how it was started.")
+    case .conversationHistory:
+      what = String(localized: "conversation history", bundle: .module)
     case .handover:
       what = String(
         localized: "given a summary", bundle: .module,

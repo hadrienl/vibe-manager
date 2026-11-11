@@ -1371,6 +1371,8 @@ private struct AgentHistoryList: View {
       return String(
         localized: "same conversation", bundle: .module,
         comment: "What an agent switch handed over: the conversation was resumed.")
+    case .conversationHistory:
+      return String(localized: "conversation history", bundle: .module)
     case .summary(let bytes, _, let wasEdited):
       let size = AgentSwitchSheet.size(bytes)
       return wasEdited

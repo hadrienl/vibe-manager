@@ -23,7 +23,7 @@ running agent can only be told apart from a stopped one, not a busy one from an 
 | Switch | What runs | Conversation |
 |---|---|---|
 | Same agent, another model, with a conversation to resume | `--resume <id>` with the new `--model` (`codex resume -m`) | goes on; no text is sent |
-| Same agent without an identifier, or another agent | a new process, handed a summary | not transferred, and said so |
+| Same agent without an identifier, or another agent | a new process, instructed to read copied logs by default, or handed a summary | logs copied; internal state not transferred |
 | A session that never ran | its first launch, initial prompt included | none existed |
 
 A conversation the agent dropped within seconds the last time it was resumed (#10's
@@ -39,7 +39,7 @@ stale picture; its identifier is kept for a later ticket to offer that deliberat
 ### Everything that can refuse, refuses before the agent is stopped
 
 `PlanAgentSwitch` is `RestartSession`'s twin with a target that is chosen rather than read back. It
-accepts a running session, stops nothing and writes nothing: the target's availability, the model
+accepts a running session and stops nothing: the target's availability, the model
 against a catalogue that exists, the folder, the size of the summary and the launch plan itself are
 all settled while the current agent is still working. A Codex that is not signed in must not cost
 the user the Claude Code session it was meant to replace.
@@ -103,6 +103,35 @@ one back in place. The
 launcher already finishes the observer on `detach`; the check closes the window left. The observer
 itself is chosen from the plan's provider rather than the stored agent, the one fact that cannot lag
 behind a switch.
+
+### Conversation logs are handed over by default (#539)
+
+When a switch needs a new conversation, **Pass conversation history** is selected by default.
+Unchecking it restores the editable summary below. Native resume and first launch bypass this
+choice. Agents that take no initial prompt still receive nothing.
+
+`ConversationHandoverExporter` copies the available native JSONL files, without reinterpreting
+or dropping tool results, into `Handovers/<session UUID>/<snapshot UUID>/` beside `sessions.json`.
+An index names their provider, harness and original filename, in conversation order; Claude
+sub-agents follow their main log. Codex child rollouts are discovered recursively from the
+`SubAgentActivity` records used by the conversation reader, with repeated files copied once. Missing conversations are explicitly marked in the index. If
+no log is available, or a copy fails, the switch refuses before stopping the current agent and
+the user can reopen Switch Agent and choose the summary.
+
+The plan's only prompt is an instruction to read the index and the copied logs, in parts if
+needed, and continue from the latest request and current files. JSON-encoded absolute paths work
+outside a repository and survive spaces and quotes. The snapshot is bounded to each source's
+size when opened: an active CLI cannot make the copy run forever, though its final record may be
+incomplete. No process state or in-flight operation is restored. No native log is modified and no
+CLI-specific conversation database is fabricated.
+
+The copied logs are deliberately durable: each switch has its own directory, and subsequent
+switches and deletion of the original CLI logs leave earlier copies usable. They are local,
+owner-only files (0600, directories 0700), may contain sensitive information, and are not part of
+the Git worktree. The sheet says this explicitly. They are retained until the user removes the
+corresponding `Handovers/<session UUID>` directory; no automatic expiry or upload is added.
+The session store records only the handover kind and byte count, not log contents or file paths.
+A refused plan may leave an unused snapshot; it is subject to the same retention policy.
 
 ### The summary says where the work is
 

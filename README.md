@@ -156,10 +156,12 @@ are documented in
 [`docs/architecture/0010-session-restart.md`](docs/architecture/0010-session-restart.md).
 
 A session can change agent or model without losing its work. Another model of the same agent
-resumes the same conversation and sends nothing; another agent starts a new one, handed a summary
-of the session — who worked in it, where the work is on each branch and worktree, its notes and the
-prompt it was created with — shown and editable before it is sent, and never presented as the
-conversation itself. Everything that can refuse the switch refuses it while the running agent is
+resumes the same conversation and sends nothing; another agent starts a new one, instructed by
+default to read durable copies of the available conversation logs, including tool calls and
+results. Uncheck **Pass conversation history** to send the editable session summary instead.
+Copies stay on this Mac, outside the repositories; internal state and operations in progress are
+not restored. If no log is available or copying fails, choose the summary or retry.
+Everything that can refuse the switch refuses it while the running agent is
 still at work; the agent is stopped only once the switch is confirmed, and a launch that fails puts
 the session back on its previous agent, resumable as before. Every switch is kept in the session's
 history, and the transcripts of every agent it had are still read. The decisions are documented in

@@ -494,6 +494,11 @@ private struct StoredAgentChangeV4: Codable {
       summaryByteCount = nil
       summaryIsTruncated = nil
       summaryWasEdited = nil
+    case .conversationHistory(let byteCount):
+      handover = "conversationHistory"
+      summaryByteCount = byteCount
+      summaryIsTruncated = nil
+      summaryWasEdited = nil
     case .summary(let byteCount, let isTruncated, let wasEdited):
       handover = "summary"
       summaryByteCount = byteCount
@@ -523,6 +528,7 @@ private struct StoredAgentChangeV4: Codable {
   var domainValue: AgentChange {
     let handover: AgentChange.Handover
     switch self.handover {
+    case "conversationHistory": handover = .conversationHistory(byteCount: summaryByteCount ?? 0)
     case "resumedConversation":
       handover = .resumedConversation
     case "initialPrompt":

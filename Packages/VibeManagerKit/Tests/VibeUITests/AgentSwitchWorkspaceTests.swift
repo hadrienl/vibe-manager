@@ -44,7 +44,8 @@ struct AgentSwitchWorkspaceTests {
   private func makeWorkspace(
     session: WorkSession,
     supervisor: WorkspaceSupervisor = WorkspaceSupervisor(),
-    clock: any SessionClock = SystemSessionClock()
+    clock: any SessionClock = SystemSessionClock(),
+    history: (any ConversationHandoverExporting)? = nil
   ) async -> (AppModel, SessionLauncher, WorkspaceSupervisor, WorkspaceRepository) {
     let repository = WorkspaceRepository(sessions: [session])
     let registry = WorkspaceRegistry(providers: [Self.stub, Self.other])
@@ -55,7 +56,8 @@ struct AgentSwitchWorkspaceTests {
       viewportTimeout: .zero
     )
     let model = AppModel(
-      repository: repository, agents: registry, launcher: launcher, clock: clock)
+      repository: repository, agents: registry, launcher: launcher, clock: clock,
+      conversationHandover: history)
     await model.reload()
     return (model, launcher, supervisor, repository)
   }
@@ -66,6 +68,47 @@ struct AgentSwitchWorkspaceTests {
     let sheet = try #require(model.pendingSwitch)
     await sheet.load()
     return sheet
+  }
+
+  private struct UnavailableHistory: ConversationHandoverExporting {
+    func export(_ session: WorkSession) async throws -> ConversationHandover {
+      throw ConversationHandoverError.unavailable
+    }
+  }
+
+  @Test(
+    "History is the default; a missing log leaves the old agent intact and summary remains usable")
+  func historyFailureAndSummaryFallback() async throws {
+    let subject = session(path: folder())
+    let (model, _, _, repository) = await makeWorkspace(
+      session: subject, history: UnavailableHistory())
+    let sheet = try await openSheet(model, for: subject.id)
+    await sheet.select(agent: "other")
+    #expect(sheet.offersConversationHistory)
+    #expect(sheet.handover == .conversationHistory)
+    #expect(sheet.expectedModeKind == .conversationHistory)
+    #expect(sheet.continuityNotice.contains("copies"))
+    #expect(sheet.canSwitch)
+    await model.confirmAgentSwitch()
+    #expect(model.switchFailure?.message.contains("No conversation logs") == true)
+    let unchanged = try #require(await repository.session(id: subject.id))
+    #expect(unchanged.agent == subject.agent)
+    #expect(unchanged.agentHistory.isEmpty)
+
+    let fallback = try await openSheet(model, for: subject.id)
+    await fallback.select(agent: "other")
+    fallback.includesConversationHistory = false
+    #expect(fallback.handover == .summary)
+    #expect(fallback.expectedModeKind == .handover)
+    #expect(!fallback.summaryText.isEmpty)
+    #expect(fallback.canSwitch)
+    fallback.summaryText = String(repeating: "x", count: AgentPromptLimits.argumentByteLimit + 1)
+    #expect(!fallback.canSwitch)
+    fallback.includesConversationHistory = true
+    #expect(fallback.canSwitch)
+    await fallback.select(agent: "stub")
+    fallback.select(model: "deep")
+    #expect(fallback.handover == .resumesConversation)
   }
 
   // MARK: - The sheet

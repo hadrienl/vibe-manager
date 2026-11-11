@@ -78,6 +78,54 @@ struct AgentSwitchTests {
     }
   }
 
+  private actor HistoryExporter: ConversationHandoverExporting {
+    var calls = 0
+    func export(_ session: WorkSession) -> ConversationHandover {
+      calls += 1
+      return ConversationHandover(
+        index: URL(fileURLWithPath: "/copies/history.md"), byteCount: 1_000_000)
+    }
+  }
+
+  @Test("History handover launches with a short file instruction and records its actual kind")
+  func conversationHistory() async throws {
+    let stored = session()
+    let repository = RestorationRepository(sessions: [stored])
+    let history = HistoryExporter()
+    let planner = PlanAgentSwitch(
+      repository: repository,
+      agents: RestorationRegistry(providers: [Self.claude, Self.codex]),
+      folders: RestorationFolders(status: .usable), history: history)
+    let plan = try await planner(
+      id: stored.id, to: AgentTarget(providerID: "codex"),
+      includesConversationHistory: true, expecting: .conversationHistory)
+    guard case .conversationHistory(let snapshot) = plan.mode else {
+      Issue.record("Expected history handover")
+      return
+    }
+    #expect(plan.plan.arguments.last == snapshot.prompt)
+    #expect(plan.nextConfiguration.resumeIdentifier == nil)
+    let change = try await RecordAgentSwitch(repository: repository)(plan, wasEdited: false)
+    #expect(change.handover == .conversationHistory(byteCount: 1_000_000))
+    #expect(await history.calls == 1)
+  }
+
+  @Test("Native resume ignores the history choice and does not copy logs")
+  func nativeResumeDoesNotExport() async throws {
+    let stored = session()
+    let history = HistoryExporter()
+    let planner = PlanAgentSwitch(
+      repository: RestorationRepository(sessions: [stored]),
+      agents: RestorationRegistry(providers: [Self.claude]),
+      folders: RestorationFolders(status: .usable), history: history)
+    let plan = try await planner(
+      id: stored.id,
+      to: AgentTarget(providerID: "claude-code", modelID: "sonnet"),
+      includesConversationHistory: true)
+    #expect(plan.mode.keepsConversation)
+    #expect(await history.calls == 0)
+  }
+
   // MARK: - Modes
 
   @Test("Another model of the same agent resumes its conversation, and sends no text")

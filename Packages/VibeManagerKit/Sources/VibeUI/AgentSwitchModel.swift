@@ -20,6 +20,7 @@ public final class AgentSwitchModel {
     case firstLaunch
     /// A new conversation, handed the summary.
     case summary
+    case conversationHistory
     /// A new conversation, told nothing: this agent takes no prompt.
     case nothing
   }
@@ -33,6 +34,9 @@ public final class AgentSwitchModel {
   public let resumeFailedBefore: Bool
   /// The user's answer when it did: try resuming it once more, with the new model, rather than
   /// handing over. Off by default — what failed is not retried unless asked.
+  public var includesConversationHistory = false
+  public var offersConversationHistory: Bool { planner.supportsConversationHistory }
+
   public var retriesFailedResume = false {
     didSet { regenerateUnlessEdited() }
   }
@@ -76,6 +80,7 @@ public final class AgentSwitchModel {
     self.resumeFailedBefore = resumeFailedBefore
     self.registry = registry
     self.planner = planner
+    includesConversationHistory = planner.supportsConversationHistory
     self.context = context
     providerID = preselected?.providerID ?? current.providerID
     modelID = preselected?.modelID ?? current.modelID
@@ -140,7 +145,7 @@ public final class AgentSwitchModel {
     if let agent = selectedAgent, !agent.descriptor.capabilities.supportsInitialPrompt {
       return .nothing
     }
-    return .summary
+    return includesConversationHistory ? .conversationHistory : .summary
   }
 
   /// The mode the sheet is showing, for the switch to confirm it is still the one it would take.
@@ -148,6 +153,7 @@ public final class AgentSwitchModel {
     switch handover {
     case .resumesConversation: return .resumeWithModel
     case .firstLaunch: return .firstLaunch
+    case .conversationHistory: return .conversationHistory
     case .summary: return isSummaryEmptied ? .freshWithoutContext : .handover
     case .nothing: return .freshWithoutContext
     }
@@ -217,6 +223,11 @@ public final class AgentSwitchModel {
           \(currentName)'s conversation, and nothing is sent to it.
           """,
         bundle: .module, comment: "The new agent's name, then the current agent's name.")
+    case .conversationHistory:
+      return String(
+        localized:
+          "The new agent will read copies of the available conversation logs, including tool calls and results. Copies are kept on this Mac and may contain sensitive information. Internal state and running operations are not restored.",
+        bundle: .module)
     case .summary:
       if skipsResume {
         return String(

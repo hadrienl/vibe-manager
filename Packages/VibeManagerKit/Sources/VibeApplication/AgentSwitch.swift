@@ -24,12 +24,13 @@ public enum AgentSwitchMode: Equatable, Sendable {
   case firstLaunch
   /// A new process, handed a summary of the session.
   case handover(SessionContextBrief)
+  case conversationHistory(ConversationHandover)
   /// A new process, told nothing: the summary was emptied, or the agent takes no prompt.
   case freshWithoutContext
 
   /// The mode without what it carries: what the sheet showed, compared with what the plan chose.
   public enum Kind: Equatable, Sendable {
-    case resumeWithModel, firstLaunch, handover, freshWithoutContext
+    case resumeWithModel, firstLaunch, handover, conversationHistory, freshWithoutContext
   }
 
   public var kind: Kind {
@@ -37,6 +38,7 @@ public enum AgentSwitchMode: Equatable, Sendable {
     case .resumeWithModel: return .resumeWithModel
     case .firstLaunch: return .firstLaunch
     case .handover: return .handover
+    case .conversationHistory: return .conversationHistory
     case .freshWithoutContext: return .freshWithoutContext
     }
   }
@@ -58,6 +60,8 @@ public enum AgentSwitchMode: Equatable, Sendable {
     case .handover(let brief):
       return .summary(
         byteCount: brief.text.utf8.count, isTruncated: brief.isTruncated, wasEdited: wasEdited)
+    case .conversationHistory(let history):
+      return .conversationHistory(byteCount: history.byteCount)
     case .freshWithoutContext: return .nothing
     }
   }
@@ -255,7 +259,7 @@ public struct AgentSwitchPlan: Sendable {
   }
 }
 
-/// Plans a switch of agent or model, and neither stops nor writes anything.
+/// Plans a switch without stopping the current agent. A history handover writes a private snapshot.
 ///
 /// Everything that can refuse a switch refuses it here, while the current agent is still running:
 /// an agent that is not signed in, a model it does not offer, a folder that is gone or a summary
@@ -265,17 +269,22 @@ public struct PlanAgentSwitch: Sendable {
   private let agents: any AgentProviderResolving
   private let folders: any WorkingDirectoryProbe
   private let brief: SessionContextBriefBuilder
+  private let history: (any ConversationHandoverExporting)?
+
+  public var supportsConversationHistory: Bool { history != nil }
 
   public init(
     repository: any SessionRepository,
     agents: any AgentProviderResolving,
     folders: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
-    brief: SessionContextBriefBuilder = SessionContextBriefBuilder()
+    brief: SessionContextBriefBuilder = SessionContextBriefBuilder(),
+    history: (any ConversationHandoverExporting)? = nil
   ) {
     self.repository = repository
     self.agents = agents
     self.folders = folders
     self.brief = brief
+    self.history = history
   }
 
   /// The summary the target would be handed, for the sheet to show before anything is decided.
@@ -302,12 +311,13 @@ public struct PlanAgentSwitch: Sendable {
     to target: AgentTarget,
     context: SessionBriefInput? = nil,
     summaryOverride: String? = nil,
+    includesConversationHistory: Bool = false,
     skippingResume: Bool = false,
     expecting: AgentSwitchMode.Kind? = nil
   ) async throws -> AgentSwitchPlan {
     let planned = try await plan(
       id: id, to: target, context: context, summaryOverride: summaryOverride,
-      skippingResume: skippingResume)
+      skippingResume: skippingResume, includesConversationHistory: includesConversationHistory)
     if let expecting, planned.mode.kind != expecting {
       throw AgentSwitchRefusal.planChanged
     }
@@ -319,7 +329,8 @@ public struct PlanAgentSwitch: Sendable {
     to target: AgentTarget,
     context: SessionBriefInput?,
     summaryOverride: String?,
-    skippingResume: Bool
+    skippingResume: Bool,
+    includesConversationHistory: Bool
   ) async throws -> AgentSwitchPlan {
     let stored: WorkSession?
     do {
@@ -426,6 +437,14 @@ public struct PlanAgentSwitch: Sendable {
 
     guard descriptor.capabilities.supportsInitialPrompt else {
       return planned(try await plan(prompt: nil, resume: .none), .freshWithoutContext)
+    }
+
+    if includesConversationHistory {
+      // A missing log or failed copy refuses while the current agent still runs.
+      guard let history else { throw ConversationHandoverError.unavailable }
+      let snapshot = try await history.export(session)
+      return planned(
+        try await plan(prompt: snapshot.prompt, resume: .none), .conversationHistory(snapshot))
     }
 
     let generated = self.summary(for: context ?? SessionBriefInput(session: session), to: target)

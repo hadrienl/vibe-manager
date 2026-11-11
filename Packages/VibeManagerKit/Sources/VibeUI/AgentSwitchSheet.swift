@@ -59,6 +59,15 @@ struct AgentSwitchSheet: View {
             bundle: .module))
       }
 
+      if model.offersConversationHistory,
+        model.handover == .summary || model.handover == .conversationHistory
+      {
+        Toggle(isOn: $model.includesConversationHistory) {
+          Text("Pass conversation history", bundle: .module)
+        }
+        .toggleStyle(.checkbox)
+      }
+
       if model.handover == .summary {
         summaryField
       }

@@ -1,6 +1,306 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "The new agent will read copies of the available conversation logs, including tool calls and results. Copies are kept on this Mac and may contain sensitive information. Internal state and running operations are not restored." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيقرأ الوكيل الجديد نسخًا من سجلات المحادثة المتاحة، بما فيها استدعاءات الأدوات ونتائجها. تُحفظ النسخ على جهاز Mac هذا وقد تحتوي على معلومات حساسة. لا تُستعاد الحالة الداخلية ولا العمليات الجارية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der neue Agent liest Kopien der verfügbaren Gesprächsprotokolle einschließlich Werkzeugaufrufen und Ergebnissen. Die Kopien bleiben auf diesem Mac und können vertrauliche Informationen enthalten. Interner Zustand und laufende Vorgänge werden nicht wiederhergestellt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nuevo agente leerá copias de los registros disponibles, incluidas las llamadas a herramientas y sus resultados. Las copias se guardan en este Mac y pueden contener información sensible. No se restauran el estado interno ni las operaciones en curso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nouvel agent lira des copies des journaux disponibles, y compris les appels d’outils et leurs résultats. Ces copies sont conservées sur ce Mac et peuvent contenir des informations sensibles. L’état interne et les opérations en cours ne sont pas restaurés."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "नया एजेंट उपलब्ध बातचीत लॉग की प्रतियाँ पढ़ेगा, जिनमें टूल कॉल और परिणाम शामिल हैं। प्रतियाँ इस Mac पर रखी जाती हैं और उनमें संवेदनशील जानकारी हो सकती है। आंतरिक स्थिति और चल रही प्रक्रियाएँ बहाल नहीं होतीं।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il nuovo agente leggerà copie dei registri disponibili, incluse le chiamate agli strumenti e i risultati. Le copie restano su questo Mac e possono contenere informazioni sensibili. Lo stato interno e le operazioni in corso non vengono ripristinati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいエージェントは、ツール呼び出しと結果を含む利用可能な会話ログのコピーを読みます。コピーはこのMacに保存され、機密情報を含む場合があります。内部状態や実行中の操作は復元されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 에이전트는 도구 호출과 결과를 포함한 대화 로그 사본을 읽습니다. 사본은 이 Mac에 보관되며 민감한 정보를 포함할 수 있습니다. 내부 상태와 진행 중인 작업은 복원되지 않습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De nieuwe agent leest kopieën van de beschikbare gesprekslogboeken, inclusief toolaanroepen en resultaten. Kopieën blijven op deze Mac en kunnen gevoelige informatie bevatten. De interne status en lopende bewerkingen worden niet hersteld."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nowy agent odczyta kopie dostępnych dzienników rozmowy, w tym wywołania narzędzi i wyniki. Kopie pozostają na tym Macu i mogą zawierać poufne informacje. Stan wewnętrzny i trwające operacje nie są przywracane."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O novo agente lerá cópias dos registros disponíveis, incluindo chamadas de ferramentas e resultados. As cópias ficam neste Mac e podem conter informações confidenciais. O estado interno e as operações em andamento não são restaurados."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новый агент прочитает копии доступных журналов разговора, включая вызовы инструментов и результаты. Копии сохраняются на этом Mac и могут содержать конфиденциальные данные. Внутреннее состояние и текущие операции не восстанавливаются."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yeni ajan, araç çağrıları ve sonuçları dahil mevcut konuşma günlüklerinin kopyalarını okuyacak. Kopyalar bu Mac’te tutulur ve hassas bilgiler içerebilir. İç durum ve devam eden işlemler geri yüklenmez."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новий агент прочитає копії доступних журналів розмови, включно з викликами інструментів і результатами. Копії зберігаються на цьому Mac і можуть містити конфіденційні дані. Внутрішній стан і поточні операції не відновлюються."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新代理将读取可用对话日志的副本，包括工具调用和结果。副本保存在此 Mac 上，可能包含敏感信息。内部状态和正在进行的操作不会恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新代理將讀取可用對話記錄的副本，包括工具呼叫和結果。副本保存在此 Mac 上，可能包含敏感資訊。內部狀態和正在進行的操作不會還原。"
+          }
+        }
+      }
+    },
+    "Pass conversation history" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمرير سجل المحادثة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesprächsverlauf übergeben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitir el historial de conversación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmettre l’historique de conversation"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बातचीत का इतिहास भेजें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasmetti la cronologia della conversazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話履歴を引き継ぐ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대화 기록 전달"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gespreksgeschiedenis doorgeven"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przekaż historię rozmowy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitir o histórico da conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Передать историю разговора"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konuşma geçmişini aktar"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Передати історію розмови"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "传递对话历史"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳遞對話歷史"
+          }
+        }
+      }
+    },
+    "conversation history" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سجل المحادثة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesprächsverlauf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "historial de conversación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "historique de conversation"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बातचीत का इतिहास"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cronologia della conversazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話履歴"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대화 기록"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gespreksgeschiedenis"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "historia rozmowy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "histórico da conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "история разговора"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "konuşma geçmişi"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "історія розмови"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对话历史"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對話歷史"
+          }
+        }
+      }
+    },
     " (%lld after relaunch)" : {
       "comment" : "How many of the resumes followed a relaunch of Vibe Manager. Keep the leading space.",
       "localizations" : {

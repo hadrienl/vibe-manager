@@ -869,6 +869,8 @@ public final class AppModel {
     coordination: CoordinationModel = CoordinationModel(),
     /// Settings › Worktrees (#432). In memory by default.
     worktrees: WorktreesModel = WorktreesModel(),
+    /// Durable conversation snapshots for switching agents; absent in an in-memory workspace.
+    conversationHandover: (any ConversationHandoverExporting)? = nil,
     /// Says that a gesture did nothing. Silent in a workspace assembled without it: the tests run
     /// while the user works, and are not to be heard.
     beep: @escaping @MainActor () -> Void = {}
@@ -954,7 +956,9 @@ public final class AppModel {
       RestartSession(repository: repository, agents: $0, notes: notesStore)
     }
     restartSession = restart
-    planAgentSwitch = agents.map { PlanAgentSwitch(repository: repository, agents: $0) }
+    planAgentSwitch = agents.map {
+      PlanAgentSwitch(repository: repository, agents: $0, history: conversationHandover)
+    }
     recordAgentSwitch = RecordAgentSwitch(repository: repository, clock: clock)
     revertAgentSwitch = RevertAgentSwitch(repository: repository)
     // The two halves of #11: what the previous run left behind, and the queue that honours it.
@@ -2355,6 +2359,7 @@ public final class AppModel {
       previous: sheet.currentLabel,
       summary: summary,
       wasEdited: sheet.isSummaryEdited,
+      includesConversationHistory: sheet.handover == .conversationHistory,
       skippingResume: sheet.skipsResume,
       expecting: sheet.expectedModeKind,
       names: sheet.agentNames
@@ -2370,6 +2375,7 @@ public final class AppModel {
     previous: String,
     summary: String?,
     wasEdited: Bool,
+    includesConversationHistory: Bool,
     skippingResume: Bool,
     expecting: AgentSwitchMode.Kind?,
     names: [String: String]
@@ -2391,6 +2397,7 @@ public final class AppModel {
         to: target,
         context: current.map { briefInput(for: $0, names: names) },
         summaryOverride: summary,
+        includesConversationHistory: includesConversationHistory,
         skippingResume: skippingResume,
         expecting: expecting
       )
@@ -2464,6 +2471,9 @@ public final class AppModel {
           id: id, change: change, reason: why, target: plan.targetName, previous: previous,
           name: name)
       }
+    } catch let error as ConversationHandoverError {
+      switchFailure = RestartFailure(
+        sessionName: name, message: error.localizedDescription, suggestion: nil, sessionID: id)
     } catch let refusal as AgentSwitchRefusal {
       switchFailure = RestartFailure(
         sessionName: name,
