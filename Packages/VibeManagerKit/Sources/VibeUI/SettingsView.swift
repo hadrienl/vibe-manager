@@ -219,16 +219,20 @@ struct SettingsSidebarContent {
               tint: SettingsPage.agent(agent.id).tint,
               status: AgentSettingsPage.color(
                 of: model.agentDiagnostics.first { $0.providerID == agent.id }?.state))
-          } + (model.agentAccounts == nil ? [] : [
-            Entry(
-              page: .newAccount,
-              name: SettingsPage.string(
-                LocalizedStringResource(
-                  "Add an Account…", bundle: .module,
-                  comment: "The last line of the agents in the Settings window's sidebar."),
-                locale: locale),
-              symbolName: SettingsPage.newAccount.symbolName, tint: SettingsPage.newAccount.tint)
-          ])))
+          }
+            + (model.agentAccounts == nil
+              ? []
+              : [
+                Entry(
+                  page: .newAccount,
+                  name: SettingsPage.string(
+                    LocalizedStringResource(
+                      "Add an Account…", bundle: .module,
+                      comment: "The last line of the agents in the Settings window's sidebar."),
+                    locale: locale),
+                  symbolName: SettingsPage.newAccount.symbolName, tint: SettingsPage.newAccount.tint
+                )
+              ])))
     }
     if let endpoints = model.endpoints {
       let page = SettingsPage.newEndpoint
@@ -612,6 +616,18 @@ struct AgentSettingsPage: View {
         }
       }
       AgentAccountSections(model: model, agent: agent)
+      if agent.id.rawValue == "codex"
+        || model.agentAccounts?.accounts.contains(where: {
+          $0.providerID == agent.id.rawValue && $0.harness == .codex
+        }) == true
+      {
+        Section {
+          CodexApprovalModePicker(
+            selection: Binding(
+              get: { model.codexApprovalMode(for: agent.id) },
+              set: { model.setCodexApprovalMode($0, for: agent.id) }))
+        }
+      }
       if model.hookTrustingAgents.contains(where: { $0.id == agent.id }) {
         Section {
           AgentActivityRow(model: model, agent: agent)

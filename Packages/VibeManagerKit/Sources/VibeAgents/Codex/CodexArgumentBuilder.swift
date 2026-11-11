@@ -1,5 +1,6 @@
 import Foundation
 import VibeApplication
+import VibeDomain
 
 /// Turns a launch request into the `argv` of the interactive Codex terminal interface.
 ///
@@ -22,6 +23,15 @@ public struct CodexArgumentBuilder: CommandLineAgentArgumentBuilder {
       // The subcommand comes first: its options are parsed after it, not before.
       arguments.append("resume")
       positionals.append(try Self.validatedResumeIdentifier(identifier))
+    }
+
+    switch request.codexApprovalMode {
+    case .autoReview:
+      arguments.append("--approve-for-me")
+    case .manual:
+      arguments += ["-a", "on-request", "-c", "approvals_reviewer=\"user\""]
+    case nil:
+      break
     }
 
     if let modelID = request.modelID {
