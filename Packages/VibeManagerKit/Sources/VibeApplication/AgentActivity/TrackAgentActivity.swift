@@ -503,6 +503,15 @@ public actor TrackAgentActivity {
     return named == id && tracked.state.requests.first?.id == id
   }
 
+  /// Only the oldest readable permission is watched; nothing is typed by this observation.
+  public func awaitsPermissionDialog(_ id: AgentRequestID) -> Bool {
+    guard let tracked = sessions[id.sessionID],
+      tracked.decoder?.answerKeymap?.readsRequestOnScreen == true,
+      let request = tracked.state.requests.first, request.id == id
+    else { return false }
+    return request.awaitsPermissionDialog
+  }
+
   /// Whether the request is still a dialog of the session's start: guessed, or read off its screen.
   public func waitsOnStartupDialog(_ id: AgentRequestID) -> Bool {
     guard let request = sessions[id.sessionID]?.state.requests.first(where: { $0.id == id }),

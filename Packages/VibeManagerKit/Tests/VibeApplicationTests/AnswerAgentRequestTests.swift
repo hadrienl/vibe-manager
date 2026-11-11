@@ -33,6 +33,7 @@ private actor Terminals {
 private struct PermissionDecoder: AgentSignalDecoding {
   let approvalAnswerKeys: Set<[UInt8]> = [[0x31]]
   var keymap: any AgentAnswerKeymap = TwoStepKeymap()
+  var isShown = true
 
   var answerKeymap: (any AgentAnswerKeymap)? {
     keymap
@@ -48,7 +49,7 @@ private struct PermissionDecoder: AgentSignalDecoding {
         notice: AgentRequestNotice(
           content: .permission(
             AgentToolPermission(tool: .shell, toolName: "Bash", subject: command)),
-          reference: AgentToolReference(tool: "Bash", subject: command), isShown: true))
+          reference: AgentToolReference(tool: "Bash", subject: command), isShown: isShown))
     case "done":
       let command = event.payload.map { String(decoding: $0, as: UTF8.self) }
       return .toolFinished("Bash", subject: command)
@@ -112,6 +113,19 @@ private struct PointerKeymap: AgentAnswerKeymap {
   }
 }
 
+private struct PendingPermissionKeymap: AgentAnswerKeymap {
+  let readsRequestOnScreen = true
+  func answers(for content: AgentRequestContent) -> Set<AgentAnswerKind> { [.allowOnce, .deny] }
+  func keystrokes(
+    for answer: AgentAnswer, to content: AgentRequestContent,
+    screen: AgentDialogScreen?
+  ) -> [[UInt8]]? { [[0x79]] }
+  func drawnDialog(onScreen text: String) -> AgentDrawnDialog? {
+    guard text.hasPrefix("approval:") else { return nil }
+    return AgentDrawnDialog(.shownCommand(String(text.dropFirst(9))))
+  }
+}
+
 /// What a terminal shows, which a test changes.
 private actor LiveScreen {
   var text: String?
@@ -134,10 +148,10 @@ private struct Fixture {
 
   init(
     screen: String? = nil, live: LiveScreen? = nil,
-    keymap: any AgentAnswerKeymap = TwoStepKeymap()
+    keymap: any AgentAnswerKeymap = TwoStepKeymap(), shown: Bool = true
   ) {
     tracker = makeTracker(logs: logs, store: MemoryActivityStore(), clock: TestClock(t1))
-    decoder = PermissionDecoder(keymap: keymap)
+    decoder = PermissionDecoder(keymap: keymap, isShown: shown)
     let terminals = terminals
     answer = AnswerAgentRequest(
       tracker: tracker,
@@ -165,6 +179,43 @@ private struct Fixture {
 
 @Suite("Answering a request from the palette", .timeLimit(.minutes(2)))
 struct AnswerAgentRequestTests {
+  @Test("A permission is exposed only when its actual dialog appears, without writing an answer")
+  func watchPendingPermission() async {
+    let live = LiveScreen("working")
+    let fixture = Fixture(live: live, keymap: PendingPermissionKeymap(), shown: false)
+    let (id, request) = await fixture.asking("touch a")
+    #expect(await fixture.tracker.awaitsPermissionDialog(request))
+    let watching = Task { await fixture.answer.followPermissionDialog(request) }
+    await live.show("approval:touch a")
+    await watching.value
+    #expect(await fixture.tracker.state(for: id)?.requests.first?.isShown == true)
+    #expect(await fixture.terminals.written[id] == nil)
+  }
+
+  @Test("An automatically completed permission leaves no dialog and types no answer")
+  func watchAutoApprovedPermission() async {
+    let fixture = Fixture(screen: "working", keymap: PendingPermissionKeymap(), shown: false)
+    let (id, request) = await fixture.asking("touch a")
+    let watching = Task { await fixture.answer.followPermissionDialog(request) }
+    await fixture.logs.write("done", at: t1, for: id, payload: "touch a")
+    await watching.value
+    #expect(await fixture.tracker.state(for: id)?.requests.isEmpty == true)
+    #expect(await fixture.terminals.written[id] == nil)
+  }
+
+  @Test("A different dialog cannot expose the pending permission")
+  func watchOtherPermission() async {
+    let fixture = Fixture(
+      screen: "approval:touch b", keymap: PendingPermissionKeymap(), shown: false)
+    let (id, request) = await fixture.asking("touch a")
+    let watching = Task { await fixture.answer.followPermissionDialog(request) }
+    await Task.yield()
+    watching.cancel()
+    await watching.value
+    #expect(await fixture.tracker.state(for: id)?.requests.first?.isShown == false)
+    #expect(await fixture.terminals.written[id] == nil)
+  }
+
   @Test("The answer is typed into the terminal of the request's session, and nowhere else")
   func routed() async {
     let fixture = Fixture()

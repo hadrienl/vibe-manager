@@ -118,6 +118,20 @@ public struct AnswerAgentRequest: Sendable {
     return .sent
   }
 
+  /// Observe the real dialog after a permission hook, without typing any answer. Automatic
+  /// review can finish without one; terminal input approvals may draw without an OSC notice.
+  public func followPermissionDialog(_ id: AgentRequestID) async {
+    while !Task.isCancelled, await tracker.awaitsPermissionDialog(id) {
+      if let before = await screen(id.sessionID), await tracker.catchUp(id.sessionID),
+        !Task.isCancelled, let after = await screen(id.sessionID),
+        await tracker.dialogOnScreen(after, readBefore: before, isFor: id)
+      {
+        return
+      }
+      do { try await sleep(Self.startupDialogPollInterval) } catch { return }
+    }
+  }
+
   /// Reads which dialog of its start a session waits on, off its screen: one its keymap answers
   /// — an update offered — takes the place of the request that only guessed one is there.
   ///

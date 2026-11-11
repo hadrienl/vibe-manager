@@ -81,24 +81,38 @@ extension AppModel {
     return prompt.kind != .startup || readStartupGuesses.contains(request.id)
   }
 
+  private func showsRequest(_ request: AgentRequest, in state: AgentActivityState) -> Bool {
+    if request.awaitsPermissionDialog && !state.drawnCandidates.contains(request.id) {
+      return false
+    }
+    return showsStartupDialog(request)
+  }
+
   /// A session's activity as the user is told of it, in the sidebar and on the phone: a dialog of
   /// the start no card shows — only guessed, or held back while sessions are restored — is an agent
   /// still starting, not one waiting for the user (#474).
   public func shownActivity(for id: SessionID) -> AgentActivityState? {
     guard var state = activity(for: id) else { return nil }
-    guard state.requests.contains(where: { !showsStartupDialog($0) }) else { return state }
-    state.requests.removeAll { !showsStartupDialog($0) }
-    if state.requests.isEmpty, case .awaitingUser = state.activity { state.activity = .idle }
+    let hidden = state.requests.filter { !showsRequest($0, in: state) }
+    guard !hidden.isEmpty else { return state }
+    let visible = state.requests.filter { showsRequest($0, in: state) }
+    state.requests = visible
+    if case .awaitingUser = state.activity {
+      state.activity =
+        visible.first.map { .awaitingUser($0.kind) }
+        ?? (hidden.contains(where: \.awaitsPermissionDialog) ? .working : .idle)
+    }
     return state
   }
 
   var allPendingRequests: [PendingRequest] {
     var result: [PendingRequest] = []
     for session in sessions where session.taskStatus != .archived {
-      guard let requests = activity(for: session.id)?.requests, !requests.isEmpty else { continue }
+      guard let requests = shownActivity(for: session.id)?.requests, !requests.isEmpty else {
+        continue
+      }
       let folder = RestartSession.workingDirectoryPath(of: session)
       for (position, request) in requests.enumerated() {
-        guard showsStartupDialog(request) else { continue }
         result.append(
           PendingRequest(
             request: request,

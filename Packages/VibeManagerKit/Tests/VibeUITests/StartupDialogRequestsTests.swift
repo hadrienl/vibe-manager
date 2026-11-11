@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import VibeApplication
+import VibeConversationUI
 import VibeDomain
 
 @testable import VibeUI
@@ -38,6 +39,60 @@ struct StartupDialogRequestsTests {
     ]
     state.activity = .awaitingUser(.approval)
     return state
+  }
+
+  @Test("Automatic review is not a visible human request and does not block the composer")
+  func pendingAutomaticReview() async throws {
+    let (model, subject) = await model()
+    let id = AgentRequestID(sessionID: subject.id, key: "permission")
+    var state = AgentActivityState(activity: .awaitingUser(.approval), source: .structured)
+    state.requests = [
+      AgentRequest(
+        id: id, receivedAt: Date(), kind: .approval,
+        content: .permission(
+          AgentToolPermission(tool: .shell, toolName: "Bash", subject: "git fetch origin main")),
+        reference: AgentToolReference(tool: "Bash", subject: "git fetch origin main"),
+        isShown: false)
+    ]
+    model.activityCells.set(state, for: subject.id)
+    #expect(model.pendingRequests.isEmpty)
+    let shown = try #require(model.shownActivity(for: subject.id))
+    #expect(shown.activity == .working)
+    #expect(shown.requests.isEmpty)
+    #expect(!AppModel.waitsForUser(state))
+    #expect(!model.statusPresentation(for: subject).needsAttention)
+    let conversation = ConversationModel(sessionID: subject.id)
+    conversation.write = { _ in }
+    conversation.processRunning = { true }
+    conversation.apply(ConversationSnapshot(availability: .available))
+    conversation.activity = shown.activity
+    #expect(conversation.composerState == .ready)
+    // The metadata remains available for a real dialog that may be drawn after review.
+    #expect(model.activity(for: subject.id)?.requests.count == 1)
+    state.requests[0].isShown = true
+    model.activityCells.set(state, for: subject.id)
+    #expect(model.pendingRequests.count == 1)
+    #expect(model.shownActivity(for: subject.id)?.activity == .awaitingUser(.approval))
+    #expect(AppModel.waitsForUser(state))
+  }
+
+  @Test("An announced dialog is exposed even before its exact request is read on screen")
+  func announcedPermission() async {
+    let (model, subject) = await model()
+    let id = AgentRequestID(sessionID: subject.id, key: "candidate")
+    var state = AgentActivityState(activity: .awaitingUser(.approval), source: .structured)
+    state.requests = [
+      AgentRequest(
+        id: id, receivedAt: Date(), kind: .approval,
+        content: .permission(
+          AgentToolPermission(tool: .shell, toolName: "Bash", subject: "make release")),
+        reference: AgentToolReference(tool: "Bash"), isShown: false)
+    ]
+    state.drawnCandidates = [id]
+    model.activityCells.set(state, for: subject.id)
+    #expect(model.pendingRequests.count == 1)
+    #expect(model.shownActivity(for: subject.id)?.activity == .awaitingUser(.approval))
+    #expect(AppModel.waitsForUser(state))
   }
 
   @Test("A guess shows once its screen was read: a prompt at rest takes it away unseen")

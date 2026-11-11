@@ -208,6 +208,11 @@ extension AppModel {
   /// (#474). The real request that follows the guess is.
   static func waitsForUser(_ state: AgentActivityState?) -> Bool {
     guard case .awaitingUser = state?.activity else { return false }
+    if let request = state?.requests.first, request.awaitsPermissionDialog,
+      state?.drawnCandidates.contains(request.id) != true
+    {
+      return false
+    }
     guard case .inTerminal(let prompt) = state?.requests.first?.content else { return true }
     return prompt.kind != .startup
   }

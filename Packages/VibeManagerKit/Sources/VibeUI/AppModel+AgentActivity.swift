@@ -27,6 +27,7 @@ extension AppModel {
         let signpost = Signposts.begin("ui.activityApplied")
         let previous = self.activityCells.value(for: update.sessionID)
         self.activityCells.set(update.state, for: update.sessionID)
+        self.readPermissionDialog(of: update.state, for: update.sessionID)
         if let state = update.state {
           self.activityDidChange(
             update.sessionID, from: previous, to: state, isReplayed: update.isReplayed)
@@ -55,6 +56,25 @@ extension AppModel {
     await loadHookTrustingAgents()
     await loadSigningInAgents()
     updateVisibleSession()
+  }
+
+  /// Keep pre-review permissions internal until their actual dialog is drawn.
+  private func readPermissionDialog(of state: AgentActivityState?, for session: SessionID) {
+    let first = state?.requests.first
+    for (id, task) in permissionDialogReads where id.sessionID == session {
+      if first?.id != id || first?.awaitsPermissionDialog != true {
+        task.cancel()
+        permissionDialogReads[id] = nil
+      }
+    }
+    guard let request = first, request.awaitsPermissionDialog,
+      permissionDialogReads[request.id] == nil, let answerRequest
+    else { return }
+    let id = request.id
+    permissionDialogReads[id] = Task { [weak self] in
+      await answerRequest.followPermissionDialog(id)
+      self?.permissionDialogReads[id] = nil
+    }
   }
 
   /// A dialog of the start is guessed to wait: its screen says which, when it is one that can be
