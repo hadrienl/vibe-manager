@@ -343,6 +343,22 @@ struct ToolCallSummaryTests {
 
 @Suite("A prompt written into the agent's terminal")
 struct PromptEncodingTests {
+  @Test("Messages can steer active work while commands remain queued")
+  func steeringMessages() {
+    let format = AgentPromptFormat(
+      queueKey: [0x09], workingMessageKey: [0x0D], shellEntry: ShellEntry())
+    let message = PromptSubmission(text: "Here is the bug I am seeing")
+    #expect(
+      PromptEncoding.keystrokes(for: message, format: format, whileWorking: true).submit == [0x0D])
+    #expect(
+      PromptEncoding.keystrokes(for: message, format: format, whileWorking: false).submit == [0x0D])
+    #expect(
+      PromptEncoding.keystrokes(
+        for: PromptSubmission(text: "!echo hello"),
+        format: format, whileWorking: true
+      ).submit == [0x09])
+  }
+
   @Test("A bracketed paste, then the key that sends it")
   func bracketed() {
     let keys = PromptEncoding.keystrokes(

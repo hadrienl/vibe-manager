@@ -1650,7 +1650,8 @@ public final class ConversationModel {
         // Queued, a command is written once the turn ended, then run.
         waitsForEnd: opensPanel
           || kind.isShell && (shell?.isRecordedAtStart == false || isAgentWorking),
-        queuedInTurn: kind == .message && isAgentWorking ? turn : nil,
+        queuedInTurn: kind == .message && isAgentWorking && promptFormat.workingMessageKey == nil
+          ? turn : nil,
         state: .sending))
     let submitDelay = promptFormat.delayBeforeSubmit(attachmentCount: attachments.count)
     draft = ""
