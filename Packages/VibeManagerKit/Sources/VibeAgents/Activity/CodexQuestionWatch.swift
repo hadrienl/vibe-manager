@@ -105,11 +105,13 @@ public struct CodexQuestionWatch: Sendable {
     return (pending, waiting, UInt64(read - splitter.pendingCount))
   }
 
-  /// What one line of a rollout says about questions: one asked, or some of those answered.
+  /// What one line of a rollout says about questions: one asked, or some of those answered — and
+  /// a turn that failed, which no hook reports.
   static func signals(in line: Data, pending: inout Set<String>) -> [AgentSignal] {
     // Most lines are messages and tool output, some large: the words are looked for first.
     let isCall = line.range(of: Data(tool.utf8)) != nil
-    guard isCall || (!pending.isEmpty && LineSplitter.contains(line, anyOf: needles)),
+    let mayEnd = line.range(of: Data("task_complete".utf8)) != nil
+    guard isCall || mayEnd || (!pending.isEmpty && LineSplitter.contains(line, anyOf: needles)),
       let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
       let payload = object["payload"] as? [String: Any]
     else { return [] }
@@ -120,9 +122,10 @@ public struct CodexQuestionWatch: Sendable {
       }
       let ended = pending.filter { $0.hasPrefix(asyncMark) }
       pending.subtract(ended)
-      return ended.sorted().map {
+      let finished: [AgentSignal] = ended.sorted().map {
         .toolFinished(asyncTool, subject: String($0.dropFirst(asyncMark.count)))
       }
+      return finished + (endsOnError(payload) ? [.turnEnded] : [])
     }
     guard object["type"] as? String == "response_item",
       let callID = payload["call_id"] as? String
@@ -155,6 +158,18 @@ public struct CodexQuestionWatch: Sendable {
     default:
       return []
     }
+  }
+
+  /// Whether the session's own turn ended on an error — `usage_limit_exceeded` once the account's
+  /// quota is spent (0.166.0). Codex then runs no `Stop` hook: without this, the session would be
+  /// said to work until the user's next message. A sub-agent's turn is not the session's.
+  static func endsOnError(_ payload: [String: Any]) -> Bool {
+    guard payload["type"] as? String == "task_complete", payload["error"] is [String: Any] else {
+      return false
+    }
+    guard let root = payload["root_turn_id"] as? String, let turn = payload["turn_id"] as? String
+    else { return true }
+    return root == turn
   }
 
   /// The questions of `request_user_input_async`: a title each, and answers to suggest — plain
