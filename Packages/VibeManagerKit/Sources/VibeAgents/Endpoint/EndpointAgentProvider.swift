@@ -192,6 +192,7 @@ public struct EndpointAgentProvider: AgentProvider {
     }
     var harnessRequest = request
     harnessRequest.modelID = Self.harnessModelName(model)
+    if harnessKind == .codex { harnessRequest.codexApprovalMode = endpoint.codexApprovalMode }
     let plan = try await harnessProvider.launchPlan(for: harnessRequest)
     return AgentLaunchPlan(
       providerID: descriptor.id, executablePath: plan.executablePath, arguments: plan.arguments,

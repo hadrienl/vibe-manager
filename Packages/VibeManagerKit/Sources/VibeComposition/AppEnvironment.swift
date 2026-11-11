@@ -161,11 +161,12 @@ public final class AppEnvironment {
     // One shell for every agent and account.
     let loginShell = LoginShellEnvironment(
       inherited: configuration.environment, probe: SystemProcessProbe())
+    let codexApprovals = UserDefaultsCodexApprovalPreferences(suiteName: data.defaultsSuite)
     let providers =
       configuration.providers?(diagnostics.log)
       ?? Self.providers(
         environment: configuration.environment, diagnostics: diagnostics.log,
-        transcriptLocations: transcriptLocations, shell: loginShell)
+        transcriptLocations: transcriptLocations, shell: loginShell, codexApprovals: codexApprovals)
     // The endpoints (#107): registered beside the command line agents from the start — a session
     // the terminal host kept is adopted as soon as the workspace loads, and must find its agent —
     // their secrets in the keychain, their sessions reaching them through the gateway.
@@ -182,7 +183,7 @@ public final class AppEnvironment {
     let agentAccounts = AgentAccountCatalog(
       repository: FileAgentAccountRepository(storeURL: accountsURL),
       homes: agentHomes, environment: configuration.environment, diagnostics: diagnostics.log,
-      transcriptLocations: transcriptLocations, shell: loginShell)
+      transcriptLocations: transcriptLocations, shell: loginShell, codexApprovals: codexApprovals)
     let registry = AgentProviderRegistry(
       providers: providers,
       accounts: agentAccounts.providers(
@@ -480,6 +481,7 @@ public final class AppEnvironment {
         diagnostics: diagnostics),
       requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
       agentUpdatePreferences: UserDefaultsAgentUpdatePreferences(suiteName: data.defaultsSuite),
+      codexApprovalPreferences: codexApprovals,
       browser: browser,
       terminals: terminals,
       ticketContext: ReadTicketContext(
@@ -968,7 +970,8 @@ public final class AppEnvironment {
   /// on a Mac with Claude Code or Codex installed, they would otherwise come first.
   private static func providers(
     environment: [String: String], diagnostics: any DiagnosticLog,
-    transcriptLocations: TranscriptLocationCache, shell: LoginShellEnvironment
+    transcriptLocations: TranscriptLocationCache, shell: LoginShellEnvironment,
+    codexApprovals: any CodexApprovalPreferences
   ) -> [any AgentProvider] {
     if environment["VIBE_ENABLE_MOCK_AGENT"] == "only" {
       return [MockAgentProvider(environment: environment)]
@@ -982,7 +985,7 @@ public final class AppEnvironment {
         transcriptLocations: transcriptLocations),
       CodexAgentProvider.make(
         environment: environment, diagnostics: diagnostics, shellEnvironment: shell,
-        transcriptLocations: transcriptLocations),
+        transcriptLocations: transcriptLocations, approvalPreferences: codexApprovals),
     ]
     if MockAgentProvider.isEnabled(environment: environment) {
       providers.append(MockAgentProvider(environment: environment))

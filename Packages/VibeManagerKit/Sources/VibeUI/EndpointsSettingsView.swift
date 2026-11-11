@@ -343,6 +343,9 @@ struct EndpointsSettingsView: View {
           """,
           bundle: .module)
       }
+      if binding.wrappedValue.harness.resolved(for: binding.wrappedValue.wireProtocol) == .codex {
+        CodexApprovalModePicker(selection: binding.codexApprovalMode)
+      }
     } header: {
       Text("Agent", bundle: .module)
     }

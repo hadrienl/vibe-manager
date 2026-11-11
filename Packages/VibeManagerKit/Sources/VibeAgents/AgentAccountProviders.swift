@@ -11,7 +11,8 @@ public enum AgentAccountProviders {
     environment: [String: String],
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
     shellEnvironment: (any ShellEnvironmentSource)? = nil,
-    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache()
+    transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
+    codexApprovals: (any CodexApprovalPreferences)? = nil
   ) -> (any AgentProvider)? {
     let home = AgentHomeDirectory.home(in: environment)
     guard
@@ -31,7 +32,8 @@ public enum AgentAccountProviders {
       return CodexAgentProvider.make(
         environment: variables, diagnostics: diagnostics, shellEnvironment: shellEnvironment,
         transcriptLocations: transcriptLocations,
-        account: descriptor(of: account, like: CodexAgentProvider.descriptor))
+        account: descriptor(of: account, like: CodexAgentProvider.descriptor),
+        approvalPreferences: codexApprovals)
     }
   }
 

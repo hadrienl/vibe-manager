@@ -72,7 +72,9 @@ public enum PromptEncoding {
   public static func keystrokes(
     for submission: PromptSubmission, format: AgentPromptFormat, whileWorking: Bool
   ) -> Keystrokes {
-    let submit = whileWorking ? format.queueKey : format.submitKey
+    let isMessage = !submission.kind(shell: format.shellEntry).isShell
+    let workingKey = isMessage ? format.workingMessageKey ?? format.queueKey : format.queueKey
+    let submit = whileWorking ? workingKey : format.submitKey
     if let shell = format.shellEntry, case .shell(let command) = submission.kind(shell: shell) {
       return Keystrokes(
         writes: [shell.trigger] + chunks(of: command, size: shell.chunkSize),

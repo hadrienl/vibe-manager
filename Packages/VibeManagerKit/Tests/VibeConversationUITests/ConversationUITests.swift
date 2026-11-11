@@ -531,6 +531,19 @@ struct ConversationModelTests {
     #expect(terminal.written.last == [0x09])
   }
 
+  @Test("A follow-up sent while working reaches the current turn instead of waiting for its end")
+  func steerWorkingAgent() async {
+    let (model, terminal) = model()
+    model.promptFormat.workingMessageKey = [0x0D]
+    model.activity = .working
+    model.draft = "This message must reach you during the review"
+    #expect(await model.send())
+    #expect(terminal.written.last == [0x0D])
+    #expect(model.echoes.first?.queuedInTurn == nil)
+    #expect(model.draft.isEmpty)
+    #expect(model.sendNowEchoID == nil)
+  }
+
   @Test("Typed for Claude Code: every piece written in order, then Return")
   func sendTyped() async {
     let (model, terminal) = model()

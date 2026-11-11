@@ -53,6 +53,7 @@ public struct CodexAgentProvider: AgentProvider {
     authenticationCommandLine: "codex login"
   )
 
+  private let approvalPreferences: (any CodexApprovalPreferences)?
   private let base: CommandLineAgentProvider
   let catalog: any CodexModelCatalogSource
   private let discovery: any CodexSessionDiscovering
@@ -71,8 +72,10 @@ public struct CodexAgentProvider: AgentProvider {
     discovery: any CodexSessionDiscovering,
     appServer: any CodexAppServerConnecting = CodexAppServerProcess(),
     transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
-    effortReader: CodexEffortReader = CodexEffortReader()
+    effortReader: CodexEffortReader = CodexEffortReader(),
+    approvalPreferences: (any CodexApprovalPreferences)? = nil
   ) {
+    self.approvalPreferences = approvalPreferences
     self.base = base
     self.catalog = catalog
     self.discovery = discovery
@@ -88,7 +91,8 @@ public struct CodexAgentProvider: AgentProvider {
     diagnostics: any DiagnosticLog = NullDiagnosticLog(),
     shellEnvironment: (any ShellEnvironmentSource)? = nil,
     transcriptLocations: TranscriptLocationCache = TranscriptLocationCache(),
-    account: AgentDescriptor? = nil
+    account: AgentDescriptor? = nil,
+    approvalPreferences: (any CodexApprovalPreferences)? = nil
   ) -> CodexAgentProvider {
     // A `CODEX_HOME` this application cannot resolve is dropped rather than forwarded: the
     // CLI would then write its sessions where nothing watches for them.
@@ -126,7 +130,8 @@ public struct CodexAgentProvider: AgentProvider {
       catalog: CodexModelCatalog(environment: environment),
       discovery: CodexRolloutSessionDiscovery(environment: environment),
       transcriptLocations: transcriptLocations,
-      effortReader: CodexEffortReader(environment: environment)
+      effortReader: CodexEffortReader(environment: environment),
+      approvalPreferences: approvalPreferences
     )
     if account != nil { provider.accountHome = environment[CodexHome.overrideKey] }
     return provider
@@ -173,6 +178,10 @@ public struct CodexAgentProvider: AgentProvider {
   }
 
   public func launchPlan(for request: AgentLaunchRequest) async throws -> AgentLaunchPlan {
-    try await base.launchPlan(for: request)
+    var request = request
+    if request.codexApprovalMode == nil, let approvalPreferences {
+      request.codexApprovalMode = await approvalPreferences.mode(for: descriptor.id)
+    }
+    return try await base.launchPlan(for: request)
   }
 }
