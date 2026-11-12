@@ -1,6 +1,107 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Some earlier conversations left no logs that could be found, so the history is partial." : {
+      "comment" : "Added to the history notice of the Switch Agent sheet when some earlier conversations' logs were not found.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يُعثر على سجلات بعض المحادثات السابقة، لذا فإن السجل جزئي."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für einige frühere Gespräche wurden keine Gesprächsprotokolle gefunden, daher ist der Verlauf unvollständig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron los registros de algunas conversaciones anteriores, así que el historial es parcial."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les journaux de certaines conversations précédentes sont introuvables : l’historique est donc partiel."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कुछ पिछली बातचीत के लॉग नहीं मिले, इसलिए इतिहास अधूरा है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non sono stati trovati i registri di alcune conversazioni precedenti, quindi la cronologia è parziale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前の会話の一部でログが見つからなかったため、履歴は不完全です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 대화 일부의 로그를 찾을 수 없어 기록이 불완전합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Van sommige eerdere gesprekken zijn geen logboeken gevonden, dus de geschiedenis is onvolledig."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie znaleziono dzienników niektórych wcześniejszych rozmów, więc historia jest niepełna."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foram encontrados os registros de algumas conversas anteriores, então o histórico está incompleto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Журналы некоторых предыдущих разговоров не найдены, поэтому история неполная."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bazı önceki konuşmaların günlükleri bulunamadı, bu nedenle geçmiş eksik."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Журнали деяких попередніх розмов не знайдено, тому історія неповна."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到部分早先对话的日志，因此历史记录不完整。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到部分先前對話的記錄，因此歷史記錄不完整。"
+          }
+        }
+      }
+    },
     "New conversation with summary" : {
       "localizations" : {
         "ar" : {

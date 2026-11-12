@@ -143,11 +143,15 @@ through its normal tools and permissions. A target unable to read outside its sa
 for access through its own usual permission flow.
 
 Sources are discovered through the existing transcript locator. Invalid path-like resume IDs
-are rejected; non-regular source files, including symlinks, refuse the copy. Each file is streamed
-in 64 KiB chunks and bounded to its size at open, without changing or linking the source. Failure
-removes the incomplete snapshot and refuses the switch before stopping the old agent. The index
-labels unavailable conversations, and the prompt labels the logs as history, instructs progressive
-reading and warns about incomplete trailing records. Copied logs are not executed by the app.
+are rejected; non-regular source files, including symlinks, refuse the copy: each is opened with
+`O_NOFOLLOW` and checked with `fstat` before it is cloned from that descriptor (`fclonefileat`),
+or, where the volume cannot clone, streamed in 64 KiB chunks bounded to its size at open. The
+source is never changed or linked. The copy is made only after the old agent has stopped, into a
+folder reserved under `Handovers/` and checked to be the exporter's own. Failure removes the
+incomplete snapshot; a switch that fails after the copy removes the whole snapshot, which no agent
+will read. The index labels unavailable conversations, and the prompt labels the logs as history,
+instructs progressive reading and warns about incomplete trailing records. Copied logs are not
+executed by the app.
 
 Snapshots persist independently of CLI logs and later switches. They are not diagnostics, are not
 synced to the companion, and are not placed in repositories. Removing

@@ -154,6 +154,7 @@ struct WorkspaceProvider: AgentProvider, AgentLaunchObserverProviding {
   var id = "stub"
   var name = "Stub Agent"
   var catalog: [AgentModel] = []
+  var takesInitialPrompt = true
 
   func launchObserver(
     for _: SessionID,
@@ -168,7 +169,7 @@ struct WorkspaceProvider: AgentProvider, AgentLaunchObserverProviding {
       displayName: name,
       capabilities: AgentCapabilities(
         supportsModelSelection: true,
-        supportsInitialPrompt: true,
+        supportsInitialPrompt: takesInitialPrompt,
         supportsResume: true
       )
     )

@@ -45,19 +45,27 @@ struct AgentSwitchSheet: View {
 
       if model.offersContextChoice {
         Picker(selection: $model.contextChoice) {
-          if model.canResumeConversation {
-            Text("Continue the conversation", bundle: .module)
-              .tag(AgentSwitchModel.ContextChoice.resume)
+          ForEach(model.contextChoices, id: \.self) { choice in
+            Self.label(of: choice).tag(choice)
           }
-          if model.offersConversationHistory {
-            Text("New conversation with history", bundle: .module)
-              .tag(AgentSwitchModel.ContextChoice.history)
-          }
-          Text("New conversation with summary", bundle: .module)
-            .tag(AgentSwitchModel.ContextChoice.summary)
         } label: {
           Text("Conversation", bundle: .module)
         }
+      } else if model.offersResumeRetry {
+        // An agent that takes no prompt has nothing else to offer. Off by default: what failed is
+        // not retried unless asked. Worth asking when the model was what the agent refused, and
+        // switching it is precisely the fix.
+        Toggle(isOn: $model.retriesFailedResume) {
+          Text("Try resuming the conversation anyway", bundle: .module)
+        }
+        .toggleStyle(.checkbox)
+        .instantTooltip(
+          Text(
+            """
+            Worth trying when the previous model is what the agent refused, rather than the \
+            conversation itself.
+            """,
+            bundle: .module))
       }
 
       if model.handover == .summary {
@@ -222,6 +230,14 @@ struct AgentSwitchSheet: View {
       : String(
         localized: "Summary uses \(sizeLabel)", bundle: .module,
         comment: "VoiceOver: “120 bytes of 96.0 KiB”.")
+  }
+
+  private static func label(of choice: AgentSwitchModel.ContextChoice) -> Text {
+    switch choice {
+    case .resume: Text("Continue the conversation", bundle: .module)
+    case .history: Text("New conversation with history", bundle: .module)
+    case .summary: Text("New conversation with summary", bundle: .module)
+    }
   }
 
   static func size(_ bytes: Int) -> String {

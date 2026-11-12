@@ -516,7 +516,7 @@ public final class AppEnvironment {
       worktrees: WorktreesModel(preferences: worktreeLocations),
       conversationHandover: ConversationHandoverExporter(
         directory: data.store.deletingLastPathComponent().appendingPathComponent("Handovers"),
-        locator: AgentTranscriptLocator(homes: agentHomes)),
+        locations: transcriptLocations),
       beep: { NSSound.beep() }
     )
     // The coordination tools are answered on the web view's channel (#352), for the processes of

@@ -24,6 +24,8 @@ public enum AgentSwitchMode: Equatable, Sendable {
   case firstLaunch
   /// A new process, handed a summary of the session.
   case handover(SessionContextBrief)
+  /// A new process, told to read a copy of the session's conversation logs: reserved when
+  /// planned, written once the current agent has stopped.
   case conversationHistory(ConversationHandover)
   /// A new process, told nothing: the summary was emptied, or the agent takes no prompt.
   case freshWithoutContext
@@ -68,7 +70,7 @@ public enum AgentSwitchMode: Equatable, Sendable {
 }
 
 /// Everything that stops a switch. None of them has stopped an agent or written anything, except
-/// `stopUnconfirmed` and `sessionMoved`, which are only reached after the stop and say so.
+/// `stopUnconfirmed`, `sessionMoved` and `historyNotCopied`, which are only reached after the stop.
 public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
   case sessionMissing
   case storeUnreadable
@@ -89,6 +91,10 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
   /// The session changed while the sheet was open, and the switch would no longer do what the
   /// sheet said: resume a conversation it announced a summary for, or the reverse.
   case planChanged
+  /// No log of the conversation being left was found, so there is no history to hand over.
+  case historyUnavailable
+  /// The logs could not be copied, after the agent was stopped: the session is left on it.
+  case historyNotCopied
 
   public var errorDescription: String? {
     switch self {
@@ -144,6 +150,14 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
         localized:
           "This session changed while the switch was being prepared, so nothing was switched.",
         bundle: .module)
+    case .historyUnavailable:
+      return String(
+        localized: "No conversation logs are available. Choose the summary instead.",
+        bundle: .module)
+    case .historyNotCopied:
+      return String(
+        localized: "The conversation logs could not be copied. Choose the summary or try again.",
+        bundle: .module)
     }
   }
 
@@ -151,7 +165,7 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
     switch self {
     case .sessionMissing, .sessionMoved:
       return String(localized: "Reload the workspace.", bundle: .module)
-    case .planChanged:
+    case .planChanged, .historyUnavailable:
       return String(
         localized: "Open Switch Agent again to review what will be handed over.", bundle: .module)
     case .storeUnreadable:
@@ -178,7 +192,7 @@ public enum AgentSwitchRefusal: Error, Equatable, Sendable, LocalizedError {
       return String(
         localized: "Put the folder back where it was, or create a new session in its new place.",
         bundle: .module)
-    case .launchRejected:
+    case .launchRejected, .historyNotCopied:
       return String(localized: "Try again, and report the failure if it persists.", bundle: .module)
     case .stopUnconfirmed:
       return String(
@@ -259,7 +273,8 @@ public struct AgentSwitchPlan: Sendable {
   }
 }
 
-/// Plans a switch without stopping the current agent. A history handover writes a private snapshot.
+/// Plans a switch, and neither stops nor writes anything: a history handover only reserves the place
+/// of its copy, made by `writeHistory` once the current agent has stopped writing its logs.
 ///
 /// Everything that can refuse a switch refuses it here, while the current agent is still running:
 /// an agent that is not signed in, a model it does not offer, a folder that is gone or a summary
@@ -285,6 +300,39 @@ public struct PlanAgentSwitch: Sendable {
     self.folders = folders
     self.brief = brief
     self.history = history
+  }
+
+  /// Which logs a history handover would copy, for the sheet to offer it only when it can work.
+  public func conversationHistory(for session: WorkSession) async
+    -> ConversationHistoryAvailability
+  {
+    await history?.availability(of: session) ?? .unavailable
+  }
+
+  /// Copies the logs a history handover reserved a place for. Called once the current agent has
+  /// stopped, so that the turn it was in is in the copy; any other plan is returned as it is.
+  public func writeHistory(_ switching: AgentSwitchPlan) async throws -> AgentSwitchPlan {
+    guard case .conversationHistory(let reserved) = switching.mode, let history else {
+      return switching
+    }
+    let written: ConversationHandover
+    do {
+      written = try await history.export(switching.session, into: reserved)
+    } catch ConversationHandoverError.unavailable {
+      throw AgentSwitchRefusal.historyUnavailable
+    } catch {
+      throw AgentSwitchRefusal.historyNotCopied
+    }
+    return AgentSwitchPlan(
+      session: switching.session, target: switching.target, targetName: switching.targetName,
+      plan: switching.plan, mode: .conversationHistory(written), effort: switching.effort)
+  }
+
+  /// Removes the copy of a switch that did not happen: nothing will read it, and it holds every
+  /// tool result of the session.
+  public func discardHistory(of switching: AgentSwitchPlan) async {
+    guard case .conversationHistory(let handover) = switching.mode, let history else { return }
+    await history.discard(handover)
   }
 
   /// The summary the target would be handed, for the sheet to show before anything is decided.
@@ -440,11 +488,13 @@ public struct PlanAgentSwitch: Sendable {
     }
 
     if includesConversationHistory {
-      // A missing log or failed copy refuses while the current agent still runs.
-      guard let history else { throw ConversationHandoverError.unavailable }
-      let snapshot = try await history.export(session)
+      // Missing logs refuse while the current agent still runs; they are copied after it stops.
+      guard let history, await history.availability(of: session).isUsable else {
+        throw AgentSwitchRefusal.historyUnavailable
+      }
+      let reserved = await history.reserve(for: session)
       return planned(
-        try await plan(prompt: snapshot.prompt, resume: .none), .conversationHistory(snapshot))
+        try await plan(prompt: reserved.prompt, resume: .none), .conversationHistory(reserved))
     }
 
     let generated = self.summary(for: context ?? SessionBriefInput(session: session), to: target)

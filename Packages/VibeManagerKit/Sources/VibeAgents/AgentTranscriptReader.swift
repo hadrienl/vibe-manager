@@ -51,25 +51,10 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
     var activity = TranscriptActivity()
     var foundAny = false
     for conversation in session.conversations {
-      guard let identifier = Self.identifier(of: conversation) else { continue }
-      let files: [URL]
-      let isCodex: Bool
-      switch conversation.transcriptProviderID {
-      case ClaudeCodeAgentProvider.id.rawValue:
-        files = claudeTranscripts(
-          for: identifier, providerID: conversation.providerID,
-          workingDirectory: RestartSession.workingDirectoryPath(of: session))
-        isCodex = false
-      case CodexAgentProvider.id.rawValue:
-        files = codexRollouts(
-          for: identifier, providerID: conversation.providerID, since: session.createdAt)
-        isCodex = true
-      default:
-        continue
-      }
-      for file in files {
+      guard let found = locations.transcripts(of: conversation, in: session) else { continue }
+      for file in found.files {
         foundAny = true
-        let read = advance(file, isCodex: isCodex)
+        let read = advance(file, isCodex: found.isCodex)
         activity.editedPaths.formUnion(read.editedPaths)
         activity.workingDirectories.formUnion(read.workingDirectories)
       }
@@ -102,32 +87,6 @@ public actor AgentTranscriptReader: SessionTranscriptSource {
       }
     }
     return directories
-  }
-
-  // MARK: - Finding them
-
-  /// Once its file is found, only the folder of its sub-agents is listed again, where new ones
-  /// appear; every project folder only if the file went away and is not where the working
-  /// directory names it, and not again for two seconds after a look found nothing. A second
-  /// transcript the conversation got when resumed from another folder outside the application is
-  /// not looked for (#276).
-  private func claudeTranscripts(
-    for identifier: String, providerID: String, workingDirectory: String?
-  ) -> [URL] {
-    guard
-      let main = locations.claudeTranscript(
-        for: identifier, providerID: providerID, workingDirectory: workingDirectory)
-    else {
-      return []
-    }
-    return [main] + locator.claudeSubagents(of: main, identifier: identifier)
-  }
-
-  private func codexRollouts(for identifier: String, providerID: String, since created: Date)
-    -> [URL]
-  {
-    locations.codexRollouts(for: identifier, providerID: providerID, since: created)
-      .sorted { $0.lastPathComponent < $1.lastPathComponent }
   }
 
   private static func identifier(of conversation: SessionAgentConfiguration) -> String? {

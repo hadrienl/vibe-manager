@@ -113,6 +113,24 @@ public struct AgentTranscriptLocator: Sendable {
   public func codexRollouts(
     for identifier: String, providerID: String? = nil, fromDay first: Date, until now: Date
   ) -> [URL] {
+    codexRollouts(for: [identifier], providerID: providerID, fromDay: first, until: now)
+  }
+
+  /// The rollouts of several conversations in one walk through the days: a session's sub-agents
+  /// are looked for together, not each in a walk of its own.
+  public func codexRollouts(
+    for identifiers: Set<String>, providerID: String? = nil, since created: Date,
+    until now: Date = Date()
+  ) -> [URL] {
+    codexRollouts(
+      for: identifiers, providerID: providerID, fromDay: created.addingTimeInterval(-86_400),
+      until: now)
+  }
+
+  private func codexRollouts(
+    for identifiers: Set<String>, providerID: String?, fromDay first: Date, until now: Date
+  ) -> [URL] {
+    guard !identifiers.isEmpty else { return [] }
     var calendar = Calendar(identifier: .gregorian)
     calendar.timeZone = .current
     var day = calendar.startOfDay(for: first)
@@ -129,8 +147,9 @@ public struct AgentTranscriptLocator: Sendable {
           .appendingPathComponent(String(format: "%02d", parts.day ?? 0))
         if let files = list(folder) {
           found.append(
-            contentsOf: files.filter {
-              $0.lastPathComponent.contains(identifier) && $0.pathExtension == "jsonl"
+            contentsOf: files.filter { file in
+              file.pathExtension == "jsonl"
+                && identifiers.contains { file.lastPathComponent.contains($0) }
             })
         }
       }

@@ -160,8 +160,11 @@ resumes the same conversation and sends nothing; another agent starts a new one,
 default to read durable copies of the available conversation logs, including tool calls and
 results. The **Conversation** menu offers continuing the existing conversation when supported, or starting
 a new one with history or an editable summary, including when only changing models.
-Copies stay on this Mac, outside the repositories; internal state and operations in progress are
-not restored. If no log is available or copying fails, choose the summary or retry.
+History is offered only when the logs of the conversation being left were found, and the sheet
+says when earlier ones are missing. The logs are copied once the running agent has stopped, so the
+turn it was in is included. Copies stay on this Mac, outside the repositories; internal state and
+operations in progress are not restored. A copy no agent reads, after a launch that failed, is
+removed.
 Everything that can refuse the switch refuses it while the running agent is
 still at work; the agent is stopped only once the switch is confirmed, and a launch that fails puts
 the session back on its previous agent, resumable as before. Every switch is kept in the session's

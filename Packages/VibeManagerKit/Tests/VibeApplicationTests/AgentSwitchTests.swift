@@ -79,15 +79,54 @@ struct AgentSwitchTests {
   }
 
   private actor HistoryExporter: ConversationHandoverExporting {
-    var calls = 0
-    func export(_ session: WorkSession) -> ConversationHandover {
-      calls += 1
+    enum Copy { case succeeds, fails, logsGone }
+    let isAvailable: Bool
+    let copy: Copy
+    private(set) var reserved = 0
+    private(set) var exported = 0
+    private(set) var discarded: [ConversationHandover] = []
+
+    init(available: Bool = true, copy: Copy = .succeeds) {
+      isAvailable = available
+      self.copy = copy
+    }
+
+    func availability(of _: WorkSession) -> ConversationHistoryAvailability {
+      ConversationHistoryAvailability(includesLatest: isAvailable, isPartial: false)
+    }
+
+    func reserve(for _: WorkSession) -> ConversationHandover {
+      reserved += 1
       return ConversationHandover(
-        index: URL(fileURLWithPath: "/copies/history.md"), byteCount: 1_000_000)
+        index: URL(fileURLWithPath: "/copies/a b/history.md"), byteCount: 0)
+    }
+
+    func export(_: WorkSession, into reserved: ConversationHandover) throws
+      -> ConversationHandover
+    {
+      exported += 1
+      switch copy {
+      case .succeeds: return ConversationHandover(index: reserved.index, byteCount: 1_000_000)
+      case .fails: throw ConversationHandoverError.cannotCopy
+      case .logsGone: throw ConversationHandoverError.unavailable
+      }
+    }
+
+    func discard(_ handover: ConversationHandover) {
+      discarded.append(handover)
     }
   }
 
-  @Test("History handover launches with a short file instruction and records its actual kind")
+  private func historyPlanner(_ history: HistoryExporter, sessions: [WorkSession])
+    -> PlanAgentSwitch
+  {
+    PlanAgentSwitch(
+      repository: RestorationRepository(sessions: sessions),
+      agents: RestorationRegistry(providers: [Self.claude, Self.codex]),
+      folders: RestorationFolders(status: .usable), history: history)
+  }
+
+  @Test("A history handover reserves its copy when planned, and writes it only when asked")
   func conversationHistory() async throws {
     let stored = session()
     let repository = RestorationRepository(sessions: [stored])
@@ -99,15 +138,61 @@ struct AgentSwitchTests {
     let plan = try await planner(
       id: stored.id, to: AgentTarget(providerID: "codex"),
       includesConversationHistory: true, expecting: .conversationHistory)
-    guard case .conversationHistory(let snapshot) = plan.mode else {
+    guard case .conversationHistory(let reserved) = plan.mode else {
       Issue.record("Expected history handover")
       return
     }
-    #expect(plan.plan.arguments.last == snapshot.prompt)
+    // Planned while the agent runs: nothing is copied yet, but the launch already names the copy.
+    #expect(await history.exported == 0)
+    #expect(plan.plan.arguments.last == reserved.prompt)
+    #expect(reserved.prompt.contains(#""/copies/a b/history.md""#))
     #expect(plan.nextConfiguration.resumeIdentifier == nil)
-    let change = try await RecordAgentSwitch(repository: repository)(plan, wasEdited: false)
+
+    let written = try await planner.writeHistory(plan)
+    #expect(await history.exported == 1)
+    #expect(written.plan.arguments == plan.plan.arguments)
+    let change = try await RecordAgentSwitch(repository: repository)(written, wasEdited: false)
     #expect(change.handover == .conversationHistory(byteCount: 1_000_000))
-    #expect(await history.calls == 1)
+  }
+
+  @Test("Missing logs refuse the switch while planning, and a failed copy says so")
+  func historyRefusals() async throws {
+    let stored = session()
+    let unavailable = HistoryExporter(available: false)
+    await #expect(throws: AgentSwitchRefusal.historyUnavailable) {
+      try await historyPlanner(unavailable, sessions: [stored])(
+        id: stored.id, to: AgentTarget(providerID: "codex"), includesConversationHistory: true)
+    }
+    #expect(await unavailable.reserved == 0)
+
+    for (copy, refusal) in [
+      (HistoryExporter.Copy.fails, AgentSwitchRefusal.historyNotCopied),
+      (.logsGone, .historyUnavailable),
+    ] {
+      let history = HistoryExporter(copy: copy)
+      let planner = historyPlanner(history, sessions: [stored])
+      let plan = try await planner(
+        id: stored.id, to: AgentTarget(providerID: "codex"), includesConversationHistory: true)
+      await #expect(throws: refusal) { try await planner.writeHistory(plan) }
+    }
+    #expect(AgentSwitchRefusal.historyUnavailable.recoverySuggestion != nil)
+    #expect(AgentSwitchRefusal.historyNotCopied.recoverySuggestion != nil)
+  }
+
+  @Test("A copy nobody will read is discarded; other plans have none")
+  func discardHistory() async throws {
+    let stored = session()
+    let history = HistoryExporter()
+    let planner = historyPlanner(history, sessions: [stored])
+    let plan = try await planner(
+      id: stored.id, to: AgentTarget(providerID: "codex"), includesConversationHistory: true)
+    await planner.discardHistory(of: try await planner.writeHistory(plan))
+    #expect(await history.discarded.count == 1)
+
+    let summary = try await planner(id: stored.id, to: AgentTarget(providerID: "codex"))
+    #expect(try await planner.writeHistory(summary).mode == summary.mode)
+    await planner.discardHistory(of: summary)
+    #expect(await history.discarded.count == 1)
   }
 
   @Test("Native resume ignores the history choice and does not copy logs")
@@ -123,7 +208,8 @@ struct AgentSwitchTests {
       to: AgentTarget(providerID: "claude-code", modelID: "sonnet"),
       includesConversationHistory: true)
     #expect(plan.mode.keepsConversation)
-    #expect(await history.calls == 0)
+    #expect(await history.reserved == 0)
+    #expect(await history.exported == 0)
   }
 
   // MARK: - Modes

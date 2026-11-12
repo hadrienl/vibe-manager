@@ -497,6 +497,8 @@ public final class AppModel {
     /// The session it is about. The banner outlives the selection, so its buttons act on this one
     /// rather than on whichever session is on screen by the time they are pressed.
     public var sessionID: SessionID?
+    /// The agent a refused switch was going to, for Switch Agent… to open on it again.
+    public var switchTarget: AgentTarget? = nil
   }
 
   /// The Switch Agent sheet, while it is open.
@@ -2379,9 +2381,9 @@ public final class AppModel {
     )
   }
 
-  /// Plan, stop, re-read, record, launch — in that order, so that everything that can refuse
-  /// refuses while the current agent still runs, and a launch that fails can put the session back
-  /// exactly as it was.
+  /// Plan, stop, copy, re-read, record, launch — in that order, so that everything that can refuse
+  /// refuses while the current agent still runs, its logs are copied once it no longer writes
+  /// them, and a launch that fails can put the session back exactly as it was.
   private func performAgentSwitch(
     id: SessionID,
     to target: AgentTarget,
@@ -2401,11 +2403,13 @@ public final class AppModel {
     switchFailure = nil
     switchBackOffers[id] = nil
     let name = sessions.first { $0.id == id }?.name ?? Self.unnamedSession
+    // A copy of the logs written for this switch, until an agent is started to read it.
+    var unreadHistory: AgentSwitchPlan?
 
     do {
       // 1. Everything that can refuse, while the agent still runs.
       let current = sessions.first { $0.id == id }
-      let plan = try await planAgentSwitch(
+      var plan = try await planAgentSwitch(
         id: id,
         to: target,
         context: current.map { briefInput(for: $0, names: names) },
@@ -2427,6 +2431,9 @@ public final class AppModel {
           throw AgentSwitchRefusal.stopUnconfirmed(processIdentifier: pid)
         }
       }
+      // The copy holds the turn the agent was in when it was stopped.
+      plan = try await planAgentSwitch.writeHistory(plan)
+      unreadHistory = plan
 
       // 3 and 4. Recorded on a fresh read of the store; an archive that landed during the stop
       // is refused there.
@@ -2461,6 +2468,7 @@ public final class AppModel {
           "to": .token(plan.plan.providerID.diagnosticToken),
         ])
       let outcome = await launcher.launchSwitch(plan, session: switched, previous: previous)
+      if outcome == .started { unreadHistory = nil }
       if outcome != .started {
         resumeAttempts[id] = nil
         switchAttempts[id] = nil
@@ -2484,16 +2492,14 @@ public final class AppModel {
           id: id, change: change, reason: why, target: plan.targetName, previous: previous,
           name: name)
       }
-    } catch let error as ConversationHandoverError {
-      switchFailure = RestartFailure(
-        sessionName: name, message: error.localizedDescription, suggestion: nil, sessionID: id)
     } catch let refusal as AgentSwitchRefusal {
       switchFailure = RestartFailure(
         sessionName: name,
         message: refusal.errorDescription
           ?? String(localized: "The agent could not be switched.", bundle: .module),
         suggestion: refusal.recoverySuggestion,
-        sessionID: id
+        sessionID: id,
+        switchTarget: target
       )
     } catch {
       // The sheet again, on the agent that was chosen: the summary is read and confirmed anew.
@@ -2501,6 +2507,8 @@ public final class AppModel {
         self?.beginAgentSwitch(id, preselected: target)
       }
     }
+    // No agent was started to read it, and it holds every tool result of the session.
+    if let unreadHistory { await planAgentSwitch.discardHistory(of: unreadHistory) }
     await reload()
     follow(id)
   }

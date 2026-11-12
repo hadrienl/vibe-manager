@@ -257,7 +257,7 @@ public final class CodexConversationDecoder: ConversationDecoding {
   /// `started` adds the sub-agent; `interacted` — a message or a new task — sets it running again
   /// once done; `completed` ends a task. What it answered is in its own rollout only.
   private func readSubagentActivity(_ item: [String: Any], id: String, date: Date?) {
-    let thread = item["agent_thread_id"] as? String ?? id
+    let thread = Self.subagentThread(of: item) ?? id
     switch item["kind"] as? String {
     case "started":
       guard subagentIndexByThread[thread] == nil else { return }
@@ -281,6 +281,24 @@ public final class CodexConversationDecoder: ConversationDecoding {
     default:
       return
     }
+  }
+
+  /// The thread a `SubAgentActivity` item is about: its own, else the item's.
+  static func subagentThread(of item: [String: Any]) -> String? {
+    item["agent_thread_id"] as? String ?? item["id"] as? String
+  }
+
+  /// The thread a rollout record names a sub-agent by, read as the conversation reads it: `nil`
+  /// for any record but a completed `SubAgentActivity`. The copy of a session's logs (#539) finds
+  /// the sub-agents' rollouts by it.
+  static func subagentThread(inRecord object: [String: Any]) -> String? {
+    guard object["type"] as? String == "event_msg",
+      let payload = object["payload"] as? [String: Any],
+      payload["type"] as? String == "item_completed",
+      let item = payload["item"] as? [String: Any],
+      item["type"] as? String == "SubAgentActivity"
+    else { return nil }
+    return subagentThread(of: item)
   }
 
   private func updateSubagent(_ thread: String, _ change: (inout ToolCall) -> Void) {
