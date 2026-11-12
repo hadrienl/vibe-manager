@@ -436,6 +436,23 @@ struct CodexConversationDecoderTests {
     ])
     #expect(entries.count == 2)
     #expect(entries.last?.content == .notice(.error("You’ve hit your usage limit.")))
+    // A call left without output stops spinning; a sub-agent's failure is not the session's.
+    let failed =
+      #"{"type":"event_msg","payload":{"type":"task_complete","root_turn_id":"t","turn_id":"t","error":{"message":"Stopped."}}}"#
+    let running = decode([
+      item(#"{"type":"UserMessage","id":"u","content":[{"type":"text","text":"go"}]}"#),
+      #"{"type":"response_item","payload":{"type":"custom_tool_call","call_id":"c","name":"exec","input":"{\"cmd\":\"ls\"}"}}"#,
+      failed.replacingOccurrences(of: #""turn_id":"t""#, with: #""turn_id":"sub""#),
+    ])
+    #expect(running.count == 2)
+    #expect(running[1].toolCall?.state == .running)
+    let stopped = decode([
+      item(#"{"type":"UserMessage","id":"u","content":[{"type":"text","text":"go"}]}"#),
+      #"{"type":"response_item","payload":{"type":"custom_tool_call","call_id":"c","name":"exec","input":"{\"cmd\":\"ls\"}"}}"#,
+      failed,
+    ])
+    #expect(stopped[1].toolCall?.state == .interrupted)
+    #expect(stopped[2].content == .notice(.error("Stopped.")))
   }
 
   @Test("A generated image keeps where it was saved, never its bytes")

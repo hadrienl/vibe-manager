@@ -94,10 +94,11 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
   /// highlighted choice.
   public let approvalAnswerKeys: Set<[UInt8]> = [[0x79], [0x61], [0x70], [0x6E], [0x0D]]
 
-  /// Follows the session's rollout for the questions no hook reports (#40); `nil` without one.
-  private let questions: (@Sendable (Date) -> AsyncStream<AgentSignal>)?
+  /// Follows the session's rollout for the questions no hook reports (#40), from the session's
+  /// start and by its identifier when `SessionStart` names it; `nil` without one.
+  private let questions: (@Sendable (Date, String?) -> AsyncStream<AgentSignal>)?
 
-  public init(questions: (@Sendable (Date) -> AsyncStream<AgentSignal>)? = nil) {
+  public init(questions: (@Sendable (Date, String?) -> AsyncStream<AgentSignal>)? = nil) {
     self.questions = questions
   }
 
@@ -223,7 +224,7 @@ public struct CodexSignalDecoder: AgentSignalDecoding {
   /// the session writes, found once the session has started.
   public func additionalSignals(after event: AgentActivityEvent) -> AsyncStream<AgentSignal>? {
     guard event.name == "SessionStart", let questions else { return nil }
-    return questions(event.date)
+    return questions(event.date, conversationIdentifier(in: event))
   }
 }
 
@@ -251,9 +252,10 @@ extension CodexAgentProvider: AgentActivityReporting {
     var variables = ProcessInfo.processInfo.environment.merging(environment) { $1 }
     if let accountHome { variables[CodexHome.overrideKey] = accountHome }
     let sessions = CodexHome.sessionsDirectory(environment: variables)
-    return CodexSignalDecoder { since in
+    return CodexSignalDecoder { since, sessionIdentifier in
       CodexQuestionWatch(
-        sessionsDirectory: sessions, workingDirectoryPath: workingDirectoryPath, since: since
+        sessionsDirectory: sessions, workingDirectoryPath: workingDirectoryPath, since: since,
+        sessionIdentifier: sessionIdentifier
       ).signals()
     }
   }

@@ -11,9 +11,10 @@ import VibeApplication
 /// Both are written before the question is drawn and after it is gone: nothing says when its
 /// dialog is on screen, so these questions are shown, and answered in the terminal.
 ///
-/// The rollout is the one created for this working directory once the session started, the oldest
-/// of them, as `CodexRolloutSessionDiscovery` picks. Two Codex sessions started in the same folder
-/// in the same seconds could see each other's question; it would only be shown, never answered.
+/// The rollout is the one named after the session `SessionStart` reports; without its identifier,
+/// the one created for this working directory once the session started, the oldest of them, as
+/// `CodexRolloutSessionDiscovery` picks — two Codex sessions started in the same folder in the
+/// same seconds could then read each other's.
 ///
 /// `request_user_input_async` (#273) asks without waiting: its output, `accepted`, comes at once,
 /// and the agent goes on. Codex keeps the question until the user answers it or the turn ends,
@@ -26,6 +27,7 @@ public struct CodexQuestionWatch: Sendable {
 
   private let sessionsDirectory: URL
   private let workingDirectoryPath: String
+  private let sessionIdentifier: String?
   private let since: Date
   private let discoveryInterval: Duration
   private let discoveryTimeout: Duration
@@ -34,11 +36,13 @@ public struct CodexQuestionWatch: Sendable {
     sessionsDirectory: URL,
     workingDirectoryPath: String,
     since: Date,
+    sessionIdentifier: String? = nil,
     discoveryInterval: Duration = .milliseconds(500),
     discoveryTimeout: Duration = .seconds(30)
   ) {
     self.sessionsDirectory = sessionsDirectory
     self.workingDirectoryPath = workingDirectoryPath
+    self.sessionIdentifier = sessionIdentifier
     // The hook writes whole seconds: the rollout may be dated a moment before.
     self.since = since.addingTimeInterval(-2)
     self.discoveryInterval = discoveryInterval
@@ -110,7 +114,7 @@ public struct CodexQuestionWatch: Sendable {
   static func signals(in line: Data, pending: inout Set<String>) -> [AgentSignal] {
     // Most lines are messages and tool output, some large: the words are looked for first.
     let isCall = line.range(of: Data(tool.utf8)) != nil
-    let mayEnd = line.range(of: Data("task_complete".utf8)) != nil
+    let mayEnd = line.range(of: Data(#""type":"task_complete""#.utf8)) != nil
     guard isCall || mayEnd || (!pending.isEmpty && LineSplitter.contains(line, anyOf: needles)),
       let object = (try? JSONSerialization.jsonObject(with: line)) as? [String: Any],
       let payload = object["payload"] as? [String: Any]
@@ -187,10 +191,22 @@ public struct CodexQuestionWatch: Sendable {
     let deadline = ContinuousClock.now.advanced(by: discoveryTimeout)
     let workingDirectory = Self.canonicalPath(workingDirectoryPath)
     while !Task.isCancelled {
-      if let found = candidates().first(where: {
-        Self.workingDirectory(of: $0).map(Self.canonicalPath) == workingDirectory
-      }) {
-        return found
+      let found = candidates()
+      // `rollout-2026-11-11T09-16-32-<session>.jsonl`: the session's own, whoever shares its
+      // folder. Another session's of the same folder would tell this one its turns' ends.
+      if let sessionIdentifier,
+        let own = found.first(where: {
+          $0.lastPathComponent.hasSuffix("-\(sessionIdentifier).jsonl")
+        })
+      {
+        return own
+      }
+      if sessionIdentifier == nil,
+        let byFolder = found.first(where: {
+          Self.workingDirectory(of: $0).map(Self.canonicalPath) == workingDirectory
+        })
+      {
+        return byFolder
       }
       guard ContinuousClock.now < deadline else { return nil }
       try? await Task.sleep(for: discoveryInterval, tolerance: discoveryInterval / 2)

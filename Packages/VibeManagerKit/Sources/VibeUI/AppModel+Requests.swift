@@ -81,27 +81,31 @@ extension AppModel {
     return prompt.kind != .startup || readStartupGuesses.contains(request.id)
   }
 
-  private func showsRequest(_ request: AgentRequest, in state: AgentActivityState) -> Bool {
-    if request.awaitsPermissionDialog && !state.drawnCandidates.contains(request.id) {
-      return false
+  /// The state without the permissions Codex reported before its automatic review and whose
+  /// dialog is not drawn yet: no request for the user, an agent still working. Every reader of a
+  /// session's activity goes by it — cards, sidebar, coordinator, usage — and only the following
+  /// of their dialog by the raw state.
+  static func withoutPendingReviews(_ state: AgentActivityState) -> AgentActivityState {
+    let awaitsDialog = { (request: AgentRequest) in
+      request.awaitsPermissionDialog && !state.drawnCandidates.contains(request.id)
     }
-    return showsStartupDialog(request)
+    guard state.requests.contains(where: awaitsDialog) else { return state }
+    var shown = state
+    shown.requests.removeAll(where: awaitsDialog)
+    if case .awaitingUser = shown.activity {
+      shown.activity = shown.requests.first.map { .awaitingUser($0.kind) } ?? .working
+    }
+    return shown
   }
 
   /// A session's activity as the user is told of it, in the sidebar and on the phone: a dialog of
   /// the start no card shows — only guessed, or held back while sessions are restored — is an agent
   /// still starting, not one waiting for the user (#474).
   public func shownActivity(for id: SessionID) -> AgentActivityState? {
-    guard var state = activity(for: id) else { return nil }
-    let hidden = state.requests.filter { !showsRequest($0, in: state) }
-    guard !hidden.isEmpty else { return state }
-    let visible = state.requests.filter { showsRequest($0, in: state) }
-    state.requests = visible
-    if case .awaitingUser = state.activity {
-      state.activity =
-        visible.first.map { .awaitingUser($0.kind) }
-        ?? (hidden.contains(where: \.awaitsPermissionDialog) ? .working : .idle)
-    }
+    guard var state = activity(for: id).map(Self.withoutPendingReviews) else { return nil }
+    guard state.requests.contains(where: { !showsStartupDialog($0) }) else { return state }
+    state.requests.removeAll { !showsStartupDialog($0) }
+    if state.requests.isEmpty, case .awaitingUser = state.activity { state.activity = .idle }
     return state
   }
 

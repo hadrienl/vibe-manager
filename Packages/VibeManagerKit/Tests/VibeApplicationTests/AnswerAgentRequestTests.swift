@@ -203,6 +203,26 @@ struct AnswerAgentRequestTests {
     #expect(await fixture.terminals.written[id] == nil)
   }
 
+  @Test("A dialog drawn but cut short exposes the pending permission, to answer in the terminal")
+  func watchUnreadablePermission() async throws {
+    let live = LiveScreen("working")
+    let fixture = Fixture(live: live, keymap: PendingPermissionKeymap(), shown: false)
+    let (id, request) = await fixture.asking("touch a")
+    let watching = Task { await fixture.answer.followPermissionDialog(request) }
+    await live.show("[… 9 lines] ctrl+a view all\n\n› 1. Yes, proceed (y)\n  2. No (esc)")
+    while await fixture.tracker.state(for: id)?.drawnCandidates.contains(request) != true {
+      await Task.yield()
+    }
+    let state = try #require(await fixture.tracker.state(for: id))
+    #expect(state.requests.first?.isShown == false)
+    #expect(state.isFirstRequestUncertain)
+    // Still read: once told apart, it is armed.
+    await live.show("approval:touch a")
+    await watching.value
+    #expect(await fixture.tracker.state(for: id)?.requests.first?.isShown == true)
+    #expect(await fixture.terminals.written[id] == nil)
+  }
+
   @Test("A different dialog cannot expose the pending permission")
   func watchOtherPermission() async {
     let fixture = Fixture(

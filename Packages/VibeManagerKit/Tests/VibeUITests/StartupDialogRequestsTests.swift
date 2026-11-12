@@ -76,6 +76,27 @@ struct StartupDialogRequestsTests {
     #expect(AppModel.waitsForUser(state))
   }
 
+  @Test("A request drawn behind a permission under review waits for the user")
+  func requestBehindReview() {
+    let session = SessionID()
+    let review = AgentRequest(
+      id: AgentRequestID(sessionID: session, key: "review"), receivedAt: Date(), kind: .approval,
+      content: .permission(
+        AgentToolPermission(tool: .shell, toolName: "Bash", subject: "git fetch")),
+      reference: AgentToolReference(tool: "Bash", subject: "git fetch"), isShown: false)
+    let question = AgentRequest(
+      id: AgentRequestID(sessionID: session, key: "question"), receivedAt: Date(),
+      kind: .question,
+      content: .inTerminal(AgentTerminalPrompt(kind: .question, message: "Which one?")),
+      reference: AgentToolReference(tool: nil), isShown: true)
+    var state = AgentActivityState(activity: .awaitingUser(.approval), source: .structured)
+    state.requests = [review, question]
+    #expect(AppModel.waitsForUser(state))
+    let shown = AppModel.withoutPendingReviews(state)
+    #expect(shown.requests.map(\.id) == [question.id])
+    #expect(shown.activity == .awaitingUser(.question))
+  }
+
   @Test("An announced dialog is exposed even before its exact request is read on screen")
   func announcedPermission() async {
     let (model, subject) = await model()

@@ -123,10 +123,12 @@ public struct AnswerAgentRequest: Sendable {
   public func followPermissionDialog(_ id: AgentRequestID) async {
     while !Task.isCancelled, await tracker.awaitsPermissionDialog(id) {
       if let before = await screen(id.sessionID), await tracker.catchUp(id.sessionID),
-        !Task.isCancelled, let after = await screen(id.sessionID),
-        await tracker.dialogOnScreen(after, readBefore: before, isFor: id)
+        !Task.isCancelled, let after = await screen(id.sessionID)
       {
-        return
+        if await tracker.dialogOnScreen(after, readBefore: before, isFor: id) { return }
+        // Drawn, but not to be told apart: shown to be answered in the terminal, and still read
+        // until it is told apart, or settled.
+        await tracker.dialogUnnamedOnScreen(after, readBefore: before, isFor: id)
       }
       do { try await sleep(Self.startupDialogPollInterval) } catch { return }
     }

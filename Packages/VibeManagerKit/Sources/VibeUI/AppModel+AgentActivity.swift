@@ -29,8 +29,10 @@ extension AppModel {
         self.activityCells.set(update.state, for: update.sessionID)
         self.readPermissionDialog(of: update.state, for: update.sessionID)
         if let state = update.state {
+          // A permission under automatic review is the agent still working, to every reader.
           self.activityDidChange(
-            update.sessionID, from: previous, to: state, isReplayed: update.isReplayed)
+            update.sessionID, from: previous.map(Self.withoutPendingReviews),
+            to: Self.withoutPendingReviews(state), isReplayed: update.isReplayed)
           self.readStartupDialog(of: state, previous: previous)
         }
         self.conversations.activityChanged(
@@ -58,12 +60,13 @@ extension AppModel {
     updateVisibleSession()
   }
 
-  /// Keep pre-review permissions internal until their actual dialog is drawn.
+  /// A permission Codex reported before its automatic review is followed on screen until its
+  /// dialog is drawn, or it is settled with none: nothing is typed meanwhile.
   private func readPermissionDialog(of state: AgentActivityState?, for session: SessionID) {
     let first = state?.requests.first
-    for (id, task) in permissionDialogReads where id.sessionID == session {
+    for (id, read) in permissionDialogReads where id.sessionID == session {
       if first?.id != id || first?.awaitsPermissionDialog != true {
-        task.cancel()
+        read.task.cancel()
         permissionDialogReads[id] = nil
       }
     }
@@ -71,10 +74,13 @@ extension AppModel {
       permissionDialogReads[request.id] == nil, let answerRequest
     else { return }
     let id = request.id
-    permissionDialogReads[id] = Task { [weak self] in
+    let token = UUID()
+    let task = Task { [weak self] in
       await answerRequest.followPermissionDialog(id)
-      self?.permissionDialogReads[id] = nil
+      // A reading cancelled and replaced since leaves its successor alone.
+      if self?.permissionDialogReads[id]?.token == token { self?.permissionDialogReads[id] = nil }
     }
+    permissionDialogReads[id] = (token, task)
   }
 
   /// A dialog of the start is guessed to wait: its screen says which, when it is one that can be

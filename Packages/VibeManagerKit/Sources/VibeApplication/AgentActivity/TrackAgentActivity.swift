@@ -512,6 +512,38 @@ public actor TrackAgentActivity {
     return request.awaitsPermissionDialog
   }
 
+  /// A dialog is drawn under a permission still awaiting its own, and the screen cannot say it is
+  /// that one alone: cut short, unreadable, or as fit for another request (#283). Codex is held
+  /// on a dialog all the same — the permission is put among the ones it may be, shown to the user
+  /// and answered in the terminal, rather than kept for an automatic review that is over.
+  /// `before` is read before `text`: a dialog on both, never one merely flashing by.
+  @discardableResult
+  public func dialogUnnamedOnScreen(
+    _ text: String, readBefore before: String, isFor id: AgentRequestID
+  ) -> Bool {
+    guard awaitsPermissionDialog(id), var tracked = sessions[id.sessionID],
+      !tracked.state.drawnCandidates.contains(id),
+      let keymap = tracked.decoder?.answerKeymap,
+      AgentDialogScreen(screen: text) != nil, AgentDialogScreen(screen: before) != nil
+    else { return false }
+    let requests = tracked.state.requests
+    var candidates: Set<AgentRequestID> = [id]
+    if let dialog = keymap.drawnDialog(onScreen: text) {
+      // Read, and another request's alone: not this one's (#283).
+      let matching = requests.filter { !$0.isShown && dialog.matches($0) }.map(\.id)
+      guard matching.contains(id), matching.count > 1 || tracked.state.isTrackLost else {
+        return false
+      }
+      candidates = Set(matching)
+    }
+    let previous = tracked.state
+    tracked.state.isFirstRequestUncertain = true
+    tracked.state.drawnCandidates = candidates
+    sessions[id.sessionID] = tracked
+    changed(id.sessionID, from: previous)
+    return true
+  }
+
   /// Whether the request is still a dialog of the session's start: guessed, or read off its screen.
   public func waitsOnStartupDialog(_ id: AgentRequestID) -> Bool {
     guard let request = sessions[id.sessionID]?.state.requests.first(where: { $0.id == id }),
