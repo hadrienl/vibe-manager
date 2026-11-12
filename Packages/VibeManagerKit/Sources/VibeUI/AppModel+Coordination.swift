@@ -207,6 +207,7 @@ extension AppModel {
   /// starting, as dozens resumed together on a busy Mac are, not one to tell its coordinator of
   /// (#474). The real request that follows the guess is.
   static func waitsForUser(_ state: AgentActivityState?) -> Bool {
+    let state = state.map(withoutPendingReviews)
     guard case .awaitingUser = state?.activity else { return false }
     guard case .inTerminal(let prompt) = state?.requests.first?.content else { return true }
     return prompt.kind != .startup

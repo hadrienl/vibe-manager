@@ -30,6 +30,11 @@ public struct AgentRequest: Identifiable, Hashable, Codable, Sendable {
   /// dialog lands in the prompt — seen in the spike of #40, where the Return that followed then
   /// picked the highlighted option: the wrong one.
   public var isShown: Bool
+  /// A readable permission may still be under automatic review; it is not a human request
+  /// until its dialog is announced or read on screen.
+  public var awaitsPermissionDialog: Bool {
+    !isShown && kind == .approval && AgentDrawnDialog.showsWhole(self)
+  }
   /// Asked without stopping the agent, which goes on meanwhile — Codex's
   /// `request_user_input_async` (#273): it never comes before a request that holds the agent.
   public var isAsynchronous: Bool

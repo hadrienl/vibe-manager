@@ -215,6 +215,9 @@ public final class AppModel {
   /// The guesses of a dialog at a start whose screen showed one: shown only then, a banner or a
   /// resumed session's prompt being an agent still starting (#474).
   var readStartupGuesses: Set<AgentRequestID> = []
+  /// The screens followed for a permission under Codex's automatic review, until its dialog shows.
+  @ObservationIgnored var permissionDialogReads:
+    [AgentRequestID: (token: UUID, task: Task<Void, Never>)] = [:]
   /// While the requests read back at launch, or replayed, are taken in: they were there before,
   /// and make no alert sound (#393).
   @ObservationIgnored var isReadingRestoredRequests = false

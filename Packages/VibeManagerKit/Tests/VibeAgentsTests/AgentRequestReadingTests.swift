@@ -287,6 +287,37 @@ struct CodexQuestionWatchTests {
     try handle.close()
     #expect(await iterator.next() == .toolFinished("request_user_input", subject: "call_3"))
   }
+
+  @Test("Named by its session, the rollout is its own, not another of the same folder")
+  func rolloutBySession() async throws {
+    let sessions = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "codex-sessions-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: sessions) }
+    let since = Date()
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = .current
+    let parts = calendar.dateComponents([.year, .month, .day], from: since)
+    let folder = sessions.appendingPathComponent(
+      String(format: "%04d/%02d/%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0))
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let work = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
+    let meta = Data(#"{"type":"session_meta","payload":{"cwd":"\#(work)"}}"#.utf8)
+    let other = folder.appendingPathComponent("rollout-2026-11-11T09-00-00-other-session.jsonl")
+    try meta.write(to: other)
+    let own = folder.appendingPathComponent("rollout-2026-11-11T09-00-01-own-session.jsonl")
+    try meta.write(to: own)
+
+    let named = CodexQuestionWatch(
+      sessionsDirectory: sessions, workingDirectoryPath: work, since: since,
+      sessionIdentifier: "own-session", discoveryInterval: .milliseconds(20),
+      discoveryTimeout: .milliseconds(200))
+    #expect(await named.rollout()?.lastPathComponent == own.lastPathComponent)
+    let unknown = CodexQuestionWatch(
+      sessionsDirectory: sessions, workingDirectoryPath: work, since: since,
+      sessionIdentifier: "missing", discoveryInterval: .milliseconds(20),
+      discoveryTimeout: .milliseconds(200))
+    #expect(await unknown.rollout() == nil)
+  }
 }
 
 @Suite("Answer keymaps")
@@ -377,7 +408,8 @@ struct AnswerKeymapTests {
     #expect(
       claude.answers(for: .elicitation(AgentElicitation(server: "db", fieldCount: 0)))
         == [.allowOnce, .deny])
-    #expect(claude.answers(for: .elicitation(AgentElicitation(server: "db", fieldCount: 2))).isEmpty)
+    #expect(
+      claude.answers(for: .elicitation(AgentElicitation(server: "db", fieldCount: 2))).isEmpty)
   }
 
   @Test("Codex: y, p for a command, a for a patch, Escape; its questions stay in the terminal")

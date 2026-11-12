@@ -170,6 +170,30 @@ struct AsyncQuestionWatchTests {
     #expect(pending.isEmpty)
   }
 
+  /// As Codex 0.166.0 writes it once the account's quota is spent: no `Stop` hook follows.
+  static let failedTurn =
+    #"{"type":"event_msg","payload":{"type":"task_complete","root_turn_id":"t","turn_id":"t","last_agent_message":null,"error":{"message":"You’ve hit your usage limit.","codex_error_info":"usage_limit_exceeded"}}}"#
+
+  @Test("A turn ended on an error ends the turn, with no question pending; one ended well does not")
+  func failedTurnEnds() {
+    var pending: Set<String> = []
+    #expect(
+      CodexQuestionWatch.signals(in: Data(Self.failedTurn.utf8), pending: &pending) == [.turnEnded])
+    #expect(CodexQuestionWatch.signals(in: Data(Self.turnComplete.utf8), pending: &pending).isEmpty)
+    let subagent = Self.failedTurn.replacingOccurrences(
+      of: #""turn_id":"t""#, with: #""turn_id":"sub""#)
+    #expect(CodexQuestionWatch.signals(in: Data(subagent.utf8), pending: &pending).isEmpty)
+  }
+
+  @Test("An asynchronous question goes with a failed turn, before the turn's end")
+  func failedTurnTakesQuestions() {
+    var pending: Set<String> = []
+    _ = CodexQuestionWatch.signals(in: Data(Self.call.utf8), pending: &pending)
+    #expect(
+      CodexQuestionWatch.signals(in: Data(Self.failedTurn.utf8), pending: &pending)
+        == [.toolFinished("request_user_input_async", subject: "call_a"), .turnEnded])
+  }
+
   @Test("A turn's end leaves a waiting request_user_input alone")
   func syncStays() {
     var pending: Set<String> = []
