@@ -43,9 +43,18 @@ struct AgentSwitchSheet: View {
       }
       notice(model.continuityNotice, symbol: "info.circle", tint: .secondary)
 
-      if model.offersResumeRetry {
-        // Off by default: what failed is not retried unless asked. Worth asking when the model
-        // was what the agent refused, and switching it is precisely the fix.
+      if model.offersContextChoice {
+        Picker(selection: $model.contextChoice) {
+          ForEach(model.contextChoices, id: \.self) { choice in
+            Self.label(of: choice).tag(choice)
+          }
+        } label: {
+          Text("Conversation", bundle: .module)
+        }
+      } else if model.offersResumeRetry {
+        // An agent that takes no prompt has nothing else to offer. Off by default: what failed is
+        // not retried unless asked. Worth asking when the model was what the agent refused, and
+        // switching it is precisely the fix.
         Toggle(isOn: $model.retriesFailedResume) {
           Text("Try resuming the conversation anyway", bundle: .module)
         }
@@ -221,6 +230,14 @@ struct AgentSwitchSheet: View {
       : String(
         localized: "Summary uses \(sizeLabel)", bundle: .module,
         comment: "VoiceOver: “120 bytes of 96.0 KiB”.")
+  }
+
+  private static func label(of choice: AgentSwitchModel.ContextChoice) -> Text {
+    switch choice {
+    case .resume: Text("Continue the conversation", bundle: .module)
+    case .history: Text("New conversation with history", bundle: .module)
+    case .summary: Text("New conversation with summary", bundle: .module)
+    }
   }
 
   static func size(_ bytes: Int) -> String {

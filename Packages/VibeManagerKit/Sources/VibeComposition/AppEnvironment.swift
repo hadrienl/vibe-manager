@@ -514,6 +514,9 @@ public final class AppEnvironment {
           directory: dataFolder.appendingPathComponent("Coordination", isDirectory: true)),
         preferences: UserDefaultsCoordinationPreferences(suiteName: data.defaultsSuite)),
       worktrees: WorktreesModel(preferences: worktreeLocations),
+      conversationHandover: ConversationHandoverExporter(
+        directory: data.store.deletingLastPathComponent().appendingPathComponent("Handovers"),
+        locations: transcriptLocations),
       beep: { NSSound.beep() }
     )
     // The coordination tools are answered on the web view's channel (#352), for the processes of

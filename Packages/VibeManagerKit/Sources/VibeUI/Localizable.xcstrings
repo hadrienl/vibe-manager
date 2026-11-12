@@ -1,6 +1,707 @@
 {
   "sourceLanguage" : "en",
   "strings" : {
+    "Some earlier conversations left no logs that could be found, so the history is partial." : {
+      "comment" : "Added to the history notice of the Switch Agent sheet when some earlier conversations' logs were not found.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "لم يُعثر على سجلات بعض المحادثات السابقة، لذا فإن السجل جزئي."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Für einige frühere Gespräche wurden keine Gesprächsprotokolle gefunden, daher ist der Verlauf unvollständig."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "No se encontraron los registros de algunas conversaciones anteriores, así que el historial es parcial."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Les journaux de certaines conversations précédentes sont introuvables : l’historique est donc partiel."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "कुछ पिछली बातचीत के लॉग नहीं मिले, इसलिए इतिहास अधूरा है।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Non sono stati trovati i registri di alcune conversazioni precedenti, quindi la cronologia è parziale."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "以前の会話の一部でログが見つからなかったため、履歴は不完全です。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "이전 대화 일부의 로그를 찾을 수 없어 기록이 불완전합니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Van sommige eerdere gesprekken zijn geen logboeken gevonden, dus de geschiedenis is onvolledig."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nie znaleziono dzienników niektórych wcześniejszych rozmów, więc historia jest niepełna."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Não foram encontrados os registros de algumas conversas anteriores, então o histórico está incompleto."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Журналы некоторых предыдущих разговоров не найдены, поэтому история неполная."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Bazı önceki konuşmaların günlükleri bulunamadı, bu nedenle geçmiş eksik."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Журнали деяких попередніх розмов не знайдено, тому історія неповна."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到部分早先对话的日志，因此历史记录不完整。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "找不到部分先前對話的記錄，因此歷史記錄不完整。"
+          }
+        }
+      }
+    },
+    "New conversation with summary" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "محادثة جديدة مع ملخص"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neues Gespräch mit Zusammenfassung"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva conversación con resumen"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle conversation avec le résumé"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "सारांश के साथ नई बातचीत"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuova conversazione con riepilogo"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "要約を引き継いで新しい会話"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "요약을 전달하여 새 대화 시작"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuw gesprek met samenvatting"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nowa rozmowa z podsumowaniem"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova conversa com resumo"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новый разговор со сводкой"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Özetle yeni konuşma"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нова розмова з підсумком"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "带摘要的新对话"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帶摘要的新對話"
+          }
+        }
+      }
+    },
+    "New conversation with history" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "محادثة جديدة مع السجل"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Neues Gespräch mit Verlauf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nueva conversación con historial"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nouvelle conversation avec l’historique"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "इतिहास के साथ नई बातचीत"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nuova conversazione con cronologia"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "履歴を引き継いで新しい会話"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "기록을 전달하여 새 대화 시작"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nieuw gesprek met geschiedenis"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nowa rozmowa z historią"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nova conversa com histórico"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новый разговор с историей"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Geçmişle yeni konuşma"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Нова розмова з історією"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "带历史记录的新对话"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "帶歷史記錄的新對話"
+          }
+        }
+      }
+    },
+    "Continue the conversation" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "متابعة المحادثة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gespräch fortsetzen"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar la conversación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuer la conversation"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बातचीत जारी रखें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continua la conversazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話を続ける"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대화 계속하기"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesprek voortzetten"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kontynuuj rozmowę"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Continuar a conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продолжить разговор"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konuşmaya devam et"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Продовжити розмову"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "继续对话"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "繼續對話"
+          }
+        }
+      }
+    },
+    "The new agent will read copies of the available conversation logs, including tool calls and results. Copies are kept on this Mac and may contain sensitive information. Internal state and running operations are not restored." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سيقرأ الوكيل الجديد نسخًا من سجلات المحادثة المتاحة، بما فيها استدعاءات الأدوات ونتائجها. تُحفظ النسخ على جهاز Mac هذا وقد تحتوي على معلومات حساسة. لا تُستعاد الحالة الداخلية ولا العمليات الجارية."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Der neue Agent liest Kopien der verfügbaren Gesprächsprotokolle einschließlich Werkzeugaufrufen und Ergebnissen. Die Kopien bleiben auf diesem Mac und können vertrauliche Informationen enthalten. Interner Zustand und laufende Vorgänge werden nicht wiederhergestellt."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "El nuevo agente leerá copias de los registros disponibles, incluidas las llamadas a herramientas y sus resultados. Las copias se guardan en este Mac y pueden contener información sensible. No se restauran el estado interno ni las operaciones en curso."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Le nouvel agent lira des copies des journaux disponibles, y compris les appels d’outils et leurs résultats. Ces copies sont conservées sur ce Mac et peuvent contenir des informations sensibles. L’état interne et les opérations en cours ne sont pas restaurés."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "नया एजेंट उपलब्ध बातचीत लॉग की प्रतियाँ पढ़ेगा, जिनमें टूल कॉल और परिणाम शामिल हैं। प्रतियाँ इस Mac पर रखी जाती हैं और उनमें संवेदनशील जानकारी हो सकती है। आंतरिक स्थिति और चल रही प्रक्रियाएँ बहाल नहीं होतीं।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Il nuovo agente leggerà copie dei registri disponibili, incluse le chiamate agli strumenti e i risultati. Le copie restano su questo Mac e possono contenere informazioni sensibili. Lo stato interno e le operazioni in corso non vengono ripristinati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新しいエージェントは、ツール呼び出しと結果を含む利用可能な会話ログのコピーを読みます。コピーはこのMacに保存され、機密情報を含む場合があります。内部状態や実行中の操作は復元されません。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "새 에이전트는 도구 호출과 결과를 포함한 대화 로그 사본을 읽습니다. 사본은 이 Mac에 보관되며 민감한 정보를 포함할 수 있습니다. 내부 상태와 진행 중인 작업은 복원되지 않습니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "De nieuwe agent leest kopieën van de beschikbare gesprekslogboeken, inclusief toolaanroepen en resultaten. Kopieën blijven op deze Mac en kunnen gevoelige informatie bevatten. De interne status en lopende bewerkingen worden niet hersteld."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Nowy agent odczyta kopie dostępnych dzienników rozmowy, w tym wywołania narzędzi i wyniki. Kopie pozostają na tym Macu i mogą zawierać poufne informacje. Stan wewnętrzny i trwające operacje nie są przywracane."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "O novo agente lerá cópias dos registros disponíveis, incluindo chamadas de ferramentas e resultados. As cópias ficam neste Mac e podem conter informações confidenciais. O estado interno e as operações em andamento não são restaurados."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новый агент прочитает копии доступных журналов разговора, включая вызовы инструментов и результаты. Копии сохраняются на этом Mac и могут содержать конфиденциальные данные. Внутреннее состояние и текущие операции не восстанавливаются."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Yeni ajan, araç çağrıları ve sonuçları dahil mevcut konuşma günlüklerinin kopyalarını okuyacak. Kopyalar bu Mac’te tutulur ve hassas bilgiler içerebilir. İç durum ve devam eden işlemler geri yüklenmez."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Новий агент прочитає копії доступних журналів розмови, включно з викликами інструментів і результатами. Копії зберігаються на цьому Mac і можуть містити конфіденційні дані. Внутрішній стан і поточні операції не відновлюються."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新代理将读取可用对话日志的副本，包括工具调用和结果。副本保存在此 Mac 上，可能包含敏感信息。内部状态和正在进行的操作不会恢复。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "新代理將讀取可用對話記錄的副本，包括工具呼叫和結果。副本保存在此 Mac 上，可能包含敏感資訊。內部狀態和正在進行的操作不會還原。"
+          }
+        }
+      }
+    },
+    "Pass conversation history" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "تمرير سجل المحادثة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesprächsverlauf übergeben"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitir el historial de conversación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmettre l’historique de conversation"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बातचीत का इतिहास भेजें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Trasmetti la cronologia della conversazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話履歴を引き継ぐ"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대화 기록 전달"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gespreksgeschiedenis doorgeven"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Przekaż historię rozmowy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Transmitir o histórico da conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Передать историю разговора"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Konuşma geçmişini aktar"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Передати історію розмови"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "传递对话历史"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "傳遞對話歷史"
+          }
+        }
+      }
+    },
+    "conversation history" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "سجل المحادثة"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gesprächsverlauf"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "historial de conversación"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "historique de conversation"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "बातचीत का इतिहास"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "cronologia della conversazione"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "会話履歴"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "대화 기록"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "gespreksgeschiedenis"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "historia rozmowy"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "histórico da conversa"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "история разговора"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "konuşma geçmişi"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "історія розмови"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "对话历史"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "對話歷史"
+          }
+        }
+      }
+    },
     "Auto reviews permission requests for you while keeping the sandbox. Changes apply to new or restarted sessions." : {
       "comment" : "Codex approval mode setting.",
       "localizations" : {

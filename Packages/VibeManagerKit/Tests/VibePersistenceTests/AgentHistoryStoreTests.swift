@@ -85,6 +85,10 @@ struct AgentHistoryStoreTests {
     )
     try session.revertAgentSwitch(failed.id, reason: "Mock Agent could not be started.")
 
+    try session.switchAgent(
+      to: SessionAgentConfiguration(providerID: "claude-code"),
+      handover: .conversationHistory(byteCount: 1_000_000),
+      at: createdAt.addingTimeInterval(40))
     let codec = SessionStoreCodec()
     let decoded = try codec.decode(try codec.encode(sessions: [session]))
 

@@ -22,13 +22,15 @@ running agent can only be told apart from a stopped one, not a busy one from an 
 
 | Switch | What runs | Conversation |
 |---|---|---|
-| Same agent, another model, with a conversation to resume | `--resume <id>` with the new `--model` (`codex resume -m`) | goes on; no text is sent |
-| Same agent without an identifier, or another agent | a new process, handed a summary | not transferred, and said so |
+| Same agent, another model, with a conversation to resume and continuation selected (default) | `--resume <id>` with the new `--model` (`codex resume -m`) | goes on; no text is sent |
+| Same agent without an identifier, or another agent | a new process, instructed to read copied logs by default, or handed a summary | logs copied; internal state not transferred |
 | A session that never ran | its first launch, initial prompt included | none existed |
 
 A conversation the agent dropped within seconds the last time it was resumed (#10's
 `resumeRefusals`) is not retried on a change of model unless the user asks: the sheet says so,
-plans a handover, and offers **Try resuming the conversation anyway**, unchecked. The application
+plans a handover, and lets the user explicitly select **Continue the conversation** in the picker —
+or, for an agent that takes no prompt and so has no picker, tick **Try resuming the conversation
+anyway**, unchecked by default. The application
 cannot tell a conversation that is gone from a model the account may not run — both are a quick
 non-zero exit — and only in the second case is switching the model the fix.
 
@@ -103,6 +105,54 @@ one back in place. The
 launcher already finishes the observer on `detach`; the check closes the window left. The observer
 itself is chosen from the plan's provider rather than the stored agent, the one fact that cannot lag
 behind a switch.
+
+### Conversation logs are handed over by default (#539)
+
+When a switch needs a new conversation, history is selected by default — when it can work. The
+sheet asks the exporter, without copying anything, whether the logs of the conversation being left
+were found, and offers history only then: confirmed without them, the switch would fail after the
+sheet had closed, or the new agent would resume an older request as the latest. Earlier
+conversations without logs, or that never got an identifier, make the history partial, and the
+sheet says so. The **Conversation** picker also offers an editable summary, and native
+continuation when supported; it is shown only when there is more than the summary. The choice is
+one stored value, kept through changes of agent and model and set aside while not on offer. It is
+available when changing models too: an explicit history or summary selection skips native resume.
+Native continuation remains the default for a model change when resume has not failed. A first
+launch bypasses this choice. Agents that take no initial prompt still receive nothing.
+
+`ConversationHandoverExporter` copies the available native JSONL files, without reinterpreting
+or dropping tool results, into `Handovers/<session UUID>/<snapshot UUID>/` beside `sessions.json`.
+It finds them where every other reader does, through `TranscriptLocationCache`, which now holds
+the one dispatch from a conversation's agent to its files. An index names their provider, harness
+and original filename, in conversation order; Claude sub-agents follow their main log. Codex child
+rollouts are discovered recursively, breadth first, from the `SubAgentActivity` records the
+conversation reader reads (`CodexConversationDecoder.subagentThread`), parsing only the lines that
+name one; each level is looked for in one walk through the day folders, and repeated files are
+copied once. Missing conversations are explicitly marked in the index.
+
+The copy is made in two steps. Planning, while the current agent runs, checks that the logs of the
+conversation being left exist — `AgentSwitchRefusal.historyUnavailable` otherwise — and reserves
+the snapshot's folder, which the launch prompt names. Once the agent is stopped,
+`PlanAgentSwitch.writeHistory` copies the logs: the turn it was in, and whatever it wrote while
+stopping, are in the copy. A copy that fails then is `historyNotCopied`: the session is left,
+stopped, on its agent, nothing is recorded, and the banner's Switch Agent… opens the sheet again
+on the same target. A copy is a clone on APFS — instant, and no space until either side changes —
+else a stream bounded to the source's size at open. When the switch fails after the copy — the
+record refused, or the launch — the copy is removed: no agent will read it.
+
+The plan's only prompt is an instruction to read the index and the copied logs, in parts if
+needed, and continue from the latest request and current files. Absolute paths are JSON strings
+without escaped slashes: they work outside a repository, survive spaces and quotes, and are found
+by an agent that hands them to a tool as written. No process state or in-flight operation is
+restored. No native log is modified and no CLI-specific conversation database is fabricated.
+
+The copied logs are deliberately durable: each switch has its own directory, and subsequent
+switches and deletion of the original CLI logs leave earlier copies usable. They are local,
+owner-only files (0600, directories 0700), may contain sensitive information, and are not part of
+the Git worktree. The sheet says this explicitly. They are retained until the user removes the
+corresponding `Handovers/<session UUID>` directory; no automatic expiry or upload is added.
+The session store records only the handover kind and byte count, not log contents or file paths.
+A refused plan writes no snapshot, and one written for a switch that then failed is removed.
 
 ### The summary says where the work is
 

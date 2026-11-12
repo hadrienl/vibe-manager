@@ -130,3 +130,29 @@ pid, so a `git` that started a helper or a login shell whose profile started one
 - **The web view's trace and tabs.** `Browser/*.json` are `0600` in a `0700` folder; a process of
   the same user can read or rewrite them. A typed value is kept cut short, and never for a password,
   card or one-time-code field.
+
+## Conversation handover snapshots (#539)
+
+Choosing **New conversation with history** copies the session's available native Claude Code and
+Codex JSONL logs (including endpoint harnesses and Claude and Codex sub-agents) to
+`Handovers/<session UUID>/<snapshot UUID>` beside the session store. Each export creates an
+owner-only directory and 0600 copies and index; raw tool output and messages may contain secrets.
+The UI discloses local retention and sensitive content before confirmation. No upload is added;
+the chosen target agent receives a short prompt containing the index path and may read the copies
+through its normal tools and permissions. A target unable to read outside its sandbox must ask
+for access through its own usual permission flow.
+
+Sources are discovered through the existing transcript locator. Invalid path-like resume IDs
+are rejected; non-regular source files, including symlinks, refuse the copy: each is opened with
+`O_NOFOLLOW` and checked with `fstat` before it is cloned from that descriptor (`fclonefileat`),
+or, where the volume cannot clone, streamed in 64 KiB chunks bounded to its size at open. The
+source is never changed or linked. The copy is made only after the old agent has stopped, into a
+folder reserved under `Handovers/` and checked to be the exporter's own. Failure removes the
+incomplete snapshot; a switch that fails after the copy removes the whole snapshot, which no agent
+will read. The index labels unavailable conversations, and the prompt labels the logs as history,
+instructs progressive reading and warns about incomplete trailing records. Copied logs are not
+executed by the app.
+
+Snapshots persist independently of CLI logs and later switches. They are not diagnostics, are not
+synced to the companion, and are not placed in repositories. Removing
+`Handovers/<session UUID>` removes that session's copies; no automatic retention period is imposed.

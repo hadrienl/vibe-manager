@@ -20,8 +20,53 @@ public final class AgentSwitchModel {
     case firstLaunch
     /// A new conversation, handed the summary.
     case summary
+    /// A new conversation, told to read a copy of the session's conversation logs.
+    case conversationHistory
     /// A new conversation, told nothing: this agent takes no prompt.
     case nothing
+  }
+
+  /// What the new agent starts from, when there is a choice: the conversation itself, a copy of
+  /// its logs, or the summary.
+  public enum ContextChoice: Hashable {
+    case resume, history, summary
+  }
+
+  /// The user's choice, `nil` until they make one. Kept through changes of agent and model, and
+  /// set aside while it is not on offer: a conversation another agent cannot resume.
+  private var chosenContext: ContextChoice?
+
+  /// The choices this target offers, in the order the sheet lists them.
+  public var contextChoices: [ContextChoice] {
+    var choices: [ContextChoice] = []
+    if canResumeConversation { choices.append(.resume) }
+    if offersConversationHistory { choices.append(.history) }
+    choices.append(.summary)
+    return choices
+  }
+
+  /// Whether the sheet asks: the target takes a prompt, and there is more than the summary.
+  public var offersContextChoice: Bool {
+    session.hasEverStarted && selectedAgent?.descriptor.capabilities.supportsInitialPrompt == true
+      && contextChoices.count > 1
+  }
+
+  /// What is done without asking: the conversation goes on when it can — unless it was dropped
+  /// last time — else the logs are copied when they can be, else the summary.
+  private var defaultContext: ContextChoice {
+    if canResumeConversation && !resumeFailedBefore { return .resume }
+    return offersConversationHistory ? .history : .summary
+  }
+
+  public var contextChoice: ContextChoice {
+    get {
+      guard let chosenContext, contextChoices.contains(chosenContext) else { return defaultContext }
+      return chosenContext
+    }
+    set {
+      chosenContext = newValue
+      regenerateUnlessEdited()
+    }
   }
 
   public let sessionID: SessionID
@@ -31,10 +76,17 @@ public final class AgentSwitchModel {
   public let stopsRunningAgent: Bool
   /// Whether the agent dropped this conversation within seconds the last time it was resumed.
   public let resumeFailedBefore: Bool
-  /// The user's answer when it did: try resuming it once more, with the new model, rather than
-  /// handing over. Off by default — what failed is not retried unless asked.
-  public var retriesFailedResume = false {
-    didSet { regenerateUnlessEdited() }
+  /// Which logs a copy would hold, read when the sheet loads; `nil` until then.
+  public private(set) var historyAvailability: ConversationHistoryAvailability?
+  /// A copy of the logs is offered only once they are known to include the conversation being
+  /// left: confirmed without them, the switch would fail after the sheet has closed.
+  public var offersConversationHistory: Bool { historyAvailability?.isUsable == true }
+
+  /// The answer to an agent that dropped its conversation last time, asked where the target takes
+  /// no prompt and so offers no other choice: try resuming it once more. Off unless asked.
+  public var retriesFailedResume: Bool {
+    get { contextChoice == .resume }
+    set { contextChoice = newValue ? .resume : .summary }
   }
 
   public private(set) var agents: [AgentOption] = []
@@ -42,6 +94,7 @@ public final class AgentSwitchModel {
   /// The models of the agent the session runs now, to name its model the way the CLI does.
   private var currentModels: [AgentModel] = []
   public private(set) var isLoadingAgents = false
+  public private(set) var isCheckingHistory = false
   public private(set) var providerID: String
   public private(set) var modelID: String?
 
@@ -126,10 +179,10 @@ public final class AgentSwitchModel {
     resumeFailedBefore && canResumeConversation
   }
 
-  /// Whether the switch skips the agent's own resume: it failed last time, and nobody asked to try
-  /// it again.
+  /// Whether the switch skips the agent's own resume: a new conversation was chosen, or the one
+  /// the agent dropped last time is not tried again.
   public var skipsResume: Bool {
-    offersResumeRetry && !retriesFailedResume
+    canResumeConversation && contextChoice != .resume
   }
 
   public var handover: Handover {
@@ -140,7 +193,7 @@ public final class AgentSwitchModel {
     if let agent = selectedAgent, !agent.descriptor.capabilities.supportsInitialPrompt {
       return .nothing
     }
-    return .summary
+    return contextChoice == .history ? .conversationHistory : .summary
   }
 
   /// The mode the sheet is showing, for the switch to confirm it is still the one it would take.
@@ -148,6 +201,7 @@ public final class AgentSwitchModel {
     switch handover {
     case .resumesConversation: return .resumeWithModel
     case .firstLaunch: return .firstLaunch
+    case .conversationHistory: return .conversationHistory
     case .summary: return isSummaryEmptied ? .freshWithoutContext : .handover
     case .nothing: return .freshWithoutContext
     }
@@ -164,7 +218,8 @@ public final class AgentSwitchModel {
   }
 
   public var canSwitch: Bool {
-    guard changesSomething, selectedAgent?.isUsable == true, !isLoadingAgents else {
+    guard changesSomething, selectedAgent?.isUsable == true, !isLoadingAgents, !isCheckingHistory
+    else {
       return false
     }
     return handover != .summary || summaryOverflow == 0
@@ -217,8 +272,19 @@ public final class AgentSwitchModel {
           \(currentName)'s conversation, and nothing is sent to it.
           """,
         bundle: .module, comment: "The new agent's name, then the current agent's name.")
+    case .conversationHistory:
+      let copies = String(
+        localized:
+          "The new agent will read copies of the available conversation logs, including tool calls and results. Copies are kept on this Mac and may contain sensitive information. Internal state and running operations are not restored.",
+        bundle: .module)
+      guard historyAvailability?.isPartial == true else { return copies }
+      return copies + " "
+        + String(
+          localized:
+            "Some earlier conversations left no logs that could be found, so the history is partial.",
+          bundle: .module)
     case .summary:
-      if skipsResume {
+      if offersResumeRetry && chosenContext == nil {
         return String(
           localized: """
             \(currentName) stopped as soon as this conversation was resumed last time, so \
@@ -275,7 +341,16 @@ public final class AgentSwitchModel {
   // MARK: - Loading and picking
 
   public func load() async {
+    // Once: the workspace loads the sheet it opens, and so may whoever opened it.
+    guard !isLoadingAgents, !isCheckingHistory else { return }
+    // The logs are looked for while the agents are detected; the switch waits for both.
+    isCheckingHistory = planner.supportsConversationHistory
+    let session = session
+    let planner = planner
+    let history = Task { await planner.conversationHistory(for: session) }
     await refreshAgents(forceRefresh: false)
+    historyAvailability = await history.value
+    isCheckingHistory = false
   }
 
   public func refreshAgents(forceRefresh: Bool) async {

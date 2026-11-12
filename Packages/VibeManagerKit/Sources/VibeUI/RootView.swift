@@ -181,9 +181,11 @@ public struct RootView: View {
     id.flatMap { id in model.sessions.first { $0.id == id } }
   }
 
-  private func switchAction(for id: SessionID?) -> (() -> Void)? {
+  private func switchAction(for id: SessionID?, preselected: AgentTarget? = nil)
+    -> (() -> Void)?
+  {
     guard let session = session(id), model.canSwitchAgent(session) else { return nil }
-    return { model.beginAgentSwitch(session.id) }
+    return { model.beginAgentSwitch(session.id, preselected: preselected) }
   }
 
   private func restartAction(for id: SessionID?) -> (() -> Void)? {
@@ -313,9 +315,10 @@ public struct RootView: View {
             detect: { Task { await model.refreshAgents(forceRefresh: true) } },
             isDetecting: model.isRefreshingAgents,
             // Back on its previous agent, the session resumes its own conversation with Restart;
-            // or another switch can be tried.
+            // or another switch can be tried, on the agent the refused one was going to.
             restart: restartAction(for: failure.sessionID),
-            switchAgent: switchAction(for: failure.sessionID),
+            switchAgent: switchAction(
+              for: failure.sessionID, preselected: failure.switchTarget),
             dismiss: { model.dismissSwitchFailure() }
           )
           Divider()
