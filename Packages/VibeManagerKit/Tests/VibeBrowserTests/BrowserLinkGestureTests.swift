@@ -17,10 +17,10 @@ struct BrowserLinkGestureTests {
       modifiers: modifiers, button: button, isLink: isLink, isAgentDriven: isAgentDriven)
   }
 
-  @Test("⌘-click opens behind, ⇧⌘-click in front, the middle button behind")
+  @Test("⌘-click opens in front, ⇧⌘-click behind, the middle button behind")
   func gestures() {
-    #expect(decide([.command]) == .newTab(activate: false))
-    #expect(decide([.command, .shift]) == .newTab(activate: true))
+    #expect(decide([.command]) == .newTab(activate: true))
+    #expect(decide([.command, .shift]) == .newTab(activate: false))
     #expect(decide([], button: .middle) == .newTab(activate: false))
   }
 

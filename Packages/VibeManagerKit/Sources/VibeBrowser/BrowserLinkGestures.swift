@@ -2,8 +2,9 @@ import AppKit
 import VibeApplication
 import WebKit
 
-/// How the user opens a link of a page in a new tab, as in Safari (#186): ⌘-click and the middle
-/// button in the background, ⇧⌘-click in front. What an agent does is never read this way.
+/// How the user opens a link of a page in a new tab (#186): ⌘-click in front — the list of tabs
+/// would hide one opened behind (#536) — ⇧⌘-click and the middle button in the background. What an
+/// agent does is never read this way.
 enum BrowserLinkGesture {
   enum Decision: Equatable {
     case sameTab
@@ -32,7 +33,7 @@ enum BrowserLinkGesture {
     guard isLink, !isAgentDriven else { return .sameTab }
     if button == .middle { return .newTab(activate: false) }
     guard modifiers.contains(.command) else { return .sameTab }
-    return .newTab(activate: modifiers.contains(.shift))
+    return .newTab(activate: !modifiers.contains(.shift))
   }
 
   /// An address of this Mac opens from a page of this Mac only: from a site, WebKit refuses to

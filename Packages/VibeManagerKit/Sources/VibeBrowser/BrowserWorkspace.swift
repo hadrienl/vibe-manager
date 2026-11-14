@@ -125,7 +125,7 @@ public final class BrowserWorkspace {
       browser.restore(state, records: records) { tab in
         self.makeTab(
           tab.url, id: tab.id, title: tab.title, openedBy: tab.openedBy,
-          isAgentDriven: tab.isAgentDriven, in: id)
+          isAgentDriven: tab.isAgentDriven, isPinned: tab.isPinned, in: id)
       }
       self.restoreTasks[id] = nil
       self.visibilityDidChange?(id)
@@ -234,7 +234,7 @@ public final class BrowserWorkspace {
   }
 
   /// A window a page opened, shown as a tab after its opener's: in front, unless the user
-  /// ⌘-clicked the link that opened it.
+  /// ⇧⌘-clicked the link that opened it.
   private func adoptPopup(
     _ popup: WKWebView, url: URL, byAgent: Bool, activate: Bool, from origin: BrowserTabID?,
     in id: SessionID
@@ -265,6 +265,12 @@ public final class BrowserWorkspace {
       return
     }
     open(url, in: id, openedBy: .terminalLink)
+  }
+
+  /// Closes the tabs the user did not pin (#536): the pinned ones and the ticket's stay.
+  public func closeUnpinnedTabs(in id: SessionID) {
+    guard let browser = browsers[id] else { return }
+    for tab in browser.tabs where !tab.isPinned { close(tab.id, in: id) }
   }
 
   public func close(_ tabID: BrowserTabID, in id: SessionID) {
@@ -308,12 +314,12 @@ public final class BrowserWorkspace {
   func makeTab(
     _ url: URL, id tabID: BrowserTabID = BrowserTabID(), title: String = "",
     openedBy: BrowserTab.Opener, isAgentDriven: Bool? = nil, isOpenedByAgentPage: Bool = false,
-    isPinnedTicket: Bool = false, in id: SessionID
+    isPinnedTicket: Bool = false, isPinned: Bool = false, in id: SessionID
   ) -> BrowserTabModel {
     let tab = BrowserTabModel(
       id: tabID, url: url, title: title, openedBy: openedBy, isAgentDriven: isAgentDriven,
       isOpenedByAgentPage: isOpenedByAgentPage, isPinnedTicket: isPinnedTicket,
-      configuration: configuration)
+      isPinned: isPinned, configuration: configuration)
     tab.didChange = { [weak self] in
       guard !isPinnedTicket else { return }
       self?.scheduleSave(id)

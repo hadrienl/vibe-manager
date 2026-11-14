@@ -74,36 +74,30 @@ struct BrowserPanel: View {
 
 // MARK: - Tabs
 
+/// The session's tabs, behind one button that shows the one in front whole (#536), beside a new
+/// tab and what agents did.
 private struct BrowserTabStrip: View {
   let model: AppModel
   let workspace: BrowserWorkspace
   let browser: SessionBrowser
   @State private var isShowingTrace = false
+  @State private var isShowingTabs = false
+  @State private var width: CGFloat = 0
 
   var body: some View {
     HStack(spacing: 4) {
-      ScrollView(.horizontal, showsIndicators: false) {
-        HStack(spacing: 4) {
-          ForEach(browser.allTabs) { tab in
-            BrowserTabButton(
-              tab: tab, isActive: browser.activeTab?.id == tab.id,
-              activate: { browser.activate(tab.id) },
-              close: { workspace.close(tab.id, in: browser.sessionID) },
-              model: model, browser: browser
+      BrowserTabPickerButton(browser: browser, isShowingTabs: $isShowingTabs)
+        .background(
+          BrowserTabListPopover(isPresented: $isShowingTabs) {
+            BrowserTabList(
+              model: model, workspace: workspace, browser: browser,
+              dismiss: { isShowingTabs = false }
             )
-            // Marked, so that a tab let go over the session is not typed into its agent (#42).
-            .draggable(BrowserTabDrag.text(for: tab.id))
-            .dropDestination(for: String.self) { items, _ in
-              guard let raw = items.first, let uuid = BrowserTabDrag.tabID(in: raw),
-                let destination = browser.tabs.firstIndex(where: { $0.id == tab.id })
-              else { return false }
-              browser.move(BrowserTabID(rawValue: uuid), to: destination)
-              return true
-            }
+            // As wide as the panel, so that titles read whole.
+            .frame(width: max(width - 12, 280))
           }
-        }
-        .padding(.horizontal, 6)
-      }
+        )
+
       Button {
         model.newWebTab()
       } label: {
@@ -113,8 +107,6 @@ private struct BrowserTabStrip: View {
       .buttonStyle(.borderless)
       .instantTooltip(Text("New Tab", bundle: .module))
       .accessibilityLabel(Text("New Tab", bundle: .module))
-
-      Spacer(minLength: 0)
 
       Button {
         isShowingTrace.toggle()
@@ -149,191 +141,18 @@ private struct BrowserTabStrip: View {
           forget: { workspace.forgetReading($0, in: browser.sessionID) })
       }
     }
+    .padding(.leading, 6)
     .frame(height: 36)
     .background(.bar)
+    .onGeometryChange(for: CGFloat.self) {
+      $0.size.width
+    } action: {
+      width = $0
+    }
+    // Another session's tabs in the same strip: the list of the previous one goes.
+    .onChange(of: browser.sessionID) { isShowingTabs = false }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Web tabs", bundle: .module))
-  }
-}
-
-private struct BrowserTabButton: View {
-  let tab: BrowserTabModel
-  let isActive: Bool
-  let activate: () -> Void
-  let close: () -> Void
-  let model: AppModel
-  let browser: SessionBrowser
-  @State private var isHovering = false
-  @FocusState private var focus: TabFocus?
-
-  /// What has the keyboard in the tab, with Full Keyboard Access (#230).
-  private enum TabFocus: Hashable {
-    case tab
-    case close
-  }
-
-  var body: some View {
-    HStack(spacing: 5) {
-      // A button, so that the keyboard reaches every tab, not only the one in front (#230).
-      Button(action: activate) {
-        HStack(spacing: 5) {
-          icon
-          if tab.isPinnedTicket {
-            Text(verbatim: browser.ticket?.label ?? tab.displayTitle)
-              .lineLimit(1)
-          } else {
-            title
-              .lineLimit(1)
-              .truncationMode(.tail)
-              .frame(maxWidth: 150, alignment: .leading)
-          }
-        }
-        // The whole tab answers the click, its margins included, as before it was a button.
-        .padding(.leading, 8)
-        .padding(.trailing, showsClose ? 0 : 8)
-        .frame(maxHeight: .infinity)
-        .contentShape(Rectangle())
-      }
-      .buttonStyle(.plain)
-      .focused($focus, equals: .tab)
-      // Shown in front, under the pointer, and when the keyboard is on the tab: a tab behind is
-      // closed without the mouse too.
-      if showsClose {
-        Button(action: close) {
-          Image(systemName: "xmark")
-            .font(.system(size: 9, weight: .semibold))
-            // At least 20 points to click (#229).
-            .frame(width: 20, height: 20)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.borderless)
-        .focused($focus, equals: .close)
-        .instantTooltip(Text("Close Tab", bundle: .module))
-        .accessibilityLabel(Text("Close Tab", bundle: .module))
-      }
-    }
-    .font(.callout.weight(isActive ? .semibold : .regular))
-    .foregroundStyle(isActive ? .primary : .secondary)
-    .padding(.trailing, showsClose ? 8 : 0)
-    .frame(height: 26)
-    .background(
-      RoundedRectangle(cornerRadius: 7)
-        .fill(isActive ? Color(nsColor: .controlBackgroundColor) : .clear)
-    )
-    .overlay(
-      RoundedRectangle(cornerRadius: 7)
-        .strokeBorder(isActive ? Color(nsColor: .separatorColor) : .clear)
-    )
-    .contentShape(Rectangle())
-    .onHover { isHovering = $0 }
-    .instantTooltip(Text(verbatim: tab.url.absoluteString))
-    .contextMenu { menu }
-    .accessibilityElement(children: .ignore)
-    .accessibilityAddTraits(isActive ? [.isButton, .isSelected] : .isButton)
-    .accessibilityLabel(accessibilityLabel)
-    .accessibilityAction { activate() }
-    .accessibilityActions {
-      if !tab.isPinnedTicket {
-        Button(String(localized: "Close Tab", bundle: .module), action: close)
-        if browser.canMoveTab(tab.id, by: -1) {
-          Button(String(localized: "Move Left", bundle: .module)) {
-            browser.moveTab(tab.id, by: -1)
-          }
-        }
-        if browser.canMoveTab(tab.id, by: 1) {
-          Button(String(localized: "Move Right", bundle: .module)) {
-            browser.moveTab(tab.id, by: 1)
-          }
-        }
-      }
-    }
-  }
-
-  private var showsClose: Bool {
-    !tab.isPinnedTicket && (isActive || isHovering || focus != nil)
-  }
-
-  @ViewBuilder
-  private var icon: some View {
-    if tab.isLoading {
-      ProgressView().controlSize(.mini)
-    } else if tab.isPinnedTicket {
-      Image(systemName: "ticket")
-    } else if tab.openedBy == .agent {
-      Image(systemName: "sparkle")
-        .foregroundStyle(Color.accentColor)
-        .padding(2)
-        .background(
-          Circle().fill(tab.isAgentActing ? Color.accentColor.opacity(0.25) : .clear))
-    } else if tab.openedBy == .terminalLink {
-      Image(systemName: "terminal")
-    } else {
-      Image(systemName: "globe")
-    }
-  }
-
-  /// An empty tab is a New Tab, never `about:blank`.
-  private var title: Text {
-    tab.isBlank && tab.title.isEmpty
-      ? Text("New Tab", bundle: .module) : Text(verbatim: tab.displayTitle)
-  }
-
-  private var accessibilityLabel: Text {
-    if tab.isPinnedTicket {
-      return Text("Ticket tab, \(browser.ticket?.label ?? tab.displayTitle)", bundle: .module)
-    }
-    if tab.isAgentActing {
-      return Text("\(tab.displayTitle), opened by the agent, the agent is acting", bundle: .module)
-    }
-    if tab.openedBy == .agent {
-      return Text("\(tab.displayTitle), opened by the agent", bundle: .module)
-    }
-    return title
-  }
-
-  @ViewBuilder
-  private var menu: some View {
-    Button {
-      tab.reload()
-    } label: {
-      Text("Reload", bundle: .module)
-    }
-    Button {
-      model.openOutside(tab.url)
-    } label: {
-      Text("Open in Browser", bundle: .module)
-    }
-    .disabled(!model.opensOutside(tab.url))
-    Button {
-      NSPasteboard.general.clearContents()
-      NSPasteboard.general.setString(tab.url.absoluteString, forType: .string)
-    } label: {
-      Text("Copy Address", bundle: .module)
-    }
-    if !tab.isPinnedTicket, let id = model.selectedSessionID {
-      Button {
-        Task { await model.setTicket(tab.url.absoluteString, for: id) }
-      } label: {
-        Text("Set as Ticket", bundle: .module)
-      }
-      Divider()
-      Button {
-        browser.moveTab(tab.id, by: -1)
-      } label: {
-        Text("Move Left", bundle: .module)
-      }
-      .disabled(!browser.canMoveTab(tab.id, by: -1))
-      Button {
-        browser.moveTab(tab.id, by: 1)
-      } label: {
-        Text("Move Right", bundle: .module)
-      }
-      .disabled(!browser.canMoveTab(tab.id, by: 1))
-      Divider()
-      Button(action: close) {
-        Text("Close Tab", bundle: .module)
-      }
-    }
   }
 }
 
@@ -490,16 +309,7 @@ private struct BrowserAddressBar: View {
   private var originBadge: some View {
     if let origin = tab?.origin, tab?.failure == nil {
       if origin.isLocal {
-        Text(
-          "LOCAL", bundle: .module, comment: "A badge in the address bar for a page of this Mac."
-        )
-        .font(.caption2.weight(.semibold))
-        .padding(.horizontal, 4)
-        .padding(.vertical, 1)
-        .foregroundStyle(.green)
-        .background(RoundedRectangle(cornerRadius: 3).fill(Color.green.opacity(0.12)))
-        .instantTooltip(
-          Text("A page of this Mac: the agent may act on it without asking.", bundle: .module))
+        BrowserLocalBadge()
       } else if origin.scheme == "https" {
         Image(systemName: "lock.fill")
           .foregroundStyle(.secondary)
@@ -1217,7 +1027,7 @@ private struct BrowserTraceRow: View {
   }
 }
 
-/// What a tab carries while it is dragged to another place of the strip: its identifier, behind a
+/// What a tab carries while it is dragged to another place of the list: its identifier, behind a
 /// prefix no drop on a session takes for text (#42).
 enum BrowserTabDrag {
   static let prefix = "vibe-manager-browser-tab:"
