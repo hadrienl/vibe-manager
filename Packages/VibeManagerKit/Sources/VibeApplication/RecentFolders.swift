@@ -8,15 +8,30 @@ public struct RecentFolder: Hashable, Codable, Sendable {
   /// The folder's identity. Two spellings of one folder — `/var/x` and `/private/var/x`, a folder
   /// reached through a link — share it, so choosing the folder again never lists it twice.
   public let key: String
+  /// The agent of the last session created in the folder, which a new session there proposes
+  /// again (#534). `nil` in a history written before it, and for a folder only noted by spelling.
+  public let providerID: String?
 
-  public init(path: String, key: String) {
+  public init(path: String, key: String, providerID: String? = nil) {
     self.path = path
     self.key = key
+    self.providerID = providerID
   }
 
   /// A folder known by its spelling alone, for when the disk may not be read.
-  public init(lexicalPath path: String) {
-    self.init(path: path, key: Self.lexicalKey(of: path))
+  public init(lexicalPath path: String, providerID: String? = nil) {
+    self.init(path: path, key: Self.lexicalKey(of: path), providerID: providerID)
+  }
+
+  public func with(providerID: String?) -> RecentFolder {
+    RecentFolder(path: path, key: key, providerID: providerID)
+  }
+
+  /// Whether this entry is the folder spelled `path`: by its identity, or by its own spelling.
+  /// Compared without reading the disk, as the cards are.
+  public func names(_ path: String) -> Bool {
+    let spelling = Self.lexicalKey(of: path)
+    return key == spelling || Self.lexicalKey(of: self.path) == spelling
   }
 
   /// A path compared without touching the disk: tilde expanded, `.` and `..` resolved, no trailing
@@ -64,9 +79,49 @@ public struct RecentFolders: Equatable, Sendable {
     let folders =
       sessions
       .sorted { $0.createdAt > $1.createdAt }
-      .compactMap(folder(of:))
-      .map(RecentFolder.init(lexicalPath:))
+      .compactMap { session in
+        folder(of: session).map {
+          RecentFolder(lexicalPath: $0, providerID: session.agent?.providerID)
+        }
+      }
     return RecentFolders(folders)
+  }
+
+  /// The agent a new session in `path` proposes (#534): the one the history recorded for the
+  /// folder, or — for a folder that has left the history — the agent of its latest session.
+  /// `nil` when neither knows one.
+  public func agent(forFolder path: String, sessions: [WorkSession]) -> String? {
+    entries.first(where: { $0.names(path) })?.providerID
+      ?? Self.latestAgent(inFolder: path, sessions: sessions)
+  }
+
+  /// The current agent of the latest session that gives the folder, by the rule of `folder(of:)`:
+  /// neither a worktree nor a coordinator's child speaks for it.
+  public static func latestAgent(inFolder path: String, sessions: [WorkSession]) -> String? {
+    let spelling = RecentFolder.lexicalKey(of: path)
+    return
+      sessions
+      .filter { folder(of: $0).map(RecentFolder.lexicalKey(of:)) == spelling }
+      .max { $0.createdAt < $1.createdAt }?
+      .agent?.providerID
+  }
+
+  /// The folder's entry with another agent, where it stands: a switch of agent is a use of the
+  /// folder, not a new folder chosen. A folder the history does not hold is left out of it.
+  public func recordingAgent(_ providerID: String, forFolder path: String) -> RecentFolders {
+    RecentFolders(entries.map { $0.names(path) ? $0.with(providerID: providerID) : $0 })
+  }
+
+  /// A history written before it kept agents, given the agent of each folder's latest session:
+  /// read once at launch, rather than looked up among the sessions at every proposal.
+  public func fillingAgents(from sessions: [WorkSession]) -> RecentFolders {
+    RecentFolders(
+      entries.map { entry in
+        guard entry.providerID == nil,
+          let agent = Self.latestAgent(inFolder: entry.path, sessions: sessions)
+        else { return entry }
+        return entry.with(providerID: agent)
+      })
   }
 
   /// The folder a session gives the history: one the user started a session in, never a worktree

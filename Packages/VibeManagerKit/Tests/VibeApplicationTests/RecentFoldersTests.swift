@@ -195,3 +195,113 @@ struct RecentFolderNamesTests {
     #expect(names == ["api — one", "api — two"])
   }
 }
+
+private func session(folder path: String, agent: String, createdAt seconds: TimeInterval)
+  -> WorkSession
+{
+  var session = session(folder: path, createdAt: seconds)
+  session.agent = SessionAgentConfiguration(providerID: agent)
+  return session
+}
+
+@Suite("The agent of a recent folder (#534)")
+struct RecentFolderAgentTests {
+  @Test("A folder chosen again takes the agent of its new session")
+  func recordingReplacesTheAgent() {
+    let folders = RecentFolders([RecentFolder(path: "/a", key: "/a", providerID: "codex")])
+      .recording(RecentFolder(path: "/a", key: "/a", providerID: "claude-code"))
+
+    #expect(folders.agent(forFolder: "/a", sessions: []) == "claude-code")
+  }
+
+  @Test("The folder is found under another spelling, without the disk")
+  func anotherSpelling() {
+    let folders = RecentFolders([
+      RecentFolder(path: "/work/api", key: "/private/work/api", providerID: "codex")
+    ])
+
+    #expect(folders.agent(forFolder: "/work/api/", sessions: []) == "codex")
+    #expect(folders.agent(forFolder: "/private/work/api", sessions: []) == "codex")
+    #expect(folders.agent(forFolder: "/work/web", sessions: []) == nil)
+  }
+
+  @Test("Without a recorded agent, the latest session of the folder gives it")
+  func fallsBackOnTheSessions() {
+    let folders = RecentFolders([folder("/a")])
+    let sessions = [
+      session(folder: "/a", agent: "codex", createdAt: 1),
+      session(folder: "/a", agent: "claude-code", createdAt: 3),
+      session(folder: "/b", agent: "gemini", createdAt: 5),
+    ]
+
+    #expect(folders.agent(forFolder: "/a", sessions: sessions) == "claude-code")
+    // A folder that has left the history still has its sessions.
+    #expect(folders.agent(forFolder: "/b", sessions: sessions) == "gemini")
+    #expect(folders.agent(forFolder: "/c", sessions: sessions) == nil)
+  }
+
+  @Test("A coordinator's child does not speak for the folder its agent chose")
+  func childrenGiveNoAgent() {
+    var child = session(folder: "/a", agent: "codex", createdAt: 9)
+    child.coordination = .child(of: SessionID())
+
+    #expect(RecentFolders().agent(forFolder: "/a", sessions: [child]) == nil)
+  }
+
+  @Test("The first history takes each folder's latest agent")
+  func seededWithAgents() {
+    let folders = RecentFolders.seeded(from: [
+      session(folder: "/a", agent: "codex", createdAt: 1),
+      session(folder: "/a", agent: "claude-code", createdAt: 2),
+    ])
+
+    #expect(folders.entries.map(\.providerID) == ["claude-code"])
+  }
+
+  @Test("A switch of agent changes the folder's agent where it stands, and adds no folder")
+  func recordingAnAgent() {
+    let folders = RecentFolders([
+      RecentFolder(path: "/a", key: "/a", providerID: "codex"),
+      RecentFolder(path: "/b", key: "/b", providerID: "codex"),
+    ])
+
+    let switched = folders.recordingAgent("claude-code", forFolder: "/b/")
+
+    #expect(switched.entries.map(\.path) == ["/a", "/b"])
+    #expect(switched.entries.map(\.providerID) == ["codex", "claude-code"])
+    #expect(folders.recordingAgent("claude-code", forFolder: "/c") == folders)
+  }
+
+  @Test("An older history takes each folder's latest agent, and keeps the ones it knows")
+  func fillingAgents() {
+    let folders = RecentFolders([
+      folder("/a"), RecentFolder(path: "/b", key: "/b", providerID: "codex"), folder("/c"),
+    ])
+    let sessions = [
+      session(folder: "/a", agent: "codex", createdAt: 1),
+      session(folder: "/a", agent: "claude-code", createdAt: 2),
+      session(folder: "/b", agent: "claude-code", createdAt: 3),
+    ]
+
+    #expect(
+      folders.fillingAgents(from: sessions).entries.map(\.providerID)
+        == ["claude-code", "codex", nil])
+  }
+
+  @Test("A history written before agents were kept reads as it was")
+  func readsAnOlderHistory() throws {
+    let json = #"[{"path":"/a","key":"/a"}]"#
+    let folders = try JSONDecoder().decode(RecentFolders.self, from: Data(json.utf8))
+
+    #expect(folders.entries == [folder("/a")])
+    #expect(folders.entries.first?.providerID == nil)
+  }
+
+  @Test("The agent survives a round trip through the store's format")
+  func roundTrip() throws {
+    let folders = RecentFolders([RecentFolder(path: "/a", key: "/a", providerID: "codex")])
+    let data = try JSONEncoder().encode(folders)
+
+    #expect(try JSONDecoder().decode(RecentFolders.self, from: data) == folders)
+  }
+}

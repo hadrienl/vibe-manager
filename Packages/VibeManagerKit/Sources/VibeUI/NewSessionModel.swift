@@ -39,7 +39,10 @@ public final class NewSessionModel {
   /// than an observer that fires a detached task: the model list the user sees must follow the
   /// agent they just picked, not the scheduler.
   public var draft = SessionDraft() {
-    didSet { commandsFollowDraft() }
+    didSet {
+      commandsFollowDraft()
+      agentFollowsFolder()
+    }
   }
 
   /// The list under a `/` typed first in the initial prompt (#219).
@@ -59,6 +62,14 @@ public final class NewSessionModel {
   private var generatedName: String?
   /// The agent the form picked by itself: choosing it is not a change the user made.
   private var defaultProviderID: String?
+  /// Whether the user picked the agent: from then on it no longer follows the folder (#534).
+  private var userChoseAgent = false
+  /// The folder the agent was last proposed for, as the field gave it, and the proposal waiting
+  /// for the typing to pause.
+  private var agentFolderPath: String?
+  private var agentFollowing: Task<Void, Never>?
+  /// The agent of the last session created in a folder (#534).
+  private let rememberedAgent: (@MainActor (String) -> String?)?
   /// The name `settleName()` gave the draft for sending, taken back if it is refused.
   private var settledName: String?
   /// The folder a template put in the field last, and the one that was there before any did.
@@ -118,6 +129,8 @@ public final class NewSessionModel {
     folderProbe: any WorkingDirectoryProbe = FileManagerWorkingDirectoryProbe(),
     recentFolderProbeBudget: Duration = .milliseconds(300),
     forgetRecentFolder: (@MainActor (RecentFolder) -> Void)? = nil,
+    /// The agent of the last session created in a folder, proposed again there (#534).
+    rememberedAgent: (@MainActor (String) -> String?)? = nil,
     /// The symbols and colours the Settings offer (#199), and what a name is given among them.
     palette: SessionAppearancePalette = .default,
     /// The skills and commands read from the agents, shared with the conversations (#219).
@@ -134,6 +147,7 @@ public final class NewSessionModel {
     self.folderProbe = folderProbe
     self.recentFolderProbeBudget = recentFolderProbeBudget
     self.forgetRecentFolder = forgetRecentFolder
+    self.rememberedAgent = rememberedAgent
     self.create = create
     self.registry = registry
     self.revalidationDelay = revalidationDelay
@@ -530,18 +544,32 @@ public final class NewSessionModel {
   }
 
   private func loadAgentsAndFolders() async {
-    // Side by side: the agents need not wait for the folders, nor the folders for the agents.
-    async let agents: Void = refreshAgents(forceRefresh: false)
+    // Side by side: detecting the agents need not wait for the folders, nor the folders for the
+    // agents. The agents are shown once the folder is in the field, with that folder's agent
+    // (#534): shown before, the agent would change under the user's eyes, and the models of one
+    // dropped at once would be read for nothing.
+    async let detection = detectAgents(forceRefresh: false)
     await checkRecentFolders()
     preselectRecentFolder()
-    await agents
+    guard let detected = await detection else { return }
+    await show(detected)
   }
 
   public func refreshAgents(forceRefresh: Bool) async {
-    guard !isLoadingAgents else { return }
-    isLoadingAgents = true
-    defer { isLoadingAgents = false }
+    guard let detected = await detectAgents(forceRefresh: forceRefresh) else { return }
+    await show(detected)
+  }
 
+  private struct DetectedAgents {
+    let options: [AgentOption]
+    let coordinating: Set<AgentProviderID>
+  }
+
+  /// The agents, and those that can coordinate. `nil` when a detection is already under way.
+  /// Leaves `isLoadingAgents` on: the agents are loading until `show` puts them on screen.
+  private func detectAgents(forceRefresh: Bool) async -> DetectedAgents? {
+    guard !isLoadingAgents else { return nil }
+    isLoadingAgents = true
     let detected = await AgentOption.detect(in: registry, forceRefresh: forceRefresh)
     // Read before the agents are shown, so that they come with their default selection at once.
     var coordinating: Set<AgentProviderID> = []
@@ -551,21 +579,22 @@ public final class NewSessionModel {
         coordinating.insert(option.id)
       }
     }
-    coordinatingAgentIDs = coordinating
-    agents = detected
+    return DetectedAgents(options: detected, coordinating: coordinating)
+  }
 
-    // Every agent stays listed, including the ones that cannot run — disappearing teaches the
-    // user nothing. Only the default selection skips them.
-    if draft.providerID == nil, let first = agents.first(where: \.isUsable) {
-      draft.providerID = first.id.rawValue
-      defaultProviderID = first.id.rawValue
-    }
+  private func show(_ detected: DetectedAgents) async {
+    coordinatingAgentIDs = detected.coordinating
+    agents = detected.options
+    isLoadingAgents = false
+    applyAgentProposal()
     await loadModels()
     if hasSubmitted {
       await revalidate()
     }
   }
 
+  /// The models of the agent in the draft. A list that comes back once another agent was chosen
+  /// — by the user, or by the folder (#534) — is not that agent's, and is dropped.
   public func loadModels() async {
     guard let providerID = draft.providerID,
       let provider = await registry.provider(id: AgentProviderID(providerID))
@@ -573,7 +602,9 @@ public final class NewSessionModel {
       models = []
       return
     }
-    models = await provider.models()
+    let listed = await provider.models()
+    guard draft.providerID == providerID else { return }
+    models = listed
     if let modelID = draft.modelID, !models.contains(where: { $0.id == modelID }) {
       draft.modelID = nil
     }
@@ -583,21 +614,91 @@ public final class NewSessionModel {
   /// The levels of the chosen agent for the chosen model: Codex's differ from one model to the
   /// next. A level the new list lacks goes back to the agent's default.
   public func loadEffortLevels() async {
-    guard let providerID = draft.providerID,
+    let chosen = draft.providerID
+    guard let providerID = chosen,
       let provider = await registry.provider(id: AgentProviderID(providerID))
         as? any AgentEffortControlling
     else {
+      // Answered for an agent since replaced: the levels are the next one's to give.
+      guard draft.providerID == chosen else { return }
       effortLevels = []
       if draft.effort != nil { draft.effort = nil }
       return
     }
-    effortLevels = await provider.effortLevels(modelID: draft.modelID)
+    let modelID = draft.modelID
+    let levels = await provider.effortLevels(modelID: modelID)
+    guard draft.providerID == providerID, draft.modelID == modelID else { return }
+    effortLevels = levels
     if let effort = draft.effort, !effortLevels.contains(effort) { draft.effort = nil }
+  }
+
+  /// The agent the form proposes for the folder in the field (#534): the one of the last session
+  /// used there, or else the first usable agent. Its models follow it.
+  func proposeAgent() async {
+    guard applyAgentProposal() else { return }
+    await loadModels()
+    await revalidateIfSubmitted()
+  }
+
+  /// Whether the agent still follows the folder: no longer once the user set anything of the
+  /// agent's — the agent itself, its model, its effort, or Coordinate — which a change of agent
+  /// would silently drop. Nor once the draft is on its way.
+  private var agentFollowsTheFolder: Bool {
+    !userChoseAgent && draft.modelID == nil && draft.effort == nil && draft.coordination == nil
+      && !isSubmitting
+  }
+
+  /// The one place the agent follows the folder from, whatever put the folder in the field — a
+  /// card, the open panel, a template, a drop, typing: another folder brings its agent once the
+  /// field has settled. The gestures that designate a folder at once propose at once.
+  private func agentFollowsFolder() {
+    let folder = draft.resolvedWorkingDirectoryPath
+    guard folder != agentFolderPath, agentFollowsTheFolder else { return }
+    agentFollowing?.cancel()
+    agentFollowing = Task { [revalidationDelay] in
+      try? await Task.sleep(for: revalidationDelay)
+      guard !Task.isCancelled else { return }
+      // Not cancelled by the proposal it makes: loading the agent's models must finish.
+      self.agentFollowing = nil
+      await self.proposeAgent()
+    }
+  }
+
+  /// What Send does first, before anything is awaited: the agent sent is the one on screen, not
+  /// one a folder typed just before would bring.
+  public func holdAgentForSending() {
+    agentFollowing?.cancel()
+    agentFollowing = nil
+  }
+
+  /// Puts the proposed agent in the draft, and says whether that changed it. Every agent stays
+  /// listed, including the ones that cannot run — disappearing teaches the user nothing. Only the
+  /// proposal skips them, the remembered agent included.
+  @discardableResult
+  private func applyAgentProposal() -> Bool {
+    agentFollowing?.cancel()
+    agentFollowing = nil
+    let folder = draft.resolvedWorkingDirectoryPath
+    agentFolderPath = folder
+    guard agentFollowsTheFolder else { return false }
+    let usable = agents.filter(\.isUsable)
+    let remembered = folder.flatMap { rememberedAgent?($0) }
+    guard let proposed = usable.first(where: { $0.id.rawValue == remembered }) ?? usable.first
+    else { return false }
+    defaultProviderID = proposed.id.rawValue
+    guard draft.providerID != proposed.id.rawValue else { return false }
+    draft.providerID = proposed.id.rawValue
+    draft.modelID = nil
+    draft.effort = nil
+    return true
   }
 
   /// Picks an agent and lists that agent's models — the two belong together, so no state exists
   /// where the selected agent and the offered models disagree.
   public func select(agent id: String) async {
+    userChoseAgent = true
+    agentFollowing?.cancel()
+    agentFollowing = nil
     guard draft.providerID != id else { return }
     draft.providerID = id
     draft.modelID = nil
@@ -656,8 +757,12 @@ public final class NewSessionModel {
     preselectedFolder = nil
     draft.workingDirectoryPath = path
     lookForIcon()
+    // The folder's agent is in the draft before the check, which judges both; its models are
+    // read after, so the verdict on the folder does not wait for them (#534).
+    let agentChanged = applyAgentProposal()
     let checked = draft
     let found = Self.namelessAllowed(await create.problems(with: checked, checkingFolder: true))
+    if agentChanged { await loadModels() }
     guard checkedFolderPath == path else { return }
 
     // The whole verdict is only published when it still describes the form on screen. A check on
@@ -744,6 +849,7 @@ public final class NewSessionModel {
   /// nothing, so they are asked with the sheet still open; the rest waits for `submit()`.
   public func refusesBeforeCreating() async -> Bool {
     guard !isSubmitting else { return true }
+    holdAgentForSending()
     settleName()
     guard !draft.validate().isEmpty else { return false }
     unsettleName()
@@ -761,6 +867,7 @@ public final class NewSessionModel {
     // A pending debounce would otherwise land after the verdict of this submit and replace it.
     revalidation?.cancel()
     revalidation = nil
+    holdAgentForSending()
     hasSubmitted = true
     isSubmitting = true
     defer { isSubmitting = false }
@@ -821,7 +928,7 @@ extension NewSessionModel {
   /// disk, and typing the path of a recent folder lights its card as much as clicking it.
   public func isSelected(_ option: RecentFolderOption) -> Bool {
     guard let path = draft.resolvedWorkingDirectoryPath else { return false }
-    return RecentFolder.lexicalKey(of: path) == RecentFolder.lexicalKey(of: option.folder.path)
+    return option.folder.names(path)
   }
 
   /// A card clicked: the same gesture as a folder handed back by the open panel, and checked the
@@ -841,6 +948,7 @@ extension NewSessionModel {
       preselectedFolder = nil
       draft.workingDirectoryPath = option.folder.path
       lookForIconOfRecentFolder()
+      await proposeAgent()
       return
     }
     await folderChosen(option.folder.path)

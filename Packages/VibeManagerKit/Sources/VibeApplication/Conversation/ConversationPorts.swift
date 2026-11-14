@@ -177,6 +177,9 @@ public struct AgentPromptFormat: Hashable, Sendable {
   /// prompt given Return into the turn under way, and queues one given Tab; Claude Code queues
   /// either way.
   public var queueKey: [UInt8]
+  /// Sends a message into the active turn instead of queuing it; nil keeps queueKey.
+  /// Shell commands continue to use queueKey.
+  public var workingMessageKey: [UInt8]?
   /// What stops the agent's turn: Escape for both CLIs.
   public var interruptKey: [UInt8]
   /// What sends at once the prompts queued during a turn, the turn stopped; `nil` for an agent
@@ -200,6 +203,7 @@ public struct AgentPromptFormat: Hashable, Sendable {
     textEntry: PromptTextEntry = .bracketedPaste,
     submitKey: [UInt8] = [0x0D],
     queueKey: [UInt8] = [0x0D],
+    workingMessageKey: [UInt8]? = nil,
     interruptKey: [UInt8] = [0x1B],
     sendNowKey: [UInt8]? = nil,
     submitDelay: Duration = .milliseconds(80),
@@ -211,6 +215,7 @@ public struct AgentPromptFormat: Hashable, Sendable {
     self.readsInputOnScreen = readsInputOnScreen
     self.textEntry = textEntry
     self.submitKey = submitKey
+    self.workingMessageKey = workingMessageKey
     self.queueKey = queueKey
     self.interruptKey = interruptKey
     self.sendNowKey = sendNowKey

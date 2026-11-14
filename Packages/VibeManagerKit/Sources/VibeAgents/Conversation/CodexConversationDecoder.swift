@@ -64,6 +64,17 @@ public final class CodexConversationDecoder: ConversationDecoding {
       items.append(
         ConversationEntry(
           id: "aborted:\(items.count)", date: date, content: .notice(.interrupted)))
+    case ("event_msg", "task_complete"):
+      // A turn the provider stopped — its quota spent — says why only here, and its calls with
+      // no output will have none.
+      guard CodexQuestionWatch.endsOnError(payload),
+        let message = (payload["error"] as? [String: Any])?["message"] as? String,
+        !message.isEmpty
+      else { return }
+      interruptPending()
+      items.append(
+        ConversationEntry(
+          id: "failed:\(items.count)", date: date, content: .notice(.error(message))))
     case ("response_item", "custom_tool_call"), ("response_item", "function_call"):
       startCall(payload, date: date)
     case ("response_item", "custom_tool_call_output"), ("response_item", "function_call_output"):

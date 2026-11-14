@@ -16,6 +16,7 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
   /// A JSON object merged into every request, as the user typed it. Empty for none.
   public var defaultParameters: String
   public var timeouts: EndpointTimeoutSettings
+  public var codexApprovalMode: CodexApprovalMode
   public var harness: EndpointHarnessChoice
   /// For `wireProtocol == .custom`: the JSON document that says how to talk to the endpoint
   /// (#107 §3), as the user typed it.
@@ -34,6 +35,7 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
     defaultParameters: String = "",
     timeouts: EndpointTimeoutSettings = EndpointTimeoutSettings(),
     harness: EndpointHarnessChoice = .automatic,
+    codexApprovalMode: CodexApprovalMode = .manual,
     customProtocol: String = "",
     models: [EndpointModel] = [],
     lastTest: EndpointTestOutcome? = nil
@@ -46,6 +48,7 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
     self.headers = headers
     self.defaultParameters = defaultParameters
     self.timeouts = timeouts
+    self.codexApprovalMode = codexApprovalMode
     self.harness = harness
     self.customProtocol = customProtocol
     self.models = models
@@ -54,7 +57,7 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
 
   private enum CodingKeys: String, CodingKey {
     case id, name, baseURL, wireProtocol, authentication, headers, defaultParameters, timeouts
-    case harness, customProtocol, models, lastTest
+    case harness, codexApprovalMode, customProtocol, models, lastTest
   }
 
   /// Fields added after the first version of the file are read with their defaults.
@@ -70,7 +73,10 @@ public struct Endpoint: Identifiable, Hashable, Codable, Sendable {
     timeouts =
       try container.decodeIfPresent(EndpointTimeoutSettings.self, forKey: .timeouts)
       ?? EndpointTimeoutSettings()
-    harness = try container.decodeIfPresent(EndpointHarnessChoice.self, forKey: .harness) ?? .automatic
+    harness =
+      try container.decodeIfPresent(EndpointHarnessChoice.self, forKey: .harness) ?? .automatic
+    codexApprovalMode =
+      try container.decodeIfPresent(CodexApprovalMode.self, forKey: .codexApprovalMode) ?? .manual
     customProtocol = try container.decodeIfPresent(String.self, forKey: .customProtocol) ?? ""
     models = try container.decodeIfPresent([EndpointModel].self, forKey: .models) ?? []
     lastTest = try container.decodeIfPresent(EndpointTestOutcome.self, forKey: .lastTest)

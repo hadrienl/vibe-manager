@@ -124,6 +124,17 @@ public final class AppModel {
   /// from the palette.
   let answerRequest: AnswerAgentRequest?
   let requestPreferences: any RequestPreferences
+  let codexApprovalPreferences: any CodexApprovalPreferences
+  private var codexApprovalModes: [AgentProviderID: CodexApprovalMode] = [:]
+
+  public func codexApprovalMode(for provider: AgentProviderID) -> CodexApprovalMode {
+    codexApprovalModes[provider] ?? codexApprovalPreferences.mode(for: provider)
+  }
+
+  public func setCodexApprovalMode(_ mode: CodexApprovalMode, for provider: AgentProviderID) {
+    codexApprovalPreferences.setMode(mode, for: provider)
+    codexApprovalModes[provider] = mode
+  }
   let agentUpdatePreferences: any AgentUpdatePreferences
   /// Requests whose answer is being typed: their buttons wait.
   public internal(set) var answeringRequestIDs: Set<AgentRequestID> = []
@@ -204,6 +215,9 @@ public final class AppModel {
   /// The guesses of a dialog at a start whose screen showed one: shown only then, a banner or a
   /// resumed session's prompt being an agent still starting (#474).
   var readStartupGuesses: Set<AgentRequestID> = []
+  /// The screens followed for a permission under Codex's automatic review, until its dialog shows.
+  @ObservationIgnored var permissionDialogReads:
+    [AgentRequestID: (token: UUID, task: Task<Void, Never>)] = [:]
   /// While the requests read back at launch, or replayed, are taken in: they were there before,
   /// and make no alert sound (#393).
   @ObservationIgnored var isReadingRestoredRequests = false
@@ -834,6 +848,7 @@ public final class AppModel {
     requestPreferences: any RequestPreferences = InMemoryRequestPreferences(),
     /// Whether an agent's sessions restart onto its updated CLI on their own (#409).
     agentUpdatePreferences: any AgentUpdatePreferences = InMemoryAgentUpdatePreferences(),
+    codexApprovalPreferences: any CodexApprovalPreferences = InMemoryCodexApprovalPreferences(),
     /// Every session's web view (#69). A workspace assembled without one offers none.
     browser: BrowserWorkspace? = nil,
     /// Every session's drawer of side terminals (#43). A workspace assembled without one offers
@@ -889,6 +904,7 @@ public final class AppModel {
     self.hookConsents = hookConsents
     self.answerRequest = answerRequest
     self.requestPreferences = requestPreferences
+    self.codexApprovalPreferences = codexApprovalPreferences
     self.agentUpdatePreferences = agentUpdatePreferences
     notifiesRequests = requestPreferences.notifiesRequests
     requestNotificationContent = requestPreferences.notificationContent
@@ -2414,6 +2430,7 @@ public final class AppModel {
       guard let switched = try await repository.session(id: id) else {
         throw AgentSwitchRefusal.sessionMissing
       }
+      await rememberAgent(of: switched)
 
       // 5. The new agent, in the same pane, under a separator naming both. The attempts are
       // recorded before the launch: a CLI that refuses at once can exit — and its close be
@@ -2495,6 +2512,9 @@ public final class AppModel {
     let suggestion: String
     do {
       try await revertAgentSwitch(id: id, change: change.id, reason: reason)
+      if let reverted = try? await repository.session(id: id) {
+        await rememberAgent(of: reverted)
+      }
       suggestion = String(
         localized: "The session is back on \(previous).", bundle: .module,
         comment: "An agent's name.")
@@ -3181,6 +3201,7 @@ public final class AppModel {
       icons: icons,
       recentFolders: offeredRecentFolders,
       forgetRecentFolder: { [weak self] folder in self?.forgetRecentFolder(folder) },
+      rememberedAgent: { [weak self] folder in self?.rememberedAgent(forFolder: folder) },
       palette: appearancePalette.offered,
       commandCatalog: conversations.commands,
       isThemeAvailable: { [conversations] in conversations.themes.theme($0) != nil }

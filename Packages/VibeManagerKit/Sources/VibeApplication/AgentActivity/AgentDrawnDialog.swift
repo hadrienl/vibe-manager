@@ -27,6 +27,7 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     case mcpTool(server: String, tool: String)
     /// The CLI's own update, offered before it starts.
     case update
+    case terminalInput(sessionID: String, input: String)
   }
 
   public let subject: Subject
@@ -42,7 +43,7 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     switch subject {
     case .commandStart, .file, .files, .server, .mcpTool: return false
     case .update: return true
-    case .command, .shownCommand, .patch, .host: return true
+    case .terminalInput, .command, .shownCommand, .patch, .host: return true
     }
   }
 
@@ -54,6 +55,8 @@ public struct AgentDrawnDialog: Hashable, Sendable {
     }
     guard case .permission(let permission) = request.content else { return false }
     switch (subject, permission.tool) {
+    case (.terminalInput(let sessionID, let input), .terminalInput):
+      return permission.terminalSessionID == sessionID && permission.subject == input
     case (.commandStart(let start), .shell):
       return !start.isEmpty && permission.subject?.hasPrefix(start) == true
     case (.command(let command), .shell):
@@ -100,7 +103,7 @@ public struct AgentDrawnDialog: Hashable, Sendable {
   public static func showsWhole(_ request: AgentRequest) -> Bool {
     guard case .permission(let permission) = request.content else { return false }
     switch permission.tool {
-    case .shell, .patch, .mcp: return true
+    case .shell, .patch, .mcp, .terminalInput: return true
     default: return false
     }
   }

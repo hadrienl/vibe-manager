@@ -170,6 +170,30 @@ struct AsyncQuestionWatchTests {
     #expect(pending.isEmpty)
   }
 
+  /// As Codex 0.166.0 writes it once the account's quota is spent: no `Stop` hook follows.
+  static let failedTurn =
+    #"{"type":"event_msg","payload":{"type":"task_complete","root_turn_id":"t","turn_id":"t","last_agent_message":null,"error":{"message":"You’ve hit your usage limit.","codex_error_info":"usage_limit_exceeded"}}}"#
+
+  @Test("A turn ended on an error ends the turn, with no question pending; one ended well does not")
+  func failedTurnEnds() {
+    var pending: Set<String> = []
+    #expect(
+      CodexQuestionWatch.signals(in: Data(Self.failedTurn.utf8), pending: &pending) == [.turnEnded])
+    #expect(CodexQuestionWatch.signals(in: Data(Self.turnComplete.utf8), pending: &pending).isEmpty)
+    let subagent = Self.failedTurn.replacingOccurrences(
+      of: #""turn_id":"t""#, with: #""turn_id":"sub""#)
+    #expect(CodexQuestionWatch.signals(in: Data(subagent.utf8), pending: &pending).isEmpty)
+  }
+
+  @Test("An asynchronous question goes with a failed turn, before the turn's end")
+  func failedTurnTakesQuestions() {
+    var pending: Set<String> = []
+    _ = CodexQuestionWatch.signals(in: Data(Self.call.utf8), pending: &pending)
+    #expect(
+      CodexQuestionWatch.signals(in: Data(Self.failedTurn.utf8), pending: &pending)
+        == [.toolFinished("request_user_input_async", subject: "call_a"), .turnEnded])
+  }
+
   @Test("A turn's end leaves a waiting request_user_input alone")
   func syncStays() {
     var pending: Set<String> = []
@@ -253,7 +277,62 @@ struct CodexPermissionsReadingTests {
     #expect(input.alwaysAllow == nil)
   }
 
-  @Test("Both are answered in the terminal: Codex never says when they are on screen")
+  @Test("The complete input and terminal number identify the drawn request")
+  func drawnInput() throws {
+    let permission = try permission(
+      #"{"tool_name":"write_stdin","tool_input":{"session_id":42,"chars":"confirm\n"}}"#)
+    #expect(permission.terminalSessionID == "42")
+    #expect(permission.quotedTerminalInput == #""confirm\n""#)
+    let dialog = try #require(CodexDrawnDialogReading.dialog(onScreen: Self.inputDialog))
+    #expect(dialog.subject == .terminalInput(sessionID: "42", input: "confirm\n"))
+    let request = AgentRequest(
+      id: AgentRequestID(sessionID: SessionID(), key: "input"), receivedAt: Date(),
+      kind: .approval, content: .permission(permission),
+      reference: AgentToolReference(tool: "write_stdin"), isShown: false)
+    #expect(dialog.matches(request))
+    let otherTerminal = try #require(
+      CodexDrawnDialogReading.dialog(
+        onScreen:
+          Self.inputDialog.replacingOccurrences(of: "terminal 42", with: "terminal 43")))
+    #expect(!otherTerminal.matches(request))
+    let otherInput = try #require(
+      CodexDrawnDialogReading.dialog(
+        onScreen:
+          Self.inputDialog.replacingOccurrences(of: "confirm", with: "cancel")))
+    #expect(!otherInput.matches(request))
+    var state = AgentActivityState()
+    state.requests = [request]
+    #expect(
+      state.answering(request, keymap: CodexAnswerKeymap()) == .fromPalette([.allowOnce, .deny]))
+    #expect(
+      CodexDrawnDialogReading.dialog(
+        onScreen:
+          Self.inputDialog.replacingOccurrences(of: #""confirm\n""#, with: #""confirm…""#))?.subject
+        != dialog.subject)
+    #expect(
+      CodexDrawnDialogReading.dialog(
+        onScreen:
+          Self.inputDialog.replacingOccurrences(of: #""confirm\n""#, with: #""confirm"#)) == nil)
+    #expect(
+      CodexDrawnDialogReading.dialog(
+        onScreen:
+          Self.inputDialog.replacingOccurrences(of: "Input:", with: "[… 2 lines] Input:")) == nil)
+  }
+
+  @Test("The Return approval from the reported screenshot is read without JavaScript")
+  func returnInput() throws {
+    let input = try permission(
+      #"{"tool_name":"write_stdin","tool_input":{"session_id":89367,"chars":"\r","parent_call_id":"exec-parent","approval_id":"exec-approval","environment_id":"local","cwd":"file:///private/tmp","tty":true,"sandbox_permissions":"require_escalated"}}"#
+    )
+    let screen = Self.inputDialog
+      .replacingOccurrences(of: "terminal 42", with: "terminal 89367")
+      .replacingOccurrences(of: #""confirm\n""#, with: #""\r""#)
+    let dialog = try #require(CodexDrawnDialogReading.dialog(onScreen: screen))
+    #expect(dialog.subject == .terminalInput(sessionID: "89367", input: "\r"))
+    #expect(input.quotedTerminalInput == #""\r""#)
+  }
+
+  @Test("Permission grants stay in the terminal; terminal input has allow and deny")
   func inTerminal() throws {
     let keymap = CodexAnswerKeymap()
     let grant = AgentRequestContent.permission(
@@ -262,7 +341,16 @@ struct CodexPermissionsReadingTests {
       ))
     let input = AgentRequestContent.permission(
       try permission(#"{"tool_name":"write_stdin","tool_input":{"session_id":42,"chars":"y"}}"#))
-    for (content, dialog) in [(grant, Self.grantDialog), (input, Self.inputDialog)] {
+    #expect(keymap.answers(for: input) == [.allowOnce, .deny])
+    #expect(
+      keymap.keystrokes(
+        for: .allowOnce, to: input,
+        screen: AgentDialogScreen(screen: Self.inputDialog)) == [Array("y".utf8)])
+    #expect(
+      keymap.keystrokes(
+        for: .deny, to: input,
+        screen: AgentDialogScreen(screen: Self.inputDialog)) == [TerminalKeys.escape])
+    for (content, dialog) in [(grant, Self.grantDialog)] {
       #expect(keymap.answers(for: content).isEmpty)
       for answer in [AgentAnswer.allowOnce, .allowAlways, .deny] {
         #expect(
