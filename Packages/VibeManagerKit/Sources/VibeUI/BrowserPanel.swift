@@ -87,14 +87,16 @@ private struct BrowserTabStrip: View {
   var body: some View {
     HStack(spacing: 4) {
       BrowserTabPickerButton(browser: browser, isShowingTabs: $isShowingTabs)
-        .popover(isPresented: $isShowingTabs, arrowEdge: .bottom) {
-          BrowserTabList(
-            model: model, workspace: workspace, browser: browser,
-            dismiss: { isShowingTabs = false }
-          )
-          // As wide as the panel, so that titles read whole.
-          .frame(width: max(width - 12, 280))
-        }
+        .background(
+          BrowserTabListPopover(isPresented: $isShowingTabs) {
+            BrowserTabList(
+              model: model, workspace: workspace, browser: browser,
+              dismiss: { isShowingTabs = false }
+            )
+            // As wide as the panel, so that titles read whole.
+            .frame(width: max(width - 12, 280))
+          }
+        )
 
       Button {
         model.newWebTab()
@@ -147,6 +149,8 @@ private struct BrowserTabStrip: View {
     } action: {
       width = $0
     }
+    // Another session's tabs in the same strip: the list of the previous one goes.
+    .onChange(of: browser.sessionID) { isShowingTabs = false }
     .accessibilityElement(children: .contain)
     .accessibilityLabel(Text("Web tabs", bundle: .module))
   }

@@ -666,3 +666,104 @@ private struct BrowserTabListButtonStyle: ButtonStyle {
     }
   }
 }
+
+/// The list of tabs in a popover of AppKit's own (#536). SwiftUI's stayed on screen for good once
+/// the button it hung from went — another session shown — and a click outside did not always close
+/// it. This one closes at the first click outside it, and goes with its button.
+struct BrowserTabListPopover<Content: View>: NSViewRepresentable {
+  @Binding var isPresented: Bool
+  @ViewBuilder let content: () -> Content
+
+  func makeCoordinator() -> Coordinator { Coordinator() }
+
+  func makeNSView(context: Context) -> AnchorView {
+    let view = AnchorView()
+    view.coordinator = context.coordinator
+    return view
+  }
+
+  func updateNSView(_ view: AnchorView, context: Context) {
+    let coordinator = context.coordinator
+    let isPresented = $isPresented
+    coordinator.didClose = { isPresented.wrappedValue = false }
+    if isPresented.wrappedValue {
+      coordinator.show(AnyView(content()), from: view)
+    } else {
+      coordinator.close()
+    }
+  }
+
+  static func dismantleNSView(_ view: AnchorView, coordinator: Coordinator) {
+    coordinator.close()
+  }
+
+  /// Opens, fills and closes the popover.
+  @MainActor
+  final class Coordinator: NSObject, NSPopoverDelegate {
+    private var popover: NSPopover?
+    private var host: NSHostingController<AnyView>?
+    /// Asked to open before its button was in a window: it opens once it is.
+    private weak var pending: NSView?
+    var didClose: (() -> Void)?
+
+    func show(_ content: AnyView, from view: NSView) {
+      if let host {
+        host.rootView = content
+      } else {
+        let host = NSHostingController(rootView: content)
+        // The popover follows the list's size: it shrinks when tabs are closed.
+        host.sizingOptions = .preferredContentSize
+        self.host = host
+      }
+      let popover = popover ?? makePopover()
+      guard !popover.isShown else { return }
+      guard view.window != nil else {
+        pending = view
+        return
+      }
+      popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
+    }
+
+    func viewDidMoveToWindow(_ view: NSView) {
+      guard pending === view, view.window != nil, let popover, !popover.isShown else { return }
+      pending = nil
+      popover.show(relativeTo: view.bounds, of: view, preferredEdge: .maxY)
+    }
+
+    func close() {
+      pending = nil
+      if popover?.isShown == true { popover?.close() }
+    }
+
+    /// Closed by a click outside, Escape, or `close()`: the button no longer shows it open. After
+    /// this update, never during it.
+    func popoverDidClose(_ notification: Notification) {
+      Task { @MainActor [weak self] in self?.didClose?() }
+    }
+
+    private func makePopover() -> NSPopover {
+      let popover = NSPopover()
+      popover.behavior = .transient
+      popover.animates = true
+      popover.contentViewController = host
+      popover.delegate = self
+      self.popover = popover
+      return popover
+    }
+  }
+
+  /// Behind the button, the size of it: what the popover points at. Flipped, so that `maxY` is its
+  /// bottom edge. Clicks go through it.
+  final class AnchorView: NSView {
+    weak var coordinator: Coordinator?
+
+    override var isFlipped: Bool { true }
+
+    override func viewDidMoveToWindow() {
+      super.viewDidMoveToWindow()
+      coordinator?.viewDidMoveToWindow(self)
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+  }
+}
