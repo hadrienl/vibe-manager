@@ -32,7 +32,7 @@ jobs:
           - { target: VibeAgents, required: false }
           - { target: VibeEndpoints, required: false }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: compnerd/gha-setup-swift@main
         with:
           swift-version: swift-6.4.2-release
