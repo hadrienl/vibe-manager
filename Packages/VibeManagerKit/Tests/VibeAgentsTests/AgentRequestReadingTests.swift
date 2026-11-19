@@ -318,6 +318,26 @@ struct CodexQuestionWatchTests {
       discoveryTimeout: .milliseconds(200))
     #expect(await unknown.rollout() == nil)
   }
+
+  @Test("A resumed session's rollout is the one it was created with, in an earlier day's folder")
+  func resumedRollout() async throws {
+    let sessions = FileManager.default.temporaryDirectory.appendingPathComponent(
+      "codex-sessions-\(UUID().uuidString)")
+    defer { try? FileManager.default.removeItem(at: sessions) }
+    let folder = sessions.appendingPathComponent("2026/10/02")
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let work = FileManager.default.temporaryDirectory.resolvingSymlinksInPath().path
+    let own = folder.appendingPathComponent("rollout-2026-10-02T09-00-01-resumed-session.jsonl")
+    try Data(#"{"type":"session_meta","payload":{"cwd":"\#(work)"}}"#.utf8).write(to: own)
+    try FileManager.default.setAttributes(
+      [.creationDate: Date(timeIntervalSinceNow: -86_400 * 40)], ofItemAtPath: own.path)
+
+    let watch = CodexQuestionWatch(
+      sessionsDirectory: sessions, workingDirectoryPath: work, since: Date(),
+      sessionIdentifier: "resumed-session", discoveryInterval: .milliseconds(20),
+      discoveryTimeout: .milliseconds(200))
+    #expect(await watch.rollout()?.lastPathComponent == own.lastPathComponent)
+  }
 }
 
 @Suite("Answer keymaps")
