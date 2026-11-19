@@ -33,6 +33,20 @@ struct DeviceCatalogTests {
     #expect(emulators.first?.processIdentifier == alive)
   }
 
+  @Test("A file left by an emulator gone, whose pid another process has since, lists nothing")
+  func recycledPid() throws {
+    let folder = FileManager.default.temporaryDirectory
+      .appendingPathComponent(UUID().uuidString, isDirectory: true)
+    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: folder) }
+    // This process's pid, in a file written before it started: an emulator's of last week.
+    let file = folder.appendingPathComponent("pid_\(getpid()).ini")
+    try "grpc.port=8554\navd.name=Gone\n".write(to: file, atomically: true, encoding: .utf8)
+    try FileManager.default.setAttributes(
+      [.creationDate: Date(timeIntervalSinceNow: -7 * 86_400)], ofItemAtPath: file.path)
+    #expect(DeviceCatalog.emulators(in: folder).isEmpty)
+  }
+
   @Test("The phones of adb devices -l, by model, the emulators left out, the others unavailable")
   func phones() {
     let listed = DeviceCatalog.phones(
