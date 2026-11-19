@@ -12,6 +12,8 @@ public protocol AlertRhythmPlaying: AnyObject {
   func prepare()
   /// Plays `rhythm` from now, in place of one still playing.
   func play(_ rhythm: AlertSoundRhythm)
+  /// Stops the rhythm playing, if any: the user turned the rhythms off.
+  func stop()
 }
 
 /// One tap on the trackpad, away from the main actor.
@@ -55,6 +57,11 @@ public final class TrackpadRhythmPlayer: AlertRhythmPlaying {
     let runner = runner
     let generation = runner.begin()
     Self.detach { runner.run(rhythm, generation: generation) }
+  }
+
+  public func stop() {
+    // A newer generation, which plays nothing: the one playing ends at its next tap.
+    _ = runner.begin()
   }
 
   /// A thread of its own, which sleeps between two taps: a rhythm lasts as long as its sound, up
