@@ -71,7 +71,10 @@ public struct AgentDialogScreen: Hashable, Sendable {
       var shown = spacelessLines(drawn)
       if let last = shown.last, let left = last.wholeMatch(of: #/…\(\+(\d+)morelines\)/#) {
         shown.removeLast()
-        guard let count = Int(left.1), [sent.count, written.count].contains(shown.count + count)
+        // A count no message has — `(+9223372036854775807 more lines)` from a server — would
+        // overflow the sum.
+        guard let count = Int(left.1), count <= sent.count,
+          [sent.count, written.count].contains(shown.count + count)
         else { return false }
       } else {
         guard shown.count == written.count else { return false }
