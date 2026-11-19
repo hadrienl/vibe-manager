@@ -55,9 +55,10 @@ public struct RelayedMessage: Equatable, Sendable {
     children = named
   }
 
-  /// A prompt's, unless files came with it: only the user sends files.
+  /// A prompt's, unless files came with it: only the user sends files. A path the transcript
+  /// reader joined from the text itself is not one: a coordinator's message may end with one.
   public init?(_ text: String, attachments: [MessageAttachment]) {
-    guard attachments.isEmpty else { return nil }
+    guard attachments.allSatisfy(\.isWrittenInText) else { return nil }
     self.init(text)
   }
 
