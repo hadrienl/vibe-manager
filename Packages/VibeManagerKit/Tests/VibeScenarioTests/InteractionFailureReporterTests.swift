@@ -116,6 +116,13 @@ struct InteractionFailureReporterTests {
     #expect(body.contains("interaction-failure-fingerprint"))
   }
 
+  @Test("Composed outside the application, nothing is ever reported to GitHub")
+  func notFromTests() {
+    #expect(
+      AppEnvironment.interactionFailureReporter(
+        logs: FileManager.default.temporaryDirectory, environment: [:]) == nil)
+  }
+
   @Test("A failure is persisted, posted once and remains deduplicated after restart")
   func durableReport() async throws {
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)

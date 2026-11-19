@@ -438,10 +438,9 @@ public final class AppEnvironment {
     launcher.commandTyped = { [weak conversations] id, command in
       conversations?.commandTyped(command, in: id)
     }
-    let interactionFailures = InteractionFailureReporter(
-      directory: data.logs.appendingPathComponent("interaction-failures"),
-      environment: configuration.environment)
-    Task { await interactionFailures.start() }
+    let interactionFailures = Self.interactionFailureReporter(
+      logs: data.logs, environment: configuration.environment)
+    if let interactionFailures { Task { await interactionFailures.start() } }
     appModel = AppModel(
       repository: repository,
       recovery: repository,
@@ -486,7 +485,7 @@ public final class AppEnvironment {
         lastOutput: { [weak launcher] id in await launcher?.lastOutput(of: id) },
         screen: { [weak launcher] id in await launcher?.screen(of: id) },
         diagnostics: diagnostics, confirmsDelivery: true,
-        failed: { await interactionFailures.enqueue($0) }),
+        failed: { await interactionFailures?.enqueue($0) }),
       requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
       agentUpdatePreferences: UserDefaultsAgentUpdatePreferences(suiteName: data.defaultsSuite),
       approvalPreferences: approvals,
@@ -654,6 +653,16 @@ public final class AppEnvironment {
         try? await Task.sleep(for: .seconds(300))
       }
     }
+  }
+
+  /// What reports an interaction that failed (#558), in the application only: a test composed
+  /// with the developer's own `gh` would open a public issue with its mock's screen.
+  nonisolated static func interactionFailureReporter(
+    logs: URL, environment: [String: String]
+  ) -> InteractionFailureReporter? {
+    guard bundleName() != nil else { return nil }
+    return InteractionFailureReporter(
+      directory: logs.appendingPathComponent("interaction-failures"), environment: environment)
   }
 
   /// The application's name as the Finder and the menu bar say it, in the user's language: what
