@@ -116,8 +116,9 @@ struct BrowserTabPinningTests {
   func unseenTabs() {
     let workspace = BrowserWorkspace()
     let (browser, ids) = browser(in: workspace)
-    // The four tabs opened behind.
-    #expect(browser.unseenTabIDs == Set(ids))
+    // The tabs opened behind: the first is in front, none other being.
+    #expect(browser.activeTab?.id == ids[0])
+    #expect(browser.unseenTabIDs == Set(ids.dropFirst()))
 
     browser.activate(ids[0])
     workspace.close(ids[1], in: session)
@@ -128,6 +129,16 @@ struct BrowserTabPinningTests {
 
     // One in front is seen at once.
     workspace.open(URL(string: "data:text/html,<p>e</p>")!, in: session, openedBy: .user)
+    #expect(browser.unseenTabIDs.isEmpty)
+
+    // One behind, brought forward when the tab in front of it closes, is seen.
+    let behind = workspace.open(
+      URL(string: "data:text/html,<p>f</p>")!, in: session, openedBy: .user, activate: false,
+      from: ids[2])
+    #expect(browser.unseenTabIDs == [behind.id])
+    browser.activate(ids[2])
+    workspace.close(ids[2], in: session)
+    #expect(browser.activeTab?.id == behind.id)
     #expect(browser.unseenTabIDs.isEmpty)
   }
 
