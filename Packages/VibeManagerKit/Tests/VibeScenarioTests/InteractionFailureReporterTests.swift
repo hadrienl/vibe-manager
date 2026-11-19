@@ -116,6 +116,49 @@ struct InteractionFailureReporterTests {
     #expect(body.contains("interaction-failure-fingerprint"))
   }
 
+  @Test("Whose home a path is, tokens of common services and keys are masked too")
+  func personalPathsAndTokens() {
+    let text = """
+      cwd: /Users/alice/clients/acme
+      GITHUB_TOKEN=gh-fake-value NPM_TOKEN: 'npm-fake-value' max_tokens=4096
+      postgres://app:db-fake-password@localhost/app
+      glpat-fakefakefake xoxb-123-fake AIzaFakeFakeFakeFakeFakeFakeFakeFake1
+      eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJmYWtlIn0.fakesignature
+      -----BEGIN OPENSSH PRIVATE KEY-----
+      b3BlbnNzaC1rZXktdjEAAAAA
+      -----END OPENSSH PRIVATE KEY-----
+      """
+    let failure = AnswerAgentRequest.Failure(
+      requestID: "home", outcome: .interrupted, request: text, answer: "option 1",
+      before: text, after: text, keys: [], writtenKeys: [])
+    let body = InteractionFailureReporter.body(failure, fingerprint: "home")
+    for secret in [
+      "alice", "gh-fake-value", "npm-fake-value", "db-fake-password", "glpat-fakefakefake",
+      "xoxb-123-fake", "AIzaFake", "eyJhbGciOiJIUzI1NiJ9", "b3BlbnNzaC1rZXktdjEAAAAA",
+    ] {
+      #expect(!body.contains(secret), "\(secret)")
+    }
+    #expect(body.contains("/Users/[REDACTED]/clients/acme"))
+    // A count of tokens is no token.
+    #expect(body.contains("max_tokens=4096"))
+  }
+
+  @Test("A report too long for GitHub is cut to fit, its fingerprint kept")
+  func fitsInAnIssue() {
+    let screen = String(repeating: "<é> ", count: 40_000)
+    let failure = AnswerAgentRequest.Failure(
+      requestID: "long", outcome: .interrupted, request: screen, answer: screen,
+      before: screen, after: screen, keys: [], writtenKeys: [])
+    let body = InteractionFailureReporter.body(failure, fingerprint: "long")
+    #expect(body.utf16.count < 65_536)
+    #expect(body.contains("… (cut)"))
+    #expect(body.hasSuffix("interaction-failure-long"))
+    let legacy = String(repeating: "x", count: 100_000) + "\n\ninteraction-failure-legacy"
+    let fitted = InteractionFailureReporter.fitted(legacy)
+    #expect(fitted.utf16.count < 65_536)
+    #expect(fitted.hasSuffix("interaction-failure-legacy"))
+  }
+
   @Test("Composed outside the application, nothing is ever reported to GitHub")
   func notFromTests() {
     #expect(

@@ -84,8 +84,10 @@ actor InteractionFailureReporter {
           report.issueURL == nil
         else { continue }
         do {
-          // Re-sanitize pending reports written by older app versions before any upload.
-          report.body = Self.redact(report.body)
+          // Re-sanitize pending reports written by older app versions before any upload, and
+          // fit them in what GitHub takes: one refused for its length would be sent again and
+          // again.
+          report.body = Self.fitted(Self.redact(report.body))
           try JSONEncoder().encode(report).write(to: file, options: .atomic)
           let fingerprint = file.deletingPathExtension().lastPathComponent
           let found = try await gh([
@@ -134,7 +136,11 @@ actor InteractionFailureReporter {
     let patterns = [
       #"(?i)(\bbearer\s+)[^\s"'\\,}<>]+"#,
       #"(?i)((?:proxy-)?authorization["']?\s*:\s*["']?(?:basic|bearer)\s+)[^\s"'\\,}<>]+"#,
-      #"(?i)(\b(?:AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|SECURITY_TOKEN)|(?:[A-Z0-9]+_)*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|AUTH[_-]?TOKEN|PASSWORD|SECRET|CLIENT[_-]?SECRET))["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s"'\\,}<>]+)"#,
+      #"(?i)(\b(?:AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|SECURITY_TOKEN)|(?:[A-Z0-9]+_)*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|AUTH[_-]?TOKEN|TOKEN|PASSWORD|SECRET|CLIENT[_-]?SECRET))["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s"'\\,}<>]+)"#,
+      // The password of an address: `postgres://user:password@host`.
+      #"(://[^/\s:@"'<>]+:)[^/\s@"'<>]+(?=@)"#,
+      // Whose home it is: `/Users/<name>`, in a working directory, a path, the prompt.
+      #"(/Users/)[^/\s"'\\<>:]+"#,
       #"(?i)(--(?:password|api-key|token|secret|client-secret)[\s=]+)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s"'\\,}<>]+)"#,
     ]
     for pattern in patterns {
@@ -143,18 +149,44 @@ actor InteractionFailureReporter {
     }
     return scrubbed.replacingOccurrences(
       of:
-        #"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]+|(?:AKIA|ASIA)[A-Z0-9]{16})\b"#,
+        #"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]+|(?:AKIA|ASIA)[A-Z0-9]{16}|glpat-[A-Za-z0-9_-]+|xox[abposr]-[A-Za-z0-9-]+|AIza[A-Za-z0-9_-]{30,}|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+)\b|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|\z)"#,
       with: "[REDACTED]", options: .regularExpression)
+  }
+
+  /// What GitHub takes in an issue's body is 65,536 characters; a block is cut well before, so
+  /// that the six of a report always fit.
+  static let blockLimit = 9_000
+  static let bodyLimit = 60_000
+
+  /// The start of `text`, at most `limit` UTF-16 units — what GitHub counts — whole characters.
+  nonisolated static func capped(_ text: String, _ limit: Int) -> String {
+    guard text.utf16.count > limit else { return text }
+    var count = 0
+    var end = text.startIndex
+    for index in text.indices {
+      let width = text[index].utf16.count
+      guard count + width <= limit else { break }
+      count += width
+      end = text.index(after: index)
+    }
+    return String(text[..<end])
+  }
+
+  /// A body GitHub takes, its last lines — the fingerprint looked for — kept.
+  nonisolated static func fitted(_ body: String) -> String {
+    guard body.utf16.count > bodyLimit else { return body }
+    return capped(body, bodyLimit - 400) + "\n…\n" + String(body.suffix(200))
   }
 
   nonisolated static func body(_ failure: AnswerAgentRequest.Failure, fingerprint: String) -> String
   {
     func block(_ text: String) -> String {
       let scrubbed = redact(text)
-      return "<pre>"
-        + scrubbed.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(
-          of: "<", with: "&lt;"
-        ).replacingOccurrences(of: ">", with: "&gt;") + "</pre>"
+      let escaped = scrubbed.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(
+        of: "<", with: "&lt;"
+      ).replacingOccurrences(of: ">", with: "&gt;")
+      let shown = capped(escaped, blockLimit)
+      return "<pre>" + shown + (shown.count < escaped.count ? "\n… (cut)" : "") + "</pre>"
     }
     func keyGroups(_ groups: [[UInt8]]) -> String {
       groups.map { group in
