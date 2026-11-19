@@ -53,7 +53,10 @@ public final class AgentSwitchModel {
 
   /// What is done without asking: the conversation goes on when it can — unless it was dropped
   /// last time — else the logs are copied when they can be, else the summary.
+  /// A summary the user edited, while it was all the sheet offered, stays chosen: the logs found
+  /// once they started would otherwise take its place, and their words be dropped unsaid.
   private var defaultContext: ContextChoice {
+    if isSummaryEdited && chosenContext == nil { return .summary }
     if canResumeConversation && !resumeFailedBefore { return .resume }
     return offersConversationHistory ? .history : .summary
   }
