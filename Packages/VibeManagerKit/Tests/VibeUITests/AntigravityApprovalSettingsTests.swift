@@ -15,12 +15,16 @@ struct AntigravityApprovalSettingsTests {
       repository: StubRepository(sessions: []),
       layout: WorkspaceLayoutController(store: RecordingLayoutStore()),
       approvalPreferences: preferences)
-    #expect(model.approvalMode(for: agy) == .manual)
+    // Never chosen: Antigravity's own setting.
+    #expect(model.approvalMode(for: agy) == nil)
     model.setApprovalMode(.autoReview, for: agy)
     #expect(preferences.mode(for: agy) == .autoReview)
     #expect(model.approvalMode(for: agy) == .autoReview)
     model.setApprovalMode(.manual, for: agy)
     #expect(preferences.mode(for: agy) == .manual)
     #expect(model.approvalMode(for: codex) == .autoReview)
+    model.setApprovalMode(nil, for: agy)
+    #expect(preferences.mode(for: agy) == nil)
+    #expect(model.approvalMode(for: agy) == nil)
   }
 }

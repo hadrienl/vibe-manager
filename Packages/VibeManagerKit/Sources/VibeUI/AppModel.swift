@@ -127,15 +127,18 @@ public final class AppModel {
   /// The approval mode of each agent that offers one — Codex, its accounts, Antigravity —, under
   /// its own identifier: one store for all.
   let approvalPreferences: any AgentApprovalPreferences
-  private var approvalModes: [AgentProviderID: AgentApprovalMode] = [:]
+  /// What was chosen this run, nil for the CLI's own setting: read again by the views.
+  private var approvalModes: [AgentProviderID: AgentApprovalMode?] = [:]
 
-  public func approvalMode(for provider: AgentProviderID) -> AgentApprovalMode {
-    approvalModes[provider] ?? approvalPreferences.mode(for: provider)
+  /// Nil: the CLI's own setting applies.
+  public func approvalMode(for provider: AgentProviderID) -> AgentApprovalMode? {
+    if let chosen = approvalModes[provider] { return chosen }
+    return approvalPreferences.mode(for: provider)
   }
 
-  public func setApprovalMode(_ mode: AgentApprovalMode, for provider: AgentProviderID) {
+  public func setApprovalMode(_ mode: AgentApprovalMode?, for provider: AgentProviderID) {
     approvalPreferences.setMode(mode, for: provider)
-    approvalModes[provider] = mode
+    approvalModes[provider] = .some(mode)
   }
   let agentUpdatePreferences: any AgentUpdatePreferences
   /// Requests whose answer is being typed: their buttons wait.
