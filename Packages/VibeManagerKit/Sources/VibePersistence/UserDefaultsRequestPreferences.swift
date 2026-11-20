@@ -4,7 +4,8 @@ import VibeApplication
 /// What the user chose about the requests of background sessions (#40), kept across launches.
 ///
 /// Each switch is stored so that a key never written reads as its default: notifications and the
-/// Dock badge on, the notification saying the kind of request only, the palette left folded.
+/// Dock badge on, the notification saying the kind of request only, the palette left folded, no
+/// failure reported to GitHub.
 @MainActor
 public final class UserDefaultsRequestPreferences: RequestPreferences {
   private enum Key {
@@ -12,6 +13,7 @@ public final class UserDefaultsRequestPreferences: RequestPreferences {
     static let notificationContent = "requests.notifications.content.v1"
     static let hidesDockBadge = "requests.dockBadge.hidden.v1"
     static let expandsPalette = "requests.palette.expandsOnRequest.v1"
+    static let reportsFailures = "requests.failureReports.enabled.v1"
   }
 
   private let defaults: UserDefaults
@@ -41,5 +43,10 @@ public final class UserDefaultsRequestPreferences: RequestPreferences {
   public var expandsPaletteOnRequest: Bool {
     get { defaults.bool(forKey: Key.expandsPalette) }
     set { defaults.set(newValue, forKey: Key.expandsPalette) }
+  }
+
+  public var reportsInteractionFailures: Bool {
+    get { defaults.bool(forKey: Key.reportsFailures) }
+    set { defaults.set(newValue, forKey: Key.reportsFailures) }
   }
 }

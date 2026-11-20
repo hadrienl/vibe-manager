@@ -246,6 +246,17 @@ public final class AppModel {
   public var expandsPaletteOnRequest: Bool {
     didSet { requestPreferences.expandsPaletteOnRequest = expandsPaletteOnRequest }
   }
+  /// Failed answers reported as public GitHub issues (#558): off unless the user turns it on.
+  public var reportsInteractionFailures: Bool {
+    didSet {
+      guard reportsInteractionFailures != oldValue else { return }
+      requestPreferences.reportsInteractionFailures = reportsInteractionFailures
+      if reportsInteractionFailures { interactionFailureReportsTurnedOn?() }
+    }
+  }
+  /// Sends what waits once the reports are turned on. Set by the application only, which alone
+  /// reports: without it, Settings does not offer the reports.
+  public var interactionFailureReportsTurnedOn: (@MainActor () -> Void)?
   let hookConsents: any AgentHookConsentStore
   /// Every launch waiting on the consent sheet. One answer settles them all.
   var hookConsentWaiters: [UUID: CheckedContinuation<AgentHookConsent, Never>] = [:]
@@ -915,6 +926,7 @@ public final class AppModel {
     notifiesRequests = requestPreferences.notifiesRequests
     requestNotificationContent = requestPreferences.notificationContent
     showsRequestDockBadge = requestPreferences.showsDockBadge
+    reportsInteractionFailures = requestPreferences.reportsInteractionFailures
     expandsPaletteOnRequest = requestPreferences.expandsPaletteOnRequest
     self.browser = browser
     self.terminals = terminals

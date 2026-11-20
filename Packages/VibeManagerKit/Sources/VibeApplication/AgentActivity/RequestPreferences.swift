@@ -17,6 +17,9 @@ public protocol RequestPreferences: AnyObject {
   var showsDockBadge: Bool { get set }
   /// A request arriving unfolds a folded palette.
   var expandsPaletteOnRequest: Bool { get set }
+  /// An answer that could not be confirmed opens a public GitHub issue under the user's account
+  /// (#558). Off unless the user turns it on.
+  var reportsInteractionFailures: Bool { get set }
 }
 
 /// Kept for this run only. What a workspace assembled without the system around it uses.
@@ -26,16 +29,19 @@ public final class InMemoryRequestPreferences: RequestPreferences {
   public var notificationContent: RequestNotificationContent
   public var showsDockBadge: Bool
   public var expandsPaletteOnRequest: Bool
+  public var reportsInteractionFailures: Bool
 
   public init(
     notifiesRequests: Bool = true,
     notificationContent: RequestNotificationContent = .kind,
     showsDockBadge: Bool = true,
-    expandsPaletteOnRequest: Bool = false
+    expandsPaletteOnRequest: Bool = false,
+    reportsInteractionFailures: Bool = false
   ) {
     self.notifiesRequests = notifiesRequests
     self.notificationContent = notificationContent
     self.showsDockBadge = showsDockBadge
     self.expandsPaletteOnRequest = expandsPaletteOnRequest
+    self.reportsInteractionFailures = reportsInteractionFailures
   }
 }

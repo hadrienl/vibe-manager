@@ -9,12 +9,16 @@ private actor ReportingCLI {
   var calls: [BoundedProcessRequest] = []
   let existing: Bool
   var failuresLeft: Int
-  init(existing: Bool = false, failuresLeft: Int = 0) {
+  /// `gh` missing or signed out: every call fails.
+  let isMissing: Bool
+  init(existing: Bool = false, failuresLeft: Int = 0, isMissing: Bool = false) {
     self.existing = existing
     self.failuresLeft = failuresLeft
+    self.isMissing = isMissing
   }
   func run(_ request: BoundedProcessRequest) -> BoundedProcessResult {
     calls.append(request)
+    if isMissing { return BoundedProcessResult(termination: .exited(127)) }
     if request.arguments.contains("create"), failuresLeft > 0 {
       failuresLeft -= 1
       return BoundedProcessResult(termination: .exited(1))
@@ -75,7 +79,7 @@ struct InteractionFailureReporterTests {
     let cli = ReportingCLI(failuresLeft: 1)
     let reporter = InteractionFailureReporter(
       directory: directory, environment: [:], retryDelay: .milliseconds(10),
-      run: { await cli.run($0) })
+      isEnabled: { true }, run: { await cli.run($0) })
     await reporter.start()
     var posted = false
     for _ in 0..<200 {
@@ -163,7 +167,8 @@ struct InteractionFailureReporterTests {
   func notFromTests() {
     #expect(
       AppEnvironment.interactionFailureReporter(
-        logs: FileManager.default.temporaryDirectory, environment: [:]) == nil)
+        logs: FileManager.default.temporaryDirectory, environment: [:], isEnabled: { true })
+        == nil)
   }
 
   @Test("A failure is persisted, posted once and remains deduplicated after restart")
@@ -172,7 +177,7 @@ struct InteractionFailureReporterTests {
     defer { try? FileManager.default.removeItem(at: directory) }
     let cli = ReportingCLI()
     let reporter = InteractionFailureReporter(
-      directory: directory, environment: [:], run: { await cli.run($0) })
+      directory: directory, environment: [:], isEnabled: { true }, run: { await cli.run($0) })
     await reporter.enqueue(failure())
     var posted = false
     for _ in 0..<200 {
@@ -189,7 +194,7 @@ struct InteractionFailureReporterTests {
     #expect(posted)
     #expect(await cli.calls.count == 2)
     let restarted = InteractionFailureReporter(
-      directory: directory, environment: [:], run: { await cli.run($0) })
+      directory: directory, environment: [:], isEnabled: { true }, run: { await cli.run($0) })
     await restarted.enqueue(failure())
     try await Task.sleep(for: .milliseconds(50))
     #expect(await cli.calls.count == 2)
@@ -204,7 +209,7 @@ struct InteractionFailureReporterTests {
     defer { try? FileManager.default.removeItem(at: directory) }
     let cli = ReportingCLI(existing: true)
     let reporter = InteractionFailureReporter(
-      directory: directory, environment: [:], run: { await cli.run($0) })
+      directory: directory, environment: [:], isEnabled: { true }, run: { await cli.run($0) })
     await reporter.enqueue(failure())
     for _ in 0..<200 {
       if await cli.calls.count == 1 { break }
@@ -213,5 +218,122 @@ struct InteractionFailureReporterTests {
     try await Task.sleep(for: .milliseconds(50))
     #expect(await cli.calls.count == 1)
     #expect(await cli.calls.first?.arguments.contains("list") == true)
+  }
+
+  private func outbox() throws -> URL {
+    let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+    return directory
+  }
+
+  private func reports(in directory: URL) -> [[String: Any]] {
+    let files =
+      (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil))
+      ?? []
+    return files.compactMap {
+      (try? JSONSerialization.jsonObject(with: Data(contentsOf: $0))) as? [String: Any]
+    }
+  }
+
+  @Test("Turned off, a failure is neither kept nor sent, and what waits stays (#558)")
+  func offByDefault() async throws {
+    let directory = try outbox()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let pending = ["title": "Earlier failure", "body": "<pre>screen</pre>"]
+    try JSONSerialization.data(withJSONObject: pending).write(
+      to: directory.appendingPathComponent("pending.json"))
+    let cli = ReportingCLI()
+    let reporter = InteractionFailureReporter(
+      directory: directory, environment: [:], isEnabled: { false }, run: { await cli.run($0) })
+    await reporter.enqueue(failure())
+    await reporter.start()
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await cli.calls.isEmpty)
+    #expect(reports(in: directory).count == 1)
+    #expect(reports(in: directory).first?["issueURL"] == nil)
+  }
+
+  @Test("A text the user typed is reported by its length only (#558)")
+  func typedTextOmitted() {
+    let answer = AgentAnswer.answers([.option(2), .text("my private reply, with a name")])
+    #expect(!answer.reported.contains("private"))
+    #expect(answer.reported.contains("29 characters omitted"))
+    #expect(answer.reported.contains("option(2)"))
+    #expect(AgentAnswer.allowOnce.reported.hasSuffix("allowOnce"))
+    #expect(
+      answer.withoutTypedText("> my private reply, with a name\n  Enter to submit")
+        == "> <typed text omitted>\n  Enter to submit")
+  }
+
+  @Test("Without gh, a report is given up after a few attempts, the delay doubling (#558)")
+  func givesUp() async throws {
+    let directory = try outbox()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let cli = ReportingCLI(isMissing: true)
+    let reporter = InteractionFailureReporter(
+      directory: directory, environment: [:], retryDelay: .milliseconds(1),
+      isEnabled: { true }, run: { await cli.run($0) })
+    await reporter.enqueue(failure())
+    for _ in 0..<1_000 {
+      if reports(in: directory).first?["abandoned"] as? Bool == true { break }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(reports(in: directory).first?["abandoned"] as? Bool == true)
+    #expect(await cli.calls.count == InteractionFailureReporter.maximumAttempts)
+    // Given up, it is not tried again at the next launch.
+    await reporter.start()
+    try await Task.sleep(for: .milliseconds(50))
+    #expect(await cli.calls.count == InteractionFailureReporter.maximumAttempts)
+  }
+
+  @Test("A report queued days ago is given up without running gh (#558)")
+  func tooOld() async throws {
+    let directory = try outbox()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let cli = ReportingCLI()
+    let later = Date().addingTimeInterval(InteractionFailureReporter.maximumAge + 60)
+    let reporter = InteractionFailureReporter(
+      directory: directory, environment: [:], isEnabled: { true }, now: { later },
+      run: { await cli.run($0) })
+    let pending: [String: Any] = [
+      "title": "Old failure", "body": "<pre>screen</pre>",
+      "queuedAt": Date().timeIntervalSinceReferenceDate,
+    ]
+    try JSONSerialization.data(withJSONObject: pending).write(
+      to: directory.appendingPathComponent("old.json"))
+    await reporter.start()
+    for _ in 0..<200 {
+      if reports(in: directory).first?["abandoned"] as? Bool == true { break }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    #expect(reports(in: directory).first?["abandoned"] as? Bool == true)
+    #expect(await cli.calls.isEmpty)
+  }
+
+  @Test("Few issues are opened a day, the others wait (#558)")
+  func dailyLimit() async throws {
+    let directory = try outbox()
+    defer { try? FileManager.default.removeItem(at: directory) }
+    let cli = ReportingCLI()
+    let reporter = InteractionFailureReporter(
+      directory: directory, environment: [:], isEnabled: { true }, run: { await cli.run($0) })
+    for index in 0..<(InteractionFailureReporter.dailyIssueLimit + 2) {
+      await reporter.enqueue(
+        .init(
+          requestID: "request-\(index)", outcome: .notOnScreen, request: "question",
+          answer: "option 1", before: "screen", after: "screen", keys: [], writtenKeys: []))
+    }
+    for _ in 0..<200 {
+      let sent = reports(in: directory).count { $0["issueURL"] != nil }
+      if sent == InteractionFailureReporter.dailyIssueLimit { break }
+      try await Task.sleep(for: .milliseconds(10))
+    }
+    try await Task.sleep(for: .milliseconds(50))
+    let all = reports(in: directory)
+    #expect(all.count == InteractionFailureReporter.dailyIssueLimit + 2)
+    #expect(all.count { $0["issueURL"] != nil } == InteractionFailureReporter.dailyIssueLimit)
+    #expect(
+      await cli.calls.count { $0.arguments.contains("create") }
+        == InteractionFailureReporter.dailyIssueLimit)
   }
 }

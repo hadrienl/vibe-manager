@@ -438,8 +438,10 @@ public final class AppEnvironment {
     launcher.commandTyped = { [weak conversations] id, command in
       conversations?.commandTyped(command, in: id)
     }
+    let requestPreferences = UserDefaultsRequestPreferences(suiteName: data.defaultsSuite)
     let interactionFailures = Self.interactionFailureReporter(
-      logs: data.logs, environment: configuration.environment)
+      logs: data.logs, environment: configuration.environment,
+      isEnabled: { await MainActor.run { requestPreferences.reportsInteractionFailures } })
     if let interactionFailures { Task { await interactionFailures.start() } }
     appModel = AppModel(
       repository: repository,
@@ -486,7 +488,7 @@ public final class AppEnvironment {
         screen: { [weak launcher] id in await launcher?.screen(of: id) },
         diagnostics: diagnostics, confirmsDelivery: true,
         failed: { await interactionFailures?.enqueue($0) }),
-      requestPreferences: UserDefaultsRequestPreferences(suiteName: data.defaultsSuite),
+      requestPreferences: requestPreferences,
       agentUpdatePreferences: UserDefaultsAgentUpdatePreferences(suiteName: data.defaultsSuite),
       approvalPreferences: approvals,
       browser: browser,
@@ -559,6 +561,11 @@ public final class AppEnvironment {
       appModel.readAloud = readAloud
     }
     // The first launch's tour (#338), before the window loads and resumes it.
+    if let interactionFailures {
+      appModel.interactionFailureReportsTurnedOn = {
+        Task { await interactionFailures.start() }
+      }
+    }
     appModel.onboarding = OnboardingModel(
       preferences: UserDefaultsOnboardingPreferences(suiteName: data.defaultsSuite))
     // The requests above the other applications, and the avatar that presents them (#41).
@@ -657,12 +664,14 @@ public final class AppEnvironment {
 
   /// What reports an interaction that failed (#558), in the application only: a test composed
   /// with the developer's own `gh` would open a public issue with its mock's screen.
+  /// Nothing is sent unless the user turned the reports on (`isEnabled`): an issue is public.
   nonisolated static func interactionFailureReporter(
-    logs: URL, environment: [String: String]
+    logs: URL, environment: [String: String], isEnabled: @escaping @Sendable () async -> Bool
   ) -> InteractionFailureReporter? {
     guard bundleName() != nil else { return nil }
     return InteractionFailureReporter(
-      directory: logs.appendingPathComponent("interaction-failures"), environment: environment)
+      directory: logs.appendingPathComponent("interaction-failures"), environment: environment,
+      isEnabled: isEnabled)
   }
 
   /// The application's name as the Finder and the menu bar say it, in the user's language: what

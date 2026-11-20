@@ -5,21 +5,40 @@ import VibeProcess
 
 /// Durable outbox: a failed interaction remains reportable through offline periods and restarts.
 /// The request fingerprint is also searched on GitHub before creation, covering a crash after POST.
+///
+/// An issue is public and opened under the user's own GitHub account: nothing is written or sent
+/// unless they turned the reports on (`isEnabled`). Retries back off and give up, and few issues
+/// are opened a day, so that a CLI whose dialogs changed cannot flood the repository.
 actor InteractionFailureReporter {
   private let directory: URL
   private let environment: [String: String]
   private let retryDelay: Duration
+  private let isEnabled: @Sendable () async -> Bool
   private var draining = false
   private var needsDrain = false
   private let run: @Sendable (BoundedProcessRequest) async throws -> BoundedProcessResult
+  private let now: @Sendable () -> Date
+
+  /// A report not sent after this many failed attempts, or this long after it was queued, is
+  /// given up: `gh` missing or signed out would otherwise be run for the life of the application.
+  static let maximumAttempts = 10
+  static let maximumAge: TimeInterval = 3 * 24 * 3600
+  /// The longest wait between two attempts, the delay doubling from `retryDelay`.
+  static let maximumRetryDelay: Duration = .seconds(3600)
+  /// The issues opened in a day at most; the others wait for the next day.
+  static let dailyIssueLimit = 3
 
   init(
     directory: URL, environment: [String: String], retryDelay: Duration = .seconds(60),
+    isEnabled: @escaping @Sendable () async -> Bool,
+    now: @escaping @Sendable () -> Date = { Date() },
     run: @escaping @Sendable (BoundedProcessRequest) async throws -> BoundedProcessResult = {
       try await BoundedProcess.run($0)
     }
   ) {
     self.retryDelay = retryDelay
+    self.isEnabled = isEnabled
+    self.now = now
     self.run = run
     self.directory = directory
     var environment = environment
@@ -31,7 +50,9 @@ actor InteractionFailureReporter {
     self.environment = environment
   }
 
-  func enqueue(_ failure: AnswerAgentRequest.Failure) {
+  func enqueue(_ failure: AnswerAgentRequest.Failure) async {
+    // Turned off, the failure is not even kept: the terminal fallback is all that happens.
+    guard await isEnabled() else { return }
     let fingerprint = SHA256.hash(data: Data(failure.requestID.utf8))
       .map { String(format: "%02x", $0) }.joined()
     let file = directory.appendingPathComponent(fingerprint + ".json")
@@ -40,7 +61,7 @@ actor InteractionFailureReporter {
       if !FileManager.default.fileExists(atPath: file.path) {
         let report = Report(
           title: "Interaction failed: \(failure.outcome.rawValue)",
-          body: Self.body(failure, fingerprint: fingerprint))
+          body: Self.body(failure, fingerprint: fingerprint), queuedAt: now())
         try JSONEncoder().encode(report).write(to: file, options: .atomic)
       }
       needsDrain = true
@@ -60,6 +81,11 @@ actor InteractionFailureReporter {
     let title: String
     var body: String
     var issueURL: String?
+    /// Absent from the reports of 1.2.0-rc: their file's date stands for it.
+    var queuedAt: Date?
+    var attempts: Int?
+    var issueCreatedAt: Date?
+    var abandoned: Bool?
   }
 
   private func gh(_ arguments: [String], input: String? = nil) async throws -> BoundedProcessResult
@@ -73,21 +99,34 @@ actor InteractionFailureReporter {
 
   private func drain() async {
     defer { draining = false }
+    var delay = retryDelay
     while !Task.isCancelled {
       needsDrain = false
+      guard await isEnabled() else { return }
       let files =
         (try? FileManager.default.contentsOfDirectory(
-          at: directory, includingPropertiesForKeys: nil)) ?? []
+          at: directory, includingPropertiesForKeys: [.creationDateKey])) ?? []
       var pending = false
       for file in files where file.pathExtension == "json" {
         guard var report = try? JSONDecoder().decode(Report.self, from: Data(contentsOf: file)),
-          report.issueURL == nil
+          report.issueURL == nil, report.abandoned != true
         else { continue }
+        // Turned off meanwhile: what waits stays where it is.
+        guard await isEnabled() else { return }
+        let queuedAt =
+          report.queuedAt ?? (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate)
+          ?? now()
+        if now().timeIntervalSince(queuedAt) > Self.maximumAge {
+          report.abandoned = true
+          try? JSONEncoder().encode(report).write(to: file, options: .atomic)
+          continue
+        }
         do {
           // Re-sanitize pending reports written by older app versions before any upload, and
           // fit them in what GitHub takes: one refused for its length would be sent again and
           // again.
           report.body = Self.fitted(Self.redact(report.body))
+          report.queuedAt = queuedAt
           try JSONEncoder().encode(report).write(to: file, options: .atomic)
           let fingerprint = file.deletingPathExtension().lastPathComponent
           let found = try await gh([
@@ -98,35 +137,59 @@ actor InteractionFailureReporter {
             let existing = try JSONSerialization.jsonObject(with: found.standardOutput)
               as? [[String: Any]]
           else {
-            pending = true
+            pending = failed(&report, file) || pending
             continue
           }
           if let url = existing.first?["url"] as? String {
             report.issueURL = url
           } else {
+            // Enough for today: the others wait for a later launch or failure.
+            guard createdToday(in: files) < Self.dailyIssueLimit else { return }
             let created = try await gh(
               [
                 "issue", "create", "--repo", "hadrienl/vibe-manager", "--title", report.title,
                 "--label", "bug", "--body-file", "-",
               ], input: report.body)
             guard created.exitCode == 0 else {
-              pending = true
+              pending = failed(&report, file) || pending
               continue
             }
             let url = String(decoding: created.standardOutput, as: UTF8.self).trimmingCharacters(
               in: .whitespacesAndNewlines)
             guard url.hasPrefix("https://github.com/hadrienl/vibe-manager/issues/") else {
-              pending = true
+              pending = failed(&report, file) || pending
               continue
             }
             report.issueURL = url
+            report.issueCreatedAt = now()
           }
           try JSONEncoder().encode(report).write(to: file, options: .atomic)
-        } catch { pending = true }
+        } catch { pending = failed(&report, file) || pending }
       }
       if needsDrain { continue }
       guard pending else { return }
-      do { try await Task.sleep(for: retryDelay) } catch { return }
+      do { try await Task.sleep(for: delay) } catch { return }
+      delay = min(delay * 2, Self.maximumRetryDelay)
+    }
+  }
+
+  /// Counts a failed attempt; whether the report is still to be tried.
+  private func failed(_ report: inout Report, _ file: URL) -> Bool {
+    let attempts = (report.attempts ?? 0) + 1
+    report.attempts = attempts
+    if attempts >= Self.maximumAttempts { report.abandoned = true }
+    try? JSONEncoder().encode(report).write(to: file, options: .atomic)
+    return report.abandoned != true
+  }
+
+  /// The issues this outbox opened in the last 24 hours.
+  private func createdToday(in files: [URL]) -> Int {
+    files.count { file in
+      guard
+        let report = try? JSONDecoder().decode(Report.self, from: Data(contentsOf: file)),
+        let created = report.issueCreatedAt
+      else { return false }
+      return now().timeIntervalSince(created) < 24 * 3600
     }
   }
 

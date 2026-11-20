@@ -216443,6 +216443,307 @@
           }
         }
       }
+    },
+    "Report failed answers on GitHub" : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإبلاغ عن الإجابات الفاشلة على GitHub"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Fehlgeschlagene Antworten auf GitHub melden"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informar de respuestas fallidas en GitHub"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signaler les réponses qui échouent sur GitHub"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "विफल उत्तरों की GitHub पर रिपोर्ट करें"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnala su GitHub le risposte non riuscite"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "失敗した回答を GitHub に報告"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "실패한 응답을 GitHub에 보고"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Mislukte antwoorden melden op GitHub"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zgłaszaj nieudane odpowiedzi na GitHubie"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relatar respostas que falharam no GitHub"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Сообщать о неудачных ответах на GitHub"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Başarısız yanıtları GitHub’da bildir"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Повідомляти про невдалі відповіді на GitHub"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上报告失败的回答"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "在 GitHub 上回報失敗的回答"
+          }
+        }
+      }
+    },
+    "When an answer given from Vibe Manager cannot be confirmed, a public issue is opened in hadrienl/vibe-manager under your GitHub account, with gh. It contains the request and the text of the terminal; known secrets and your user name are masked." : {
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "عندما يتعذّر تأكيد إجابة قُدّمت من Vibe Manager، تُفتح مشكلة عامة في hadrienl/vibe-manager باسم حسابك على GitHub، عبر gh. تتضمن الطلب ونص الطرفية؛ وتُخفى الأسرار المعروفة واسم المستخدم الخاص بك."
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Kann eine in Vibe Manager gegebene Antwort nicht bestätigt werden, wird mit gh ein öffentliches Issue in hadrienl/vibe-manager unter deinem GitHub-Konto eröffnet. Es enthält die Anfrage und den Text des Terminals; bekannte Geheimnisse und dein Benutzername werden maskiert."
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Cuando no se puede confirmar una respuesta dada desde Vibe Manager, se abre una incidencia pública en hadrienl/vibe-manager con tu cuenta de GitHub, mediante gh. Contiene la solicitud y el texto del terminal; los secretos conocidos y tu nombre de usuario se ocultan."
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quand une réponse donnée depuis Vibe Manager ne peut pas être confirmée, une issue publique est ouverte dans hadrienl/vibe-manager sous votre compte GitHub, avec gh. Elle contient la demande et le texte du terminal ; les secrets connus et votre nom d’utilisateur sont masqués."
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "जब Vibe Manager से दिए गए उत्तर की पुष्टि नहीं हो पाती, तो gh के ज़रिए आपके GitHub खाते से hadrienl/vibe-manager में एक सार्वजनिक issue खोला जाता है। इसमें अनुरोध और टर्मिनल का टेक्स्ट होता है; ज्ञात सीक्रेट और आपका उपयोगकर्ता नाम छिपाए जाते हैं।"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando una risposta data da Vibe Manager non può essere confermata, viene aperta una issue pubblica in hadrienl/vibe-manager con il tuo account GitHub, tramite gh. Contiene la richiesta e il testo del terminale; i segreti noti e il tuo nome utente vengono mascherati."
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager から送った回答を確認できないとき、gh を使ってあなたの GitHub アカウントで hadrienl/vibe-manager に公開 Issue が作成されます。リクエストとターミナルのテキストが含まれます。既知のシークレットとユーザ名は伏せられます。"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager에서 보낸 응답을 확인할 수 없으면 gh를 통해 내 GitHub 계정으로 hadrienl/vibe-manager에 공개 이슈가 열립니다. 요청과 터미널 텍스트가 포함되며, 알려진 비밀 값과 사용자 이름은 가려집니다."
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Als een antwoord vanuit Vibe Manager niet kan worden bevestigd, wordt met gh een openbaar issue geopend in hadrienl/vibe-manager onder je GitHub-account. Het bevat het verzoek en de tekst van de terminal; bekende geheimen en je gebruikersnaam worden gemaskeerd."
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Gdy odpowiedzi udzielonej z Vibe Manager nie da się potwierdzić, przez gh otwierane jest publiczne zgłoszenie w hadrienl/vibe-manager z Twojego konta GitHub. Zawiera prośbę i tekst terminala; znane sekrety i Twoja nazwa użytkownika są maskowane."
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Quando uma resposta dada pelo Vibe Manager não pode ser confirmada, uma issue pública é aberta em hadrienl/vibe-manager com sua conta do GitHub, usando gh. Ela contém a solicitação e o texto do terminal; segredos conhecidos e seu nome de usuário são ocultados."
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Если ответ, данный из Vibe Manager, не удаётся подтвердить, через gh от имени вашей учётной записи GitHub открывается публичный issue в hadrienl/vibe-manager. Он содержит запрос и текст терминала; известные секреты и ваше имя пользователя скрываются."
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Vibe Manager’dan verilen bir yanıt doğrulanamadığında, gh ile GitHub hesabınız adına hadrienl/vibe-manager’da herkese açık bir issue açılır. İsteği ve terminal metnini içerir; bilinen gizli bilgiler ve kullanıcı adınız maskelenir."
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Якщо відповідь, надану з Vibe Manager, не вдається підтвердити, через gh від імені вашого облікового запису GitHub відкривається публічний issue в hadrienl/vibe-manager. Він містить запит і текст термінала; відомі секрети та ваше ім’я користувача приховуються."
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "当从 Vibe Manager 给出的回答无法确认时，会通过 gh 以你的 GitHub 账户在 hadrienl/vibe-manager 中创建一个公开 issue。其中包含请求和终端文本；已知的密钥和你的用户名会被遮盖。"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "當從 Vibe Manager 給出的回答無法確認時，會透過 gh 以你的 GitHub 帳號在 hadrienl/vibe-manager 中建立一個公開 issue。其中包含請求和終端機文字；已知的密鑰和你的使用者名稱會被遮蔽。"
+          }
+        }
+      }
+    },
+    "Problem Reports" : {
+      "comment" : "A section of the Settings window.",
+      "localizations" : {
+        "ar" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "الإبلاغ عن المشكلات"
+          }
+        },
+        "de" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Problemberichte"
+          }
+        },
+        "es" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Informes de problemas"
+          }
+        },
+        "fr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Signalement des problèmes"
+          }
+        },
+        "hi" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "समस्या रिपोर्ट"
+          }
+        },
+        "it" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Segnalazioni di problemi"
+          }
+        },
+        "ja" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題の報告"
+          }
+        },
+        "ko" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "문제 보고"
+          }
+        },
+        "nl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Probleemmeldingen"
+          }
+        },
+        "pl" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Zgłoszenia problemów"
+          }
+        },
+        "pt-BR" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Relatórios de problemas"
+          }
+        },
+        "ru" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Отчёты о проблемах"
+          }
+        },
+        "tr" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Sorun raporları"
+          }
+        },
+        "uk" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Звіти про проблеми"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "问题报告"
+          }
+        },
+        "zh-Hant" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "問題回報"
+          }
+        }
+      }
     }
   },
   "version" : "1.0"
