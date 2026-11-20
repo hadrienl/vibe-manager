@@ -145,6 +145,22 @@ struct AgentSwitchWorkspaceTests {
     #expect(incomplete.continuityNotice.contains("history is partial"))
   }
 
+  @Test("A summary edited while the logs were looked for stays the one sent")
+  func editedSummaryIsKept() async throws {
+    let subject = session(path: folder())
+    let (model, _, _, _) = await makeWorkspace(session: subject, history: RecordingHistory())
+    model.beginAgentSwitch(subject.id)
+    let sheet = try #require(model.pendingSwitch)
+    // Before the logs are found, the summary is what the sheet offers, and the user edits it.
+    sheet.summaryText = "Mine: keep lodash, drop moment."
+    await sheet.load()
+    await sheet.select(agent: "other")
+    #expect(sheet.contextChoices == [.history, .summary])
+    #expect(sheet.contextChoice == .summary)
+    #expect(sheet.handover == .summary)
+    #expect(sheet.summaryText == "Mine: keep lodash, drop moment.")
+  }
+
   @Test("The logs are copied once the running agent has stopped, and the copy is recorded")
   func historyIsCopiedAfterTheStop() async throws {
     let path = folder()

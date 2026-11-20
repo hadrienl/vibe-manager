@@ -21,9 +21,11 @@ final class RecordingSoundPlayer: AlertSoundPlaying {
 final class RecordingRhythmPlayer: AlertRhythmPlaying {
   private(set) var played: [AlertSoundRhythm] = []
   private(set) var prepared = 0
+  private(set) var stops = 0
 
   func prepare() { prepared += 1 }
   func play(_ rhythm: AlertSoundRhythm) { played.append(rhythm) }
+  func stop() { stops += 1 }
 }
 
 /// Where the notifications would find the sound, recorded.
@@ -258,6 +260,10 @@ struct AlertSoundLibraryModelTests {
     sounds.playsRhythm = true
     #expect(preferences.playsRhythm)
     #expect(rhythm.prepared == 1)
+    #expect(rhythm.stops == 0)
+    // Turned off while one plays: it stops.
+    sounds.playsRhythm = false
+    #expect(rhythm.stops == 1)
   }
 
   @Test("A notification's sound is felt once with an alert of the same second (#555)")

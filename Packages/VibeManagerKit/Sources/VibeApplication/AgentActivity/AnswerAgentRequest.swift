@@ -103,8 +103,9 @@ public struct AnswerAgentRequest: Sendable {
       await failed(
         Failure(
           requestID: String(describing: id), outcome: outcome,
-          request: String(reflecting: request.content), answer: String(reflecting: answer),
-          before: before ?? "<unavailable>", after: await screen(id.sessionID) ?? "<unavailable>",
+          request: String(reflecting: request.content), answer: answer.reported,
+          before: answer.withoutTypedText(before ?? "<unavailable>"),
+          after: answer.withoutTypedText(await screen(id.sessionID) ?? "<unavailable>"),
           keys: keys, writtenKeys: written))
     }
     diagnostics.record(
@@ -304,6 +305,29 @@ extension AgentAnswer {
     case .skipUpdate: return "skipUpdate"
     case .chatAboutThis: return "chatAboutThis"
     case .trustFolder: return "trustFolder"
+    }
+  }
+}
+
+extension AgentAnswer {
+  /// What a failure report says of this answer: a text the user typed by its length only, as
+  /// the key traces already do. Options, choices and refusals are kept, to reproduce the case.
+  public var reported: String {
+    guard case .answers(let answers) = self else { return String(reflecting: self) }
+    let each = answers.map { answer -> String in
+      guard case .text(let text) = answer else { return String(reflecting: answer) }
+      return ".text(<\(text.count) characters omitted>)"
+    }
+    return ".answers([\(each.joined(separator: ", "))])"
+  }
+
+  /// A screen with the text the user typed taken out where it shows whole: what the field of
+  /// the dialog echoes. A text wrapped over several lines may still show in part.
+  public func withoutTypedText(_ screen: String) -> String {
+    guard case .answers(let answers) = self else { return screen }
+    return answers.reduce(screen) { screen, answer in
+      guard case .text(let text) = answer, !text.isEmpty else { return screen }
+      return screen.replacingOccurrences(of: text, with: "<typed text omitted>")
     }
   }
 }

@@ -109,11 +109,14 @@ own provider or through an endpoint; see [the benchmark's README](../Benchmarks/
 
 ## Codex approvals
 
-In Settings → Codex, choose **Manual** or **Automatic** under **Approval mode**. Each additional
+In Settings → Codex, choose **As Set in the CLI**, **Manual** or **Automatic** under **Approval
+mode**. Each additional
 Codex account has its own choice on its agent settings page. For an endpoint driven by Codex
 (including Automatic with the Responses protocol), the same choice is in its **Agent** section.
 
 Manual leaves permission requests to you. Automatic uses Codex’s **Approve for me** mode to review
 requests while keeping the workspace sandbox. It may refuse an action or still require your input.
-The choice is saved per agent and applies to new or restarted sessions, including resumed
-conversations. Existing configurations default to Manual.
+As Set in the CLI, the default, passes nothing: the `approval_policy` and `approvals_reviewer` of
+`~/.codex/config.toml` (or Antigravity's `agentMode`) apply as the user set them. The choice is
+saved per agent and applies to new or restarted sessions, including resumed conversations. An
+endpoint's harness always has Manual or Automatic, Manual for an existing endpoint.

@@ -37,6 +37,19 @@ struct SignallingSettings: View {
       } header: {
         Text("Palette", bundle: .module, comment: "A section of the Settings window.")
       }
+      if model.interactionFailureReportsTurnedOn != nil {
+        Section {
+          Toggle(isOn: $model.reportsInteractionFailures) {
+            Text("Report failed answers on GitHub", bundle: .module)
+            Text(
+              "When an answer given from Vibe Manager cannot be confirmed, a public issue is opened in hadrienl/vibe-manager under your GitHub account, with gh. It contains the request and the text of the terminal; known secrets and your user name are masked.",
+              bundle: .module)
+          }
+          .accessibilityIdentifier("interaction-failure-reports-toggle")
+        } header: {
+          Text("Problem Reports", bundle: .module, comment: "A section of the Settings window.")
+        }
+      }
     }
     .formStyle(.grouped)
     .task { isAuthorized = await model.requestNotifier?.isAuthorized() }

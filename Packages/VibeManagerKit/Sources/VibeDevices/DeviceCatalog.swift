@@ -155,11 +155,26 @@ public enum DeviceCatalog {
     return files.compactMap { file in
       let stem = file.deletingPathExtension().lastPathComponent
       guard stem.hasPrefix("pid_"), let pid = pid_t(stem.dropFirst(4)), kill(pid, 0) == 0,
-        let text = try? String(contentsOf: file, encoding: .utf8),
+        isWriter(pid, of: file), let text = try? String(contentsOf: file, encoding: .utf8),
         let device = emulator(described: text)
       else { return nil }
       return Emulator(processIdentifier: pid, device: device)
     }
+  }
+
+  /// Whether `pid` is still the process that listed itself in `file`: started before the file was
+  /// written. An emulator that crashed leaves its file, and its pid may since be another process
+  /// of the user's — which Stop would end.
+  static func isWriter(_ pid: pid_t, of file: URL) -> Bool {
+    var info = proc_bsdinfo()
+    let size = Int32(MemoryLayout<proc_bsdinfo>.size)
+    guard proc_pidinfo(pid, PROC_PIDTBSDINFO, 0, &info, size) == size,
+      let written = (try? file.resourceValues(forKeys: [.creationDateKey]))?.creationDate
+    else { return false }
+    let started = Date(
+      timeIntervalSince1970: Double(info.pbi_start_tvsec) + Double(info.pbi_start_tvusec) / 1e6)
+    // Whole seconds in some file systems' dates.
+    return started <= written.addingTimeInterval(1)
   }
 
   /// The device a `pid_<pid>.ini` describes, if it serves gRPC.

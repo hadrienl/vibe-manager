@@ -23,6 +23,9 @@ final class EndpointConversationDecoder: ConversationDecoding {
     inner.consume(record)
   }
 
+  /// The harness's own: without it, a turn that left a command running read as finished (#393).
+  var backgroundWork: [Date] { inner.backgroundWork }
+
   var entries: [ConversationEntry] {
     refresh()
     let own = inner.entries

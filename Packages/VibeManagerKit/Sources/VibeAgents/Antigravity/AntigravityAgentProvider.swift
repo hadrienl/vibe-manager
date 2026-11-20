@@ -95,20 +95,23 @@ public struct AntigravityArgumentBuilder: CommandLineAgentArgumentBuilder {
   public func arguments(
     for request: AgentLaunchRequest, promptDelivery: PromptDelivery, descriptor: AgentDescriptor
   ) throws -> [String] {
-    let mode = request.approvalMode ?? .manual
     // Both directions override persisted CLI defaults for this process only. `--mode` has no
     // value for the default mode, so Manual sets it in the session's settings instead:
     // `agentMode: ""` is the explicit Default (`/config` saves it so since Auto became the
     // default), not an absent value. Verified on 1.5.6: with a global `agentMode: "auto"`, a
-    // write ran unasked without this override and was held for review with it.
-    var arguments: [String] = mode == .autoReview ? ["--sandbox", "--mode", "auto"] : []
-    arguments += [
-      "--settings",
-      AntigravitySettings.json([
-        "agentMode": mode == .autoReview ? "auto" : "",
-        "toolPermission": mode == .autoReview ? "proceed-in-sandbox" : "request-review",
-      ]),
-    ]
+    // write ran unasked without this override and was held for review with it. No mode chosen:
+    // the user's own `/config` applies, untouched.
+    var arguments: [String] =
+      request.approvalMode == .autoReview ? ["--sandbox", "--mode", "auto"] : []
+    if let mode = request.approvalMode {
+      arguments += [
+        "--settings",
+        AntigravitySettings.json([
+          "agentMode": mode == .autoReview ? "auto" : "",
+          "toolPermission": mode == .autoReview ? "proceed-in-sandbox" : "request-review",
+        ]),
+      ]
+    }
     if case .identifier(let identifier) = request.resume {
       guard let uuid = UUID(uuidString: identifier.trimmingCharacters(in: .whitespacesAndNewlines))
       else { throw AgentLaunchError.missingResumeIdentifier }

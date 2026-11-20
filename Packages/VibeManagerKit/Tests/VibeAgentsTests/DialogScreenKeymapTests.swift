@@ -325,6 +325,9 @@ struct AgentDialogScreenTests {
     // A last empty line is counted as Claude Code splits the words, or not: the screen hides it.
     #expect(asked(drawn, words + "\n"))
     #expect(asked("Line 1\nLine 2\nLine 3\n… (+4 more lines)", words + "\n"))
+    // A count past any message, drawn by a server's own words, is no count: not a crash.
+    #expect(!asked("Line 1\nLine 2\nLine 3\n… (+\(Int.max) more lines)", words))
+    #expect(!asked("Line 1…\n… (+\(Int.max) more lines)", "Line 1 cut\nLine 2"))
   }
 
   @Test("An agent's numbered list, or nothing numbered, is no dialog")

@@ -95,7 +95,13 @@ public final class AlertSoundLibraryModel {
     didSet {
       guard playsRhythm != oldValue else { return }
       preferences.playsRhythm = playsRhythm
-      guard playsRhythm, let rhythmPlayer else { return }
+      guard playsRhythm else {
+        // A rhythm of up to 30 seconds playing, or about to once read, stops with the switch.
+        feeling += 1
+        rhythmPlayer?.stop()
+        return
+      }
+      guard let rhythmPlayer else { return }
       rhythmPlayer.prepare()
       Task { _ = await rhythm(of: inUse) }
     }

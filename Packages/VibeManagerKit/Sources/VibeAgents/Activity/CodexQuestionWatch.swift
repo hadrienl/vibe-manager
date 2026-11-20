@@ -190,6 +190,11 @@ public struct CodexQuestionWatch: Sendable {
   func rollout() async -> URL? {
     let deadline = ContinuousClock.now.advanced(by: discoveryTimeout)
     let workingDirectory = Self.canonicalPath(workingDirectoryPath)
+    // A resumed conversation goes on in the rollout it was created with, days before maybe:
+    // looked for once by its name, before waiting for a new one.
+    if let sessionIdentifier, let resumed = existingRollout(of: sessionIdentifier) {
+      return resumed
+    }
     while !Task.isCancelled {
       let found = candidates()
       // `rollout-2026-11-11T09-16-32-<session>.jsonl`: the session's own, whoever shares its
@@ -210,6 +215,19 @@ public struct CodexQuestionWatch: Sendable {
       }
       guard ContinuousClock.now < deadline else { return nil }
       try? await Task.sleep(for: discoveryInterval, tolerance: discoveryInterval / 2)
+    }
+    return nil
+  }
+
+  /// The rollout named after the session, in any day's folder.
+  private func existingRollout(of sessionIdentifier: String) -> URL? {
+    let suffix = "-\(sessionIdentifier).jsonl"
+    guard
+      let files = FileManager.default.enumerator(
+        at: sessionsDirectory, includingPropertiesForKeys: nil, options: [.skipsHiddenFiles])
+    else { return nil }
+    for case let file as URL in files where file.lastPathComponent.hasSuffix(suffix) {
+      return file
     }
     return nil
   }

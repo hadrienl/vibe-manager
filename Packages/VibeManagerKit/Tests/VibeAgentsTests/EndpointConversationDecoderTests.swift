@@ -13,6 +13,19 @@ struct EndpointConversationDecoderTests {
     func consume(_ record: TranscriptRecord) {}
   }
 
+  private final class Working: ConversationDecoding {
+    let entries: [ConversationEntry] = []
+    let backgroundWork = [Date(timeIntervalSince1970: 42)]
+    func consume(_ record: TranscriptRecord) {}
+  }
+
+  @Test("The work the harness left running in the background is the session's (#393)")
+  func backgroundWork() {
+    let decoder = EndpointConversationDecoder(
+      inner: Working(), journal: URL(fileURLWithPath: "/nonexistent/steps.jsonl"))
+    #expect(decoder.backgroundWork == [Date(timeIntervalSince1970: 42)])
+  }
+
   private func text(_ id: String, at seconds: TimeInterval?) -> ConversationEntry {
     ConversationEntry(
       id: id, date: seconds.map { Date(timeIntervalSince1970: $0) }, content: .agentText(id))

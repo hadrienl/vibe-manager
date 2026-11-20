@@ -111,7 +111,9 @@ struct AntigravityTests {
     let defaultArgs = try AntigravityArgumentBuilder().arguments(
       for: AgentLaunchRequest(workingDirectoryPath: "/tmp"), promptDelivery: .none,
       descriptor: AntigravityAgentProvider.descriptor)
-    #expect(try settings(in: defaultArgs)["toolPermission"] as? String == "request-review")
+    // No mode chosen: the user's own `/config` is left as it is.
+    #expect(!defaultArgs.contains("--settings"))
+    #expect(!defaultArgs.contains("--sandbox"))
   }
 
   @MainActor
@@ -129,6 +131,9 @@ struct AntigravityTests {
         availability: availability, probe: StubProcessProbe(), environment: [:]),
       approvalPreferences: preferences)
     let request = AgentLaunchRequest(workingDirectoryPath: "/tmp", resume: .identifier(identifier))
+    let unset = try await provider.launchPlan(for: request)
+    #expect(!unset.arguments.contains("--settings"))
+    preferences.setMode(.manual, for: AntigravityAgentProvider.id)
     let manual = try await provider.launchPlan(for: request)
     #expect(try settings(in: manual.arguments)["agentMode"] as? String == "")
     preferences.setMode(.autoReview, for: AntigravityAgentProvider.id)

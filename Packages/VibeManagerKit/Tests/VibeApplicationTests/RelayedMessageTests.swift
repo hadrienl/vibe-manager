@@ -95,6 +95,17 @@ struct RelayedMessageTests {
         == nil)
   }
 
+  @Test("A coordinator's message ending with a path the reader joined is still the coordinator's")
+  func endingWithAPath() throws {
+    let text = CoordinationPolicy.fromCoordinator(
+      "Implement the plan in /tmp/PLAN.md", coordinatorName: "Plan")
+    let joined = MessageAttachment.file(
+      URL(fileURLWithPath: "/tmp/PLAN.md"), id: "c/file-0", isWrittenInText: true)
+    let message = try #require(RelayedMessage(text, attachments: [joined]))
+    #expect(message.sender == .coordinator("Plan"))
+    #expect(message.body.contains("PLAN"))
+  }
+
   @Test("A coordinator's message is not the source of a reply of the user's")
   func notRepliedTo() {
     let date = Date(timeIntervalSince1970: 1_000)

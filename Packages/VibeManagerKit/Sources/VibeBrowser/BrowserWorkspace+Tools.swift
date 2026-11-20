@@ -67,6 +67,11 @@ extension BrowserWorkspace: BrowserToolRunning {
     _ tool: BrowserToolCatalog.Tool, on tab: BrowserTabModel, arguments: JSONValue,
     browser: SessionBrowser
   ) async throws -> BrowserToolResult {
+    // A device's tab holds no page: its web view would be read blank, after asking the user.
+    if tab.deviceUDID != nil, tool.name.hasPrefix("page_") {
+      throw BrowserToolFailure(
+        "Tab \(tab.id) shows a device, not a page: page_ tools do not work on it.")
+    }
     switch tool.name {
     case "tab_navigate":
       let url = try Self.address(arguments["url"]?.stringValue)
@@ -435,6 +440,9 @@ extension BrowserWorkspace: BrowserToolRunning {
   func presented(_ tab: BrowserTabModel, in browser: SessionBrowser, given: URL? = nil)
     -> (url: String, title: String, isReadable: Bool)
   {
+    // A device's tab, which device_open names, holds nothing of the user's web: the agent finds
+    // it again by its address.
+    if tab.deviceUDID != nil { return (tab.url.absoluteString, tab.displayTitle, false) }
     let isReadable =
       mayRead(tab.committedURL ?? tab.url, in: browser) && mayRead(tab.url, in: browser)
     guard !isReadable else { return (tab.url.absoluteString, tab.displayTitle, true) }

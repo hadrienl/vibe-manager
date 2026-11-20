@@ -5,21 +5,40 @@ import VibeProcess
 
 /// Durable outbox: a failed interaction remains reportable through offline periods and restarts.
 /// The request fingerprint is also searched on GitHub before creation, covering a crash after POST.
+///
+/// An issue is public and opened under the user's own GitHub account: nothing is written or sent
+/// unless they turned the reports on (`isEnabled`). Retries back off and give up, and few issues
+/// are opened a day, so that a CLI whose dialogs changed cannot flood the repository.
 actor InteractionFailureReporter {
   private let directory: URL
   private let environment: [String: String]
   private let retryDelay: Duration
+  private let isEnabled: @Sendable () async -> Bool
   private var draining = false
   private var needsDrain = false
   private let run: @Sendable (BoundedProcessRequest) async throws -> BoundedProcessResult
+  private let now: @Sendable () -> Date
+
+  /// A report not sent after this many failed attempts, or this long after it was queued, is
+  /// given up: `gh` missing or signed out would otherwise be run for the life of the application.
+  static let maximumAttempts = 10
+  static let maximumAge: TimeInterval = 3 * 24 * 3600
+  /// The longest wait between two attempts, the delay doubling from `retryDelay`.
+  static let maximumRetryDelay: Duration = .seconds(3600)
+  /// The issues opened in a day at most; the others wait for the next day.
+  static let dailyIssueLimit = 3
 
   init(
     directory: URL, environment: [String: String], retryDelay: Duration = .seconds(60),
+    isEnabled: @escaping @Sendable () async -> Bool,
+    now: @escaping @Sendable () -> Date = { Date() },
     run: @escaping @Sendable (BoundedProcessRequest) async throws -> BoundedProcessResult = {
       try await BoundedProcess.run($0)
     }
   ) {
     self.retryDelay = retryDelay
+    self.isEnabled = isEnabled
+    self.now = now
     self.run = run
     self.directory = directory
     var environment = environment
@@ -31,7 +50,9 @@ actor InteractionFailureReporter {
     self.environment = environment
   }
 
-  func enqueue(_ failure: AnswerAgentRequest.Failure) {
+  func enqueue(_ failure: AnswerAgentRequest.Failure) async {
+    // Turned off, the failure is not even kept: the terminal fallback is all that happens.
+    guard await isEnabled() else { return }
     let fingerprint = SHA256.hash(data: Data(failure.requestID.utf8))
       .map { String(format: "%02x", $0) }.joined()
     let file = directory.appendingPathComponent(fingerprint + ".json")
@@ -40,7 +61,7 @@ actor InteractionFailureReporter {
       if !FileManager.default.fileExists(atPath: file.path) {
         let report = Report(
           title: "Interaction failed: \(failure.outcome.rawValue)",
-          body: Self.body(failure, fingerprint: fingerprint))
+          body: Self.body(failure, fingerprint: fingerprint), queuedAt: now())
         try JSONEncoder().encode(report).write(to: file, options: .atomic)
       }
       needsDrain = true
@@ -60,6 +81,11 @@ actor InteractionFailureReporter {
     let title: String
     var body: String
     var issueURL: String?
+    /// Absent from the reports of 1.2.0-rc: their file's date stands for it.
+    var queuedAt: Date?
+    var attempts: Int?
+    var issueCreatedAt: Date?
+    var abandoned: Bool?
   }
 
   private func gh(_ arguments: [String], input: String? = nil) async throws -> BoundedProcessResult
@@ -73,19 +99,34 @@ actor InteractionFailureReporter {
 
   private func drain() async {
     defer { draining = false }
+    var delay = retryDelay
     while !Task.isCancelled {
       needsDrain = false
+      guard await isEnabled() else { return }
       let files =
         (try? FileManager.default.contentsOfDirectory(
-          at: directory, includingPropertiesForKeys: nil)) ?? []
+          at: directory, includingPropertiesForKeys: [.creationDateKey])) ?? []
       var pending = false
       for file in files where file.pathExtension == "json" {
         guard var report = try? JSONDecoder().decode(Report.self, from: Data(contentsOf: file)),
-          report.issueURL == nil
+          report.issueURL == nil, report.abandoned != true
         else { continue }
+        // Turned off meanwhile: what waits stays where it is.
+        guard await isEnabled() else { return }
+        let queuedAt =
+          report.queuedAt ?? (try? file.resourceValues(forKeys: [.creationDateKey]).creationDate)
+          ?? now()
+        if now().timeIntervalSince(queuedAt) > Self.maximumAge {
+          report.abandoned = true
+          try? JSONEncoder().encode(report).write(to: file, options: .atomic)
+          continue
+        }
         do {
-          // Re-sanitize pending reports written by older app versions before any upload.
-          report.body = Self.redact(report.body)
+          // Re-sanitize pending reports written by older app versions before any upload, and
+          // fit them in what GitHub takes: one refused for its length would be sent again and
+          // again.
+          report.body = Self.fitted(Self.redact(report.body))
+          report.queuedAt = queuedAt
           try JSONEncoder().encode(report).write(to: file, options: .atomic)
           let fingerprint = file.deletingPathExtension().lastPathComponent
           let found = try await gh([
@@ -96,35 +137,59 @@ actor InteractionFailureReporter {
             let existing = try JSONSerialization.jsonObject(with: found.standardOutput)
               as? [[String: Any]]
           else {
-            pending = true
+            pending = failed(&report, file) || pending
             continue
           }
           if let url = existing.first?["url"] as? String {
             report.issueURL = url
           } else {
+            // Enough for today: the others wait for a later launch or failure.
+            guard createdToday(in: files) < Self.dailyIssueLimit else { return }
             let created = try await gh(
               [
                 "issue", "create", "--repo", "hadrienl/vibe-manager", "--title", report.title,
                 "--label", "bug", "--body-file", "-",
               ], input: report.body)
             guard created.exitCode == 0 else {
-              pending = true
+              pending = failed(&report, file) || pending
               continue
             }
             let url = String(decoding: created.standardOutput, as: UTF8.self).trimmingCharacters(
               in: .whitespacesAndNewlines)
             guard url.hasPrefix("https://github.com/hadrienl/vibe-manager/issues/") else {
-              pending = true
+              pending = failed(&report, file) || pending
               continue
             }
             report.issueURL = url
+            report.issueCreatedAt = now()
           }
           try JSONEncoder().encode(report).write(to: file, options: .atomic)
-        } catch { pending = true }
+        } catch { pending = failed(&report, file) || pending }
       }
       if needsDrain { continue }
       guard pending else { return }
-      do { try await Task.sleep(for: retryDelay) } catch { return }
+      do { try await Task.sleep(for: delay) } catch { return }
+      delay = min(delay * 2, Self.maximumRetryDelay)
+    }
+  }
+
+  /// Counts a failed attempt; whether the report is still to be tried.
+  private func failed(_ report: inout Report, _ file: URL) -> Bool {
+    let attempts = (report.attempts ?? 0) + 1
+    report.attempts = attempts
+    if attempts >= Self.maximumAttempts { report.abandoned = true }
+    try? JSONEncoder().encode(report).write(to: file, options: .atomic)
+    return report.abandoned != true
+  }
+
+  /// The issues this outbox opened in the last 24 hours.
+  private func createdToday(in files: [URL]) -> Int {
+    files.count { file in
+      guard
+        let report = try? JSONDecoder().decode(Report.self, from: Data(contentsOf: file)),
+        let created = report.issueCreatedAt
+      else { return false }
+      return now().timeIntervalSince(created) < 24 * 3600
     }
   }
 
@@ -134,7 +199,11 @@ actor InteractionFailureReporter {
     let patterns = [
       #"(?i)(\bbearer\s+)[^\s"'\\,}<>]+"#,
       #"(?i)((?:proxy-)?authorization["']?\s*:\s*["']?(?:basic|bearer)\s+)[^\s"'\\,}<>]+"#,
-      #"(?i)(\b(?:AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|SECURITY_TOKEN)|(?:[A-Z0-9]+_)*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|AUTH[_-]?TOKEN|PASSWORD|SECRET|CLIENT[_-]?SECRET))["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s"'\\,}<>]+)"#,
+      #"(?i)(\b(?:AWS_(?:ACCESS_KEY_ID|SECRET_ACCESS_KEY|SESSION_TOKEN|SECURITY_TOKEN)|(?:[A-Z0-9]+_)*(?:API[_-]?KEY|ACCESS[_-]?TOKEN|AUTH[_-]?TOKEN|TOKEN|PASSWORD|SECRET|CLIENT[_-]?SECRET))["']?\s*[:=]\s*)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s"'\\,}<>]+)"#,
+      // The password of an address: `postgres://user:password@host`.
+      #"(://[^/\s:@"'<>]+:)[^/\s@"'<>]+(?=@)"#,
+      // Whose home it is: `/Users/<name>`, in a working directory, a path, the prompt.
+      #"(/Users/)[^/\s"'\\<>:]+"#,
       #"(?i)(--(?:password|api-key|token|secret|client-secret)[\s=]+)(?:"[^"\r\n]*"|'[^'\r\n]*'|[^\s"'\\,}<>]+)"#,
     ]
     for pattern in patterns {
@@ -143,18 +212,44 @@ actor InteractionFailureReporter {
     }
     return scrubbed.replacingOccurrences(
       of:
-        #"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]+|(?:AKIA|ASIA)[A-Z0-9]{16})\b"#,
+        #"\b(?:gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+|sk-[A-Za-z0-9_-]+|(?:AKIA|ASIA)[A-Z0-9]{16}|glpat-[A-Za-z0-9_-]+|xox[abposr]-[A-Za-z0-9-]+|AIza[A-Za-z0-9_-]{30,}|eyJ[A-Za-z0-9_-]{8,}\.eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]+)\b|-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|\z)"#,
       with: "[REDACTED]", options: .regularExpression)
+  }
+
+  /// What GitHub takes in an issue's body is 65,536 characters; a block is cut well before, so
+  /// that the six of a report always fit.
+  static let blockLimit = 9_000
+  static let bodyLimit = 60_000
+
+  /// The start of `text`, at most `limit` UTF-16 units — what GitHub counts — whole characters.
+  nonisolated static func capped(_ text: String, _ limit: Int) -> String {
+    guard text.utf16.count > limit else { return text }
+    var count = 0
+    var end = text.startIndex
+    for index in text.indices {
+      let width = text[index].utf16.count
+      guard count + width <= limit else { break }
+      count += width
+      end = text.index(after: index)
+    }
+    return String(text[..<end])
+  }
+
+  /// A body GitHub takes, its last lines — the fingerprint looked for — kept.
+  nonisolated static func fitted(_ body: String) -> String {
+    guard body.utf16.count > bodyLimit else { return body }
+    return capped(body, bodyLimit - 400) + "\n…\n" + String(body.suffix(200))
   }
 
   nonisolated static func body(_ failure: AnswerAgentRequest.Failure, fingerprint: String) -> String
   {
     func block(_ text: String) -> String {
       let scrubbed = redact(text)
-      return "<pre>"
-        + scrubbed.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(
-          of: "<", with: "&lt;"
-        ).replacingOccurrences(of: ">", with: "&gt;") + "</pre>"
+      let escaped = scrubbed.replacingOccurrences(of: "&", with: "&amp;").replacingOccurrences(
+        of: "<", with: "&lt;"
+      ).replacingOccurrences(of: ">", with: "&gt;")
+      let shown = capped(escaped, blockLimit)
+      return "<pre>" + shown + (shown.count < escaped.count ? "\n… (cut)" : "") + "</pre>"
     }
     func keyGroups(_ groups: [[UInt8]]) -> String {
       groups.map { group in

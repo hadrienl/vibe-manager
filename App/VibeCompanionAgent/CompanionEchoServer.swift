@@ -37,6 +37,9 @@ actor CompanionEchoServer {
   private var remotes: [String: SendStream] = [:]
   private var remoteConnections: [String: Connection] = [:]
   private var remoteEndpoints: [String: String] = [:]
+  /// Each phone's mirror (#520), by peer, with its endpoint: closed with the remote channel when
+  /// the phone is removed, or its screens would go on being shown, and touched, there.
+  private var mirrorConnections: [String: (connection: Connection, endpointID: String)] = [:]
   private var nextPeer = 0
   private var relayLoop: Task<Void, Never>?
   private var acceptLoop: Task<Void, Never>?
@@ -124,11 +127,16 @@ actor CompanionEchoServer {
     }
     if connection.alpn() == CompanionIroh.mirrorALPN {
       // The same admission as the direct channel's.
-      guard await authorize(connection.remoteId().description) else {
+      let endpointID = connection.remoteId().description
+      guard await authorize(endpointID) else {
         try? connection.close(errorCode: 2, reason: Data("not paired".utf8))
         return
       }
+      nextPeer += 1
+      let peer = "mirror-\(nextPeer)"
+      mirrorConnections[peer] = (connection, endpointID)
       await CompanionMirrorServer.serve(connection)
+      mirrorConnections[peer] = nil
       return
     }
     guard connection.alpn() == CompanionIroh.alpn else {
@@ -253,6 +261,9 @@ actor CompanionEchoServer {
   func drop(endpoint endpointID: String) {
     for (peer, endpoint) in remoteEndpoints where endpoint == endpointID {
       try? remoteConnections[peer]?.close(errorCode: 2, reason: Data("removed".utf8))
+    }
+    for mirror in mirrorConnections.values where mirror.endpointID == endpointID {
+      try? mirror.connection.close(errorCode: 2, reason: Data("removed".utf8))
     }
   }
 

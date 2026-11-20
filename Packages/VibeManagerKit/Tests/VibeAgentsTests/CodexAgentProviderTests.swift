@@ -42,9 +42,15 @@ struct CodexAgentProviderTests {
   @MainActor
   @Test("A saved mode is read at every launch and an endpoint can override it")
   func approvalPreference() async throws {
-    let preferences = InMemoryAgentApprovalPreferences(mode: .autoReview)
+    let preferences = InMemoryAgentApprovalPreferences()
     let agent = provider(probe: StubProcessProbe(), preferences: preferences)
     let request = AgentLaunchRequest(workingDirectoryPath: "/tmp")
+    // Never chosen: `config.toml`'s `approval_policy` and `approvals_reviewer` apply, untouched.
+    let unset = try await agent.launchPlan(for: request)
+    #expect(!unset.arguments.contains("--approve-for-me"))
+    #expect(!unset.arguments.contains("-a"))
+    #expect(!unset.arguments.contains { $0.contains("approvals_reviewer") })
+    preferences.setMode(.autoReview, for: CodexAgentProvider.id)
     let auto = try await agent.launchPlan(for: request)
     #expect(auto.arguments.contains("--approve-for-me"))
     preferences.setMode(.manual, for: CodexAgentProvider.id)

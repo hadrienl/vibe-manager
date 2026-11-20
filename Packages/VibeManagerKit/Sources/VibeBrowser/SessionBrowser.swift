@@ -111,7 +111,12 @@ public final class SessionBrowser {
     } else {
       tabs.append(tab)
     }
-    if activate { activeTabID = tab.id } else { unseenTabIDs.insert(tab.id) }
+    if activate {
+      activeTabID = tab.id
+    } else if activeTab?.id != tab.id {
+      // The first of a web view with no tab in front is shown all the same.
+      unseenTabIDs.insert(tab.id)
+    }
     stateDidChange?()
   }
 
@@ -124,6 +129,8 @@ public final class SessionBrowser {
       // The neighbour on the right, as browsers do, else the one on the left, else the ticket.
       activeTabID = tabs.indices.contains(index) ? tabs[index].id : tabs.last?.id
     }
+    // The tab brought forward is seen.
+    if let shown = activeTab?.id { unseenTabIDs.remove(shown) }
     stateDidChange?()
   }
 
