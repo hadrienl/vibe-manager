@@ -20,7 +20,6 @@ public final class TicketTitlesModel {
     case alreadyInNotes
     case notFound(status: Int)
     case failed(TicketPageFailure)
-    case notesFull
     case notesUnreadable
     /// The tab went before its page was read.
     case interrupted
@@ -243,7 +242,6 @@ public final class TicketTitlesModel {
       {
       case .inserted: state = .inserted
       case .alreadyThere: state = .alreadyInNotes
-      case .notesFull: state = .notesFull
       case .unreadable: state = .notesUnreadable
       }
     case .signInRequired(let host): state = .signInRequired(host: host)

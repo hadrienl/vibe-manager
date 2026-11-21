@@ -173,10 +173,7 @@ struct SessionNotesEditor: NSViewRepresentable {
         isNormalizing = false
         return false
       }
-      guard document.shouldChange(in: affectedCharRange, replacement: replacement) else {
-        NSSound.beep()
-        return false
-      }
+      guard document.isEditable else { return false }
       lastEdit = NSRange(location: affectedCharRange.location, length: replacement.utf16.count)
       return true
     }
@@ -250,8 +247,8 @@ struct SessionNotesEditor: NSViewRepresentable {
   }
 }
 
-/// The notes section's content: the editor, and what it has to say about the size. Its title and
-/// its state are in the section's header (#66).
+/// The notes' editor, under the ticket titles being read for it. Its title and its state are in
+/// the header of the popover or of the panel that shows it (#578).
 struct SessionNotesSection: View {
   let session: WorkSession
   let document: NotesDocument
@@ -299,29 +296,8 @@ struct SessionNotesSection: View {
       .background(.background.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
       .padding(.horizontal, 8)
       .padding(.top, 6)
-
-      if let footer = NotesFooter.text(refusal: document.refusal, byteCount: document.byteCount) {
-        Text(footer)
-          .font(.caption)
-          .foregroundStyle(document.refusal == nil ? Color.secondary : Color.orange)
-          .padding(.horizontal, 12)
-          .fixedSize(horizontal: false, vertical: true)
-      }
     }
     .padding(.bottom, 6)
-  }
-}
-
-enum NotesFooter {
-  /// A refused change first — it is what just happened — then how close the notes are to the limit.
-  static func text(refusal: String?, byteCount: Int) -> String? {
-    if let refusal { return refusal }
-    guard byteCount >= SessionNotesLimits.warningByteCount else { return nil }
-    return String(
-      localized: "notes.footer.size",
-      defaultValue:
-        "\(SessionNotesError.size(byteCount)) of \(SessionNotesError.size(SessionNotesLimits.byteLimit))",
-      bundle: .module, comment: "How much the notes weigh, of their limit: “58 KB of 64 KB”.")
   }
 }
 
@@ -469,8 +445,6 @@ struct NotesStatePresentation: Equatable {
     switch error {
     case .cannotWrite(let reason), .unreadable(let reason):
       return reason
-    case .tooLarge:
-      return error.localizedDescription
     }
   }
 

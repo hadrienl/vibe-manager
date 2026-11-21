@@ -44,12 +44,8 @@ public actor FileSessionNotesStore: SessionNotesStore {
 
   @discardableResult
   public func save(_ text: String, for id: SessionID) throws -> SessionNotes {
-    let current = try read(id)
-    let currentCount = current?.text.utf8.count ?? 0
-    guard SessionNotesLimits.accepts(text, replacing: currentCount) else {
-      throw SessionNotesError.tooLarge(
-        byteCount: text.utf8.count, limit: SessionNotesLimits.byteLimit)
-    }
+    // Read first: a file that cannot be read is never written over.
+    _ = try read(id)
     return try write(text, for: id)
   }
 

@@ -95,7 +95,7 @@ private actor GatedNotesStore: SessionNotesStore {
 @MainActor
 private func type(_ text: String, into document: NotesDocument) {
   let end = NSRange(location: document.storage.length, length: 0)
-  guard document.shouldChange(in: end, replacement: text) else { return }
+  guard document.isEditable else { return }
   document.storage.replaceCharacters(in: end, with: text)
   document.didChange()
 }
@@ -228,19 +228,21 @@ struct NotesSavingTests {
     #expect(isSaved(document))
   }
 
-  @Test("A change that would go over the limit is refused whole, and said")
-  func limitIsRefusedWhole() async throws {
-    let (_, document, _) = await make()
+  @Test("Notes have no size limit: a paste of more than 64 KB is written, and read back (#578)")
+  func noLimit() async throws {
+    let store = InMemorySessionNotesStore()
+    let (_, document, _) = await make(store)
     type("Short.", into: document)
 
-    let paste = String(repeating: "x", count: SessionNotesLimits.byteLimit)
-    #expect(!document.shouldChange(in: NSRange(location: 6, length: 0), replacement: paste))
-    #expect(document.refusal?.contains("limited to") == true)
-    #expect(document.text == "Short.")
+    let paste = String(repeating: "x", count: 200 * 1024)
+    type(paste, into: document)
+    #expect(await document.save())
 
-    // Replacing the text with something within the limit is fine again, and clears the message.
-    #expect(document.shouldChange(in: NSRange(location: 0, length: 6), replacement: "Ok"))
-    #expect(document.refusal == nil)
+    #expect(document.text == "Short." + paste)
+    #expect(try await store.notes(for: id).text == "Short." + paste)
+    let reread = NotesModel(store: store, sleep: ManualSleeper().sleep).document(for: id)
+    await waitUntil("the notes are read again") { reread.isLoaded }
+    #expect(reread.text == "Short." + paste)
   }
 
   @Test("Notes that cannot be read are shown as such, and cannot be edited")
@@ -254,7 +256,7 @@ struct NotesSavingTests {
 
     #expect(document.state == .unreadable(reason: "test"))
     #expect(!document.isLoaded)
-    #expect(!document.shouldChange(in: NSRange(location: 0, length: 0), replacement: "x"))
+    #expect(!document.isEditable)
   }
 
   @Test("Quitting waits for the notes only so long, and reports those still in flight")
@@ -489,13 +491,6 @@ struct NotesStatePresentationTests {
     #expect(
       NotesStatePresentation.announcement(from: failed, to: .saved(at: Date())) == "Notes saved")
     #expect(NotesStatePresentation.announcement(from: .saving, to: .saved(at: Date())) == nil)
-  }
-
-  @Test("The footer warns near the limit, and says a refused change first")
-  func footer() {
-    #expect(NotesFooter.text(refusal: nil, byteCount: 1_000) == nil)
-    #expect(NotesFooter.text(refusal: nil, byteCount: 58 * 1024)?.contains("of") == true)
-    #expect(NotesFooter.text(refusal: "Refused.", byteCount: 58 * 1024) == "Refused.")
   }
 }
 

@@ -61,35 +61,17 @@ struct FileSessionNotesStoreTests {
     #expect(try permissions(of: store.fileURL(for: id)) == 0o600)
   }
 
-  @Test("Notes are held to 64 KB: the limit is accepted, one byte more is refused")
-  func limit() async throws {
+  @Test("Notes have no size limit: more than 64 KB is written, grown and read back (#578)")
+  func noLimit() async throws {
     let store = FileSessionNotesStore(directory: makeDirectory())
     let id = SessionID()
-    let atLimit = String(repeating: "a", count: SessionNotesLimits.byteLimit)
+    let large = String(repeating: "a", count: 200 * 1024)
 
-    try await store.save(atLimit, for: id)
-    await #expect(
-      throws: SessionNotesError.tooLarge(
-        byteCount: SessionNotesLimits.byteLimit + 1, limit: SessionNotesLimits.byteLimit)
-    ) {
-      try await store.save(atLimit + "b", for: id)
-    }
-    #expect(try await store.notes(for: id).text == atLimit)
-  }
+    try await store.save(large, for: id)
+    try await store.save(large + "b", for: id)
 
-  @Test("A file already over the limit stays editable down to size, never up")
-  func oversizedFileOnlyShrinks() async throws {
-    let directory = makeDirectory()
-    let store = FileSessionNotesStore(directory: directory)
-    let id = SessionID()
-    let large = String(repeating: "x", count: 100_000)
-    try await store.importNotes(large, for: id)
-
-    try await store.save(String(large.dropLast(10)), for: id)
-    await #expect(throws: SessionNotesError.self) {
-      try await store.save(large + "more", for: id)
-    }
-    #expect(try await store.notes(for: id).text.utf8.count == 99_990)
+    #expect(try await store.notes(for: id).text == large + "b")
+    #expect(await store.allNotes()[id] == large + "b")
   }
 
   @Test("A file that is not UTF-8 is unreadable, and is never written over nor removed")

@@ -109,17 +109,17 @@ struct TicketTitlesTests {
     #expect(document.text == "two\n\nMoi : one\n")
   }
 
-  @Test("An address already in the notes, or a line that would not fit, is not added")
+  @Test("An address already in the notes is not added; large notes take a line all the same")
   func refusals() async {
     let reader = ScriptedReader()
     let (_, notes) = await make(notes: "déjà https://x/1", reader: reader)
     let document = notes.document(for: id)
     #expect(document.insertTicketLine("one", address: "https://x/1", rank: 0) == .alreadyThere)
-    let full = String(repeating: "x", count: SessionNotesLimits.byteLimit - 2)
-    document.storage.setAttributedString(NSAttributedString(string: full))
+    let large = String(repeating: "x", count: 100 * 1024)
+    document.storage.setAttributedString(NSAttributedString(string: large))
     document.didChange()
-    #expect(document.insertTicketLine("two", address: "u2", rank: 1) == .notesFull)
-    #expect(document.text == full)
+    #expect(document.insertTicketLine("two", address: "u2", rank: 1) == .inserted)
+    #expect(document.text == "two\n\n" + large)
   }
 
   @Test("An address is only in the notes as a whole address")
