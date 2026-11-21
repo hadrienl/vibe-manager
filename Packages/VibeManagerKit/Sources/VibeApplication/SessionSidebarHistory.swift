@@ -34,7 +34,7 @@ public struct SessionStatusUndo: Hashable, Sendable {
   }
 }
 
-/// What ⌘Z undoes where the sidebar or the inspector holds the keyboard, last first: a rename, a
+/// What ⌘Z undoes where the sidebar holds the keyboard, last first: a rename, a
 /// change of icon (#183), an archive (#242), a status changed from the keyboard (#240).
 public struct SessionSidebarHistory: Hashable, Sendable {
   public enum Entry: Hashable, Sendable {

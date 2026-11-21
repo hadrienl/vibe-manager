@@ -134,11 +134,6 @@ extension AppModel {
     coordination.traces[id] ?? []
   }
 
-  /// Reads the trace of a child shown in the inspector.
-  public func loadCoordinationTrace(of id: SessionID) async {
-    await coordination.loadTrace(of: id)
-  }
-
   /// A coordinator that called the user has been answered: its session came in front of them, or
   /// they wrote to it — from its terminal, its composer or the phone (#417).
   func coordinationCallAnswered(_ id: SessionID?) {

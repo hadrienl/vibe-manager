@@ -3,7 +3,7 @@ import VibeDomain
 
 /// The sessions the sidebar has selected, and the one of them on screen (#77).
 ///
-/// The main area and the inspector always show one session: `displayed`, the last one clicked.
+/// The main area always shows one session: `displayed`, the last one clicked.
 /// The others only say what the next command applies to. A selection of one is the ordinary case,
 /// and every way of going to a session — a plain click, ⌘1…9, the palette, a notification — comes
 /// back to it.

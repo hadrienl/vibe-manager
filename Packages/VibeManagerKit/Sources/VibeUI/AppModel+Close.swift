@@ -13,7 +13,7 @@ public enum InnerCloseTarget: Equatable, Sendable {
 
 extension AppModel {
   /// What ⌘W would close, from where the keyboard is; `nil` when it is in none of the session's
-  /// inner elements — the agent's terminal, the conversation, the sidebar, the inspector: ⌘W is
+  /// inner elements — the agent's terminal, the conversation, the sidebar: ⌘W is
   /// then unavailable, and the session is left alone.
   public var innerCloseTarget: InnerCloseTarget? {
     if closesDrawerTerminal { return .drawerTerminal }

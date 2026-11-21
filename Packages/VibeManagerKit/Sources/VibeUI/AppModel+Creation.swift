@@ -119,6 +119,8 @@ extension AppModel {
   /// Brings the draft on screen, the keyboard in its composer.
   public func showNewSessionDraft() {
     guard newSessionModel != nil else { return }
+    // The popover would only be hidden under the draft, and come back by itself after it (#578).
+    notesPopoverDismissed()
     isPresentingNewSession = true
     newSessionFocusRequest += 1
     onboarding.send(.draftOpened)

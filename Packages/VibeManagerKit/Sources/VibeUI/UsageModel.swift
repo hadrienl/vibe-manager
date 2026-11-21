@@ -21,9 +21,9 @@ public final class UsageModel {
     didSet { if grouping != oldValue { scheduleRecompute() } }
   }
   public private(set) var report = UsageReport()
-  /// The whole usage of each session shown in the inspector.
+  /// The whole usage of each session, for its status bar.
   public private(set) var sessionUsage: [SessionID: SessionUsage] = [:]
-  /// The context of the current conversation of each session shown in the inspector (#407).
+  /// The context of the current conversation of each session, for its status bar (#407).
   public private(set) var contextWindows: [SessionID: ContextWindowUsage] = [:]
   public private(set) var isReading = false
   public private(set) var isTrackingEnabled = true

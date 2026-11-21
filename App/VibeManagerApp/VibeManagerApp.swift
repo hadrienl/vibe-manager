@@ -670,7 +670,7 @@ private struct SessionHistoryCommands: Commands {
       model.hasMultipleSelection || !(model.selectedSession.map(model.canSwitchAgent) ?? false))
 
     // What the session is shown as (#183): on its row when the sidebar shows it, in the
-    // inspector's header otherwise. The agent never hears of it.
+    // bar above the session otherwise. The agent never hears of it.
     Button("Rename…") {
       guard let id = model.selectedSessionID else { return }
       model.beginRename(id)
@@ -872,6 +872,8 @@ private struct InnerCloseButton: View {
     Button(title) {
       switch focus.front {
       case .workspace: model.closeInnerElement()
+      // The notes' popover is no window to close: ⌘W puts it away, as Escape does (#578).
+      case .other where model.notesPresentation.isPopoverShown: model.notesPopoverDismissed()
       case .other: focus.closeKeyWindow()
       case .sheet, .none: break
       }

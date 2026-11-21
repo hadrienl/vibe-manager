@@ -35,6 +35,10 @@ public final class NotesPanelController: NSObject, NSWindowDelegate {
 
   private let model: AppModel
   private(set) var panel: NotesPanel?
+  /// What `update` last acted on: the panel is shown or hidden when the presentation says so,
+  /// never again because only its title changed — hidden while another application is in front,
+  /// it would come back over that application.
+  private var isShown = false
 
   public init(model: AppModel) {
     self.model = model
@@ -57,10 +61,10 @@ public final class NotesPanelController: NSObject, NSWindowDelegate {
   }
 
   private func update() {
-    if model.notesPresentation.isPanelShown {
-      show()
-    } else {
-      hide()
+    let shouldShow = model.notesPresentation.isPanelShown
+    if shouldShow != isShown {
+      isShown = shouldShow
+      if shouldShow { show() } else { hide() }
     }
     panel?.title = title
   }

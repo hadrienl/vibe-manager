@@ -4,7 +4,7 @@ import VibeApplication
 import VibeDomain
 
 /// A session's name, turned into a field to rename it in place (#183): on its row in the sidebar,
-/// and in the inspector's header.
+/// and in the bar above the session.
 ///
 /// Return keeps the name, Escape keeps the old one, and so does leaving the field — it keeps the
 /// new one when it can be kept. A name that cannot be is refused where it was typed, with the

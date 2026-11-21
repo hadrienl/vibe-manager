@@ -93,7 +93,7 @@ public final class AppModel {
   /// The session between Create and its terminal, shown in its place meanwhile.
   public internal(set) var sessionInCreation: SessionInCreation?
   /// What each session's agent can do right now, refreshed with the detections. Held here so
-  /// that the sidebar and the inspector read the same answer instead of each probing again.
+  /// that the sidebar and the session read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
   /// What each session's agent is doing, as the tracker last said (#45), one cell per session
   /// (#254): a view reading one session's activity is not woken by another's.
@@ -813,7 +813,7 @@ public final class AppModel {
     // time: without a clock to move, its far side could only be tested by waiting eight seconds.
     clock: any SessionClock = SystemSessionClock(),
     /// Reads what the agent did to the branches. Absent in a workspace assembled without Git,
-    /// where the inspector shows no report at all.
+    /// where no report is read at all.
     branchReader: ReadSessionBranchReport? = nil,
     /// Keeps the repositories of the session on screen read, when the disk says they moved.
     /// Absent in a workspace assembled without Git: the report is then read on demand only.
@@ -860,7 +860,7 @@ public final class AppModel {
     conversations: ConversationWorkspace = ConversationWorkspace(),
     /// Writes the archive of an export.
     archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() },
-    /// Keeps each session's journal. Absent, the inspector shows Git alone.
+    /// Keeps each session's journal. Absent, there are no resources to read.
     journal: SessionJournalModel? = nil,
     /// Where the names given to groups are kept. A workspace assembled without one keeps them for
     /// the run.

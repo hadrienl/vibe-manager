@@ -99,7 +99,7 @@ extension AppModel {
 
   // MARK: - Badge
 
-  /// Opens the badge's popover on the session's row, or on the inspector's header.
+  /// Opens the badge's popover on the session's row, or on the bar above the session.
   public func beginAppearanceEditing(
     _ id: SessionID, in place: SessionIdentityEditing.Place? = nil
   ) {
@@ -166,7 +166,7 @@ extension AppModel {
 
   // MARK: - Conversation theme (#274)
 
-  /// Opens the Change Theme popover on the session's row, or on the inspector's header.
+  /// Opens the Change Theme popover on the session's row, or on the bar above the session.
   public func beginThemeEditing(_ id: SessionID, in place: SessionIdentityEditing.Place? = nil) {
     guard canEditIdentity(of: id), let session = sessions.first(where: { $0.id == id }) else {
       return
@@ -228,7 +228,7 @@ extension AppModel {
   public var canUndoSidebarChange: Bool { sidebarHistory.canUndo }
   public var canRedoSidebarChange: Bool { sidebarHistory.canRedo }
 
-  /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard:
+  /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar, or the bar above the session, holds the keyboard:
   /// the last rename, change of icon (#183), archive (#242) or status changed from the keyboard
   /// (#240). `nil` with nothing to undo, or with the keyboard elsewhere (`keyboardHere` false):
   /// ⌘Z then goes on to the window, whose own undo — the draft of a new session given back, for
@@ -261,7 +261,7 @@ extension AppModel {
     responder is NSText
   }
 
-  /// ⌘Z in the sidebar or the inspector: the last rename, badge change, archive or status change,
+  /// ⌘Z in the sidebar, or the bar above the session: the last rename, badge change, archive or status change,
   /// unless the session has changed since — then nothing is undone, and the Mac beeps.
   public func undoSidebarChange() async {
     sidebarHistory.keep(only: Set(sessions.map(\.id)))
