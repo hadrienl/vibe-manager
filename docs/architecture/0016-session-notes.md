@@ -1,6 +1,6 @@
 # 0016 — Notes kept on a session
 
-- Status: accepted
+- Status: accepted; the notes moved to the toolbar, and their size limit removed, by [0048](0048-no-right-column.md)
 - Date: 2026-09-24
 - Issue: [#16](https://github.com/hadrienl/vibe-manager/issues/16)
 

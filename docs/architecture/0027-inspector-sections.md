@@ -1,6 +1,6 @@
 # 0027 — The context column in sections
 
-- Status: accepted
+- Status: superseded by [0048](0048-no-right-column.md) — there is no right column any more
 - Date: 2026-09-26
 - Issue: [#66](https://github.com/hadrienl/vibe-manager/issues/66)
 - Mockup: [`0027-inspector-sections/mockup.html`](0027-inspector-sections/mockup.html), validated on
