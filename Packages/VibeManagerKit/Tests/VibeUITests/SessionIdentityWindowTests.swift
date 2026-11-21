@@ -122,6 +122,21 @@ struct SessionIdentityWindowTests {
     #expect(workspace.model.sessions.first?.name == "Alpha")
   }
 
+  @Test("With the sidebar hidden, the name is edited in a bar above the session, gone after (#578)")
+  func fieldAboveTheSession() async throws {
+    let workspace = try await workspace()
+    defer { workspace.close() }
+    await waitUntil("the list") { workspace.list != nil }
+    workspace.model.layout.setSidebarVisible(false)
+
+    workspace.model.beginRename(workspace.session.id)
+    #expect(workspace.model.renaming?.place == .detail)
+    await waitUntil("the name field") { !workspace.nameFields.isEmpty }
+
+    workspace.model.cancelRename()
+    await waitUntil("the field goes") { workspace.nameFields.isEmpty }
+  }
+
   @Test("The field takes the keyboard by itself, and leaving it keeps the name typed")
   func fieldTakesTheKeyboard() async throws {
     let workspace = try await workspace()

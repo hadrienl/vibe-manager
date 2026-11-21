@@ -3735,18 +3735,6 @@ extension AppModel {
     isArchiveListPresented = true
   }
 
-  /// Focus Inspector, ⌥⌘3: the inspector is shown if it was hidden, and its list takes the
-  /// keyboard.
-  public func focusInspector() {
-    guard selectedSessionID != nil else { return }
-    if !layout.columns.isInspectorVisible {
-      layout.setInspectorVisible(true)
-    }
-    // Git's list, unfolded: the Activity section is gone (#572).
-    layout.setSectionCollapsed(.git, false)
-    gitInspector.requestFocus()
-  }
-
   /// Read Last Output, ⌃⌥⌘O: VoiceOver says the agent's last message when the session is shown as
   /// a conversation (#227), the last lines its terminal showed otherwise. On demand only — never
   /// as output arrives.

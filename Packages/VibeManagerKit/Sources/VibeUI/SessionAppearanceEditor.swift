@@ -3,12 +3,12 @@ import Observation
 import VibeApplication
 import VibeDomain
 
-/// Where a session's name or badge is being edited (#183): its row in the sidebar, or the header
-/// of the inspector.
+/// Where a session's name or badge is being edited (#183): its row in the sidebar, or, when the
+/// sidebar does not show the row, a bar above the session for as long as it is edited (#578).
 public struct SessionIdentityEditing: Hashable, Sendable {
   public enum Place: Hashable, Sendable {
     case sidebar
-    case inspector
+    case detail
   }
 
   public let sessionID: SessionID

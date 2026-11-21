@@ -887,17 +887,17 @@ private struct ArchivedSessionsList: View {
               if ids.count > 1, !plan.isEmpty {
                 Button(model.batchTitle(for: plan)) { Task { await model.requestBatch(plan) } }
               } else if let id = ids.first {
-                // Shown in the main area, and edited in the inspector's header (#183).
+                // Shown in the main area, and edited in a bar above it (#183, #578).
                 Button(
                   LocalizedStringResource("Rename", bundle: .module, comment: "Renames a session.")
                 ) {
-                  editArchived(id) { model.beginRename(id, in: .inspector) }
+                  editArchived(id) { model.beginRename(id, in: .detail) }
                 }
                 Button(LocalizedStringResource("Change Icon…", bundle: .module)) {
-                  editArchived(id) { model.beginAppearanceEditing(id, in: .inspector) }
+                  editArchived(id) { model.beginAppearanceEditing(id, in: .detail) }
                 }
                 Button(LocalizedStringResource("Change Conversation Theme…", bundle: .module)) {
-                  editArchived(id) { model.beginThemeEditing(id, in: .inspector) }
+                  editArchived(id) { model.beginThemeEditing(id, in: .detail) }
                 }
                 Divider()
                 Button(LocalizedStringResource("Unarchive", bundle: .module)) {

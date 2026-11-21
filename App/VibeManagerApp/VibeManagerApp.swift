@@ -172,21 +172,6 @@ struct VibeManagerApp: App {
 
       CommandGroup(after: .sidebar) {
         Button(
-          environment.appModel.layout.columns.isInspectorVisible
-            ? String(localized: "Hide Context", comment: "Hides the inspector of the window.")
-            : String(localized: "Show Context", comment: "Shows the inspector of the window.")
-        ) {
-          environment.appModel.layout.toggleInspector()
-        }
-        .keyboardShortcut("i", modifiers: [.command, .option])
-
-        // The sections of the context column back in their first order, sizes and folds (#66).
-        Button("Reset Column Layout") {
-          environment.appModel.layout.resetInspectorSections()
-        }
-        .disabled(environment.appModel.layout.isInspectorArrangementDefault)
-
-        Button(
           environment.appModel.isWebViewOpen
             ? String(localized: "Hide Web View", comment: "Hides the session's web view.")
             : String(localized: "Show Web View", comment: "Shows the session's web view.")
@@ -197,7 +182,8 @@ struct VibeManagerApp: App {
         .disabled(!environment.appModel.isWebViewAvailable)
 
         // Without it the terminal keeps the keyboard, and the notes can only be reached with the
-        // pointer. Escape in the notes hands the keyboard back.
+        // pointer. The editor opens where the user keeps it, under the toolbar's button or in its
+        // floating window (#578); Escape in the notes, or Edit Notes again, hands the keyboard back.
         Button("Edit Notes") {
           environment.appModel.focusNotes()
         }
@@ -341,12 +327,6 @@ struct VibeManagerApp: App {
           environment.appModel.focusSession()
         }
         .keyboardShortcut("2", modifiers: [.command, .option])
-        .disabled(!environment.appModel.isSessionOnScreen)
-
-        Button("Focus Context") {
-          environment.appModel.focusInspector()
-        }
-        .keyboardShortcut("3", modifiers: [.command, .option])
         .disabled(!environment.appModel.isSessionOnScreen)
 
         Button("Focus Web View") {

@@ -219,30 +219,21 @@ struct BrowserLayoutPolicyTests {
 
   @Test("Without the web view, nothing changes")
   func unchanged() {
-    #expect(
-      columns(1_100, browser: false)
-        == WorkspaceColumns(isSidebarVisible: true, isInspectorVisible: true))
-    #expect(columns(900, browser: false).isInspectorVisible == false)
+    #expect(columns(1_100, browser: false) == WorkspaceColumns(isSidebarVisible: true))
+    #expect(columns(800, browser: false) == WorkspaceColumns(isSidebarVisible: false))
   }
 
-  @Test("The inspector folds first, then the sidebar, then the two take turns")
+  @Test("The sidebar folds first, then the two take turns")
   func order() {
     #expect(
-      columns(1_700, browser: true)
-        == WorkspaceColumns(
-          isSidebarVisible: true, isInspectorVisible: true, browser: .beside))
-    #expect(
       columns(1_400, browser: true)
-        == WorkspaceColumns(
-          isSidebarVisible: true, isInspectorVisible: false, browser: .beside))
+        == WorkspaceColumns(isSidebarVisible: true, browser: .beside))
     #expect(
       columns(1_000, browser: true)
-        == WorkspaceColumns(
-          isSidebarVisible: false, isInspectorVisible: false, browser: .beside))
+        == WorkspaceColumns(isSidebarVisible: false, browser: .beside))
     #expect(
       columns(850, browser: true)
-        == WorkspaceColumns(
-          isSidebarVisible: false, isInspectorVisible: false, browser: .alternating))
+        == WorkspaceColumns(isSidebarVisible: false, browser: .alternating))
   }
 
   @Test("An unmeasured window shows the web view beside the terminal")

@@ -393,7 +393,6 @@ struct WorkspaceLayoutGroupingTests {
     #expect(decoded.sidebarMode == .flat)
     #expect(decoded.collapsedFolders.isEmpty)
     #expect(decoded.sidebarWidth == 300)
-    #expect(!decoded.isInspectorVisible)
   }
 
   @Test("A mode written by a later build costs the grouping, not the rest of the layout")

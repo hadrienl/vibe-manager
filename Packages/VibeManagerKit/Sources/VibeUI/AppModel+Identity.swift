@@ -23,20 +23,27 @@ extension AppModel {
   }
 
   /// Where a rename or a badge asked for from the menu bar is edited: on the session's row when
-  /// the sidebar shows it, in the inspector's header otherwise — a folded group is not unfolded
-  /// for it.
+  /// the sidebar shows it, above the session otherwise — a folded group is not unfolded, nor the
+  /// sidebar shown, for it.
   func editingPlace(for id: SessionID) -> SessionIdentityEditing.Place {
     guard layout.columns.isSidebarVisible,
       displayedSessions.contains(where: { $0.id == id })
-    else { return .inspector }
+    else { return .detail }
     return .sidebar
   }
 
-  /// The inspector's header shows the session on screen: it is brought there, and shown.
+  /// The bar above the session is drawn over the session on screen: it is brought there.
   private func prepare(_ place: SessionIdentityEditing.Place, for id: SessionID) {
-    guard place == .inspector else { return }
-    if selectedSessionID != id { select(id) }
-    if !layout.columns.isInspectorVisible { layout.setInspectorVisible(true) }
+    guard place == .detail, selectedSessionID != id else { return }
+    select(id)
+  }
+
+  /// Whether the session's name, badge or theme is being edited above it, rather than in its row:
+  /// the bar that holds the field and the popovers is shown for as long as it is.
+  public func isEditingIdentityInDetail(of id: SessionID) -> Bool {
+    let place = SessionIdentityEditing(sessionID: id, place: .detail)
+    return renaming == place || appearanceEditor?.editing == place
+      || themeEditing?.editing == place
   }
 
   // MARK: - Rename

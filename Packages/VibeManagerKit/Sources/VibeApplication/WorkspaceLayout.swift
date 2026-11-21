@@ -8,17 +8,14 @@ import VibeDomain
 /// sessions would make every change of interface a change of the persisted session schema.
 public struct WorkspaceLayout: Equatable, Sendable, Codable {
   public static let sidebarWidthRange: ClosedRange<Double> = 220...360
-  public static let inspectorWidthRange: ClosedRange<Double> = 260...420
   /// The session's web view (#69), beside the terminal.
   public static let browserWidthRange: ClosedRange<Double> = 380...1_200
 
   public var selectedSessionID: SessionID?
-  /// What the user asked for, not what is currently on screen. A column folded because the
+  /// What the user asked for, not what is currently on screen. A sidebar folded because the
   /// window got narrow must come back when the window is widened again.
   public var isSidebarVisible: Bool
-  public var isInspectorVisible: Bool
   public var sidebarWidth: Double
-  public var inspectorWidth: Double
   /// Which part of the history the sidebar is showing, and in what order. It belongs here for
   /// the same reason as the columns: it is how the user arranged their view, not a fact about
   /// the work, and it must be found again exactly as it was left.
@@ -50,9 +47,7 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   public init(
     selectedSessionID: SessionID? = nil,
     isSidebarVisible: Bool = true,
-    isInspectorVisible: Bool = true,
     sidebarWidth: Double = 280,
-    inspectorWidth: Double = 300,
     sessionFilter: SessionFilter = SessionFilter(),
     inspectorSections: InspectorArrangement = .default,
     browserWidth: Double = 520,
@@ -65,9 +60,7 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
-    self.isInspectorVisible = isInspectorVisible
     self.sidebarWidth = Self.bounded(sidebarWidth, in: Self.sidebarWidthRange, fallback: 280)
-    self.inspectorWidth = Self.bounded(inspectorWidth, in: Self.inspectorWidthRange, fallback: 300)
     self.sessionFilter = sessionFilter
     self.inspectorSections = inspectorSections
     self.browserWidth = Self.bounded(browserWidth, in: Self.browserWidthRange, fallback: 520)
@@ -79,8 +72,10 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.notesPlacement = notesPlacement
   }
 
+  /// The right column's keys, `isInspectorVisible` and `inspectorWidth`, are gone with it (#578):
+  /// a layout an older build wrote still holds them, and they are read past.
   private enum CodingKeys: String, CodingKey {
-    case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
+    case selectedSessionID, isSidebarVisible, sidebarWidth
     case sessionFilter, inspectorSections, browserWidth
     case sidebarMode, collapsedFolders, sessionPresentations
     case isRequestPaletteCollapsed, collapsedCoordinators, notesPlacement
@@ -99,10 +94,7 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.init(
       selectedSessionID: try container.decodeIfPresent(SessionID.self, forKey: .selectedSessionID),
       isSidebarVisible: try container.decodeIfPresent(Bool.self, forKey: .isSidebarVisible) ?? true,
-      isInspectorVisible: try container.decodeIfPresent(Bool.self, forKey: .isInspectorVisible)
-        ?? true,
       sidebarWidth: try container.decodeIfPresent(Double.self, forKey: .sidebarWidth) ?? 280,
-      inspectorWidth: try container.decodeIfPresent(Double.self, forKey: .inspectorWidth) ?? 300,
       sessionFilter: try container.decodeIfPresent(SessionFilter.self, forKey: .sessionFilter)
         ?? SessionFilter(),
       inspectorSections: Self.decodeSections(
@@ -244,34 +236,28 @@ public enum BrowserPlacement: Equatable, Sendable {
   case alternating
 }
 
-/// The columns actually shown, once the window's width has had its say.
+/// The columns actually shown, once the window's width has had its say: the sidebar, and where
+/// the web view goes. There is no right column any more (#578).
 public struct WorkspaceColumns: Equatable, Sendable {
   public let isSidebarVisible: Bool
-  public let isInspectorVisible: Bool
   public let browser: BrowserPlacement
 
-  public init(
-    isSidebarVisible: Bool, isInspectorVisible: Bool, browser: BrowserPlacement = .hidden
-  ) {
+  public init(isSidebarVisible: Bool, browser: BrowserPlacement = .hidden) {
     self.isSidebarVisible = isSidebarVisible
-    self.isInspectorVisible = isInspectorVisible
     self.browser = browser
   }
 }
 
 /// Decides which columns fit, and is a pure function so the rule can be tested without a window.
 public enum WorkspaceLayoutPolicy {
-  /// Below this width the inspector is folded: the terminal would be left with less than a
-  /// readable eighty columns.
-  public static let inspectorThreshold: Double = 1_040
-  /// Below this width the sidebar folds too, and is reached through its toolbar button.
+  /// Below this width the sidebar folds, and is reached through its toolbar button: the terminal
+  /// would be left with less than a readable eighty columns.
   public static let sidebarThreshold: Double = 820
 
   /// With the web view beside the terminal, the same order holds with more room asked for: the
-  /// inspector first, then the sidebar, and last the web view stops sitting beside the terminal.
-  /// Each threshold keeps the terminal at a readable eighty columns (about 560 points) next to a
-  /// web view at its narrowest (380), plus the columns still shown.
-  public static let inspectorThresholdWithBrowser: Double = 1_600
+  /// sidebar first, and last the web view stops sitting beside the terminal. Each threshold keeps
+  /// the terminal at a readable eighty columns (about 560 points) next to a web view at its
+  /// narrowest (380), plus the sidebar while it is shown.
   public static let sidebarThresholdWithBrowser: Double = 1_180
   public static let browserBesideThreshold: Double = 900
 
@@ -284,18 +270,13 @@ public enum WorkspaceLayoutPolicy {
   ) -> WorkspaceColumns {
     guard windowWidth.isFinite, windowWidth > 0 else {
       return WorkspaceColumns(
-        isSidebarVisible: true, isInspectorVisible: true,
-        browser: isBrowserRequested ? .beside : .hidden)
+        isSidebarVisible: true, browser: isBrowserRequested ? .beside : .hidden)
     }
     guard isBrowserRequested else {
-      return WorkspaceColumns(
-        isSidebarVisible: windowWidth >= sidebarThreshold,
-        isInspectorVisible: windowWidth >= inspectorThreshold
-      )
+      return WorkspaceColumns(isSidebarVisible: windowWidth >= sidebarThreshold)
     }
     return WorkspaceColumns(
       isSidebarVisible: windowWidth >= sidebarThresholdWithBrowser,
-      isInspectorVisible: windowWidth >= inspectorThresholdWithBrowser,
       browser: windowWidth >= browserBesideThreshold ? .beside : .alternating
     )
   }
@@ -306,7 +287,6 @@ public enum WorkspaceLayoutPolicy {
     let allowances = allowances(windowWidth: windowWidth, isBrowserRequested: isBrowserRequested)
     return WorkspaceColumns(
       isSidebarVisible: intent.isSidebarVisible && allowances.isSidebarVisible,
-      isInspectorVisible: intent.isInspectorVisible && allowances.isInspectorVisible,
       browser: allowances.browser
     )
   }

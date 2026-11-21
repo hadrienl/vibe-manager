@@ -33,8 +33,9 @@ struct WorkspaceLayoutControllerTests {
     let store = RecordingLayoutStore(
       layout: WorkspaceLayout(
         selectedSessionID: selected,
-        isInspectorVisible: false,
-        sidebarWidth: 320
+        isSidebarVisible: false,
+        sidebarWidth: 320,
+        notesPlacement: .panel
       )
     )
     let controller = WorkspaceLayoutController(store: store)
@@ -43,7 +44,8 @@ struct WorkspaceLayoutControllerTests {
 
     #expect(restored == selected)
     #expect(controller.intent.sidebarWidth == 320)
-    #expect(!controller.columns.isInspectorVisible)
+    #expect(!controller.columns.isSidebarVisible)
+    #expect(controller.notesPlacement == .panel)
   }
 
   @Test("A column folded by a narrow window is not recorded as a decision")
@@ -52,27 +54,38 @@ struct WorkspaceLayoutControllerTests {
     let controller = WorkspaceLayoutController(store: store, saveDelay: .milliseconds(1))
 
     controller.windowWidthChanged(to: 700)
-    #expect(!controller.columns.isInspectorVisible)
     #expect(!controller.columns.isSidebarVisible)
-    #expect(controller.intent.isInspectorVisible)
+    #expect(controller.intent.isSidebarVisible)
 
     controller.windowWidthChanged(to: 1_400)
-    #expect(controller.columns.isInspectorVisible)
     #expect(controller.columns.isSidebarVisible)
     await #expect(store.saves.isEmpty)
   }
 
-  @Test("Closing a column is recorded, and survives a resize")
+  @Test("Closing the sidebar is recorded, and survives a resize")
   func closingIsAChoice() async {
     let store = RecordingLayoutStore()
     let controller = WorkspaceLayoutController(store: store)
 
     controller.windowWidthChanged(to: 1_400)
-    controller.setInspectorVisible(false)
+    controller.setSidebarVisible(false)
     await controller.flush()
 
-    #expect(!controller.columns.isInspectorVisible)
-    await #expect(store.load().isInspectorVisible == false)
+    #expect(!controller.columns.isSidebarVisible)
+    await #expect(store.load().isSidebarVisible == false)
+  }
+
+  @Test("Where the notes open is written, and read back after a relaunch (#578)")
+  func notesPlacementIsKept() async {
+    let store = RecordingLayoutStore()
+    let controller = WorkspaceLayoutController(store: store)
+
+    controller.setNotesPlacement(.panel)
+    await controller.flush()
+
+    let relaunched = WorkspaceLayoutController(store: store)
+    await relaunched.restore()
+    #expect(relaunched.notesPlacement == .panel)
   }
 
   @Test("A drag is written once, not at every width it passes through", .timeLimit(.minutes(1)))
@@ -159,10 +172,8 @@ struct WorkspaceLayoutControllerTests {
     // What a column on its way out reports: its minimum, then nothing at all.
     controller.sidebarWidthChanged(to: 120)
     controller.sidebarWidthChanged(to: 0)
-    controller.inspectorWidthChanged(to: 0)
 
     #expect(controller.intent.sidebarWidth == 320)
-    #expect(controller.intent.inspectorWidth == 300)
   }
 
   @Test("A narrow window can still be asked for its sidebar")
@@ -196,20 +207,6 @@ struct WorkspaceLayoutControllerTests {
     #expect(controller.columns.isSidebarVisible)
   }
 
-  @Test("Widening past one column's threshold leaves the other column's exception standing")
-  func eachColumnAnswersForItsOwnException() async {
-    let controller = WorkspaceLayoutController()
-    controller.windowWidthChanged(to: 700)
-
-    controller.setInspectorVisible(true)
-    #expect(controller.columns.isInspectorVisible)
-
-    // Wide enough for the sidebar, still too narrow for the inspector.
-    controller.windowWidthChanged(to: 900)
-    #expect(controller.columns.isSidebarVisible)
-    #expect(controller.columns.isInspectorVisible)
-  }
-
   @Test("The exception granted to a narrow window ends when the window changes")
   func overrideEndsWithTheWindow() async {
     let controller = WorkspaceLayoutController()
@@ -229,10 +226,10 @@ struct WorkspaceLayoutControllerTests {
     let controller = WorkspaceLayoutController()
 
     controller.sidebarWidthChanged(to: 10_000)
-    controller.inspectorWidthChanged(to: .nan)
-
     #expect(controller.intent.sidebarWidth == WorkspaceLayout.sidebarWidthRange.upperBound)
-    #expect(WorkspaceLayout.inspectorWidthRange.contains(controller.intent.inspectorWidth))
+
+    controller.sidebarWidthChanged(to: .nan)
+    #expect(controller.intent.sidebarWidth == WorkspaceLayout.sidebarWidthRange.upperBound)
   }
 
   @Test("Quitting writes what the delay was still holding")

@@ -250,7 +250,7 @@ struct SessionIdentityTests {
     let model = workspace.model
     let session = workspace.running
 
-    model.beginThemeEditing(session.id, in: .inspector)
+    model.beginThemeEditing(session.id, in: .detail)
     model.previewTheme("night")
     #expect(model.displayedConversationTheme(of: session) == "night")
     #expect(model.displayedConversationTheme(of: workspace.other) == nil)
@@ -331,7 +331,7 @@ struct SessionIdentityTests {
     #expect(await workspace.repository.session(id: id)?.name == "Elsewhere")
   }
 
-  @Test("From the menu bar, the row is edited when the sidebar shows it, the inspector otherwise")
+  @Test("From the menu bar, the row is edited when the sidebar shows it, the session otherwise")
   func editingPlace() async throws {
     let workspace = try await workspace()
     let model = workspace.model
@@ -343,21 +343,25 @@ struct SessionIdentityTests {
     #expect(model.renaming?.place == .sidebar)
     model.cancelRename()
 
-    // A session the sidebar does not show — another column — is renamed in the inspector.
+    // A session the sidebar does not show — another column — is renamed above the session, where
+    // the right column's header used to be (#578).
     let hidden = try #require(
       [workspace.running, workspace.other].first { session in
         !model.displayedSessions.contains { $0.id == session.id }
       })
     model.beginRename(hidden.id)
-    #expect(model.renaming?.place == .inspector)
+    #expect(model.renaming?.place == .detail)
     #expect(model.selectedSessionID == hidden.id)
+    #expect(model.isEditingIdentityInDetail(of: hidden.id))
     model.cancelRename()
 
     model.layout.setSidebarVisible(false)
     model.beginRename(workspace.other.id)
-    #expect(model.renaming?.place == .inspector)
-    // The inspector shows the session on screen: it is brought there.
+    #expect(model.renaming?.place == .detail)
+    // The bar is drawn over the session on screen: it is brought there.
     #expect(model.selectedSessionID == workspace.other.id)
+    model.cancelRename()
+    #expect(!model.isEditingIdentityInDetail(of: workspace.other.id))
   }
 
   @Test("Only a double-click renames from the list: Return and a single click do not")
