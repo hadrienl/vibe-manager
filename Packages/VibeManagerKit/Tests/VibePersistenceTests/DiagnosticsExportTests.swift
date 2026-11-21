@@ -23,8 +23,7 @@ struct DiagnosticsExportTests {
         operatingSystem: DiagnosticVersion("15.1.0"), architecture: "arm64", signature: "team",
         teamIdentifier: DiagnosticVersion("ABCDE12345"), hardenedRuntime: true),
       settings: DiagnosticSnapshot.Settings(
-        quitBehavior: "ask", confirmsStoppingRunningAgent: true,
-        fileEditor: "defaultApplication", verboseDiagnostics: false,
+        quitBehavior: "ask", confirmsStoppingRunningAgent: true, verboseDiagnostics: false,
         isolatedData: false, terminalHost: true),
       agents: [
         DiagnosticSnapshot.Agent(

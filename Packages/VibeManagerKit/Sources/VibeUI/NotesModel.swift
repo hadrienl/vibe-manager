@@ -415,7 +415,7 @@ public final class NotesModel {
       return
     }
     // Opens outside: an http, https or mail address (`NotesLinks.isAllowed`; a file was revealed).
-    Task { _ = await opener.open(url, with: .defaultApplication) }
+    Task { _ = await opener.open(url) }
   }
 }
 

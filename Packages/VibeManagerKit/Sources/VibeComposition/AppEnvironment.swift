@@ -474,7 +474,6 @@ public final class AppEnvironment {
         }),
       repositoryStatus: repositoryStatus,
       closePreferences: UserDefaultsSessionClosePreferences(suiteName: data.defaultsSuite),
-      fileOpeningPreferences: UserDefaultsFileOpeningPreferences(suiteName: data.defaultsSuite),
       notesStore: notes,
       notesFileLocation: { notes.fileURL(for: $0) },
       quitPreferences: UserDefaultsQuitPreferences(suiteName: data.defaultsSuite),
@@ -717,12 +716,6 @@ public final class AppEnvironment {
     context.file.flush()
     let facts = ApplicationFacts.current()
     let runtime = await context.runtime.read()
-    let editor: DiagnosticToken
-    switch model.fileEditor {
-    case nil: editor = "unset"
-    case .defaultApplication: editor = "defaultApplication"
-    case .application: editor = "application"
-    }
     return DiagnosticSnapshot(
       createdAt: Date(),
       application: DiagnosticSnapshot.Application(
@@ -735,7 +728,6 @@ public final class AppEnvironment {
       settings: DiagnosticSnapshot.Settings(
         quitBehavior: model.quitBehavior.diagnosticToken,
         confirmsStoppingRunningAgent: model.confirmsStoppingRunningAgent,
-        fileEditor: editor,
         verboseDiagnostics: DiagnosticsVerbosity.minimumLevel() == .debug,
         isolatedData: context.data.defaultsSuite != nil,
         terminalHost: context.hostEnabled),

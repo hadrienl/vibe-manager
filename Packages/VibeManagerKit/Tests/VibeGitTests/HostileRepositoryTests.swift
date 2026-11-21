@@ -85,8 +85,6 @@ struct HostileRepositoryTests {
     try touchFiltered(in: repository)
     _ = await GitStatusReader().status(atPath: repository, limit: 100)
     try touchFiltered(in: repository)
-    _ = await GitStatusReader().untrackedFiles(in: ".", atPath: repository, limit: 100)
-    try touchFiltered(in: repository)
     _ = await GitActivityReader().hasUncommittedChanges(atPath: repository, since: .distantPast)
   }
 

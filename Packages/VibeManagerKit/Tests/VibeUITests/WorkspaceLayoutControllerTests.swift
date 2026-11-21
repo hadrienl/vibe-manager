@@ -122,47 +122,6 @@ struct WorkspaceLayoutControllerTests {
     #expect(relaunched.browserWidth == 700)
   }
 
-  @Test("Folding, moving and sizing the sections are kept", .timeLimit(.minutes(1)))
-  func inspectorSections() async throws {
-    let store = RecordingLayoutStore()
-    let controller = WorkspaceLayoutController(store: store, saveDelay: .milliseconds(20))
-    let shown: [InspectorSectionID] = [.activity, .git, .notes, .agent, .usage, .prompt]
-
-    controller.setSectionCollapsed(.agent, false)
-    controller.moveSection(.notes, by: -1, among: shown)
-    controller.moveSection(.prompt, to: .activity, after: false, among: shown)
-    controller.resizeSections(to: [.git: 320, .notes: 110])
-
-    #expect(!controller.inspectorSections.isCollapsed(.agent))
-    #expect(
-      controller.inspectorSections.order(of: shown)
-        == [.prompt, .activity, .notes, .git, .agent, .usage])
-    #expect(controller.inspectorSections.weight(.git) == 320)
-    #expect(!controller.isInspectorArrangementDefault)
-
-    // The save is waited for, however late a frozen runner runs it.
-    while await store.saves.last?.inspectorSections != controller.inspectorSections {
-      try await Task.sleep(for: .milliseconds(10))
-    }
-
-    controller.resetInspectorSections()
-    #expect(controller.isInspectorArrangementDefault)
-    while await store.saves.last?.inspectorSections != .default {
-      try await Task.sleep(for: .milliseconds(10))
-    }
-  }
-
-  @Test("Option-click and Collapse Others")
-  func foldingSeveral() {
-    let controller = WorkspaceLayoutController()
-    let shown: [InspectorSectionID] = [.git, .notes, .agent]
-
-    controller.setAllSectionsCollapsed(true, among: shown)
-    #expect(shown.allSatisfy(controller.inspectorSections.isCollapsed))
-    controller.collapseOtherSections(than: .notes, among: shown)
-    #expect(shown.filter { !controller.inspectorSections.isCollapsed($0) } == [.notes])
-  }
-
   @Test("A column folding away does not overwrite the width it was dragged to")
   func foldingKeepsTheWidth() async {
     let controller = WorkspaceLayoutController()

@@ -32,19 +32,16 @@ public struct DiagnosticSnapshot: Sendable {
   public struct Settings: Sendable {
     public var quitBehavior: DiagnosticToken
     public var confirmsStoppingRunningAgent: Bool
-    public var fileEditor: DiagnosticToken
     public var verboseDiagnostics: Bool
     public var isolatedData: Bool
     public var terminalHost: Bool
 
     public init(
       quitBehavior: DiagnosticToken, confirmsStoppingRunningAgent: Bool,
-      fileEditor: DiagnosticToken,
       verboseDiagnostics: Bool, isolatedData: Bool, terminalHost: Bool
     ) {
       self.quitBehavior = quitBehavior
       self.confirmsStoppingRunningAgent = confirmsStoppingRunningAgent
-      self.fileEditor = fileEditor
       self.verboseDiagnostics = verboseDiagnostics
       self.isolatedData = isolatedData
       self.terminalHost = terminalHost
@@ -293,7 +290,6 @@ public enum DiagnosticArchive {
       Settings
       Quit with agents running: \(settings.quitBehavior.rawValue)
       Confirm stopping a running agent: \(settings.confirmsStoppingRunningAgent ? "yes" : "no")
-      File editor: \(settings.fileEditor.rawValue)
       Verbose diagnostics: \(settings.verboseDiagnostics ? "yes" : "no")
       Isolated data directory: \(settings.isolatedData ? "yes" : "no")
       Terminal host: \(settings.terminalHost ? "on" : "off")

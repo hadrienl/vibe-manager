@@ -328,16 +328,6 @@ public final class AppModel {
   public var quitBehavior: QuitBehavior {
     didSet { quitPreferences.behavior = quitBehavior }
   }
-  /// Where a changed file listed in the inspector opens. `nil`: it is only revealed. Mirrored
-  /// here so that the settings window and the inspector read and change the same answer.
-  public var fileEditor: EditorChoice? {
-    didSet {
-      fileOpeningPreferences.editor = fileEditor
-      gitInspector.editor = fileEditor
-    }
-  }
-  /// The screen state of the inspector's Git pane, kept per session for the length of the run.
-  let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
   /// Where the notes are on screen: under the toolbar's button, or in their panel (#578).
@@ -721,7 +711,6 @@ public final class AppModel {
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
   private let quitPreferences: any QuitPreferences
-  private let fileOpeningPreferences: any FileOpeningPreferences
   private let archiveSession: ArchiveSession
   /// Where what happens to the sessions is noted, by pseudonym.
   public let diagnostics: Diagnostics
@@ -830,7 +819,6 @@ public final class AppModel {
     /// Absent in a workspace assembled without Git: the report is then read on demand only.
     repositoryStatus: RepositoryStatusMonitor? = nil,
     closePreferences: any SessionClosePreferences = InMemorySessionClosePreferences(),
-    fileOpeningPreferences: any FileOpeningPreferences = InMemoryFileOpeningPreferences(),
     /// Where the notes are kept. A workspace assembled without one keeps none.
     notesStore: any SessionNotesStore = NoSessionNotes(),
     /// Where a session's notes file is, for Reveal in Finder when it cannot be read.
@@ -934,19 +922,6 @@ public final class AppModel {
     self.closePreferences = closePreferences
     self.quitPreferences = quitPreferences
     quitBehavior = quitPreferences.behavior
-    self.fileOpeningPreferences = fileOpeningPreferences
-    fileEditor = fileOpeningPreferences.editor
-    var listUntracked: GitInspectorModel.ListUntracked?
-    if let repositoryStatus {
-      listUntracked = { directory, key in
-        await repositoryStatus.untrackedFiles(in: directory, of: key)
-      }
-    }
-    gitInspector = GitInspectorModel(
-      listUntracked: listUntracked,
-      opener: WorkspaceFileOpener(),
-      editor: fileOpeningPreferences.editor
-    )
     confirmsStoppingRunningAgent = closePreferences.confirmsStoppingRunningAgent
     setAsideClose = closePreferences.setAsideClose
     self.clock = clock
@@ -3613,8 +3588,6 @@ extension AppModel {
     branchReportCheckedAt[id] ?? branchReports[id]?.readAt
   }
 
-  public var reportsBranches: Bool { readBranchReport != nil }
-
   /// Whether the repositories of the session on screen are kept live, rather than read on demand.
   public var observesRepositories: Bool { repositoryStatus != nil }
 
@@ -3869,7 +3842,6 @@ extension AppModel {
       for state in states {
         repositoryStatuses[state.key] = state
       }
-      gitInspector.statesChanged(states)
     case .branchReportOutdated(let id):
       guard id == observedSessionID else { return }
       requestBranchReport(of: id)

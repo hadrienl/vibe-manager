@@ -20,9 +20,6 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// the same reason as the columns: it is how the user arranged their view, not a fact about
   /// the work, and it must be found again exactly as it was left.
   public var sessionFilter: SessionFilter
-  /// The sections of the context column: their order, which are folded, and their share of the
-  /// height (#66). Common to every session.
-  public var inspectorSections: InspectorArrangement
   /// The width of the web view, common to every session: whether it is shown is the session's own
   /// business (#69), how wide it is is this Mac's.
   public var browserWidth: Double
@@ -49,7 +46,6 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     isSidebarVisible: Bool = true,
     sidebarWidth: Double = 280,
     sessionFilter: SessionFilter = SessionFilter(),
-    inspectorSections: InspectorArrangement = .default,
     browserWidth: Double = 520,
     sidebarMode: SidebarMode = .flat,
     collapsedFolders: Set<SessionFolderKey> = [],
@@ -62,7 +58,6 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.isSidebarVisible = isSidebarVisible
     self.sidebarWidth = Self.bounded(sidebarWidth, in: Self.sidebarWidthRange, fallback: 280)
     self.sessionFilter = sessionFilter
-    self.inspectorSections = inspectorSections
     self.browserWidth = Self.bounded(browserWidth, in: Self.browserWidthRange, fallback: 520)
     self.sidebarMode = sidebarMode
     self.collapsedFolders = collapsedFolders
@@ -72,19 +67,14 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.notesPlacement = notesPlacement
   }
 
-  /// The right column's keys, `isInspectorVisible` and `inspectorWidth`, are gone with it (#578):
-  /// a layout an older build wrote still holds them, and they are read past.
+  /// The right column's keys — `isInspectorVisible`, `inspectorWidth`, `inspectorSections` and,
+  /// from before #66, `inspectorSplit`, `isSessionDetailsExpanded` and `inspectorTopTab` — are gone
+  /// with it (#578): a layout an older build wrote still holds them, and they are read past.
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, sidebarWidth
-    case sessionFilter, inspectorSections, browserWidth
+    case sessionFilter, browserWidth
     case sidebarMode, collapsedFolders, sessionPresentations
     case isRequestPaletteCollapsed, collapsedCoordinators, notesPlacement
-  }
-
-  /// What the column was arranged with before #66. Read once, to arrange the sections the same
-  /// way, and never written again.
-  private enum LegacyKeys: String, CodingKey {
-    case inspectorSplit, isSessionDetailsExpanded, inspectorTopTab
   }
 
   /// Decoding routes through the designated initializer, so a width written by a future build,
@@ -97,8 +87,6 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       sidebarWidth: try container.decodeIfPresent(Double.self, forKey: .sidebarWidth) ?? 280,
       sessionFilter: try container.decodeIfPresent(SessionFilter.self, forKey: .sessionFilter)
         ?? SessionFilter(),
-      inspectorSections: Self.decodeSections(
-        from: container, legacy: try decoder.container(keyedBy: LegacyKeys.self)),
       browserWidth: (try? container.decodeIfPresent(Double.self, forKey: .browserWidth)) ?? 520,
       // Each on its own terms, like the filter: a mode written by a later build costs the user
       // the grouping at worst, never the rest of the layout.
@@ -120,44 +108,6 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
 }
 
 extension WorkspaceLayout {
-  /// The sections as stored; or, from a layout written before they existed, the arrangement that
-  /// shows what the user had: the same pane on top, the same share of the height against the
-  /// notes, and the agent and prompt folded or not as they were. Unreadable, the default.
-  private static func decodeSections(
-    from container: KeyedDecodingContainer<CodingKeys>,
-    legacy: KeyedDecodingContainer<LegacyKeys>
-  ) -> InspectorArrangement {
-    if container.contains(.inspectorSections) {
-      return (try? container.decode(InspectorArrangement.self, forKey: .inspectorSections))
-        ?? .default
-    }
-    let split = try? legacy.decodeIfPresent(Double.self, forKey: .inspectorSplit)
-    let details = try? legacy.decodeIfPresent(Bool.self, forKey: .isSessionDetailsExpanded)
-    let tab = try? legacy.decodeIfPresent(String.self, forKey: .inspectorTopTab)
-    guard split != nil || details != nil || tab != nil else { return .default }
-    return migratedSections(split: split, isDetailsExpanded: details, topTab: tab)
-  }
-
-  /// The column before #66: Activity or Git on top, one at a time, over the notes, which had
-  /// `1 - split` of the height; then the agent, usage and prompt, folded together.
-  static func migratedSections(split: Double?, isDetailsExpanded: Bool?, topTab: String?)
-    -> InspectorArrangement
-  {
-    let top = bounded(split ?? 0.6, in: 0.25...0.85, fallback: 0.6)
-    let showsGit = topTab == "git"
-    let detailsCollapsed = !(isDetailsExpanded ?? true)
-    let activity = InspectorArrangement.Entry(id: .activity, isCollapsed: showsGit, weight: top)
-    let git = InspectorArrangement.Entry(id: .git, isCollapsed: !showsGit, weight: top)
-    return InspectorArrangement(entries: [
-      showsGit ? git : activity,
-      showsGit ? activity : git,
-      .init(id: .notes, isCollapsed: false, weight: 1 - top),
-      .init(id: .agent, isCollapsed: detailsCollapsed),
-      .init(id: .usage, isCollapsed: detailsCollapsed),
-      .init(id: .prompt, isCollapsed: detailsCollapsed),
-    ])
-  }
-
   public func presentation(of id: SessionID, default fallback: SessionPresentation)
     -> SessionPresentation
   {

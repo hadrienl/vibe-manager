@@ -106,6 +106,20 @@ private func isSaved(_ document: NotesDocument) -> Bool {
   return false
 }
 
+/// Records what the notes revealed and opened.
+@MainActor
+final class FakeOpener: FileOpening {
+  private(set) var revealed: [String] = []
+  private(set) var opened: [String] = []
+
+  func reveal(_ url: URL) { revealed.append(url.path) }
+
+  func open(_ url: URL) async -> Bool {
+    opened.append(url.path)
+    return true
+  }
+}
+
 @MainActor
 @Suite("Saving the notes as they are typed", .timeLimit(.minutes(2)))
 struct NotesSavingTests {
