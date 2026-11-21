@@ -17,18 +17,20 @@ Keyboard Access on (see [release checklist](release-checklist.md)).
 | ⌘P | Open Quickly: find a session by ticket, request URL, branch, folder or title; arrows, ⌃N / ⌃P and Page Up / Down move, Return opens, Escape closes | File |
 | ⌥⌘1 | Focus Sidebar: the session list takes the keyboard | View |
 | ⌥⌘2 | Focus Session: the selected session's terminal, or its composer in the conversation view | View |
+| ⌥⌘3 | Focus Context: the Git list, the context column shown if it was hidden | View |
 | ⌥⌘4 | Focus Web View: the page in front, the web view shown if it was hidden | View |
 | ⌥⌘5 | Focus Side Terminals: the terminal in front of the drawer, the drawer shown if it was hidden | View |
 | ⌘J | Show / Hide Terminals: the session's drawer of side terminals; hiding it stops nothing | View |
 | ⌘T | New Terminal: a new tab in the drawer, a shell in the session's folder; with the keyboard in the web view, New Tab | View |
 | ⌥⌘P | Focus Pending Requests: the palette unfolds and its oldest request takes the keyboard | View |
 | ⌥⌘B | Show / Hide Web View; in a window where the two take turns, swaps terminal and web view | View |
-| ⌥⌘N | Edit Notes: the notes open under their toolbar button, or in their floating window, and take the keyboard; Escape, or ⌥⌘N again, gives it back to the session: its terminal, or its composer | View |
+| ⌥⌘N | Edit Notes; Escape gives the keyboard back to the session: its terminal, or its composer | View |
 | ⌥⌘↓ / ⌥⌘↑ | Next / Previous Session | View |
 | ⌘1…⌘9 | The session at that position in the list, as drawn: folded groups are skipped | View |
 | ⌥⌘→ / ⌥⌘← | Next / Previous Column (To Do, In Progress, Waiting, Done) | View |
 | ⌃⌘G | Group Sessions by Folder | View |
 | ⌃⌥⌘← / ⌃⌥⌘→ | Collapse / Expand the group of the selected session | View |
+| ⌥⌘I | Show / Hide Context | View |
 | ⌃⌥⌘O | Read Last Output: VoiceOver says the agent's last message when the session is shown as a conversation, the last five lines the terminal showed otherwise | View |
 
 In the composer of a conversation, Page Up and Page Down (fn↑ and fn↓ on a laptop) scroll the
@@ -36,7 +38,7 @@ messages by a page, and End (fn→) goes back to the last one (#227): the conver
 without leaving the composer, whose ↑ and ↓ keep recalling the messages sent. A draft taller
 than its field keeps the three keys, to scroll itself, as any text does.
 
-An agent running in the terminal loses ⌥⌘1 and ⌥⌘2, which full-screen programs rarely use; the
+An agent running in the terminal loses ⌥⌘1, ⌥⌘2 and ⌥⌘3, which full-screen programs rarely use; the
 menus already took the others before #19.
 
 ## The side terminals
@@ -173,9 +175,9 @@ put in use, a file added.
 | Restart | ⌃⌘R | Session |
 | Restart in a new process, from anywhere in its sheet | ⌘↩ | — |
 | Switch Agent… | ⌃⌘M | Session |
-| Rename…: the name becomes a field, on its row, or in a bar above the session when the sidebar does not show it; Return keeps it, Escape does not | ⌃⌘E, or a double-click on the row, off its badge | Session, and the row's context menu |
-| Change Icon…: symbol, colour, the project's icon, Revert to Default Icon; Escape leaves it as it was | ⌃⌘I, a double-click on the row's badge, or a click on the badge of the bar above the session | Session, and the row's context menu |
-| Undo / Redo the last rename or change of icon; Undo the last archive or status changed from the keyboard — with the keyboard in the sidebar | ⌘Z / ⇧⌘Z | Edit |
+| Rename…: the name becomes a field, on its row or in the inspector's header; Return keeps it, Escape does not | ⌃⌘E, or a double-click on the row, off its badge | Session, and the row's context menu |
+| Change Icon…: symbol, colour, the project's icon, Revert to Default Icon; Escape leaves it as it was | ⌃⌘I, a double-click on the row's badge, or a click on the inspector's badge | Session, and the row's context menu |
+| Undo / Redo the last rename or change of icon; Undo the last archive or status changed from the keyboard — with the keyboard in the sidebar or the inspector | ⌘Z / ⇧⌘Z | Edit |
 | Attach Files…, the keyboard's way to a drop (files and folders) | ⌘O | Session |
 | Close Session | ⇧⌘W | Session |
 | Archive / Unarchive | ⌃⌘A / ⇧⌃⌘A | Session |
@@ -214,14 +216,13 @@ stays in the sidebar, so the next ⌃⌘A archives it.
 | A request's card | session, agent, folder, branch, age, then what it asks ("Refactor, Claude Code, app, branch feat/40, 2 minutes ago. Shell command: swift test") | — | Allow, Always, Refuse — each only when the agent's dialog can take it from here; Open Session | `request-card` |
 | A session row, one element | name, agent and model, status ("Refactor, codex gpt-5, Running") | "Restoring" while it is | Restart, Switch Agent, Rename, Change Icon, Close Session, Archive, Unarchive — each only when it applies; Move to To Do, In Progress, Waiting, Done — the swipe's buttons | `session-row` |
 | A session's name, being renamed | "Session name", the reason as the hint when it is refused; "Session renamed: ‹name›" or "Name refused: ‹reason›" is announced | the name typed | editable | `session-name-field` |
-| The bar above the session, while it is renamed or given an icon from the menu bar | its badge, "Change Icon"; its pencil, "Rename" | — | activate | `detail-session-badge`, `detail-session-rename` |
+| The inspector's header | its badge, "Change Icon"; its pencil, "Rename" | — | activate | `inspector-session-badge`, `inspector-session-rename` |
 | Change Icon popover | the symbols by their names ("Tools", "Lightning"), the colours by their code, "Project icon" | selected | activate; Revert to Default Icon, Done | `session-appearance-popover`, `session-appearance-revert` |
 | Swipe buttons | "Move to ‹status›", "Archive" | — | — | `swipe-‹status›` |
 | Archived sessions | "Archived (N)", opens the list | — | Show, Unarchive | `archived-sessions` |
 | Terminal | "Terminal — ‹session› — ‹status›" | the visible screen, as text, read-only | Read Last Output (⌃⌥⌘O) | `terminal` |
-| Notes button, in the toolbar | "Session Notes", its tooltip too | "Contains notes" or "Empty"; with the floating window, "Shown" or "Hidden" first | opens the notes | — |
 | Notes | "Notes for ‹session›" | the text | editable | `notes-editor` |
-| Detach, Reattach | "Detach to a Floating Window", "Reattach to the Toolbar" | — | activate | `notes-detach`, `notes-reattach` |
+| Git inspector | the list of repositories and files | — | Open, Reveal in Finder, from the context menu | `inspector-git` |
 | New Session: name, prompt, folder, Create | their labels | — | — | `new-session-name`, `new-session-prompt`, `new-session-folder`, `new-session-create` |
 | Diagnostics preview | "Diagnostics preview" | the whole text of the export | searchable (⌘F) | `diagnostics-preview` |
 | Web view | "Web view", containing "Web tabs" | — | — | — |

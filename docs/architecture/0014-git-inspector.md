@@ -1,6 +1,6 @@
 # 0014 — The Git context of a session, one repository at a time, beside its notes
 
-- Status: superseded by [0048](0048-no-right-column.md) — the Git pane is gone; the reading of 0012 and 0013 stays
+- Status: accepted
 - Date: 2026-09-23
 - Issue: [#14](https://github.com/hadrienl/vibe-manager/issues/14), extended by
   [#56](https://github.com/hadrienl/vibe-manager/issues/56)

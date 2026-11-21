@@ -1,6 +1,6 @@
 # 0008 — The three-column workspace
 
-- Status: accepted; the right column removed by [0048](0048-no-right-column.md)
+- Status: accepted
 - Date: 2026-09-22
 - Issue: [#8](https://github.com/hadrienl/vibe-manager/issues/8)
 - Amended by: [0027](0027-inspector-sections.md) — the column's content is a stack of sections

@@ -23,7 +23,8 @@ the text is about as soon as the words alone do not: what an argument stands for
 sentence refers to, where a lone word is shown. A key of its own is kept for an English text that
 needs two different translations, with the English as its default value: `separator.restart`
 (“Restart”, the noun over a restarted terminal, where the button is a verb), `usage.column.running`
-(“Running”, a column of running time, where a session's state is also “Running”).
+(“Running”, a column of running time, where a session's state is also “Running”),
+`inspector.distance` and `notes.footer.size` (two sentences assembled from parts).
 
 The compiler lists the strings it sees (`SWIFT_EMIT_LOC_STRINGS`), and building in Xcode adds them
 to the catalogs. On the command line, `swift build` leaves `.stringsdata` files next to the objects
@@ -111,7 +112,7 @@ What French asks below holds for every language, in its own terms:
 
 ### Arabic, from right to left
 
-Arabic mirrors the interface: the sidebar and the web view change sides, the toolbar and the
+Arabic mirrors the interface: the sidebar and the inspector change sides, the toolbar and the
 lists read from the right, as SwiftUI and AppKit lay them out. What is not language stays from left
 to right — the terminal and its content, a path, a command, code.
 
@@ -208,4 +209,4 @@ A word that names a model of an agent never names a template, in any language, n
 - The interface smoke test launches the application in English (`-AppleLanguages (en)`), and one
   test launches it in French.
 - French runs 20 to 30 % longer than English. The sidebar's lines are truncated already; the sheets,
-  the settings and the notes are checked with Xcode's double-length pseudolanguage.
+  the settings and the inspector are checked with Xcode's double-length pseudolanguage.

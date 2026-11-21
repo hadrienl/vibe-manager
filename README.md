@@ -220,16 +220,15 @@ disk, out of backups, and Settings › Terminals turns it off. The decisions are
 [`docs/architecture/0030-side-terminals.md`](docs/architecture/0030-side-terminals.md).
 
 The application never creates a branch or a worktree: the agent makes those it needs. The
-application reads what it did — each branch the session worked on, the repositories it is checked
-out in (worktrees the agent made for itself included), and whether it was created, moved forward or
-rewritten, or has uncommitted work — and hands it over in the summary of a restart or an agent
-switch. The repositories come from the session's own
+inspector's Git section reports what it did — each branch the session worked on, the repositories
+it is checked out in (worktrees the agent made for itself included), and whether it was created,
+moved forward or rewritten, or has uncommitted work. The repositories come from the session's own
 transcript, so two sessions in one folder are never told each other's work. The decisions are
 documented in
 [`docs/architecture/0012-session-branch-report.md`](docs/architecture/0012-session-branch-report.md).
 
-Each of those repositories is kept live while its session is on screen, for that summary: staged,
-unstaged, untracked, renamed, deleted and conflicted files, the distance from upstream and an operation left
+Each of those repositories is kept live while its session is on screen: staged, unstaged,
+untracked, renamed, deleted and conflicted files, the distance from upstream and an operation left
 half done, with every changed file the session's transcript names attributed to its agent. Nothing
 reads a repository on a timer — the file system says something moved, and one `git status` confirms
 it, without ever taking a lock, off the main thread, never more often than the repository's own
@@ -237,17 +236,25 @@ speed allows. A failure keeps the last state that was true beside the reason. Th
 documented in
 [`docs/architecture/0013-live-git-status.md`](docs/architecture/0013-live-git-status.md).
 
-Each session has its notes: plain text, behind the Notes button of the toolbar — in a popover
-under it, or in a floating window that stays open and follows the session on screen (⌥⌘N from the
-terminal, Escape back), saved a moment after the typing stops and whenever they are closed or the
-session is left, with their header saying whether they are on disk. Undo belongs to the session,
-links open, and nothing is corrected behind the user's back. Each session's notes are a file of
-their own beside the session store, of any size, written atomically, never written over when they
-cannot be read, kept through close, relaunch and archive, and searched by the sidebar. Quitting with
-notes that could not be saved asks first. The decisions are documented in
-[`docs/architecture/0016-session-notes.md`](docs/architecture/0016-session-notes.md) and
-[`docs/architecture/0048-no-right-column.md`](docs/architecture/0048-no-right-column.md), which
-also removed the right column and its Git pane.
+The inspector shows it one repository at a time, above the session's notes, each pane scrolling on
+its own: the branch, the distance from upstream and an operation left half done in the header, then
+the conflicted, staged, unstaged and untracked files in Git's own order — a file staged and changed
+again is in both lists — and, last, the files the branch already committed since `origin/main` (or
+whichever branch `origin/HEAD` names), so that a session whose agent committed its work still shows
+what it changed. Folding, "Show More", the selection and the scroll position survive every
+update, and a file keeps its selection as it moves from one list to another. Return or a
+double-click opens a file in the editor chosen in Settings, and only reveals it in the Finder until
+one is chosen. The decisions are documented in
+[`docs/architecture/0014-git-inspector.md`](docs/architecture/0014-git-inspector.md).
+
+Below Git, each session has its notes: plain text, typed straight into the inspector (⌥⌘N from
+the terminal, Escape back), saved a moment after the typing stops and whenever the session is left,
+with the header saying whether they are on disk. Undo belongs to the session, links open, and
+nothing is corrected behind the user's back. Each session's notes are a file of their own beside
+the session store, 64 KB at most, written atomically, never written over when they cannot be read,
+kept through close, relaunch and archive, and searched by the sidebar. Quitting with notes that
+could not be saved asks first. The decisions are documented in
+[`docs/architecture/0016-session-notes.md`](docs/architecture/0016-session-notes.md).
 
 File ▸ Open Quickly… (⌘P) finds a session from what is at hand: a ticket number (`36`, `#36`,
 `owner/repo#36`, `!12`), the URL of a ticket or of a pull or merge request pasted as it is — tab,
@@ -270,7 +277,7 @@ created. Templates are edited, duplicated, ordered and deleted in the Templates 
 [`docs/prompt-templates.md`](docs/prompt-templates.md). The decisions are documented in
 [`docs/architecture/0018-prompt-templates.md`](docs/architecture/0018-prompt-templates.md).
 
-What the agents used is shown in the status bar of the session and in Window ▸ Usage (⌥⌘U), by
+What the agents used is shown in the Session pane of the inspector and in Window ▸ Usage (⌥⌘U), by
 session, agent or model, over a period. Running time and runs are measured by the application,
 sleep excluded; tokens are read from the transcripts Claude Code and Codex write, marked `≈`, and
 counted from their counters alone — what the agents were asked or answered is never decoded. No
