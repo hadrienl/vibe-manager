@@ -19,9 +19,8 @@ struct UserDefaultsWorkspaceLayoutStoreTests {
     let layout = WorkspaceLayout(
       selectedSessionID: SessionID(),
       isSidebarVisible: false,
-      isInspectorVisible: true,
       sidebarWidth: 320,
-      inspectorWidth: 300
+      notesPlacement: .panel
     )
 
     await store.save(layout)
@@ -74,7 +73,8 @@ struct UserDefaultsWorkspaceLayoutStoreTests {
 
     let loaded = await UserDefaultsWorkspaceLayoutStore(suiteName: suite).load()
 
-    #expect(loaded.isInspectorVisible == false)
+    // The right column's key, read past since #578.
+    #expect(loaded.isSidebarVisible)
     #expect(loaded.sessionFilter == SessionFilter())
   }
 

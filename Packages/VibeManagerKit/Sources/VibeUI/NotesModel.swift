@@ -53,10 +53,8 @@ public typealias NotesSleep = @Sendable (Duration) async throws -> Void
 public final class NotesDocument {
   public let sessionID: SessionID
   public private(set) var state: NotesSaveState = .loading
-  /// The weight of the text in UTF-8, which is what the limit is about.
+  /// The weight of the text in UTF-8.
   public private(set) var byteCount = 0
-  /// Why the last change was refused, until the next one is accepted.
-  public private(set) var refusal: String?
 
   @ObservationIgnored let storage = NSTextStorage()
   @ObservationIgnored let undoManager = UndoManager()
@@ -127,28 +125,9 @@ public final class NotesDocument {
 
   // MARK: - Editing
 
-  /// Whether replacing `range` with `replacement` keeps the notes within their limit.
-  ///
-  /// A change that would not is refused whole, and said: cutting the end off a paste would lose
-  /// text without anyone seeing where.
-  func shouldChange(in range: NSRange, replacement: String) -> Bool {
-    guard isLoaded else { return false }
-    let current = storage.string as NSString
-    let clamped = NSIntersectionRange(range, NSRange(location: 0, length: current.length))
-    let removed = current.substring(with: clamped).utf8.count
-    let next = byteCount - removed + replacement.utf8.count
-    guard next <= SessionNotesLimits.byteLimit || next <= byteCount else {
-      refusal = String(
-        localized: """
-          This would make the notes \(SessionNotesError.size(next)); they are limited to \
-          \(SessionNotesError.size(SessionNotesLimits.byteLimit)).
-          """,
-        bundle: .module, comment: "Two sizes, formatted: “70 KB”, “64 KB”.")
-      return false
-    }
-    refusal = nil
-    return true
-  }
+  /// Whether the notes take changes: not before they are read, nor over a file that could not be.
+  /// They have no size limit (#578).
+  var isEditable: Bool { isLoaded }
 
   /// Called once the text storage holds the change.
   func didChange() {
@@ -249,7 +228,6 @@ public final class NotesDocument {
     if let error = error as? SessionNotesError {
       switch error {
       case .unreadable(let reason), .cannotWrite(let reason): return reason
-      case .tooLarge: return error.localizedDescription
       }
     }
     return error.localizedDescription
@@ -351,6 +329,11 @@ public final class NotesModel {
     return searchIndex[id]
   }
 
+  /// Whether a session has notes worth the name: something else than blanks.
+  public func hasNotes(for id: SessionID) -> Bool {
+    searchIndex[id]?.contains { !$0.isWhitespace } ?? false
+  }
+
   /// Writes what is pending for one session, now.
   @discardableResult
   public func flush(_ id: SessionID) async -> Bool {
@@ -432,7 +415,7 @@ public final class NotesModel {
       return
     }
     // Opens outside: an http, https or mail address (`NotesLinks.isAllowed`; a file was revealed).
-    Task { _ = await opener.open(url, with: .defaultApplication) }
+    Task { _ = await opener.open(url) }
   }
 }
 

@@ -113,7 +113,7 @@ struct SessionNotesEditor: NSViewRepresentable {
       // Typing is grouped into one undo action as long as nothing breaks it: left open, the next
       // session's first keystrokes would join the action registered in this one's undo manager.
       textView.breakUndoCoalescing()
-      textView.layoutManager?.replaceTextStorage(next.storage)
+      Self.move(textView.layoutManager, to: next.storage)
       textView.typingAttributes = NotesStyle.attributes
       let length = next.storage.length
       let selection = next.selection
@@ -133,19 +133,31 @@ struct SessionNotesEditor: NSViewRepresentable {
       document.undoManager.removeAllActions()
       document.breakTypingCoalescing = nil
       // An empty storage of its own, so the document's is held by one layout manager fewer.
-      textView.layoutManager?.replaceTextStorage(NSTextStorage())
+      Self.move(textView.layoutManager, to: NSTextStorage())
+      textView.isEditable = false
       self.document = nil
       Task { await document.save() }
     }
 
+    /// `replaceTextStorage` transfers every layout manager of the old storage. During a
+    /// presentation change that includes the new editor's manager, leaving it on empty storage.
+    /// Move only this view; the other presentation must keep editing the same document.
+    private static func move(_ manager: NSLayoutManager?, to storage: NSTextStorage) {
+      guard let manager else { return }
+      manager.textStorage?.removeLayoutManager(manager)
+      storage.addLayoutManager(manager)
+    }
+
     func takeFocus(in textView: NSTextView, attempts: Int) {
       DispatchQueue.main.async { [weak self, weak textView] in
-        guard let self, let textView else { return }
-        guard let window = textView.window else {
-          // Just unfolded: the inspector is not in the window yet.
+        guard let self, let textView, self.document != nil else { return }
+        guard let window = textView.window, window.isVisible else {
+          // Just opened: the popover or the panel is not on screen yet.
           if attempts > 0 { self.takeFocus(in: textView, attempts: attempts - 1) }
           return
         }
+        // The floating panel, already open behind the workspace window, takes the keyboard too.
+        if !window.isKeyWindow { window.makeKey() }
         window.makeFirstResponder(textView)
         let end = NSRange(location: textView.string.utf16.count, length: 0)
         textView.setSelectedRange(end)
@@ -162,7 +174,8 @@ struct SessionNotesEditor: NSViewRepresentable {
       replacementString: String?
     ) -> Bool {
       // `nil`: attributes only, which a plain-text view only changes itself.
-      guard let replacement = replacementString, let document else { return true }
+      guard let document, textView.textStorage === document.storage else { return false }
+      guard let replacement = replacementString else { return true }
       // In UTF-16: as a `String`, "\r\n" is one character, and `contains("\r")` says no.
       if !isNormalizing, replacement.utf16.contains(13) {
         // Pasted from Windows or an old Mac document: stored with the line endings of the file.
@@ -173,16 +186,13 @@ struct SessionNotesEditor: NSViewRepresentable {
         isNormalizing = false
         return false
       }
-      guard document.shouldChange(in: affectedCharRange, replacement: replacement) else {
-        NSSound.beep()
-        return false
-      }
+      guard document.isEditable else { return false }
       lastEdit = NSRange(location: affectedCharRange.location, length: replacement.utf16.count)
       return true
     }
 
     func textDidChange(_ notification: Notification) {
-      guard let document else { return }
+      guard let document, textView?.textStorage === document.storage else { return }
       if let lastEdit {
         NotesLinks.apply(to: document.storage, around: lastEdit)
       }
@@ -250,8 +260,8 @@ struct SessionNotesEditor: NSViewRepresentable {
   }
 }
 
-/// The notes section's content: the editor, and what it has to say about the size. Its title and
-/// its state are in the section's header (#66).
+/// The notes' editor, under the ticket titles being read for it. Its title and its state are in
+/// the header of the popover or of the panel that shows it (#578).
 struct SessionNotesSection: View {
   let session: WorkSession
   let document: NotesDocument
@@ -299,29 +309,8 @@ struct SessionNotesSection: View {
       .background(.background.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
       .padding(.horizontal, 8)
       .padding(.top, 6)
-
-      if let footer = NotesFooter.text(refusal: document.refusal, byteCount: document.byteCount) {
-        Text(footer)
-          .font(.caption)
-          .foregroundStyle(document.refusal == nil ? Color.secondary : Color.orange)
-          .padding(.horizontal, 12)
-          .fixedSize(horizontal: false, vertical: true)
-      }
     }
     .padding(.bottom, 6)
-  }
-}
-
-enum NotesFooter {
-  /// A refused change first — it is what just happened — then how close the notes are to the limit.
-  static func text(refusal: String?, byteCount: Int) -> String? {
-    if let refusal { return refusal }
-    guard byteCount >= SessionNotesLimits.warningByteCount else { return nil }
-    return String(
-      localized: "notes.footer.size",
-      defaultValue:
-        "\(SessionNotesError.size(byteCount)) of \(SessionNotesError.size(SessionNotesLimits.byteLimit))",
-      bundle: .module, comment: "How much the notes weigh, of their limit: “58 KB of 64 KB”.")
   }
 }
 
@@ -469,8 +458,6 @@ struct NotesStatePresentation: Equatable {
     switch error {
     case .cannotWrite(let reason), .unreadable(let reason):
       return reason
-    case .tooLarge:
-      return error.localizedDescription
     }
   }
 

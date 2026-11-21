@@ -480,11 +480,6 @@ struct GeneralSettingsPage: View {
         }
       }
       Section {
-        EditorRow(model: model)
-      } header: {
-        Text("Changed Files", bundle: .module, comment: "A section of the Settings window.")
-      }
-      Section {
         TutorialRow(model: model)
       } header: {
         Text("Tutorial", bundle: .module, comment: "A section of the Settings window.")
@@ -1284,113 +1279,6 @@ private struct QuitBehaviorRow: View {
       .foregroundStyle(.secondary)
       .fixedSize(horizontal: false, vertical: true)
     }
-  }
-}
-
-/// Where a changed file of the inspector opens. Without a choice it is only revealed: nothing is
-/// opened in an application the user did not pick.
-private struct EditorRow: View {
-  @Bindable var model: AppModel
-  /// Renewed when "Other…" is cancelled: the setting did not change, so nothing else would bring
-  /// the popup back from "Other…" to the choice that holds.
-  @State private var pickerIdentity = 0
-
-  private enum Choice: Hashable {
-    case revealOnly
-    case defaultApplication
-    case application(String)
-    case other
-  }
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Picker(selection: selection) {
-        Text("Finder (reveal only)", bundle: .module).tag(Choice.revealOnly)
-        Text("Default Application", bundle: .module).tag(Choice.defaultApplication)
-        let editors = model.gitInspector.installedEditors()
-        if !editors.isEmpty || chosenElsewhere != nil {
-          Divider()
-        }
-        ForEach(editors, id: \.bundleIdentifier) { editor in
-          Text(editor.name).tag(Choice.application(editor.bundleIdentifier))
-        }
-        if let chosenElsewhere {
-          Text(chosenElsewhere.name).tag(Choice.application(chosenElsewhere.identifier))
-        }
-        Divider()
-        Text("Other…", bundle: .module, comment: "Picks another application to open files with.")
-          .tag(Choice.other)
-      } label: {
-        Text("Open changed files with", bundle: .module)
-      }
-      .id(pickerIdentity)
-      if case .application = model.fileEditor, let editor = model.fileEditor,
-        model.gitInspector.name(of: editor) == nil
-      {
-        Text(
-          "This editor is no longer installed: files are revealed in the Finder instead.",
-          bundle: .module
-        )
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-      }
-      Text("Double-click a file in the Git list, or press Return, to open it.", bundle: .module)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-        .fixedSize(horizontal: false, vertical: true)
-    }
-  }
-
-  /// The chosen application when the installed editors do not list it: picked with "Other…", or
-  /// a known editor uninstalled since. Without it the picker would show no choice at all.
-  private var chosenElsewhere: (identifier: String, name: String)? {
-    guard case .application(let identifier) = model.fileEditor,
-      !model.gitInspector.installedEditors().contains(where: { $0.bundleIdentifier == identifier })
-    else { return nil }
-    return (
-      identifier,
-      model.gitInspector.name(of: .application(bundleIdentifier: identifier)) ?? identifier
-    )
-  }
-
-  private var selection: Binding<Choice> {
-    Binding(
-      get: {
-        switch model.fileEditor {
-        case nil: return .revealOnly
-        case .defaultApplication: return .defaultApplication
-        case .application(let identifier): return .application(identifier)
-        }
-      },
-      set: { choice in
-        switch choice {
-        case .revealOnly: model.fileEditor = nil
-        case .defaultApplication: model.fileEditor = .defaultApplication
-        case .application(let identifier):
-          model.fileEditor = .application(bundleIdentifier: identifier)
-        case .other: chooseApplication()
-        }
-      }
-    )
-  }
-
-  private func chooseApplication() {
-    let panel = NSOpenPanel()
-    panel.directoryURL = URL(fileURLWithPath: "/Applications", isDirectory: true)
-    panel.allowedContentTypes = [.application]
-    panel.canChooseDirectories = false
-    panel.allowsMultipleSelection = false
-    panel.prompt = String(
-      localized: "Choose", bundle: .module,
-      comment: "The button of the panel that picks an application to open files with.")
-    guard panel.runModal() == .OK, let url = panel.url,
-      let identifier = Bundle(url: url)?.bundleIdentifier
-    else {
-      pickerIdentity += 1
-      return
-    }
-    model.fileEditor = .application(bundleIdentifier: identifier)
   }
 }
 

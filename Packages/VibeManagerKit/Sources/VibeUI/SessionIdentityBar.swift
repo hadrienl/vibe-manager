@@ -3,23 +3,24 @@ import VibeApplication
 import VibeConversationUI
 import VibeDomain
 
-/// The top of the inspector (#183): which session it describes, and where to rename it or change
-/// its icon. Not a section: it is neither folded nor moved, and stays above them.
-struct SessionIdentityHeader: View {
+/// Where a session is renamed, or given another icon or theme, when the sidebar does not show its
+/// row (#183, #578): the sidebar hidden, the session in another column, or archived. Shown above
+/// the session for as long as it is edited, from the menu bar or the archive's menu.
+struct SessionIdentityBar: View {
   let model: AppModel
   let session: WorkSession
   @State private var isHovering = false
   @FocusState private var isRenameFocused: Bool
 
   private var isRenaming: Bool {
-    model.renaming == SessionIdentityEditing(sessionID: session.id, place: .inspector)
+    model.renaming == SessionIdentityEditing(sessionID: session.id, place: .detail)
   }
 
   var body: some View {
     let appearance = model.displayedAppearance(of: session)
     HStack(alignment: .top, spacing: 10) {
       Button {
-        model.beginAppearanceEditing(session.id, in: .inspector)
+        model.beginAppearanceEditing(session.id, in: .detail)
       } label: {
         SessionBadge(
           appearance: appearance, icon: model.icons.image(for: appearance.iconID), size: 32)
@@ -28,8 +29,8 @@ struct SessionIdentityHeader: View {
       .disabled(!model.canEditIdentity(of: session.id))
       .instantTooltip(Text("Change Icon", bundle: .module))
       .accessibilityLabel(Text("Change Icon", bundle: .module))
-      .accessibilityIdentifier("inspector-session-badge")
-      .sessionAppearancePopover(model: model, sessionID: session.id, place: .inspector)
+      .accessibilityIdentifier("detail-session-badge")
+      .sessionAppearancePopover(model: model, sessionID: session.id, place: .detail)
 
       VStack(alignment: .leading, spacing: 2) {
         if isRenaming {
@@ -51,7 +52,7 @@ struct SessionIdentityHeader: View {
             .opacity(isHovering || isRenameFocused ? 1 : 0)
             .instantTooltip(Text("Rename", bundle: .module, comment: "Renames a session."))
             .accessibilityLabel(Text("Rename", bundle: .module, comment: "Renames a session."))
-            .accessibilityIdentifier("inspector-session-rename")
+            .accessibilityIdentifier("detail-session-rename")
           }
         }
         if let agent = session.agent {
@@ -77,7 +78,7 @@ struct SessionIdentityHeader: View {
     let isMissing = theme.map { themes.theme($0) == nil } ?? false
     let name = SessionThemeText.name(of: theme, themes: themes)
     return Button {
-      model.beginThemeEditing(session.id, in: .inspector)
+      model.beginThemeEditing(session.id, in: .detail)
     } label: {
       Label {
         name
@@ -92,11 +93,11 @@ struct SessionIdentityHeader: View {
     .disabled(!model.canEditIdentity(of: session.id))
     .instantTooltip(Text("Change Conversation Theme", bundle: .module))
     .accessibilityLabel(Text("Conversation Theme: \(name)", bundle: .module))
-    .accessibilityIdentifier("inspector-session-theme")
-    .sessionThemePopover(model: model, sessionID: session.id, place: .inspector)
+    .accessibilityIdentifier("detail-session-theme")
+    .sessionThemePopover(model: model, sessionID: session.id, place: .detail)
   }
 
   private func rename() {
-    model.beginRename(session.id, in: .inspector)
+    model.beginRename(session.id, in: .detail)
   }
 }

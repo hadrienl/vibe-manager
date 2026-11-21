@@ -23,20 +23,27 @@ extension AppModel {
   }
 
   /// Where a rename or a badge asked for from the menu bar is edited: on the session's row when
-  /// the sidebar shows it, in the inspector's header otherwise — a folded group is not unfolded
-  /// for it.
+  /// the sidebar shows it, above the session otherwise — a folded group is not unfolded, nor the
+  /// sidebar shown, for it.
   func editingPlace(for id: SessionID) -> SessionIdentityEditing.Place {
     guard layout.columns.isSidebarVisible,
       displayedSessions.contains(where: { $0.id == id })
-    else { return .inspector }
+    else { return .detail }
     return .sidebar
   }
 
-  /// The inspector's header shows the session on screen: it is brought there, and shown.
+  /// The bar above the session is drawn over the session on screen: it is brought there.
   private func prepare(_ place: SessionIdentityEditing.Place, for id: SessionID) {
-    guard place == .inspector else { return }
-    if selectedSessionID != id { select(id) }
-    if !layout.columns.isInspectorVisible { layout.setInspectorVisible(true) }
+    guard place == .detail, selectedSessionID != id else { return }
+    select(id)
+  }
+
+  /// Whether the session's name, badge or theme is being edited above it, rather than in its row:
+  /// the bar that holds the field and the popovers is shown for as long as it is.
+  public func isEditingIdentityInDetail(of id: SessionID) -> Bool {
+    let place = SessionIdentityEditing(sessionID: id, place: .detail)
+    return renaming == place || appearanceEditor?.editing == place
+      || themeEditing?.editing == place
   }
 
   // MARK: - Rename
@@ -92,7 +99,7 @@ extension AppModel {
 
   // MARK: - Badge
 
-  /// Opens the badge's popover on the session's row, or on the inspector's header.
+  /// Opens the badge's popover on the session's row, or on the bar above the session.
   public func beginAppearanceEditing(
     _ id: SessionID, in place: SessionIdentityEditing.Place? = nil
   ) {
@@ -159,7 +166,7 @@ extension AppModel {
 
   // MARK: - Conversation theme (#274)
 
-  /// Opens the Change Theme popover on the session's row, or on the inspector's header.
+  /// Opens the Change Theme popover on the session's row, or on the bar above the session.
   public func beginThemeEditing(_ id: SessionID, in place: SessionIdentityEditing.Place? = nil) {
     guard canEditIdentity(of: id), let session = sessions.first(where: { $0.id == id }) else {
       return
@@ -221,7 +228,7 @@ extension AppModel {
   public var canUndoSidebarChange: Bool { sidebarHistory.canUndo }
   public var canRedoSidebarChange: Bool { sidebarHistory.canRedo }
 
-  /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar or the inspector holds the keyboard:
+  /// What ⌘Z (or ⇧⌘Z, with `redo`) does where the sidebar, or the bar above the session, holds the keyboard:
   /// the last rename, change of icon (#183), archive (#242) or status changed from the keyboard
   /// (#240). `nil` with nothing to undo, or with the keyboard elsewhere (`keyboardHere` false):
   /// ⌘Z then goes on to the window, whose own undo — the draft of a new session given back, for
@@ -254,7 +261,7 @@ extension AppModel {
     responder is NSText
   }
 
-  /// ⌘Z in the sidebar or the inspector: the last rename, badge change, archive or status change,
+  /// ⌘Z in the sidebar, or the bar above the session: the last rename, badge change, archive or status change,
   /// unless the session has changed since — then nothing is undone, and the Mac beeps.
   public func undoSidebarChange() async {
     sidebarHistory.keep(only: Set(sessions.map(\.id)))

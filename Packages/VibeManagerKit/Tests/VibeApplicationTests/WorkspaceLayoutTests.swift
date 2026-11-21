@@ -8,18 +8,17 @@ import VibeDomain
 struct WorkspaceLayoutTests {
   @Test("A width outside its range is bounded rather than refused")
   func widthsAreBounded() {
-    let layout = WorkspaceLayout(sidebarWidth: 10_000, inspectorWidth: 1)
-
-    #expect(layout.sidebarWidth == WorkspaceLayout.sidebarWidthRange.upperBound)
-    #expect(layout.inspectorWidth == WorkspaceLayout.inspectorWidthRange.lowerBound)
+    #expect(
+      WorkspaceLayout(sidebarWidth: 10_000).sidebarWidth
+        == WorkspaceLayout.sidebarWidthRange.upperBound)
+    #expect(
+      WorkspaceLayout(sidebarWidth: 1).sidebarWidth == WorkspaceLayout.sidebarWidthRange.lowerBound)
   }
 
   @Test("A width that is not a number falls back to the default")
   func unmeasuredWidthFallsBack() {
-    let layout = WorkspaceLayout(sidebarWidth: .nan, inspectorWidth: .infinity)
-
-    #expect(layout.sidebarWidth == 280)
-    #expect(WorkspaceLayout.inspectorWidthRange.contains(layout.inspectorWidth))
+    #expect(WorkspaceLayout(sidebarWidth: .nan).sidebarWidth == 280)
+    #expect(WorkspaceLayout(sidebarWidth: .infinity).sidebarWidth == 280)
   }
 
   @Test("A width a folding column reports is not an arrangement")
@@ -60,12 +59,8 @@ struct WorkspaceLayoutTests {
     let layout = WorkspaceLayout(
       selectedSessionID: SessionID(),
       isSidebarVisible: false,
-      isInspectorVisible: false,
       sidebarWidth: 300,
-      inspectorWidth: 320,
-      inspectorSections: InspectorArrangement(entries: [
-        .init(id: .notes, isCollapsed: false, weight: 2), .init(id: .git, isCollapsed: true),
-      ])
+      notesPlacement: .panel
     )
 
     let data = try JSONEncoder().encode(layout)
@@ -74,126 +69,89 @@ struct WorkspaceLayoutTests {
 
   @Test("A width decoded from a foreign document is bounded like a measured one")
   func decodingBounds() throws {
-    let json = Data(#"{"sidebarWidth": 9000, "inspectorWidth": -3}"#.utf8)
+    let json = Data(#"{"sidebarWidth": 9000}"#.utf8)
 
     let layout = try JSONDecoder().decode(WorkspaceLayout.self, from: json)
 
     #expect(layout.sidebarWidth == WorkspaceLayout.sidebarWidthRange.upperBound)
-    #expect(layout.inspectorWidth == WorkspaceLayout.inspectorWidthRange.lowerBound)
     #expect(layout.isSidebarVisible)
-    #expect(layout.isInspectorVisible)
+    #expect(layout.notesPlacement == .popover)
   }
 
-  @Test("A layout stored before #66 arranges the sections as the column was")
-  func migratesTheColumn() throws {
+  @Test("A layout written with the right column reads without it, and never writes it again (#578)")
+  func rightColumnIsReadPast() throws {
     let json = Data(
-      #"""
-      {"sidebarWidth": 300, "inspectorWidth": 320, "inspectorSplit": 0.7,
-       "isSessionDetailsExpanded": false, "inspectorTopTab": "git"}
-      """#.utf8)
-
-    let sections = try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSections
-
-    let six: [InspectorSectionID] = [.activity, .git, .notes, .agent, .usage, .prompt]
-    #expect(sections.order(of: six) == [.git, .activity, .notes, .agent, .usage, .prompt])
-    #expect(!sections.isCollapsed(.git))
-    #expect(sections.isCollapsed(.activity))
-    #expect(!sections.isCollapsed(.notes))
-    #expect(sections.isCollapsed(.agent) && sections.isCollapsed(.usage))
-    #expect(sections.isCollapsed(.prompt))
-    #expect(abs(sections.weight(.git) - 0.7) < 0.0001)
-    #expect(abs(sections.weight(.notes) - 0.3) < 0.0001)
-  }
-
-  @Test("The activity on top, the details unfolded, and a split out of bounds")
-  func migratesActivityOnTop() throws {
-    let json = Data(
-      #"{"inspectorSplit": 0.99, "isSessionDetailsExpanded": true, "inspectorTopTab": "activity"}"#
-        .utf8)
-
-    let sections = try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSections
-
-    #expect(sections.entries.map(\.id).prefix(3) == [.activity, .git, .notes])
-    #expect(!sections.isCollapsed(.activity) && sections.isCollapsed(.git))
-    #expect(!sections.isCollapsed(.agent) && !sections.isCollapsed(.prompt))
-    #expect(abs(sections.weight(.activity) - 0.85) < 0.0001)
-  }
-
-  @Test("A layout that never arranged the column gets the default sections")
-  func noColumnYet() throws {
-    let json = Data(#"{"sidebarWidth": 300, "inspectorWidth": 320}"#.utf8)
-
-    #expect(
-      try JSONDecoder().decode(WorkspaceLayout.self, from: json).inspectorSections == .default)
-  }
-
-  @Test("Unreadable sections cost the sections, not the rest of the layout")
-  func unreadableSections() throws {
-    let json = Data(#"{"sidebarWidth": 300, "inspectorSections": "nonsense"}"#.utf8)
+      #"{"sidebarWidth": 300, "isInspectorVisible": false, "inspectorWidth": 340}"#.utf8)
 
     let layout = try JSONDecoder().decode(WorkspaceLayout.self, from: json)
-
-    #expect(layout.inspectorSections == .default)
-    #expect(layout.sidebarWidth == 300)
-  }
-
-  @Test("The keys of the old column are never written again")
-  func legacyKeysAreDropped() throws {
-    let json = Data(#"{"inspectorSplit": 0.4, "inspectorTopTab": "git"}"#.utf8)
-    let layout = try JSONDecoder().decode(WorkspaceLayout.self, from: json)
-
     let written = try #require(
       JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
 
-    #expect(written["inspectorSplit"] == nil)
-    #expect(written["inspectorTopTab"] == nil)
-    #expect(written["isSessionDetailsExpanded"] == nil)
-    #expect(written["inspectorSections"] != nil)
-    // Once written in the new form, the old keys no longer say anything.
-    let again = try JSONDecoder().decode(WorkspaceLayout.self, from: JSONEncoder().encode(layout))
-    #expect(again.inspectorSections == layout.inspectorSections)
+    #expect(layout.sidebarWidth == 300)
+    #expect(written["isInspectorVisible"] == nil)
+    #expect(written["inspectorWidth"] == nil)
+  }
+
+  @Test("A notes placement written by a later build costs the placement only")
+  func unknownNotesPlacement() throws {
+    let json = Data(#"{"sidebarWidth": 300, "notesPlacement": "sheet"}"#.utf8)
+
+    let layout = try JSONDecoder().decode(WorkspaceLayout.self, from: json)
+
+    #expect(layout.notesPlacement == .popover)
+    #expect(layout.sidebarWidth == 300)
+  }
+
+  @Test("The sections of the right column, and the keys from before #66, are read past (#578)")
+  func sectionsAreReadPast() throws {
+    let json = Data(
+      #"""
+      {"sidebarWidth": 300, "inspectorSplit": 0.7, "isSessionDetailsExpanded": false,
+       "inspectorTopTab": "git", "inspectorSections": {"entries": "nonsense"}}
+      """#.utf8)
+
+    let layout = try JSONDecoder().decode(WorkspaceLayout.self, from: json)
+    let written = try #require(
+      JSONSerialization.jsonObject(with: JSONEncoder().encode(layout)) as? [String: Any])
+
+    #expect(layout.sidebarWidth == 300)
+    for key in [
+      "inspectorSplit", "isSessionDetailsExpanded", "inspectorTopTab", "inspectorSections",
+    ] {
+      #expect(written[key] == nil)
+    }
   }
 }
 
 @Suite("Which columns fit")
 struct WorkspaceLayoutPolicyTests {
-  private let open = WorkspaceLayout(isSidebarVisible: true, isInspectorVisible: true)
+  private let open = WorkspaceLayout(isSidebarVisible: true)
 
   @Test("A wide window shows what the user asked for")
   func wideWindowFollowsIntent() {
-    let columns = WorkspaceLayoutPolicy.resolve(windowWidth: 1_400, intent: open)
-
-    #expect(columns.isSidebarVisible)
-    #expect(columns.isInspectorVisible)
+    #expect(WorkspaceLayoutPolicy.resolve(windowWidth: 1_400, intent: open).isSidebarVisible)
   }
 
-  @Test("The inspector folds first, then the sidebar")
-  func columnsFoldInOrder() {
-    let medium = WorkspaceLayoutPolicy.resolve(windowWidth: 900, intent: open)
-    #expect(medium.isSidebarVisible)
-    #expect(!medium.isInspectorVisible)
-
-    let narrow = WorkspaceLayoutPolicy.resolve(windowWidth: 700, intent: open)
-    #expect(!narrow.isSidebarVisible)
-    #expect(!narrow.isInspectorVisible)
+  @Test("The sidebar keeps its place down to 820 points, the right column gone (#578)")
+  func sidebarFolds() {
+    #expect(WorkspaceLayoutPolicy.resolve(windowWidth: 900, intent: open).isSidebarVisible)
+    #expect(WorkspaceLayoutPolicy.resolve(windowWidth: 820, intent: open).isSidebarVisible)
+    #expect(!WorkspaceLayoutPolicy.resolve(windowWidth: 700, intent: open).isSidebarVisible)
   }
 
-  @Test("Folding a column never decides for the user: widening brings it back")
+  @Test("Folding the sidebar never decides for the user: widening brings it back")
   func intentSurvivesFolding() {
     var intent = open
-    #expect(!WorkspaceLayoutPolicy.resolve(windowWidth: 700, intent: intent).isInspectorVisible)
-    #expect(WorkspaceLayoutPolicy.resolve(windowWidth: 1_400, intent: intent).isInspectorVisible)
+    #expect(!WorkspaceLayoutPolicy.resolve(windowWidth: 700, intent: intent).isSidebarVisible)
+    #expect(WorkspaceLayoutPolicy.resolve(windowWidth: 1_400, intent: intent).isSidebarVisible)
 
-    // A column the user closed stays closed at any width.
-    intent.isInspectorVisible = false
-    #expect(!WorkspaceLayoutPolicy.resolve(windowWidth: 1_400, intent: intent).isInspectorVisible)
+    // A sidebar the user closed stays closed at any width.
+    intent.isSidebarVisible = false
+    #expect(!WorkspaceLayoutPolicy.resolve(windowWidth: 1_400, intent: intent).isSidebarVisible)
   }
 
   @Test("An unmeasured window shows the stored columns rather than folding them away")
   func unmeasuredWindowFollowsIntent() {
-    let columns = WorkspaceLayoutPolicy.resolve(windowWidth: 0, intent: open)
-
-    #expect(columns.isSidebarVisible)
-    #expect(columns.isInspectorVisible)
+    #expect(WorkspaceLayoutPolicy.resolve(windowWidth: 0, intent: open).isSidebarVisible)
   }
 }

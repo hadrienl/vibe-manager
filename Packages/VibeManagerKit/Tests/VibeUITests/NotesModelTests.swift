@@ -95,7 +95,7 @@ private actor GatedNotesStore: SessionNotesStore {
 @MainActor
 private func type(_ text: String, into document: NotesDocument) {
   let end = NSRange(location: document.storage.length, length: 0)
-  guard document.shouldChange(in: end, replacement: text) else { return }
+  guard document.isEditable else { return }
   document.storage.replaceCharacters(in: end, with: text)
   document.didChange()
 }
@@ -104,6 +104,20 @@ private func type(_ text: String, into document: NotesDocument) {
 private func isSaved(_ document: NotesDocument) -> Bool {
   if case .saved = document.state { return true }
   return false
+}
+
+/// Records what the notes revealed and opened.
+@MainActor
+final class FakeOpener: FileOpening {
+  private(set) var revealed: [String] = []
+  private(set) var opened: [String] = []
+
+  func reveal(_ url: URL) { revealed.append(url.path) }
+
+  func open(_ url: URL) async -> Bool {
+    opened.append(url.path)
+    return true
+  }
 }
 
 @MainActor
@@ -228,19 +242,21 @@ struct NotesSavingTests {
     #expect(isSaved(document))
   }
 
-  @Test("A change that would go over the limit is refused whole, and said")
-  func limitIsRefusedWhole() async throws {
-    let (_, document, _) = await make()
+  @Test("Notes have no size limit: a paste of more than 64 KB is written, and read back (#578)")
+  func noLimit() async throws {
+    let store = InMemorySessionNotesStore()
+    let (_, document, _) = await make(store)
     type("Short.", into: document)
 
-    let paste = String(repeating: "x", count: SessionNotesLimits.byteLimit)
-    #expect(!document.shouldChange(in: NSRange(location: 6, length: 0), replacement: paste))
-    #expect(document.refusal?.contains("limited to") == true)
-    #expect(document.text == "Short.")
+    let paste = String(repeating: "x", count: 200 * 1024)
+    type(paste, into: document)
+    #expect(await document.save())
 
-    // Replacing the text with something within the limit is fine again, and clears the message.
-    #expect(document.shouldChange(in: NSRange(location: 0, length: 6), replacement: "Ok"))
-    #expect(document.refusal == nil)
+    #expect(document.text == "Short." + paste)
+    #expect(try await store.notes(for: id).text == "Short." + paste)
+    let reread = NotesModel(store: store, sleep: ManualSleeper().sleep).document(for: id)
+    await waitUntil("the notes are read again") { reread.isLoaded }
+    #expect(reread.text == "Short." + paste)
   }
 
   @Test("Notes that cannot be read are shown as such, and cannot be edited")
@@ -254,7 +270,7 @@ struct NotesSavingTests {
 
     #expect(document.state == .unreadable(reason: "test"))
     #expect(!document.isLoaded)
-    #expect(!document.shouldChange(in: NSRange(location: 0, length: 0), replacement: "x"))
+    #expect(!document.isEditable)
   }
 
   @Test("Quitting waits for the notes only so long, and reports those still in flight")
@@ -351,6 +367,59 @@ struct NotesEditorTests {
     coordinator.textView = textView
     coordinator.attach(document, to: textView)
     return (textView, coordinator)
+  }
+
+  @Test("An immediate detach and reattach keeps the new editor on the shared text storage")
+  func transferBetweenPresentations() async throws {
+    let store = InMemorySessionNotesStore()
+    let model = NotesModel(store: store, sleep: ManualSleeper().sleep)
+    let id = SessionID()
+    let document = model.document(for: id)
+    await waitUntil("the notes are loaded") { document.isLoaded }
+    let (popover, oldCoordinator) = editor(for: document)
+    let text = "ici on peut noter plein de trucs cools"
+    popover.insertText(text, replacementRange: popover.selectedRange())
+    #expect(document.hasUnsavedChanges)
+
+    // SwiftUI can create the destination before dismantling the previous presentation.
+    let (panel, panelCoordinator) = editor(for: document)
+    oldCoordinator.detach()
+    #expect(panel.textStorage === document.storage)
+    #expect(panel.string == text)
+    #expect(document.storage.layoutManagers.count == 1)
+
+    // A stale, now empty view must neither mark the document edited nor erase its contents.
+    popover.insertText("", replacementRange: NSRange(location: 0, length: 0))
+    oldCoordinator.textDidChange(Notification(name: NSText.didChangeNotification, object: popover))
+    #expect(document.text == text)
+
+    panel.insertText(
+      " — suite", replacementRange: NSRange(location: panel.string.utf16.count, length: 0))
+    let (reattached, nextCoordinator) = editor(for: document)
+    panelCoordinator.detach()
+    #expect(reattached.textStorage === document.storage)
+    #expect(reattached.string == text + " — suite")
+    #expect(document.storage.layoutManagers.count == 1)
+    #expect(await document.save())
+    #expect(try await store.notes(for: id).text == text + " — suite")
+    nextCoordinator.detach()
+  }
+
+  @Test("Changing a view's session leaves another view on the previous document")
+  func changingOneEditorDoesNotMoveAnother() async {
+    let model = NotesModel(store: InMemorySessionNotesStore(), sleep: ManualSleeper().sleep)
+    let first = model.document(for: SessionID())
+    let second = model.document(for: SessionID())
+    await waitUntil("both notes are loaded") { first.isLoaded && second.isLoaded }
+    let (one, coordinator) = editor(for: first)
+    let (two, secondCoordinator) = editor(for: first)
+    one.insertText("First", replacementRange: NSRange(location: 0, length: 0))
+    coordinator.attach(second, to: one)
+    #expect(one.textStorage === second.storage)
+    #expect(two.textStorage === first.storage)
+    #expect(two.string == "First")
+    secondCoordinator.detach()
+    coordinator.detach()
   }
 
   @Test("Undo belongs to a session: ⌘Z in one never touches the other")
@@ -489,13 +558,6 @@ struct NotesStatePresentationTests {
     #expect(
       NotesStatePresentation.announcement(from: failed, to: .saved(at: Date())) == "Notes saved")
     #expect(NotesStatePresentation.announcement(from: .saving, to: .saved(at: Date())) == nil)
-  }
-
-  @Test("The footer warns near the limit, and says a refused change first")
-  func footer() {
-    #expect(NotesFooter.text(refusal: nil, byteCount: 1_000) == nil)
-    #expect(NotesFooter.text(refusal: nil, byteCount: 58 * 1024)?.contains("of") == true)
-    #expect(NotesFooter.text(refusal: "Refused.", byteCount: 58 * 1024) == "Refused.")
   }
 }
 

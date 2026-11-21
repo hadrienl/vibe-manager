@@ -108,7 +108,6 @@ struct BranchReportWatchTests {
     let model = AppModel(repository: WatchRepository(values: [api]))
     await model.load()
 
-    #expect(!model.reportsBranches)
     #expect(model.branchReport(for: api.id) == nil)
   }
 }
@@ -213,11 +212,6 @@ private struct CleanStatusReader: RepositoryStatusReading {
     .success(GitDirectories(gitDirectory: path + "/.git", commonDirectory: path + "/.git"))
   }
 
-  func untrackedFiles(in directory: String, atPath path: String, limit: Int) async -> Result<
-    UntrackedListing, RepositoryStatusIssue
-  > {
-    .success(UntrackedListing(directory: directory, paths: [], totalCount: 0))
-  }
 }
 
 private final class HandFileChanges: FileChangeObserving, @unchecked Sendable {

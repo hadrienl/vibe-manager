@@ -15,28 +15,7 @@ public struct SessionNotes: Hashable, Sendable {
   public static let empty = SessionNotes(text: "", modifiedAt: nil)
 }
 
-public enum SessionNotesLimits {
-  /// The most a session's notes may weigh, in UTF-8 bytes.
-  ///
-  /// About thirty pages: far above a note, below a log pasted by mistake. Every session's notes
-  /// are held in memory for the search, and this is what bounds that memory.
-  public static let byteLimit = 64 * 1024
-  /// From here on the editor says how close the notes are to the limit.
-  public static let warningByteCount = 56 * 1024
-
-  /// Whether `text` may replace notes that weigh `current` bytes.
-  ///
-  /// Anything under the limit may. Over it, only a text that shrinks: a file written by hand, or
-  /// by a future version, must stay editable down to size rather than become frozen.
-  public static func accepts(_ text: String, replacing current: Int) -> Bool {
-    let count = text.utf8.count
-    return count <= byteLimit || count <= current
-  }
-}
-
 public enum SessionNotesError: Error, Equatable, Sendable, LocalizedError {
-  /// Writing would take the notes over `SessionNotesLimits.byteLimit`.
-  case tooLarge(byteCount: Int, limit: Int)
   /// The file is there but could not be read — invalid UTF-8, a permission. It is never
   /// overwritten: the bytes that could not be read are the only copy of what was written.
   case unreadable(reason: String)
@@ -45,11 +24,6 @@ public enum SessionNotesError: Error, Equatable, Sendable, LocalizedError {
 
   public var errorDescription: String? {
     switch self {
-    case .tooLarge(let byteCount, let limit):
-      return String(
-        localized:
-          "The notes would weigh \(Self.size(byteCount)); they are limited to \(Self.size(limit)).",
-        bundle: .module, comment: "Two sizes, formatted: “70 KB”, “64 KB”.")
     case .unreadable(let reason):
       return String(localized: "The notes could not be read: \(reason)", bundle: .module)
     case .cannotWrite(let reason):
@@ -57,8 +31,7 @@ public enum SessionNotesError: Error, Equatable, Sendable, LocalizedError {
     }
   }
 
-  /// "64 KB", "1.2 MB", counted in powers of two like the limit itself: counted in thousands,
-  /// the limit would read "66 KB" next to a promise of 64.
+  /// "18 KB", "1.2 MB", counted in powers of two, as notes were when they had a limit of 64 KB.
   public static func size(_ byteCount: Int) -> String {
     ByteCountFormatter.string(fromByteCount: Int64(byteCount), countStyle: .memory)
   }
@@ -73,16 +46,13 @@ public protocol SessionNotesStore: Sendable {
   func notes(for id: SessionID) async throws -> SessionNotes
   /// Writes `text` in place of the session's notes, or removes them when it is empty.
   ///
-  /// Refused with `tooLarge` past the limit — unless it shrinks notes that were already over it —
-  /// and with `unreadable` over a file that could not be read.
+  /// Refused with `unreadable` over a file that could not be read. Notes have no size limit
+  /// (#578): a log pasted in is the user's to keep.
   @discardableResult
   func save(_ text: String, for id: SessionID) async throws -> SessionNotes
   /// Every session's notes that can be read, for the search. The others are left out.
   func allNotes() async -> [SessionID: String]
   /// Writes notes found in an older store, unless the session already has some.
-  ///
-  /// Not held to the limit: those notes were written before there was one, and refusing them
-  /// would leave them where nothing shows them any more.
   func importNotes(_ text: String, for id: SessionID) async throws
 }
 
@@ -179,11 +149,6 @@ public actor InMemorySessionNotesStore: SessionNotesStore {
   @discardableResult
   public func save(_ text: String, for id: SessionID) throws -> SessionNotes {
     if unreadable.contains(id) { throw SessionNotesError.unreadable(reason: "test") }
-    let current = storage[id]?.text.utf8.count ?? 0
-    guard SessionNotesLimits.accepts(text, replacing: current) else {
-      throw SessionNotesError.tooLarge(
-        byteCount: text.utf8.count, limit: SessionNotesLimits.byteLimit)
-    }
     if let failure { throw failure }
     saveCount += 1
     let notes = text.isEmpty ? SessionNotes.empty : SessionNotes(text: text, modifiedAt: Date())

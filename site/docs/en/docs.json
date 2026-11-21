@@ -8,7 +8,7 @@
   "pagerLabel": "Documentation pages",
   "groups": [
     { "title": "Getting started", "pages": ["index", "install"] },
-    { "title": "Everyday work", "pages": ["sessions", "organize", "archive", "conversation", "voice", "requests", "inspector", "terminals"] },
+    { "title": "Everyday work", "pages": ["sessions", "organize", "archive", "conversation", "voice", "requests", "terminals"] },
     { "title": "Going further", "pages": ["templates", "agents", "coordination", "companion", "personalize", "settings", "shortcuts", "troubleshooting"] }
   ]
 }

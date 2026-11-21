@@ -81,6 +81,10 @@ struct VibeManagerApp: App {
           if appDelegate.floatingPanel == nil {
             appDelegate.floatingPanel = FloatingRequestPanelController(model: environment.appModel)
           }
+          // The notes' floating window (#578), shown when the user detaches the notes.
+          if appDelegate.notesPanel == nil {
+            appDelegate.notesPanel = NotesPanelController(model: environment.appModel)
+          }
           // The updater replaces the bundle this process runs from (#92): made here, not in the
           // package, whose tests have no bundle of their own to replace.
           if environment.appModel.updates == nil {
@@ -168,21 +172,6 @@ struct VibeManagerApp: App {
 
       CommandGroup(after: .sidebar) {
         Button(
-          environment.appModel.layout.columns.isInspectorVisible
-            ? String(localized: "Hide Context", comment: "Hides the inspector of the window.")
-            : String(localized: "Show Context", comment: "Shows the inspector of the window.")
-        ) {
-          environment.appModel.layout.toggleInspector()
-        }
-        .keyboardShortcut("i", modifiers: [.command, .option])
-
-        // The sections of the context column back in their first order, sizes and folds (#66).
-        Button("Reset Column Layout") {
-          environment.appModel.layout.resetInspectorSections()
-        }
-        .disabled(environment.appModel.layout.isInspectorArrangementDefault)
-
-        Button(
           environment.appModel.isWebViewOpen
             ? String(localized: "Hide Web View", comment: "Hides the session's web view.")
             : String(localized: "Show Web View", comment: "Shows the session's web view.")
@@ -193,7 +182,8 @@ struct VibeManagerApp: App {
         .disabled(!environment.appModel.isWebViewAvailable)
 
         // Without it the terminal keeps the keyboard, and the notes can only be reached with the
-        // pointer. Escape in the notes hands the keyboard back.
+        // pointer. The editor opens where the user keeps it, under the toolbar's button or in its
+        // floating window (#578); Escape in the notes, or Edit Notes again, hands the keyboard back.
         Button("Edit Notes") {
           environment.appModel.focusNotes()
         }
@@ -337,12 +327,6 @@ struct VibeManagerApp: App {
           environment.appModel.focusSession()
         }
         .keyboardShortcut("2", modifiers: [.command, .option])
-        .disabled(!environment.appModel.isSessionOnScreen)
-
-        Button("Focus Context") {
-          environment.appModel.focusInspector()
-        }
-        .keyboardShortcut("3", modifiers: [.command, .option])
         .disabled(!environment.appModel.isSessionOnScreen)
 
         Button("Focus Web View") {
@@ -686,7 +670,7 @@ private struct SessionHistoryCommands: Commands {
       model.hasMultipleSelection || !(model.selectedSession.map(model.canSwitchAgent) ?? false))
 
     // What the session is shown as (#183): on its row when the sidebar shows it, in the
-    // inspector's header otherwise. The agent never hears of it.
+    // bar above the session otherwise. The agent never hears of it.
     Button("Rename…") {
       guard let id = model.selectedSessionID else { return }
       model.beginRename(id)
@@ -888,6 +872,8 @@ private struct InnerCloseButton: View {
     Button(title) {
       switch focus.front {
       case .workspace: model.closeInnerElement()
+      // The notes' popover is no window to close: ⌘W puts it away, as Escape does (#578).
+      case .other where model.notesPresentation.isPopoverShown: model.notesPopoverDismissed()
       case .other: focus.closeKeyWindow()
       case .sheet, .none: break
       }
@@ -997,6 +983,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   var environment: AppEnvironment?
   /// The floating panel's window (#41), held for the life of the application.
   var floatingPanel: FloatingRequestPanelController?
+  var notesPanel: NotesPanelController?
 
   /// How long quitting may spend being tidy.
   ///

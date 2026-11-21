@@ -93,39 +93,18 @@ func appModelSurfacesStoreFailure() async {
 @MainActor
 @Suite("Moving between the zones of the window")
 struct ZoneNavigationTests {
-  @Test("Focus Sidebar and Focus Inspector ask their zone for the keyboard, showing it if hidden")
+  @Test("Focus Sidebar asks the sidebar for the keyboard, showing it if hidden")
   func focusRequests() async {
     let session = WorkSession(name: "Zones", status: .closed)
     let model = AppModel(repository: FakeSessionRepository(values: [session]))
     await model.load()
     model.select(session.id)
-    model.layout.setInspectorVisible(false)
+    model.layout.setSidebarVisible(false)
 
     model.focusSidebar()
-    model.focusInspector()
 
     #expect(model.sidebarFocusRequest == 1)
-    #expect(model.gitInspector.focusRequest == 1)
-    #expect(model.layout.columns.isInspectorVisible)
-  }
-
-  @Test("Focus Inspector and Edit Notes unfold their section, and the request waits for its list")
-  func focusUnfolds() async {
-    let session = WorkSession(name: "Folded", status: .closed)
-    let model = AppModel(repository: FakeSessionRepository(values: [session]))
-    await model.load()
-    model.select(session.id)
-    model.layout.setAllSectionsCollapsed(true, among: [.git, .notes])
-
-    model.focusInspector()
-    model.focusNotes()
-
-    #expect(!model.layout.inspectorSections.isCollapsed(.git))
-    #expect(!model.layout.inspectorSections.isCollapsed(.notes))
-    // Taken by the list once unfolding has put it on screen, not lost with the bump it never saw.
-    #expect(model.gitInspector.isFocusPending)
-    model.gitInspector.focusTaken()
-    #expect(!model.gitInspector.isFocusPending)
+    #expect(model.layout.columns.isSidebarVisible)
   }
 
   @Test("Read Last Output says so when there is no terminal to read")

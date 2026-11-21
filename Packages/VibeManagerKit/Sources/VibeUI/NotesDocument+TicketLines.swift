@@ -25,8 +25,6 @@ public enum TicketLineInsertion: Hashable, Sendable {
   case inserted
   /// The notes already hold the ticket's address: typed or pasted meanwhile.
   case alreadyThere
-  /// The line would take the notes over their limit.
-  case notesFull
   /// The notes could not be read: nothing is ever written over them.
   case unreadable
 }
@@ -56,10 +54,6 @@ extension NotesDocument {
       insertion = current.isEmpty ? line + "\n" : line + "\n\n"
       block = TicketLineBlock(lines: [.init(rank: rank, text: line)])
     }
-    guard byteCount + insertion.utf8.count <= SessionNotesLimits.byteLimit else {
-      return .notesFull
-    }
-
     breakTypingCoalescing?()
     let length = (insertion as NSString).length
     storage.replaceCharacters(

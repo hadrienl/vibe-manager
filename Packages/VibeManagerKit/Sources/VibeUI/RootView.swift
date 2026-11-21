@@ -8,10 +8,10 @@ import VibeTerminalUI
 
 public struct RootView: View {
   private let model: AppModel
-  /// The widths the columns open at, taken once the stored layout has been read and then left
+  /// The width the sidebar opens at, taken once the stored layout has been read and then left
   /// alone. Handing the measured width back as the column's ideal width would close the loop —
   /// measure, store, propose again, resize — and fight the drag the user is in the middle of.
-  @State private var idealWidths: IdealColumnWidths?
+  @State private var idealSidebarWidth: Double?
   /// The "Don't ask again" box of the close and archive confirmations, unticked each time one opens.
   @State private var suppressesCloseConfirmation = false
   /// The window this view is drawn in: the only one whose visibility says whether its sessions
@@ -94,10 +94,7 @@ public struct RootView: View {
       // Launched behind another application — at login, with `open -g` — it never resigned: it
       // must not believe it is in front, or the floating panel of #41 would wait for nothing.
       if !NSApp.isActive { model.applicationWillResignActive() }
-      idealWidths = IdealColumnWidths(
-        sidebar: model.layout.intent.sidebarWidth,
-        inspector: model.layout.intent.inspectorWidth
-      )
+      idealSidebarWidth = model.layout.intent.sidebarWidth
     }
     // Session › Attach Files… (⌘O): the keyboard's way to a drop (#42). Folders too, as from the
     // Finder.
@@ -256,7 +253,7 @@ public struct RootView: View {
       SessionSidebar(model: model)
         .navigationSplitViewColumnWidth(
           min: WorkspaceLayout.sidebarWidthRange.lowerBound,
-          ideal: idealWidths?.sidebar ?? model.layout.intent.sidebarWidth,
+          ideal: idealSidebarWidth ?? model.layout.intent.sidebarWidth,
           max: WorkspaceLayout.sidebarWidthRange.upperBound
         )
         .background(WidthReporter { model.layout.sidebarWidthChanged(to: $0) })
@@ -371,6 +368,17 @@ public struct RootView: View {
         {
           FullDiskAccessRestartBanner(
             permissions: permissions, runner: runner, runningAgents: running)
+          Divider()
+        }
+        // Renaming, or a new icon or theme, for a session the sidebar does not show (#578).
+        if !model.isPresentingNewSession, let session = model.selectedSession,
+          model.isEditingIdentityInDetail(of: session.id)
+        {
+          SessionIdentityBar(model: model, session: session)
+            // ⌘Z undoes a rename, a change of icon (#183) or an archive (#242) here too; the name
+            // being typed undoes its own typing.
+            .onCommand(Selector(("undo:")), perform: model.sidebarUndoAction(redo: false))
+            .onCommand(Selector(("redo:")), perform: model.sidebarUndoAction(redo: true))
           Divider()
         }
         detail
@@ -511,66 +519,18 @@ public struct RootView: View {
             DeviceMirrorToolbarButton(model: model)
           }
         }
+        // Right of the simulators, where the right column's button was: the session's notes,
+        // under the button or in their panel (#578).
         ToolbarItem(placement: .primaryAction) {
-          // Never disabled: with the column open and the selection gone, a disabled button
-          // would be the only way to close it. The column says so itself instead.
-          Button {
-            model.layout.toggleInspector()
-          } label: {
-            Label(
-              model.layout.columns.isInspectorVisible
-                ? LocalizedStringResource(
-                  "Hide Context", bundle: .module, comment: "Hides the inspector of the window.")
-                : LocalizedStringResource(
-                  "Show Context", bundle: .module, comment: "Shows the inspector of the window."),
-              systemImage: "sidebar.right"
-            )
-          }
-          .accessibilityValue(
-            model.layout.columns.isInspectorVisible
-              ? Text("Shown", bundle: .module, comment: "The inspector is shown.")
-              : Text("Hidden", bundle: .module, comment: "The inspector is hidden."))
+          NotesToolbarButton(model: model)
         }
-      }
-      .inspector(isPresented: inspectorPresented) {
-        Group {
-          if !model.isPresentingNewSession, let session = model.selectedSession {
-            VStack(spacing: 0) {
-              SessionIdentityHeader(model: model, session: session)
-              Divider()
-              inspector(for: session)
-            }
-            // ⌘Z undoes a rename, a change of icon (#183) or an archive (#242) here too; the notes
-            // and the name being typed undo their own typing.
-            .onCommand(Selector(("undo:")), perform: model.sidebarUndoAction(redo: false))
-            .onCommand(Selector(("redo:")), perform: model.sidebarUndoAction(redo: true))
-          } else {
-            // The inspector is only reachable with a selection, but a session can disappear
-            // under it: the column stays rather than snapping shut mid-refresh.
-            ContentUnavailableView {
-              Label {
-                Text("No session selected", bundle: .module)
-              } icon: {
-                Image(systemName: "sidebar.right")
-              }
-            } description: {
-              Text("Select a session to see its repositories and notes.", bundle: .module)
-            }
-          }
-        }
-        .inspectorColumnWidth(
-          min: WorkspaceLayout.inspectorWidthRange.lowerBound,
-          ideal: idealWidths?.inspector ?? model.layout.intent.inspectorWidth,
-          max: WorkspaceLayout.inspectorWidthRange.upperBound
-        )
-        .background(WidthReporter { model.layout.inspectorWidthChanged(to: $0) })
       }
     }
     // Measured on the whole split view: which columns fit is a question about the window, and
     // the answer has to be known before either column decides whether to draw itself.
     .background(WidthReporter { model.layout.windowWidthChanged(to: $0) })
-    // A name or an icon that could not be written (#183), wherever it was edited: the inspector
-    // is where it is edited with the sidebar hidden.
+    // A name or an icon that could not be written (#183), wherever it was edited: in the sidebar,
+    // or above the session when the sidebar does not show it.
     .alert(
       Text("The session could not be changed.", bundle: .module),
       isPresented: Binding(
@@ -823,33 +783,6 @@ public struct RootView: View {
     )
   }
 
-  /// The sections of the inspector, under the session's header.
-  private func inspector(for session: WorkSession) -> some View {
-    SessionContextInspector(
-      session: session,
-      resolution: model.resolution(forID: session.id),
-      branchReport: model.branchReport(for: session.id),
-      branchReportCheckedAt: { model.branchReportCheckedAt(for: session.id) },
-      repositoryStatuses: model.repositoryStatuses,
-      sessionNames: Dictionary(
-        model.sessions.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first }),
-      refreshBranches: model.reportsBranches
-        ? { Task { await model.refreshBranchReport() } } : nil,
-      git: model.gitInspector,
-      layout: model.layout,
-      openPrivacySettings: model.permissions.map { permissions in
-        { permissions.openSystemSettings() }
-      },
-      agentNames: model.agentNames,
-      switchAgent: model.canSwitchAgent(session)
-        ? { model.beginAgentSwitch(session.id) } : nil,
-      notes: model.notes,
-      ticketTitles: model.ticketTitles,
-      leaveNotes: { model.focusSession() },
-      coordination: model
-    )
-  }
-
   /// Whether the close question on screen offers "Don't ask again", `nil` when there is none.
   /// Asked by a move because the agent is in the middle of a turn, it does not (#353).
   private var closeOffersDontAskAgain: Bool? {
@@ -918,13 +851,6 @@ public struct RootView: View {
     Binding(
       get: { model.layout.columns.isSidebarVisible ? .all : .detailOnly },
       set: { model.layout.setSidebarVisible($0 != .detailOnly) }
-    )
-  }
-
-  private var inspectorPresented: Binding<Bool> {
-    Binding(
-      get: { model.layout.columns.isInspectorVisible },
-      set: { model.layout.setInspectorVisible($0) }
     )
   }
 
@@ -1944,9 +1870,9 @@ private struct ArchivedSessionDetail: View {
 
           Text(
             """
-            Repositories, Git metadata, notes and the initial prompt are kept, and are listed in \
-            the context column. An archived session stays in Closed, but cannot be reopened: \
-            unarchive it first, then restarting its agent is a separate, deliberate step.
+            Repositories, Git metadata, notes and the initial prompt are kept. An archived \
+            session stays in Closed, but cannot be reopened: unarchive it first, then restarting \
+            its agent is a separate, deliberate step.
             """,
             bundle: .module,
             comment: "Closed is the tab of the sidebar that lists closed sessions."
@@ -1970,12 +1896,6 @@ private struct ArchivedSessionDetail: View {
       Text(date.formatted(date: .abbreviated, time: .shortened))
     }
   }
-}
-
-/// The widths the two columns open at, frozen once so that measuring them cannot move them.
-private struct IdealColumnWidths: Equatable {
-  let sidebar: Double
-  let inspector: Double
 }
 
 /// Reports the width of whatever it is placed behind, because SwiftUI never reports back the

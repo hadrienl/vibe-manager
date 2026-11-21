@@ -5,9 +5,9 @@ import VibeApplication
 /// Keeps the toolbar see-through over every column, in a window and in full screen (#317).
 ///
 /// Each column of the split view has a background under the toolbar. macOS 26 draws it, whole or
-/// in part, wherever no scroll edge effect lies beneath: opaque above the web view, above the whole
-/// detail once the inspector is open, and, in full screen, as a 91 pt veil left in the split view
-/// after the inspector folds. What scrolls under the toolbar — the conversation — blurs itself
+/// in part, wherever no scroll edge effect lies beneath: opaque above the web view and, in full
+/// screen, as a 91 pt veil left in the split view after a column folds. What scrolls under the
+/// toolbar — the conversation — blurs itself
 /// with its own edge effect, which this leaves alone (`toolbarBackgroundVisibility(.hidden)` would
 /// take it away too).
 ///
@@ -28,8 +28,8 @@ final class ToolbarBackgroundRemover {
 
   private struct Hidden {
     weak var view: NSView?
-    /// AppKit showing it again — each time the inspector opens, or the window enters full
-    /// screen — hidden at once: shown even for a moment, it flickers over the column.
+    /// AppKit showing it again — each time a column opens, or the window enters full screen —
+    /// hidden at once: shown even for a moment, it flickers over the column.
     let shown: NSKeyValueObservation
   }
 

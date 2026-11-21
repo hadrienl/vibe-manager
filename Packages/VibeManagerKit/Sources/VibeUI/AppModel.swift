@@ -93,7 +93,7 @@ public final class AppModel {
   /// The session between Create and its terminal, shown in its place meanwhile.
   public internal(set) var sessionInCreation: SessionInCreation?
   /// What each session's agent can do right now, refreshed with the detections. Held here so
-  /// that the sidebar and the inspector read the same answer instead of each probing again.
+  /// that the sidebar and the session read the same answer instead of each probing again.
   public private(set) var resolutions: [SessionID: SessionAgentResolution] = [:]
   /// What each session's agent is doing, as the tracker last said (#45), one cell per session
   /// (#254): a view reading one session's activity is not woken by another's.
@@ -328,18 +328,10 @@ public final class AppModel {
   public var quitBehavior: QuitBehavior {
     didSet { quitPreferences.behavior = quitBehavior }
   }
-  /// Where a changed file listed in the inspector opens. `nil`: it is only revealed. Mirrored
-  /// here so that the settings window and the inspector read and change the same answer.
-  public var fileEditor: EditorChoice? {
-    didSet {
-      fileOpeningPreferences.editor = fileEditor
-      gitInspector.editor = fileEditor
-    }
-  }
-  /// The screen state of the inspector's Git pane, kept per session for the length of the run.
-  let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
+  /// Where the notes are on screen: under the toolbar's button, or in their panel (#578).
+  public let notesPresentation: NotesPresentation
   /// The titles of the tickets a new session names, read in its web view for its notes (#89).
   public let ticketTitles: TicketTitlesModel
   /// Every session's journal: its resources (#36). Absent in a workspace
@@ -719,7 +711,6 @@ public final class AppModel {
   private let closeSession: CloseSession
   private let closePreferences: any SessionClosePreferences
   private let quitPreferences: any QuitPreferences
-  private let fileOpeningPreferences: any FileOpeningPreferences
   private let archiveSession: ArchiveSession
   /// Where what happens to the sessions is noted, by pseudonym.
   public let diagnostics: Diagnostics
@@ -822,13 +813,12 @@ public final class AppModel {
     // time: without a clock to move, its far side could only be tested by waiting eight seconds.
     clock: any SessionClock = SystemSessionClock(),
     /// Reads what the agent did to the branches. Absent in a workspace assembled without Git,
-    /// where the inspector shows no report at all.
+    /// where no report is read at all.
     branchReader: ReadSessionBranchReport? = nil,
     /// Keeps the repositories of the session on screen read, when the disk says they moved.
     /// Absent in a workspace assembled without Git: the report is then read on demand only.
     repositoryStatus: RepositoryStatusMonitor? = nil,
     closePreferences: any SessionClosePreferences = InMemorySessionClosePreferences(),
-    fileOpeningPreferences: any FileOpeningPreferences = InMemoryFileOpeningPreferences(),
     /// Where the notes are kept. A workspace assembled without one keeps none.
     notesStore: any SessionNotesStore = NoSessionNotes(),
     /// Where a session's notes file is, for Reveal in Finder when it cannot be read.
@@ -870,7 +860,7 @@ public final class AppModel {
     conversations: ConversationWorkspace = ConversationWorkspace(),
     /// Writes the archive of an export.
     archiveDiagnostics: @escaping @Sendable ([DiagnosticFile], Date) -> Data = { _, _ in Data() },
-    /// Keeps each session's journal. Absent, the inspector shows Git alone.
+    /// Keeps each session's journal. Absent, there are no resources to read.
     journal: SessionJournalModel? = nil,
     /// Where the names given to groups are kept. A workspace assembled without one keeps them for
     /// the run.
@@ -932,19 +922,6 @@ public final class AppModel {
     self.closePreferences = closePreferences
     self.quitPreferences = quitPreferences
     quitBehavior = quitPreferences.behavior
-    self.fileOpeningPreferences = fileOpeningPreferences
-    fileEditor = fileOpeningPreferences.editor
-    var listUntracked: GitInspectorModel.ListUntracked?
-    if let repositoryStatus {
-      listUntracked = { directory, key in
-        await repositoryStatus.untrackedFiles(in: directory, of: key)
-      }
-    }
-    gitInspector = GitInspectorModel(
-      listUntracked: listUntracked,
-      opener: WorkspaceFileOpener(),
-      editor: fileOpeningPreferences.editor
-    )
     confirmsStoppingRunningAgent = closePreferences.confirmsStoppingRunningAgent
     setAsideClose = closePreferences.setAsideClose
     self.clock = clock
@@ -958,6 +935,7 @@ public final class AppModel {
     self.launcher = launcher
     self.recentFolderStore = recentFolderStore
     self.layout = layout
+    notesPresentation = NotesPresentation(layout: layout)
 
     // A workspace without a launcher has nothing running, so the use cases are handed a runtime
     // that says exactly that rather than an optional they would each have to second-guess.
@@ -3051,6 +3029,7 @@ public final class AppModel {
     if let previous = selectedSessionID, previous != id {
       Task { [notes] in await notes.flush(previous) }
     }
+    if selectedSessionID != id { notesSelectionChanged() }
     selectedSessionID = id
     conversations.cancelPendingComposerFocus(unless: id)
     layout.select(id)
@@ -3609,8 +3588,6 @@ extension AppModel {
     branchReportCheckedAt[id] ?? branchReports[id]?.readAt
   }
 
-  public var reportsBranches: Bool { readBranchReport != nil }
-
   /// Whether the repositories of the session on screen are kept live, rather than read on demand.
   public var observesRepositories: Bool { repositoryStatus != nil }
 
@@ -3700,17 +3677,6 @@ extension AppModel {
         comment: "Stands for a session whose name is unknown.")
   }
 
-  /// Edit Notes: the inspector is shown if it was hidden, the notes unfolded if they were folded,
-  /// and their editor takes the keyboard.
-  public func focusNotes() {
-    guard selectedSessionID != nil else { return }
-    if !layout.columns.isInspectorVisible {
-      layout.setInspectorVisible(true)
-    }
-    layout.setSectionCollapsed(.notes, false)
-    notes.requestFocus()
-  }
-
   public func focusSidebar() {
     if !layout.columns.isSidebarVisible {
       layout.setSidebarVisible(true)
@@ -3740,18 +3706,6 @@ extension AppModel {
     guard isArchiveListPending else { return }
     isArchiveListPending = false
     isArchiveListPresented = true
-  }
-
-  /// Focus Inspector, ⌥⌘3: the inspector is shown if it was hidden, and its list takes the
-  /// keyboard.
-  public func focusInspector() {
-    guard selectedSessionID != nil else { return }
-    if !layout.columns.isInspectorVisible {
-      layout.setInspectorVisible(true)
-    }
-    // Git's list, unfolded: the Activity section is gone (#572).
-    layout.setSectionCollapsed(.git, false)
-    gitInspector.requestFocus()
   }
 
   /// Read Last Output, ⌃⌥⌘O: VoiceOver says the agent's last message when the session is shown as
@@ -3888,7 +3842,6 @@ extension AppModel {
       for state in states {
         repositoryStatuses[state.key] = state
       }
-      gitInspector.statesChanged(states)
     case .branchReportOutdated(let id):
       guard id == observedSessionID else { return }
       requestBranchReport(of: id)

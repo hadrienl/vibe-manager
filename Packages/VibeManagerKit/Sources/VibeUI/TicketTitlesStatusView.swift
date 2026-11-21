@@ -104,10 +104,6 @@ enum TicketTitlesPresentation {
         bundle: .module, comment: "A ticket's identifier.")
     case .failed(let failure):
       return failed(failure, id: id)
-    case .notesFull:
-      return String(
-        localized: "The title of \(id) does not fit in the notes.", bundle: .module,
-        comment: "A ticket's identifier.")
     case .notesUnreadable:
       return String(
         localized: "The title of \(id) was not added: the notes could not be read.",
