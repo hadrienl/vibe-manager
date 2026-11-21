@@ -142,10 +142,12 @@ struct SessionNotesEditor: NSViewRepresentable {
       DispatchQueue.main.async { [weak self, weak textView] in
         guard let self, let textView else { return }
         guard let window = textView.window else {
-          // Just unfolded: the inspector is not in the window yet.
+          // Just opened: the popover or the panel is not on screen yet.
           if attempts > 0 { self.takeFocus(in: textView, attempts: attempts - 1) }
           return
         }
+        // The floating panel, already open behind the workspace window, takes the keyboard too.
+        if !window.isKeyWindow { window.makeKey() }
         window.makeFirstResponder(textView)
         let end = NSRange(location: textView.string.utf16.count, length: 0)
         textView.setSelectedRange(end)
