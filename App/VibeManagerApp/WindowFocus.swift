@@ -72,8 +72,9 @@ final class WindowFocus {
       hasWorkspace = false
     }
     // The floating panel (#41) takes the keyboard only while another application is in front:
-    // ⌘W has nothing to close there.
-    guard let key = NSApp.keyWindow, !((key as? NSPanel)?.isFloatingPanel ?? false) else {
+    // ⌘W has nothing to close there. The notes' panel (#578), which activates the application,
+    // is another window: ⌘W closes it.
+    guard let key = NSApp.keyWindow, !key.styleMask.contains(.nonactivatingPanel) else {
       front = .none
       return
     }

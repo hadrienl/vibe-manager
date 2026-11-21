@@ -81,6 +81,10 @@ struct VibeManagerApp: App {
           if appDelegate.floatingPanel == nil {
             appDelegate.floatingPanel = FloatingRequestPanelController(model: environment.appModel)
           }
+          // The notes' floating window (#578), shown when the user detaches the notes.
+          if appDelegate.notesPanel == nil {
+            appDelegate.notesPanel = NotesPanelController(model: environment.appModel)
+          }
           // The updater replaces the bundle this process runs from (#92): made here, not in the
           // package, whose tests have no bundle of their own to replace.
           if environment.appModel.updates == nil {
@@ -997,6 +1001,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   var environment: AppEnvironment?
   /// The floating panel's window (#41), held for the life of the application.
   var floatingPanel: FloatingRequestPanelController?
+  var notesPanel: NotesPanelController?
 
   /// How long quitting may spend being tidy.
   ///

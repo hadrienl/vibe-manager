@@ -341,6 +341,15 @@ public final class WorkspaceLayoutController {
     updateIntent { $0.keepPresentations(of: ids) }
   }
 
+  /// Where the notes open from the toolbar (#578).
+  public var notesPlacement: NotesPlacement {
+    settings.notesPlacement
+  }
+
+  public func setNotesPlacement(_ placement: NotesPlacement) {
+    updateIntent { $0.notesPlacement = placement }
+  }
+
   /// Folds the palette of pending requests into its count, or unfolds it (#40).
   public var isRequestPaletteCollapsed: Bool {
     settings.isRequestPaletteCollapsed

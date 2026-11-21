@@ -43,6 +43,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
   /// The coordinators whose children are folded away in the sidebar (#352). Never pruned, like the
   /// folders.
   public var collapsedCoordinators: Set<SessionID>
+  /// Where the session's notes open from the toolbar (#578): under the button, or in a panel that
+  /// stays open.
+  public var notesPlacement: NotesPlacement
 
   public init(
     selectedSessionID: SessionID? = nil,
@@ -57,7 +60,8 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     collapsedFolders: Set<SessionFolderKey> = [],
     sessionPresentations: [String: SessionPresentation] = [:],
     isRequestPaletteCollapsed: Bool = false,
-    collapsedCoordinators: Set<SessionID> = []
+    collapsedCoordinators: Set<SessionID> = [],
+    notesPlacement: NotesPlacement = .popover
   ) {
     self.selectedSessionID = selectedSessionID
     self.isSidebarVisible = isSidebarVisible
@@ -72,13 +76,14 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
     self.sessionPresentations = sessionPresentations
     self.isRequestPaletteCollapsed = isRequestPaletteCollapsed
     self.collapsedCoordinators = collapsedCoordinators
+    self.notesPlacement = notesPlacement
   }
 
   private enum CodingKeys: String, CodingKey {
     case selectedSessionID, isSidebarVisible, isInspectorVisible, sidebarWidth, inspectorWidth
     case sessionFilter, inspectorSections, browserWidth
     case sidebarMode, collapsedFolders, sessionPresentations
-    case isRequestPaletteCollapsed, collapsedCoordinators
+    case isRequestPaletteCollapsed, collapsedCoordinators, notesPlacement
   }
 
   /// What the column was arranged with before #66. Read once, to arrange the sections the same
@@ -115,7 +120,9 @@ public struct WorkspaceLayout: Equatable, Sendable, Codable {
       isRequestPaletteCollapsed: (try? container.decodeIfPresent(
         Bool.self, forKey: .isRequestPaletteCollapsed)) ?? false,
       collapsedCoordinators: (try? container.decodeIfPresent(
-        Set<SessionID>.self, forKey: .collapsedCoordinators)) ?? []
+        Set<SessionID>.self, forKey: .collapsedCoordinators)) ?? [],
+      notesPlacement: (try? container.decodeIfPresent(
+        NotesPlacement.self, forKey: .notesPlacement)) ?? .popover
     )
   }
 }
@@ -216,6 +223,14 @@ extension WorkspaceLayout {
     guard value.isFinite, value >= range.lowerBound else { return nil }
     return min(value, range.upperBound)
   }
+}
+
+/// Where the notes of the session open (#578).
+public enum NotesPlacement: String, Codable, Equatable, Sendable {
+  /// Under the toolbar's button, closed by a click elsewhere.
+  case popover
+  /// In a panel of its own, which stays open and follows the selection.
+  case panel
 }
 
 /// Where the session's web view goes, once the window's width has had its say (#69).

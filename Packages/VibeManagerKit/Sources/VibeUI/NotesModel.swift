@@ -351,6 +351,11 @@ public final class NotesModel {
     return searchIndex[id]
   }
 
+  /// Whether a session has notes worth the name: something else than blanks.
+  public func hasNotes(for id: SessionID) -> Bool {
+    searchIndex[id]?.contains { !$0.isWhitespace } ?? false
+  }
+
   /// Writes what is pending for one session, now.
   @discardableResult
   public func flush(_ id: SessionID) async -> Bool {

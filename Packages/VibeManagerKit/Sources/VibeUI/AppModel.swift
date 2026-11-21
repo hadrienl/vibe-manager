@@ -340,6 +340,8 @@ public final class AppModel {
   let gitInspector: GitInspectorModel
   /// Every session's notes: the editor's documents, the writes, the search index.
   public let notes: NotesModel
+  /// Where the notes are on screen: under the toolbar's button, or in their panel (#578).
+  public let notesPresentation: NotesPresentation
   /// The titles of the tickets a new session names, read in its web view for its notes (#89).
   public let ticketTitles: TicketTitlesModel
   /// Every session's journal: its resources (#36). Absent in a workspace
@@ -958,6 +960,7 @@ public final class AppModel {
     self.launcher = launcher
     self.recentFolderStore = recentFolderStore
     self.layout = layout
+    notesPresentation = NotesPresentation(layout: layout)
 
     // A workspace without a launcher has nothing running, so the use cases are handed a runtime
     // that says exactly that rather than an optional they would each have to second-guess.
@@ -3051,6 +3054,7 @@ public final class AppModel {
     if let previous = selectedSessionID, previous != id {
       Task { [notes] in await notes.flush(previous) }
     }
+    if selectedSessionID != id { notesSelectionChanged() }
     selectedSessionID = id
     conversations.cancelPendingComposerFocus(unless: id)
     layout.select(id)
@@ -3698,17 +3702,6 @@ extension AppModel {
       ?? String(
         localized: "a session", bundle: .module,
         comment: "Stands for a session whose name is unknown.")
-  }
-
-  /// Edit Notes: the inspector is shown if it was hidden, the notes unfolded if they were folded,
-  /// and their editor takes the keyboard.
-  public func focusNotes() {
-    guard selectedSessionID != nil else { return }
-    if !layout.columns.isInspectorVisible {
-      layout.setInspectorVisible(true)
-    }
-    layout.setSectionCollapsed(.notes, false)
-    notes.requestFocus()
   }
 
   public func focusSidebar() {

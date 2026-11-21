@@ -109,19 +109,17 @@ struct ZoneNavigationTests {
     #expect(model.layout.columns.isInspectorVisible)
   }
 
-  @Test("Focus Inspector and Edit Notes unfold their section, and the request waits for its list")
+  @Test("Focus Inspector unfolds its section, and the request waits for its list")
   func focusUnfolds() async {
     let session = WorkSession(name: "Folded", status: .closed)
     let model = AppModel(repository: FakeSessionRepository(values: [session]))
     await model.load()
     model.select(session.id)
-    model.layout.setAllSectionsCollapsed(true, among: [.git, .notes])
+    model.layout.setAllSectionsCollapsed(true, among: [.git])
 
     model.focusInspector()
-    model.focusNotes()
 
     #expect(!model.layout.inspectorSections.isCollapsed(.git))
-    #expect(!model.layout.inspectorSections.isCollapsed(.notes))
     // Taken by the list once unfolding has put it on screen, not lost with the bump it never saw.
     #expect(model.gitInspector.isFocusPending)
     model.gitInspector.focusTaken()
