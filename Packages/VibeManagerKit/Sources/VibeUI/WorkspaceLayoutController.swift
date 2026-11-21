@@ -311,7 +311,7 @@ public final class WorkspaceLayoutController {
   }
 
   public var isInspectorArrangementDefault: Bool {
-    settings.inspectorSections == .default
+    settings.inspectorSections.isDefault
   }
 
   /// Reset Column Layout.

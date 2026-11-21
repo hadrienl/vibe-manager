@@ -5,9 +5,10 @@ import Testing
 
 @Suite("The sections of the context column")
 struct InspectorArrangementTests {
-  private let five: [InspectorSectionID] = [.activity, .git, .notes, .agent, .prompt]
+  /// The agent's section moved to the status bar (#575), as the usage did (#574).
+  private let four: [InspectorSectionID] = [.activity, .git, .notes, .prompt]
 
-  /// The default arrangement before #572, Activity first: five sections to move about.
+  /// The default arrangement before #572, Activity first: four sections to move about.
   private static let withActivity = InspectorArrangement(
     entries: [.init(id: .activity, isCollapsed: false)] + InspectorArrangement.default.entries)
 
@@ -18,29 +19,39 @@ struct InspectorArrangementTests {
     #expect(arrangement.entry(.activity) == nil)
     // In the status bar since #574.
     #expect(arrangement.entry(.usage) == nil)
-    #expect(arrangement.order(of: Array(five.dropFirst())) == Array(five.dropFirst()))
+    #expect(arrangement.order(of: Array(four.dropFirst())) == Array(four.dropFirst()))
     #expect(!arrangement.isCollapsed(.git))
     #expect(!arrangement.isCollapsed(.notes))
-    #expect(arrangement.isCollapsed(.agent))
+    #expect(arrangement.entry(.agent) == nil)
     #expect(arrangement.isCollapsed(.prompt))
+  }
+
+  @Test("An arrangement saved with the Activity, Usage and Agent sections is still the default one")
+  func retiredSectionsDoNotCount() {
+    var saved = InspectorArrangement(
+      entries: [.init(id: .activity, isCollapsed: false)] + InspectorArrangement.default.entries
+        + [.init(id: .usage, isCollapsed: true), .init(id: .agent, isCollapsed: true)])
+    #expect(saved.isDefault)
+    saved.setCollapsed(.git, true)
+    #expect(!saved.isDefault)
   }
 
   @Test("Move Up and Move Down stop at the ends")
   func moveByOne() {
     var arrangement = InspectorArrangement.default
 
-    arrangement.move(.notes, by: -1, among: five)
-    #expect(arrangement.order(of: five) == [.activity, .notes, .git, .agent, .prompt])
-    arrangement.move(.activity, by: -1, among: five)
-    #expect(arrangement.order(of: five).first == .activity)
-    arrangement.move(.prompt, by: 1, among: five)
-    #expect(arrangement.order(of: five).last == .prompt)
-    arrangement.move(.activity, by: 1, among: five)
-    #expect(arrangement.order(of: five) == [.notes, .activity, .git, .agent, .prompt])
+    arrangement.move(.notes, by: -1, among: four)
+    #expect(arrangement.order(of: four) == [.activity, .notes, .git, .prompt])
+    arrangement.move(.activity, by: -1, among: four)
+    #expect(arrangement.order(of: four).first == .activity)
+    arrangement.move(.prompt, by: 1, among: four)
+    #expect(arrangement.order(of: four).last == .prompt)
+    arrangement.move(.activity, by: 1, among: four)
+    #expect(arrangement.order(of: four) == [.notes, .activity, .git, .prompt])
 
-    #expect(!arrangement.canMove(.notes, by: -1, among: five))
-    #expect(arrangement.canMove(.notes, by: 1, among: five))
-    #expect(!arrangement.canMove(.prompt, by: 1, among: five))
+    #expect(!arrangement.canMove(.notes, by: -1, among: four))
+    #expect(arrangement.canMove(.notes, by: 1, among: four))
+    #expect(!arrangement.canMove(.prompt, by: 1, among: four))
   }
 
   @Test("A section that is not shown is never a step of Move Up or Move Down")
@@ -64,13 +75,13 @@ struct InspectorArrangementTests {
     var arrangement = Self.withActivity
 
     arrangement.move(.prompt, before: .activity)
-    #expect(arrangement.order(of: five) == [.prompt, .activity, .git, .notes, .agent])
+    #expect(arrangement.order(of: four) == [.prompt, .activity, .git, .notes])
     arrangement.move(.prompt, after: .notes)
-    #expect(arrangement.order(of: five) == [.activity, .git, .notes, .prompt, .agent])
+    #expect(arrangement.order(of: four) == [.activity, .git, .notes, .prompt])
     arrangement.move(.activity, before: nil)
-    #expect(arrangement.order(of: five) == [.git, .notes, .prompt, .agent, .activity])
+    #expect(arrangement.order(of: four) == [.git, .notes, .prompt, .activity])
     arrangement.move(.git, before: .git)
-    #expect(arrangement.order(of: five).first == .git)
+    #expect(arrangement.order(of: four).first == .git)
   }
 
   @Test("Folding one, all, or all the others")
@@ -80,25 +91,24 @@ struct InspectorArrangementTests {
     arrangement.setCollapsed(.git, true)
     #expect(arrangement.isCollapsed(.git))
 
-    arrangement.setCollapsed(true, among: five)
-    #expect(five.allSatisfy(arrangement.isCollapsed))
-    arrangement.setCollapsed(false, among: five)
-    #expect(!five.contains(where: arrangement.isCollapsed))
+    arrangement.setCollapsed(true, among: four)
+    #expect(four.allSatisfy(arrangement.isCollapsed))
+    arrangement.setCollapsed(false, among: four)
+    #expect(!four.contains(where: arrangement.isCollapsed))
 
-    arrangement.collapseOthers(than: .notes, among: five)
-    #expect(five.filter { !arrangement.isCollapsed($0) } == [.notes])
+    arrangement.collapseOthers(than: .notes, among: four)
+    #expect(four.filter { !arrangement.isCollapsed($0) } == [.notes])
   }
 
   @Test("Resizing rewrites the weights it is given, and scales the others to the same unit")
   func resizing() {
     var arrangement = Self.withActivity
 
-    arrangement.resize(to: [.git: 280, .notes: 200, .agent: .nan, .prompt: -4])
+    arrangement.resize(to: [.git: 280, .notes: 200, .prompt: .nan, .agent: -4])
 
     #expect(arrangement.weight(.git) == 280)
     #expect(arrangement.weight(.notes) == 200)
     #expect(arrangement.weight(.activity) == 200)
-    #expect(arrangement.weight(.agent) == 200)
     #expect(arrangement.weight(.prompt) == 200)
   }
 
@@ -106,16 +116,16 @@ struct InspectorArrangementTests {
   func unfoldingAfterResize() {
     var arrangement = InspectorArrangement.default
     arrangement.resize(to: [.activity: 150, .git: 250, .notes: 150])
-    arrangement.setCollapsed(.agent, false)
+    arrangement.setCollapsed(.prompt, false)
 
     let heights = InspectorHeights.distribute(
       600,
-      among: [.activity, .git, .notes, .agent].map {
+      among: [.activity, .git, .notes, .prompt].map {
         InspectorHeights.Demand(id: $0, weight: arrangement.weight($0), minimum: 60)
       })
 
     // Its default weight of 1, out of 1 + 1.4 + 1, becomes 550 / 3.4 points.
-    #expect(abs((heights[.agent] ?? 0) - 600 * (550 / 3.4) / (550 + 550 / 3.4)) < 0.001)
+    #expect(abs((heights[.prompt] ?? 0) - 600 * (550 / 3.4) / (550 + 550 / 3.4)) < 0.001)
   }
 
   @Test("A section new in this build goes after the one declared before it")
@@ -125,11 +135,11 @@ struct InspectorArrangementTests {
       .init(id: .git, isCollapsed: true),
     ])
 
-    let resolved = stored.resolved(declared: five)
+    let resolved = stored.resolved(declared: four)
 
-    #expect(resolved.entries.map(\.id) == [.activity, .notes, .agent, .prompt, .git])
+    #expect(resolved.entries.map(\.id) == [.activity, .notes, .prompt, .git])
     #expect(resolved.isCollapsed(.git))
-    #expect(resolved.isCollapsed(.agent))
+    #expect(resolved.isCollapsed(.prompt))
   }
 
   @Test("A section this build does not know is kept, in its place, and written back as it was")
@@ -151,7 +161,7 @@ struct InspectorArrangementTests {
     #expect(arrangement.entries.map(\.id.rawValue) == ["git", "llm-costs", "notes", "agent"])
     #expect(arrangement.weight(.git) == 2)
     #expect(arrangement.weight(.agent) == 1)
-    #expect(arrangement.order(of: five) == [.activity, .git, .notes, .agent, .prompt])
+    #expect(arrangement.order(of: four) == [.activity, .git, .notes, .prompt])
 
     let again = try JSONDecoder().decode(
       InspectorArrangement.self, from: JSONEncoder().encode(arrangement))

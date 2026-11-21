@@ -81,7 +81,9 @@ let package = Package(
     .target(
       name: "VibeTerminalUI",
       dependencies: [
-        "VibeApplication", "VibeDomain", .product(name: "SwiftTerm", package: "SwiftTerm"),
+        // VibeConversationUI for its instant tooltip, on the status bar's icons (#575).
+        "VibeApplication", "VibeConversationUI", "VibeDomain",
+        .product(name: "SwiftTerm", package: "SwiftTerm"),
       ],
       resources: [.process("Localizable.xcstrings")]
     ),

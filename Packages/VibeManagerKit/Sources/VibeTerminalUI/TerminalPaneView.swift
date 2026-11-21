@@ -1,5 +1,6 @@
 import SwiftUI
 import VibeApplication
+import VibeConversationUI
 
 // Presentation of one terminal: the surface itself plus a readable lifecycle state. The view
 // knows nothing of process identifiers or descriptors.
@@ -131,6 +132,7 @@ public struct TerminalStatusBar<Accessory: View>: View {
   /// What ends the process of a session's terminal: the session's own Close, which asks first
   /// when an agent is at work (#238), never the pane's process stopped behind the user's back.
   private let close: () -> Void
+  @State private var density = StatusBarDensity.full
 
   public init(
     pane: TerminalPaneModel, accessory: Accessory?, restart: (() -> Void)? = nil,
@@ -157,32 +159,63 @@ public struct TerminalStatusBar<Accessory: View>: View {
 
   public var body: some View {
     HStack(spacing: 8) {
-      Image(systemName: status.symbolName)
-        .foregroundStyle(status.tint)
-      Text(status.label)
-        .font(.callout)
-        .foregroundStyle(.secondary)
-      Spacer()
+      // Nothing while the agent runs: the bar is the agent's buttons. Any other state is an icon,
+      // its words in its tooltip (#575).
+      if !status.isRunningProcess {
+        Image(systemName: status.symbolName)
+          .foregroundStyle(status.tint)
+          .instantTooltip(Text(status.label))
+          .accessibilityElement(children: .ignore)
+          .accessibilityLabel(Text(status.label))
+          .accessibilityAddTraits(.isStaticText)
+          .statusBarItem("state")
+      }
+      Spacer(minLength: 0)
       if let accessory {
         accessory
       }
       if status.isRunning {
-        Button(action: stop) {
+        iconButton(
+          "power",
           Text(
             "Close Session…", bundle: .module,
-            comment: "Stops a session's agent, asking first when it is at work.")
-        }
-        .controlSize(.small)
+            comment: "Stops a session's agent, asking first when it is at work."),
+          action: stop
+        )
+        .statusBarItem("close")
       } else {
-        Button(action: restart) {
-          Text("Restart", bundle: .module, comment: "Starts the terminal's process again.")
-        }
-        .controlSize(.small)
+        iconButton(
+          "arrow.clockwise",
+          Text("Restart", bundle: .module, comment: "Starts the terminal's process again."),
+          action: restart
+        )
         .disabled(!canRestart)
+        .statusBarItem("restart")
       }
     }
+    .environment(\.statusBarDensity, density)
     .padding(.horizontal, 12)
     .padding(.vertical, 6)
+    .coordinateSpace(.named(statusBarSpace))
+    // The step is chosen from the bar's own width, once for all its buttons.
+    .onGeometryChange(for: StatusBarDensity.self) {
+      StatusBarDensity.fitting($0.size.width)
+    } action: {
+      density = $0
+    }
+  }
+
+  /// A button drawn as its icon, its name in its tooltip and for VoiceOver.
+  private func iconButton(_ symbol: String, _ name: Text, action: @escaping () -> Void)
+    -> some View
+  {
+    Button(action: action) {
+      Image(systemName: symbol)
+    }
+    .controlSize(.small)
+    // Outside the button, so that a greyed-out Restart says what it is too.
+    .instantTooltip(name)
+    .accessibilityLabel(name)
   }
 }
 
@@ -212,7 +245,7 @@ extension TerminalStatusBar where Accessory == EmptyView {
 }
 
 extension TerminalPaneModel.Status {
-  var label: String {
+  public var label: String {
     switch self {
     case .starting:
       return String(localized: "Starting…", bundle: .module, comment: "A terminal's state.")
@@ -261,6 +294,12 @@ extension TerminalPaneModel.Status {
     case .failed:
       return .red
     }
+  }
+
+  /// Whether the process runs, its start over: the one state the bar shows nothing for.
+  var isRunningProcess: Bool {
+    if case .running = self { return true }
+    return false
   }
 
   var isRunning: Bool {

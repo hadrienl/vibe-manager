@@ -84,11 +84,15 @@ public struct AgentModel: Hashable, Sendable, Identifiable {
   public let id: String
   public let displayName: String
   public let isDefault: Bool
+  /// The family's name — “Opus” — when the catalogue gives one: the alias the CLI takes for the
+  /// newest model of the family, `opus`, is named after the model it stands for (#575).
+  public let shortName: String?
 
-  public init(id: String, displayName: String, isDefault: Bool = false) {
+  public init(id: String, displayName: String, isDefault: Bool = false, shortName: String? = nil) {
     self.id = id
     self.displayName = displayName
     self.isDefault = isDefault
+    self.shortName = shortName
   }
 }
 

@@ -113,17 +113,17 @@ struct WorkspaceLayoutControllerTests {
   func inspectorSections() async throws {
     let store = RecordingLayoutStore()
     let controller = WorkspaceLayoutController(store: store, saveDelay: .milliseconds(20))
-    let shown: [InspectorSectionID] = [.activity, .git, .notes, .agent, .usage, .prompt]
+    let shown: [InspectorSectionID] = [.activity, .git, .notes, .usage, .prompt]
 
-    controller.setSectionCollapsed(.agent, false)
+    controller.setSectionCollapsed(.usage, false)
     controller.moveSection(.notes, by: -1, among: shown)
     controller.moveSection(.prompt, to: .activity, after: false, among: shown)
     controller.resizeSections(to: [.git: 320, .notes: 110])
 
-    #expect(!controller.inspectorSections.isCollapsed(.agent))
+    #expect(!controller.inspectorSections.isCollapsed(.usage))
     #expect(
       controller.inspectorSections.order(of: shown)
-        == [.prompt, .activity, .notes, .git, .agent, .usage])
+        == [.prompt, .activity, .notes, .git, .usage])
     #expect(controller.inspectorSections.weight(.git) == 320)
     #expect(!controller.isInspectorArrangementDefault)
 
@@ -142,7 +142,7 @@ struct WorkspaceLayoutControllerTests {
   @Test("Option-click and Collapse Others")
   func foldingSeveral() {
     let controller = WorkspaceLayoutController()
-    let shown: [InspectorSectionID] = [.git, .notes, .agent]
+    let shown: [InspectorSectionID] = [.git, .notes, .usage]
 
     controller.setAllSectionsCollapsed(true, among: shown)
     #expect(shown.allSatisfy(controller.inspectorSections.isCollapsed))

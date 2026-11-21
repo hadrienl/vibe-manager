@@ -2,6 +2,7 @@ import SwiftUI
 import VibeApplication
 import VibeConversationUI
 import VibeDomain
+import VibeTerminalUI
 
 /// The session's usage in its status bar (#574), under the terminal and under the conversation:
 /// a ring of the context, its share and the cost — “◔ 55 % · 4,82 $” — and every figure in a
@@ -147,28 +148,46 @@ struct SessionUsageSummary: Equatable {
 /// “◔ 55 % · 4,82 $”: the ring and share of the context — or the running time, when the window is
 /// unknown — then the cost. A dash while nothing was read.
 ///
-/// Three forms, from the widest to the narrowest — “◔ 55 % · 4,82 $”, “◔ 55 %”, the ring alone —
-/// the widest that fits is shown. The status bar will choose them for all its buttons together
-/// (#575); the tooltip and VoiceOver always have the whole value.
+/// Three forms, from the widest to the narrowest — “◔ 55 % · 4,82 $”, “◔ 55 %”, the ring alone.
+/// The status bar's step chooses the widest one, for all its buttons together (#575); a narrower
+/// one is shown when even that does not fit. The tooltip and VoiceOver always have the whole
+/// value.
 struct SessionUsageLabel: View {
   let summary: SessionUsageSummary
   let isReading: Bool
 
-  enum Form: CaseIterable {
+  enum Form: Int, CaseIterable {
     case full
     case withoutCost
     case ringAlone
+
+    /// The widest form a bar drawn at `density` gives the usage: the cost goes at `.level`, the
+    /// share at `.gauge`.
+    init(_ density: StatusBarDensity) {
+      switch density {
+      case .full, .model: self = .full
+      case .level: self = .withoutCost
+      case .gauge, .icons: self = .ringAlone
+      }
+    }
   }
 
   @Environment(\.locale) private var locale
+  @Environment(\.statusBarDensity) private var density
 
   var body: some View {
-    let forms = forms
     ViewThatFits(in: .horizontal) {
-      if forms.contains(.full) { form(.full) }
-      form(.withoutCost)
-      if forms.contains(.ringAlone) { form(.ringAlone) }
+      ForEach(forms(at: density), id: \.self) { form($0) }
     }
+  }
+
+  /// The forms a bar drawn at `density` may show, widest first: the step's own, then each
+  /// narrower one the figures allow. The narrowest the figures allow when they have none that
+  /// narrow — no ring alone without a known window.
+  func forms(at density: StatusBarDensity) -> [Form] {
+    let widest = Form(density)
+    let allowed = forms.filter { $0.rawValue >= widest.rawValue }
+    return allowed.isEmpty ? Array(forms.suffix(1)) : allowed
   }
 
   /// The forms this summary has, widest first: no cost to leave out without a price, and no ring

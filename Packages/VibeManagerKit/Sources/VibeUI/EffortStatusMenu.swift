@@ -1,9 +1,11 @@
 import SwiftUI
 import VibeConversationUI
 import VibeDomain
+import VibeTerminalUI
 
 /// What the status bar of a session's terminal and conversation shows beside its Close: the
-/// menu of reasoning effort (#411), the usage (#574), then the button of the drawer.
+/// agent (#575), the menu of reasoning effort (#411), the usage (#574), then the button of the
+/// drawer.
 struct SessionStatusAccessory: View {
   let model: AppModel
   let session: WorkSession
@@ -11,14 +13,20 @@ struct SessionStatusAccessory: View {
   var body: some View {
     let isRunning = model.launcher?.isRunning(session.id) ?? false
     StatusAccessoryStack {
+      SessionAgentMenu(model: model, session: session)
+        .statusBarItem("agent")
       EffortStatusMenu(model: model, session: session)
+        .statusBarItem("effort")
       if let usage = model.usage {
         SessionUsageButton(
           usage: usage, session: session, isShown: model.selectedSessionID == session.id,
-          agentNames: model.agentNames)
+          agentNames: model.agentNames
+        )
+        .statusBarItem("usage")
       }
       if model.terminals != nil {
         DrawerStatusButton(model: model, session: session)
+          .statusBarItem("drawer")
       }
     }
     // Read again when the agent or the process changes; a turn ending reads it too.
@@ -51,6 +59,7 @@ struct StatusAccessoryStack<Content: View>: View {
 struct EffortStatusMenu: View {
   let model: AppModel
   let session: WorkSession
+  @Environment(\.statusBarDensity) private var density
 
   var body: some View {
     if let menu = model.effortMenu(for: session.id) {
@@ -59,28 +68,18 @@ struct EffortStatusMenu: View {
         case .working, .awaitingUser: true
         case .idle, nil: false
         }
-      Menu {
-        Picker(selection: selection(menu)) {
-          if menu.offersDefault {
-            Text(
-              "Default", bundle: .module,
-              comment: "The agent's own reasoning effort, in the status bar's menu."
-            )
-            .tag(Self.defaultTag)
+      // The bar's step, or a narrower one when even that does not fit.
+      ViewThatFits(in: .horizontal) {
+        ForEach(density.andNarrower, id: \.self) { form in
+          Menu {
+            levels(menu)
+          } label: {
+            Self.label(of: menu.current, form: form)
           }
-          ForEach(menu.levels, id: \.self) { level in
-            Self.name(of: level).tag(level)
-          }
-        } label: {
-          EmptyView()
+          .controlSize(.small)
+          .fixedSize()
         }
-        .pickerStyle(.inline)
-        .labelsHidden()
-      } label: {
-        Self.title(of: menu.current)
       }
-      .controlSize(.small)
-      .fixedSize()
       .disabled(!model.canChangeEffort(of: session.id))
       // Outside the disabled menu, so that it is shown on the menu greyed out too.
       .instantTooltip(
@@ -100,6 +99,41 @@ struct EffortStatusMenu: View {
           ?? Text(
             "Default", bundle: .module,
             comment: "The agent's own reasoning effort, in the status bar's menu."))
+    }
+  }
+
+  private func levels(_ menu: SessionEffortMenu) -> some View {
+    Picker(selection: selection(menu)) {
+      if menu.offersDefault {
+        Text(
+          "Default", bundle: .module,
+          comment: "The agent's own reasoning effort, in the status bar's menu."
+        )
+        .tag(Self.defaultTag)
+      }
+      ForEach(menu.levels, id: \.self) { level in
+        Self.name(of: level).tag(level)
+      }
+    } label: {
+      EmptyView()
+    }
+    .pickerStyle(.inline)
+    .labelsHidden()
+  }
+
+  /// The menu's label at a step of the bar: "Effort: High", "High", or the gauge.
+  @ViewBuilder
+  static func label(of level: String?, form: StatusBarDensity) -> some View {
+    switch form {
+    case .full, .model:
+      title(of: level)
+    case .level, .gauge:
+      level.map(name(of:))
+        ?? Text(
+          "Default", bundle: .module,
+          comment: "The agent's own reasoning effort, in the status bar's menu.")
+    case .icons:
+      Image(systemName: "gauge.with.dots.needle.50percent")
     }
   }
 

@@ -5,15 +5,14 @@ import VibeDomain
 
 /// The right column: what this session works on, and with what (#66).
 ///
-/// A stack of sections — the activity, Git, the notes, the agent, the prompt it started from —
-/// that the user folds, orders and sizes; `InspectorSectionStack` does all of that. This
+/// A stack of sections — the activity, Git, the notes, the prompt the agent started from — that
+/// the user folds, orders and sizes; `InspectorSectionStack` does all of that. This
 /// view only declares them: adding one is adding a descriptor, never touching the layout.
 ///
 /// Everything in the Git section is what Git and the agent's transcript say, in Git's order: the
 /// application reveals and opens files, and never acts on Git.
 struct SessionContextInspector: View {
   private let session: WorkSession
-  private let resolution: SessionAgentResolution?
   private let branchReport: SessionBranchReport?
   private let branchReportCheckedAt: (() -> Date?)?
   private let repositoryStatuses: [String: RepositoryStatusState]
@@ -23,7 +22,6 @@ struct SessionContextInspector: View {
   private let layout: WorkspaceLayoutController
   private let openPrivacySettings: (() -> Void)?
   private let agentNames: [String: String]
-  private let switchAgent: (() -> Void)?
   private let notes: NotesModel?
   private let ticketTitles: TicketTitlesModel?
   private let leaveNotes: () -> Void
@@ -33,7 +31,6 @@ struct SessionContextInspector: View {
 
   init(
     session: WorkSession,
-    resolution: SessionAgentResolution?,
     branchReport: SessionBranchReport? = nil,
     branchReportCheckedAt: (() -> Date?)? = nil,
     repositoryStatuses: [RepositoryStatusKey: RepositoryStatusState] = [:],
@@ -43,7 +40,6 @@ struct SessionContextInspector: View {
     layout: WorkspaceLayoutController,
     openPrivacySettings: (() -> Void)? = nil,
     agentNames: [String: String] = [:],
-    switchAgent: (() -> Void)? = nil,
     notes: NotesModel? = nil,
     ticketTitles: TicketTitlesModel? = nil,
     leaveNotes: @escaping () -> Void = {},
@@ -54,7 +50,6 @@ struct SessionContextInspector: View {
     self.notes = notes
     self.ticketTitles = ticketTitles
     self.leaveNotes = leaveNotes
-    self.resolution = resolution
     self.branchReport = branchReport
     self.branchReportCheckedAt = branchReportCheckedAt
     var byPath: [String: RepositoryStatusState] = [:]
@@ -68,7 +63,6 @@ struct SessionContextInspector: View {
     self.layout = layout
     self.openPrivacySettings = openPrivacySettings
     self.agentNames = agentNames
-    self.switchAgent = switchAgent
   }
 
   var body: some View {
@@ -76,8 +70,9 @@ struct SessionContextInspector: View {
   }
 
   /// In their default order. A section with nothing to show in this window is left out, and keeps
-  /// its place in the arrangement for when it comes back. Activity is gone (#572), and the usage is
-  /// in the status bar (#574): an arrangement that holds them keeps them, unshown.
+  /// its place in the arrangement for when it comes back. Activity is gone (#572), and the usage
+  /// (#574) and the agent (#575) are in the status bar: an arrangement that holds them keeps them,
+  /// unshown.
   private var sections: [InspectorSectionDescriptor] {
     var sections: [InspectorSectionDescriptor] = []
     if let coordination, session.coordination != nil || coordination.showsAsCoordinator(session) {
@@ -87,7 +82,6 @@ struct SessionContextInspector: View {
     if let notes {
       sections.append(notesSection(notes))
     }
-    sections.append(agentSection)
     sections.append(promptSection)
     return sections
   }
@@ -159,39 +153,6 @@ extension SessionContextInspector {
           session: session, document: document, notes: notes, ticketTitles: ticketTitles,
           leave: leaveNotes)),
       accessibilityIdentifier: "inspector-notes-section"
-    )
-  }
-
-  fileprivate var agentSection: InspectorSectionDescriptor {
-    InspectorSectionDescriptor(
-      id: .agent,
-      title: String(
-        localized: "Agent", bundle: .module, comment: "The heading of the session's agent."),
-      systemImage: "cpu",
-      sizing: .fitting(minimum: 60),
-      summary: AnyView(
-        Text(
-          session.agent.map { AgentHistoryList.label($0, names: agentNames) }
-            ?? String(localized: "No agent recorded", bundle: .module))),
-      accessory: switchAgent.map { switchAgent in
-        AnyView(
-          Button(action: switchAgent) {
-            Text("Switch…", bundle: .module, comment: "Opens the sheet that switches the agent.")
-          }
-          .buttonStyle(.borderless)
-          .controlSize(.small)
-          .accessibilityLabel(
-            Text(
-              "Switch the agent of \(session.name)", bundle: .module,
-              comment: "The session's name.")))
-      },
-      content: AnyView(
-        VStack(alignment: .leading, spacing: 8) {
-          AgentRow(agent: session.agent, resolution: resolution, names: agentNames)
-          if !session.agentHistory.isEmpty {
-            AgentHistoryList(session: session, names: agentNames)
-          }
-        })
     )
   }
 
@@ -1100,198 +1061,6 @@ private struct Pill: View {
       .foregroundStyle(color)
       .background(Capsule().fill(color.opacity(0.18)))
       .fixedSize()
-  }
-}
-
-// MARK: - Session
-
-private struct AgentRow: View {
-  let agent: SessionAgentConfiguration?
-  let resolution: SessionAgentResolution?
-  let names: [String: String]
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 4) {
-      if let agent {
-        Label(AgentHistoryList.label(agent, names: names), systemImage: "cpu")
-          .lineLimit(1)
-      } else {
-        Label {
-          Text("No agent recorded", bundle: .module)
-        } icon: {
-          Image(systemName: "cpu")
-        }
-        .lineLimit(1)
-      }
-
-      Text(statusSentence)
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-    .padding(.vertical, 2)
-    .accessibilityElement(children: .combine)
-  }
-
-  private var statusSentence: String {
-    switch resolution {
-    case .ready:
-      return String(localized: "Ready to resume.", bundle: .module)
-    case .unavailable(let diagnostic):
-      return diagnostic.summary
-    case .unknownProvider(let providerID):
-      return String(
-        localized: "The provider \(providerID) is not installed in this build.", bundle: .module,
-        comment: "An agent's identifier: claude-code, codex.")
-    case .unassigned:
-      return String(localized: "This session was stored without an agent.", bundle: .module)
-    case .none:
-      return String(localized: "Detection has not answered yet.", bundle: .module)
-    }
-  }
-}
-
-/// Every agent the session had, newest first: each switch, the failed ones included, and where it
-/// started.
-private struct AgentHistoryList: View {
-  let session: WorkSession
-  let names: [String: String]
-
-  var body: some View {
-    VStack(alignment: .leading, spacing: 6) {
-      Text("History", bundle: .module, comment: "The agents a session had, heading.")
-        .font(.caption.weight(.semibold))
-        .foregroundStyle(.secondary)
-      ForEach(session.agentHistory.reversed()) { change in
-        entry(change)
-      }
-      if let first = firstAgent, let start = session.startedAt {
-        row(
-          date: start,
-          text: String(
-            localized: "Started with \(Self.label(first, names: names))", bundle: .module,
-            comment: "The agent a session first ran: its name, and its model."),
-          detail: nil,
-          failed: false,
-          spoken: String(
-            localized:
-              "\(Self.spoken(start)), started with \(Self.label(first, names: names))",
-            bundle: .module,
-            comment: "What VoiceOver says of a session's start: a date, then its first agent.")
-        )
-      }
-    }
-    .padding(.vertical, 2)
-  }
-
-  /// The agent that first ran: the one the first real switch left, or the current one. A switch
-  /// made before the session ever ran does not count — the agent it left never started.
-  private var firstAgent: SessionAgentConfiguration? {
-    session.agentHistory.first(where: \.leftAgentThatRan)?.previous ?? session.agent
-  }
-
-  @ViewBuilder
-  private func entry(_ change: AgentChange) -> some View {
-    let from = Self.label(change.previous, names: names)
-    // Another model of the same agent names the model alone: the agent is already on the line.
-    let to =
-      change.changesProvider
-      ? Self.label(change.next, names: names)
-      : (change.next.modelID
-        ?? String(
-          localized: "default model", bundle: .module,
-          comment: "Stands for the model an agent uses when none is chosen."))
-    switch change.outcome {
-    case .completed:
-      row(
-        date: change.date,
-        text: "\(from) → \(to)",
-        detail: Self.handover(change.handover),
-        failed: false,
-        spoken: String(
-          localized:
-            "\(Self.spoken(change.date)), switched from \(from) to \(to), \(Self.handover(change.handover))",
-          bundle: .module,
-          comment:
-            "What VoiceOver says of an agent switch: a date, the agent left, the agent taken, and what was handed over."
-        )
-      )
-    case .failed(let reason):
-      row(
-        date: change.date,
-        text: String(
-          localized: "→ \(to) failed", bundle: .module,
-          comment: "A switch to this agent that failed."),
-        detail: reason.isEmpty ? nil : reason,
-        failed: true,
-        spoken: String(
-          localized: "\(Self.spoken(change.date)), switch to \(to) failed. \(reason)",
-          bundle: .module,
-          comment: "What VoiceOver says of a failed agent switch: a date, the agent, and why.")
-      )
-    }
-  }
-
-  private func row(
-    date: Date, text: String, detail: String?, failed: Bool, spoken: String
-  ) -> some View {
-    // The change first and whole, on as many lines as it takes; when and how below it.
-    VStack(alignment: .leading, spacing: 1) {
-      HStack(alignment: .firstTextBaseline, spacing: 4) {
-        if failed {
-          Image(systemName: "exclamationmark.triangle.fill")
-            .foregroundStyle(.orange)
-        }
-        Text(text)
-          .foregroundStyle(failed ? Color.orange : .primary)
-          .fixedSize(horizontal: false, vertical: true)
-      }
-      .font(.caption)
-      Text(
-        [date.formatted(date: .abbreviated, time: .shortened), detail]
-          .compactMap { $0 }.joined(separator: " · ")
-      )
-      .font(.caption2)
-      .foregroundStyle(.secondary)
-      .fixedSize(horizontal: false, vertical: true)
-    }
-    .accessibilityElement(children: .ignore)
-    .accessibilityLabel(spoken)
-  }
-
-  static func label(_ agent: SessionAgentConfiguration, names: [String: String]) -> String {
-    AgentNaming.label(agent, names: names)
-  }
-
-  static func handover(_ handover: AgentChange.Handover) -> String {
-    switch handover {
-    case .resumedConversation:
-      return String(
-        localized: "same conversation", bundle: .module,
-        comment: "What an agent switch handed over: the conversation was resumed.")
-    case .conversationHistory:
-      return String(localized: "conversation history", bundle: .module)
-    case .summary(let bytes, _, let wasEdited):
-      let size = AgentSwitchSheet.size(bytes)
-      return wasEdited
-        ? String(
-          localized: "edited summary, \(size)", bundle: .module,
-          comment: "What an agent switch handed over: a size, “1.2 KiB”.")
-        : String(
-          localized: "summary, \(size)", bundle: .module,
-          comment: "What an agent switch handed over: a size, “1.2 KiB”.")
-    case .initialPrompt:
-      return String(
-        localized: "initial prompt", bundle: .module,
-        comment: "What an agent switch handed over.")
-    case .nothing:
-      return String(
-        localized: "nothing handed over", bundle: .module,
-        comment: "What an agent switch handed over.")
-    }
-  }
-
-  private static func spoken(_ date: Date) -> String {
-    date.formatted(date: .long, time: .shortened)
   }
 }
 

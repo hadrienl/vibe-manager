@@ -60,7 +60,8 @@ public struct ClaudeCodeModelCatalog: ClaudeCodeModelCatalogSource {
           displayName: name.map { $0.isEmpty ? id : $0 } ?? id,
           // Passing no model at all is the explicit choice that leaves the user's own setting
           // in charge, so no entry is ever marked as the default.
-          isDefault: false
+          isDefault: false,
+          shortName: entry.shortName?.trimmingCharacters(in: .whitespacesAndNewlines)
         )
       )
       if models.count == Self.maximumModelCount { break }
@@ -172,6 +173,13 @@ public struct ClaudeCodeModelCatalog: ClaudeCodeModelCatalogSource {
       let id: String
       let name: String?
       let section: String?
+      /// “Opus”: the family, which the CLI's alias `opus` names.
+      let shortName: String?
+
+      private enum CodingKeys: String, CodingKey {
+        case id, name, section
+        case shortName = "short_name"
+      }
     }
   }
 }

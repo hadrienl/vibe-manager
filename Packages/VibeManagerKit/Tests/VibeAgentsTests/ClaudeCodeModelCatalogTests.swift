@@ -36,7 +36,7 @@ struct ClaudeCodeModelCatalogTests {
   }
 
   private static let models = """
-    {"id":"claude-opus-5","name":"Opus 5","section":"main"},
+    {"id":"claude-opus-5","name":"Opus 5","short_name":"Opus","section":"main"},
     {"id":"claude-sonnet-5","name":"Sonnet 5","section":"main"},
     {"id":"claude-opus-4-8","name":"Opus 4.8","section":"overflow"}
     """
@@ -51,6 +51,8 @@ struct ClaudeCodeModelCatalogTests {
 
     #expect(models.map(\.id) == ["claude-opus-5", "claude-sonnet-5", "claude-opus-4-8"])
     #expect(models.map(\.displayName) == ["Opus 5", "Sonnet 5", "Opus 4.8"])
+    // The family, which the CLI's alias `opus` names (#575).
+    #expect(models.map(\.shortName) == ["Opus", nil, nil])
     // Passing no model at all is what leaves the user's own setting in charge.
     #expect(models.allSatisfy { !$0.isDefault })
   }

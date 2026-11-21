@@ -827,7 +827,6 @@ public struct RootView: View {
   private func inspector(for session: WorkSession) -> some View {
     SessionContextInspector(
       session: session,
-      resolution: model.resolution(forID: session.id),
       branchReport: model.branchReport(for: session.id),
       branchReportCheckedAt: { model.branchReportCheckedAt(for: session.id) },
       repositoryStatuses: model.repositoryStatuses,
@@ -841,8 +840,6 @@ public struct RootView: View {
         { permissions.openSystemSettings() }
       },
       agentNames: model.agentNames,
-      switchAgent: model.canSwitchAgent(session)
-        ? { model.beginAgentSwitch(session.id) } : nil,
       notes: model.notes,
       ticketTitles: model.ticketTitles,
       leaveNotes: { model.focusSession() },

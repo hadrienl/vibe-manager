@@ -139,9 +139,30 @@ final class TooltipPresenter {
   private var panel: NSPanel?
   private var hosting: NSHostingView<TooltipBubble>?
   private var monitor: Any?
+  /// While a menu is open — the status bar's, opened from the very button the bubble names — no
+  /// bubble is shown: it would sit over the menu (#575).
+  private var isMenuOpen = false
+
+  private init() {
+    let center = NotificationCenter.default
+    center.addObserver(
+      forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated {
+        self?.isMenuOpen = true
+        self?.hide()
+      }
+    }
+    center.addObserver(
+      forName: NSMenu.didEndTrackingNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.isMenuOpen = false }
+    }
+  }
 
   func show(_ text: Text, from view: NSView, edge: TooltipEdge? = nil) {
-    guard let window = view.window, let screen = window.screen ?? NSScreen.main else { return }
+    guard !isMenuOpen, let window = view.window, let screen = window.screen ?? NSScreen.main
+    else { return }
     let anchor = window.convertToScreen(view.convert(view.bounds, to: nil))
     let placement = TooltipPlacement(
       size: TooltipBubble.size(of: text, sideways: edge != nil), anchor: anchor,
@@ -308,7 +329,8 @@ struct TooltipBubble: View {
       .frame(
         minWidth: arrowEdge == nil ? 2 * TooltipBubbleShape.arrowClearance : nil,
         minHeight: arrowEdge == nil ? nil : 2 * TooltipBubbleShape.arrowClearance,
-        alignment: .leading)
+        alignment: .leading
+      )
       .modifier(TooltipGlass(shape: shape))
   }
 }
