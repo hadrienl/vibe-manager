@@ -13,7 +13,13 @@ public final class NotesPresentation {
   /// The popover under the toolbar's button.
   public private(set) var isPopoverShown = false
   /// The floating panel.
-  public private(set) var isPanelShown = false
+  public private(set) var isPanelShown = false {
+    didSet {
+      if isPanelShown != oldValue { panelVisibilityChanged?() }
+    }
+  }
+  /// AppKit must dismiss the previous window before SwiftUI opens the next presentation.
+  @ObservationIgnored var panelVisibilityChanged: (() -> Void)?
   /// Whether the panel holds the keyboard, as its window says: a second Edit Notes hands it back.
   @ObservationIgnored var isPanelKey = false
   /// Gives the keyboard back to the workspace window, for the panel's editor to let go of it. Set
@@ -46,8 +52,14 @@ public final class NotesPresentation {
 
   /// Shows the notes in their placement, closing the other one.
   func show() {
-    isPopoverShown = placement == .popover
-    isPanelShown = placement == .panel
+    switch placement {
+    case .popover:
+      isPanelShown = false
+      isPopoverShown = true
+    case .panel:
+      isPopoverShown = false
+      isPanelShown = true
+    }
   }
 
   /// Detach to a Floating Window: the panel, from now on.

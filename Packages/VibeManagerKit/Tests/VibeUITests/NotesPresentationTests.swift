@@ -207,6 +207,56 @@ struct NotesPresentationViewTests {
     return (model, session)
   }
 
+  @Test("Reattaching really closes the panel and preserves typing before either view disappears")
+  func typingDetachReattach() async throws {
+    _ = NSApplication.shared
+    let (model, session) = await model()
+    let controller = NotesPanelController(model: model)
+    let document = model.notes.document(for: session.id)
+    await waitUntil("the notes are loaded") { document.isLoaded }
+    let host = NSHostingView(rootView: NotesPopoverContent(model: model, session: session))
+    let window = NSWindow(
+      contentRect: NSRect(x: -10000, y: -10000, width: 400, height: 460),
+      styleMask: [.titled], backing: .buffered, defer: false)
+    window.isReleasedWhenClosed = false
+    window.contentView = host
+    defer {
+      model.notesPanelClosed()
+      window.contentView = nil
+      window.close()
+    }
+    model.toggleNotes()
+    await waitUntil("the popover editor") { Self.editor(in: host) != nil }
+    let popover = try #require(Self.editor(in: host))
+    popover.insertText(
+      "Typed immediately before detaching", replacementRange: NSRange(location: 0, length: 0))
+
+    model.detachNotes()
+    let panel = try #require(controller.panel)
+    panel.setFrameOrigin(NSPoint(x: -10000, y: -10000))
+    #expect(panel.isVisible)
+    #expect(!model.notesPresentation.isPopoverShown)
+    await waitUntil("the panel editor") { Self.editor(in: panel.contentView) != nil }
+    let panelEditor = try #require(Self.editor(in: panel.contentView))
+    #expect(panelEditor.string == "Typed immediately before detaching")
+    panelEditor.insertText(
+      " and in the panel",
+      replacementRange: NSRange(location: panelEditor.string.utf16.count, length: 0))
+
+    model.attachNotes()
+    #expect(!panel.isVisible)
+    #expect(panel.contentView == nil)
+    #expect(controller.panel == nil)
+    #expect(!model.notesPresentation.isPanelShown)
+    #expect(model.notesPresentation.isPopoverShown)
+    #expect(popover.string == "Typed immediately before detaching and in the panel")
+    // Let pending SwiftUI focus requests run: none may bring the old window back.
+    for _ in 0..<10 { await Task.yield() }
+    #expect(!panel.isVisible)
+    #expect(document.text == "Typed immediately before detaching and in the panel")
+    #expect(await document.save())
+  }
+
   @Test("The popover holds the session's editor and the Detach button")
   func popover() async throws {
     let (model, session) = await model()

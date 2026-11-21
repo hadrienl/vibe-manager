@@ -369,6 +369,59 @@ struct NotesEditorTests {
     return (textView, coordinator)
   }
 
+  @Test("An immediate detach and reattach keeps the new editor on the shared text storage")
+  func transferBetweenPresentations() async throws {
+    let store = InMemorySessionNotesStore()
+    let model = NotesModel(store: store, sleep: ManualSleeper().sleep)
+    let id = SessionID()
+    let document = model.document(for: id)
+    await waitUntil("the notes are loaded") { document.isLoaded }
+    let (popover, oldCoordinator) = editor(for: document)
+    let text = "ici on peut noter plein de trucs cools"
+    popover.insertText(text, replacementRange: popover.selectedRange())
+    #expect(document.hasUnsavedChanges)
+
+    // SwiftUI can create the destination before dismantling the previous presentation.
+    let (panel, panelCoordinator) = editor(for: document)
+    oldCoordinator.detach()
+    #expect(panel.textStorage === document.storage)
+    #expect(panel.string == text)
+    #expect(document.storage.layoutManagers.count == 1)
+
+    // A stale, now empty view must neither mark the document edited nor erase its contents.
+    popover.insertText("", replacementRange: NSRange(location: 0, length: 0))
+    oldCoordinator.textDidChange(Notification(name: NSText.didChangeNotification, object: popover))
+    #expect(document.text == text)
+
+    panel.insertText(
+      " — suite", replacementRange: NSRange(location: panel.string.utf16.count, length: 0))
+    let (reattached, nextCoordinator) = editor(for: document)
+    panelCoordinator.detach()
+    #expect(reattached.textStorage === document.storage)
+    #expect(reattached.string == text + " — suite")
+    #expect(document.storage.layoutManagers.count == 1)
+    #expect(await document.save())
+    #expect(try await store.notes(for: id).text == text + " — suite")
+    nextCoordinator.detach()
+  }
+
+  @Test("Changing a view's session leaves another view on the previous document")
+  func changingOneEditorDoesNotMoveAnother() async {
+    let model = NotesModel(store: InMemorySessionNotesStore(), sleep: ManualSleeper().sleep)
+    let first = model.document(for: SessionID())
+    let second = model.document(for: SessionID())
+    await waitUntil("both notes are loaded") { first.isLoaded && second.isLoaded }
+    let (one, coordinator) = editor(for: first)
+    let (two, secondCoordinator) = editor(for: first)
+    one.insertText("First", replacementRange: NSRange(location: 0, length: 0))
+    coordinator.attach(second, to: one)
+    #expect(one.textStorage === second.storage)
+    #expect(two.textStorage === first.storage)
+    #expect(two.string == "First")
+    secondCoordinator.detach()
+    coordinator.detach()
+  }
+
   @Test("Undo belongs to a session: ⌘Z in one never touches the other")
   func undoIsPerSession() async throws {
     let model = NotesModel(store: InMemorySessionNotesStore(), sleep: ManualSleeper().sleep)

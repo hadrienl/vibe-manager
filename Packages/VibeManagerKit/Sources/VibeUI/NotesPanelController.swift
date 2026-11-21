@@ -44,12 +44,12 @@ public final class NotesPanelController: NSObject, NSWindowDelegate {
     self.model = model
     super.init()
     model.notesPresentation.returnFromPanel = { [weak self] in self?.returnKeyboard() }
+    model.notesPresentation.panelVisibilityChanged = { [weak self] in self?.update() }
     observe()
   }
 
   private func observe() {
     withObservationTracking {
-      _ = model.notesPresentation.isPanelShown
       _ = title
     } onChange: { [weak self] in
       Task { @MainActor in
@@ -118,9 +118,13 @@ public final class NotesPanelController: NSObject, NSWindowDelegate {
   }
 
   private func hide() {
-    guard let panel, panel.isVisible else { return }
+    guard let panel else { return }
+    self.panel = nil
     if panel.isKeyWindow { returnKeyboard() }
-    panel.orderOut(nil)
+    // An ordered-out hosting view still observes focus requests and can make its panel key
+    // again. Destroy the editor when returning to the popover, including its pending focus.
+    panel.contentView = nil
+    panel.close()
   }
 
   /// The workspace window takes the keyboard back: Escape in the panel's editor, a second Edit

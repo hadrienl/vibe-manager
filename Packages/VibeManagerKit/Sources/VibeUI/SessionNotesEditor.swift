@@ -113,7 +113,7 @@ struct SessionNotesEditor: NSViewRepresentable {
       // Typing is grouped into one undo action as long as nothing breaks it: left open, the next
       // session's first keystrokes would join the action registered in this one's undo manager.
       textView.breakUndoCoalescing()
-      textView.layoutManager?.replaceTextStorage(next.storage)
+      Self.move(textView.layoutManager, to: next.storage)
       textView.typingAttributes = NotesStyle.attributes
       let length = next.storage.length
       let selection = next.selection
@@ -133,15 +133,25 @@ struct SessionNotesEditor: NSViewRepresentable {
       document.undoManager.removeAllActions()
       document.breakTypingCoalescing = nil
       // An empty storage of its own, so the document's is held by one layout manager fewer.
-      textView.layoutManager?.replaceTextStorage(NSTextStorage())
+      Self.move(textView.layoutManager, to: NSTextStorage())
+      textView.isEditable = false
       self.document = nil
       Task { await document.save() }
     }
 
+    /// `replaceTextStorage` transfers every layout manager of the old storage. During a
+    /// presentation change that includes the new editor's manager, leaving it on empty storage.
+    /// Move only this view; the other presentation must keep editing the same document.
+    private static func move(_ manager: NSLayoutManager?, to storage: NSTextStorage) {
+      guard let manager else { return }
+      manager.textStorage?.removeLayoutManager(manager)
+      storage.addLayoutManager(manager)
+    }
+
     func takeFocus(in textView: NSTextView, attempts: Int) {
       DispatchQueue.main.async { [weak self, weak textView] in
-        guard let self, let textView else { return }
-        guard let window = textView.window else {
+        guard let self, let textView, self.document != nil else { return }
+        guard let window = textView.window, window.isVisible else {
           // Just opened: the popover or the panel is not on screen yet.
           if attempts > 0 { self.takeFocus(in: textView, attempts: attempts - 1) }
           return
@@ -164,7 +174,8 @@ struct SessionNotesEditor: NSViewRepresentable {
       replacementString: String?
     ) -> Bool {
       // `nil`: attributes only, which a plain-text view only changes itself.
-      guard let replacement = replacementString, let document else { return true }
+      guard let document, textView.textStorage === document.storage else { return false }
+      guard let replacement = replacementString else { return true }
       // In UTF-16: as a `String`, "\r\n" is one character, and `contains("\r")` says no.
       if !isNormalizing, replacement.utf16.contains(13) {
         // Pasted from Windows or an old Mac document: stored with the line endings of the file.
@@ -181,7 +192,7 @@ struct SessionNotesEditor: NSViewRepresentable {
     }
 
     func textDidChange(_ notification: Notification) {
-      guard let document else { return }
+      guard let document, textView?.textStorage === document.storage else { return }
       if let lastEdit {
         NotesLinks.apply(to: document.storage, around: lastEdit)
       }
